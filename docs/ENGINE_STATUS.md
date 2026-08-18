@@ -48,12 +48,28 @@ this line should get more specific as soon as that's settled.
   `BuildScript.BuildWebGL()`, each auto-creates an empty scene if needed
   and builds to `Builds/` (gitignored). Not yet run — that's the next step.
 
+## Build status (Sprint 0)
+
+Both targets build clean via `BuildScript`:
+
+- **Windows**: `Succeeded, size: 93255296 bytes, errors: 0` -> `Builds/Windows/ImmunologyTowerDefense.exe`
+- **WebGL**: `Succeeded, size: 5169527 bytes, errors: 0` -> `Builds/WebGL/` (index.html + compressed wasm/data/framework)
+
+First WebGL build took roughly 30+ minutes (IL2CPP -> Emscripten -> wasm
+compile) -- expected on a first run on a laptop GPU; later builds should
+be faster since Bee/IL2CPP caches are now warm. Not yet done: actually
+launching each build to confirm the "no crash, empty window" part of the
+Sprint 0 stopping point -- a successful build isn't the same as a
+successful launch, and only the Director can do that step (device bridge
+can't execute either binary, same constraint as everywhere else).
+
 ## Known issues
 
-None yet — first real build hasn't been attempted. WebGL build support
-may not be installed as a Unity Hub module; if `BuildWebGL()` fails on
-that, it needs to be added via Unity Hub (a Director/GUI step — see the
-device-bridge addendum above).
+None found yet. One thing worth knowing for local WebGL testing: opening
+`Builds/WebGL/index.html` directly via a `file://` URL often doesn't work
+correctly (browsers block the compressed asset loading over `file://`) --
+it needs to be served over local HTTP, e.g. `python -m http.server` run
+from inside `Builds/WebGL/`, then opened at `http://localhost:8000`.
 
 ## Addendum: what the device bridge can and can't do (found during Sprint 0)
 
