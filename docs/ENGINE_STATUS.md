@@ -36,20 +36,24 @@ this line should get more specific as soon as that's settled.
 
 ## Current state
 
-Environment is ready; nothing built yet. Sprint 0's job is to produce:
-
-- A Unity project initialized in this repo, building successfully to a
-  Windows/desktop target and a WebGL target, each launching an empty scene.
-- A pooling utility (generic object pool) ready to back enemies and
-  projectiles once combat exists — see the performance requirement in
-  `GAME_DESIGN.md`.
-- Steam integration stubbed (e.g. via Steamworks.NET or Facepunch.Steamworks
-  — pick one and record the choice here), even if it's just app-ID
-  plumbing with no real store presence yet.
+- Unity project created at `game/` — Unity 6000.5.8f1, confirmed via
+  `ProjectSettings/ProjectVersion.txt`.
+- `Assets/Scripts/Pooling/PrefabPool.cs` — generic pooled spawner wrapping
+  `UnityEngine.Pool.ObjectPool<GameObject>`. Not wired into any gameplay
+  yet (there isn't any); ready for enemies/projectiles once combat starts.
+- `Assets/Scripts/Platform/SteamStub.cs` — placeholder only, no real SDK
+  dependency. Real Steamworks.NET/Facepunch.Steamworks integration is a
+  follow-up, not Sprint 0 scope.
+- `Assets/Editor/BuildScript.cs` — `BuildScript.BuildWindows()` and
+  `BuildScript.BuildWebGL()`, each auto-creates an empty scene if needed
+  and builds to `Builds/` (gitignored). Not yet run — that's the next step.
 
 ## Known issues
 
-None yet — nothing exists to have issues.
+None yet — first real build hasn't been attempted. WebGL build support
+may not be installed as a Unity Hub module; if `BuildWebGL()` fails on
+that, it needs to be added via Unity Hub (a Director/GUI step — see the
+device-bridge addendum above).
 
 ## Addendum: what the device bridge can and can't do (found during Sprint 0)
 

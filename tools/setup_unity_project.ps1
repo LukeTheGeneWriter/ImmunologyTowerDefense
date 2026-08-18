@@ -1,10 +1,17 @@
 # Sprint 0: auto-detect the installed Unity Editor and create the project
 # skeleton in game/. Run this from PowerShell, from anywhere -- it locates
-# the repo root relative to its own location.
+# the repo root relative to its own location. Safe to re-run: skips
+# creation if the project already exists.
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot "game"
 $logPath = Join-Path $repoRoot "unity_create_log.txt"
+$versionMarker = Join-Path $projectPath "ProjectSettings\ProjectVersion.txt"
+
+if (Test-Path $versionMarker) {
+    Write-Host "Project already exists at $projectPath (found ProjectVersion.txt) -- nothing to do."
+    exit 0
+}
 
 $unityExe = Get-ChildItem "C:\Program Files\Unity\Hub\Editor\*\Editor\Unity.exe" -ErrorAction SilentlyContinue |
     Sort-Object FullName -Descending | Select-Object -First 1
@@ -21,9 +28,11 @@ Write-Host "This can take a few minutes on first run (Unity imports default pack
 
 & $unityExe.FullName -batchmode -createProject $projectPath -quit -logFile $logPath
 
-if ($LASTEXITCODE -eq 0) {
+# NOTE: $LASTEXITCODE has been unreliable for this Unity version when
+# launched this way -- it can come back $null even on a clean run. Check
+# the actual marker file instead of trusting the exit code.
+if (Test-Path $versionMarker) {
     Write-Host "Success. Project created at $projectPath."
-    Write-Host "Log: $logPath"
 } else {
-    Write-Host "Unity exited with code $LASTEXITCODE. Check $logPath for details."
+    Write-Host "ProjectVersion.txt not found -- something went wrong. Check $logPath for details."
 }
