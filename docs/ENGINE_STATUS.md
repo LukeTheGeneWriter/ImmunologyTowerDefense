@@ -50,3 +50,15 @@ Environment is ready; nothing built yet. Sprint 0's job is to produce:
 ## Known issues
 
 None yet — nothing exists to have issues.
+
+## Addendum: what the device bridge can and can't do (found during Sprint 0)
+
+The Claude desktop device bridge (used to reach the Director's machine from
+a Cowork session) can read and write files in a connected folder — that's
+how this repo got linked and how docs land here — but its shell is an
+isolated Linux sandbox, *not* the Director's actual Windows shell. It
+cannot execute `Unity.exe`, Unity Hub, or any other Windows binary. Any
+step that needs the Unity CLI or Editor has to be run by the Director
+directly in their own terminal, or by a local Claude Code session running
+natively on their machine. File authoring (C# scripts, project config,
+docs) can still happen through the device bridge either way.
