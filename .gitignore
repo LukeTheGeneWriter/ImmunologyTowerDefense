@@ -43,3 +43,7 @@ crashlytics-build.properties
 # Our own transfer scratch (see WORKFLOW.md — device bridge can't delete files)
 _to_delete/
 *.zip
+
+# Scratch logs from CLI/build runs
+unity_create_log.txt
+*_log.txt
