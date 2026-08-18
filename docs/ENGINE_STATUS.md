@@ -57,11 +57,9 @@ Both targets build clean via `BuildScript`:
 
 First WebGL build took roughly 30+ minutes (IL2CPP -> Emscripten -> wasm
 compile) -- expected on a first run on a laptop GPU; later builds should
-be faster since Bee/IL2CPP caches are now warm. Not yet done: actually
-launching each build to confirm the "no crash, empty window" part of the
-Sprint 0 stopping point -- a successful build isn't the same as a
-successful launch, and only the Director can do that step (device bridge
-can't execute either binary, same constraint as everywhere else).
+be faster since Bee/IL2CPP caches are now warm. Both launches confirmed by the Director 2026-08-18: Windows .exe opened
+to an empty window with no crash; WebGL loaded and ran cleanly in-browser
+via `tools/serve_webgl.ps1` (localhost:8000). Sprint 0 stopping point met.
 
 ## Known issues
 

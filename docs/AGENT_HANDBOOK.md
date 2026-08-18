@@ -7,7 +7,25 @@ status doc.
 
 ## Tips & tricks
 
-(None yet.)
+- **Always invoke .ps1 scripts as `powershell -ExecutionPolicy Bypass -File <path>`.**
+  Direct invocation (`.\script.ps1` or `& "path"`) hits this machine's
+  default execution policy and fails -- and running as administrator does
+  NOT fix it, that's a separate setting from elevation.
+- **Unity 6 Hub calls the WebGL module "Web Build Support,"** not "WebGL
+  Build Support." Check for that exact label before assuming it's missing.
+- **Don't trust `$LASTEXITCODE` after a batchmode `& Unity.exe ...` call**
+  on this setup -- it can come back null even on success. Check a real
+  output artifact (e.g. `ProjectSettings/ProjectVersion.txt`, or grep the
+  log for "Exiting batchmode successfully") instead.
+- **A quiet-looking WebGL build log usually isn't stuck.** First WebGL
+  builds are slow (30+ min: IL2CPP -> Emscripten -> wasm) and the Editor
+  log goes quiet well before the build actually finishes. Check the log's
+  mtime and for newer files under `Library/Bee/artifacts` before assuming
+  it crashed.
+- **Local WebGL testing needs `tools/serve_webgl.ps1`, not a generic static
+  server.** `file://` URLs can't load Unity's fetch-based loader, and even
+  `python -m http.server` doesn't set the `Content-Encoding: gzip` header
+  Unity's compressed build output needs.
 
 ## Known points of difficulty
 

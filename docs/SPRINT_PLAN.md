@@ -33,11 +33,13 @@ review) works before investing in features.
 
 ## Stopping point (definition of done)
 
-- [ ] Desktop build launches to an empty window without crashing.
-- [ ] WebGL build loads and runs in a browser without errors.
-- [ ] `ENGINE_STATUS.md` reflects the real, current state of the repo.
-- [ ] The `/docs` folder matches the file list in `WORKFLOW.md` Section 3.
-- [ ] Code has appended at least one note to `TEAM_RETRO.md`.
+- [x] Desktop build launches to an empty window without crashing.
+- [x] WebGL build loads and runs in a browser without errors.
+- [x] `ENGINE_STATUS.md` reflects the real, current state of the repo.
+- [x] The `/docs` folder matches the file list in `WORKFLOW.md` Section 3.
+- [x] Code has appended at least one note to `TEAM_RETRO.md`.
 
 This is intentionally a low bar — the goal is a working pipeline you can
 point at and say "yes, that's real," not an impressive first build.
+
+**Status: complete, confirmed by Director 2026-08-18.** Windows build launched cleanly; WebGL build loaded and ran in-browser via `tools/serve_webgl.ps1`.

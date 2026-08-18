@@ -25,3 +25,23 @@ Section 6.1 for the intended format.
   Tip for future build/CLI scripts: don't trust $LASTEXITCODE for Unity
   batchmode calls on this setup -- check a real output artifact or grep
   the log for "Exiting batchmode successfully" instead.
+
+### Sprint 0 -- Producer (closing out)
+- PowerShell blocks direct .ps1 execution by default (not an admin-rights
+  issue -- running as admin does NOT fix it). Every .ps1 in this repo
+  needs to be invoked as `powershell -ExecutionPolicy Bypass -File <path>`,
+  not run directly or via `& <path>`. Forgot this once for
+  serve_webgl.ps1 and cost a round trip -- should have been consistent
+  with setup_unity_project.ps1's invocation from the start.
+- Unity 6 Hub labels the WebGL module "Web Build Support," not "WebGL
+  Build Support" -- don't assume it's missing just because that exact
+  string isn't in the modules list.
+- First WebGL build was slow (30+ min: IL2CPP -> Emscripten -> wasm) with
+  a near-silent-looking log. Don't conclude a build is stuck without
+  checking log mtime / newer files under Library/Bee first.
+- Local WebGL testing needs a real HTTP server (file:// won't load the
+  fetch-based loader) AND correct Content-Encoding: gzip handling for
+  Unity's compressed output -- plain `python -m http.server` doesn't set
+  that header either, so it's not just a "no Python" problem. Use
+  `tools/serve_webgl.ps1`.
+- Sprint 0 complete: both builds launch-confirmed by the Director.
