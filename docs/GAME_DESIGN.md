@@ -131,6 +131,57 @@ board before the lymph node is online. Not a round-1 purchase.
 
 Costs are unresolved — see `BACKLOG.md`.
 
+## 4a. Pathogen classes — LOCKED in principle (Director, 2026-08-19)
+
+Four classes, distinguished by where they sit relative to a host cell and
+how that determines what can clear them. This split is what gives combat
+real texture instead of one undifferentiated "pathogen" type, and it
+plugs directly into mechanics already in this document rather than adding
+new ones.
+
+| Class | Example | Occupies | Visible as | Cleared by |
+|---|---|---|---|---|
+| **Intracellular — virus** | generic virus | Hides inside a host cell; the cell is not replaced | The host cell, not itself (until sensed — see below) | Collateral damage to the whole infected cell (innate) or precise MHC-I killing (adaptive, ~10% knowledge, §5) |
+| **Intracellular — bacterium** | *Salmonella* (or *Listeria*/*Shigella* — genuinely gut-invasive, unlike *C. diff*, which is extracellular and toxin-mediated, not intracellular) | Same as virus | Same as virus | Same as virus |
+| **Large bacterium (extracellular)** | generic gut bacterium | Kills and directly occupies one coarse slot | Itself — no disguise | Direct combat damage to the pathogen |
+| **Parasite** | generic multicellular/large parasite | Multiple coarse slots at once | Itself, spanning its footprint | Direct combat damage, more of it (bigger target) |
+
+**Intracellular pathogens are why innate-only clearing is destructive, not
+just suboptimal.** Neither macrophages nor neutrophils have MHC-I-restricted
+recognition — that's a §5 adaptive capability, unlocked at ~10% knowledge.
+Until then, the only way an innate cell can clear an infected cell is to
+damage the cell itself into destruction, pathogen included. This is
+literally what "high collateral tissue damage" (§4's neutrophil role
+already states this) *is* — it isn't flavor text, it's this mechanic. Tissue
+damage from clearing intracellular infections is what feeds fibrosis (§6)
+once that's built.
+
+**Large bacteria and parasites don't hide.** They've already killed and
+taken the slot (or slots) outright, so there's no host cell to collaterally
+damage — combat targets the pathogen directly. Mechanically simpler than
+the intracellular case, and closest to what Sprint 1's original adhesion
+model already does (a pathogen claiming a coarse slot).
+
+**Viral spread.** An intracellular virus left uncleared through an
+**incubation period** spreads to an adjacent uninfected coarse slot,
+infecting a second cell — genuine cell-to-cell viral spread, not just the
+original infection sitting still. This is deliberately the mechanic that
+makes search speed matter in a way the player can watch happen: a slow
+random-walk search (rung 1) means visible, spreading infection; faster
+search (cytokine sensing and beyond, §7/§9) catches infections before they
+spread. It's a direct, legible payoff for exactly the search-ladder
+progression the game is built around — not a separate difficulty knob
+bolted on. (Intracellular bacteria are not stated to spread this way — this
+is a virus-specific mechanic unless/until said otherwise.)
+
+**Parasites' multi-slot footprint is a real structural change**, not just a
+bigger number — `TissueGrid`'s occupancy model (§7, and
+`docs/INTERFACE.md`) currently assumes exactly one pathogen per coarse
+slot. Building this properly (footprint claiming multiple slots, partial
+clearing, etc.) is more engineering than the other three classes combined.
+See `docs/SPRINT_PLAN.md` for which of these four classes land in which
+sprint — not all four need to ship at once.
+
 ## 5. Pathogen knowledge — LOCKED
 
 A percentage representing how well the adaptive system has characterised a

@@ -77,6 +77,15 @@ formal sprint plan:
   `GAME_DESIGN.md` §4's neutrophil/macrophage role split?) still need to
   be worked out before writing the Sprint 2 brief.
 
+## Deferred out of Sprint 2
+
+- **Parasites (multi-coarse-slot pathogen footprint).** Per
+  `GAME_DESIGN.md` §4a, the fourth pathogen class — larger, occupies
+  multiple coarse slots at once. Needs real structural work to
+  `TissueGrid`'s current one-pathogen-per-slot occupancy model (partial
+  clearing, footprint claiming, etc.) — more engineering than the other
+  three classes combined, so deliberately not folded into Sprint 2.
+
 ## Everything else
 
 (Nothing else triaged yet.)
