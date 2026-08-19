@@ -8,9 +8,13 @@ namespace ImmunologyTD.Pathogens
     /// <summary>
     /// Periodically spawns pathogens from a pooled template
     /// (GAME_DESIGN.md section 8 -- no raw Instantiate/Destroy). Recomputes
-    /// the cytokine field whenever the set of adhered pathogens changes,
-    /// and releases transited-through pathogens back to the pool when they
-    /// exit the right edge.
+    /// the cytokine field on a timer (not just when the adhered set
+    /// changes -- Sprint 1 closing task: infected cells now secrete
+    /// continuously, ramping strength over time per
+    /// TissueGrid.GetSecretionStrength, so the field itself keeps changing
+    /// even with a static set of infected slots), and releases
+    /// transited-through pathogens back to the pool when they exit the
+    /// right edge.
     /// </summary>
     public class PathogenSpawner : MonoBehaviour
     {
@@ -22,9 +26,16 @@ namespace ImmunologyTD.Pathogens
         [SerializeField] private float spawnIntervalSeconds = 2.5f;
         [SerializeField] private int maxLivePathogens = 40;
 
+        /// <summary>How often the field is recomputed from the current
+        /// infected-source set. Cheap (<=200 coarse cells x a few dozen
+        /// sources) so a short interval is fine; fast enough that the
+        /// heatmap visual cue and the movement bias both track secretion
+        /// ramp-up smoothly rather than in visible jumps.</summary>
+        private const float FieldRecomputeIntervalSeconds = 0.4f;
+
         private readonly List<PathogenAgent> live = new List<PathogenAgent>();
         private float spawnTimer;
-        private int lastAdheredCount = -1;
+        private float fieldRecomputeTimer;
 
         public void Initialize(BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField, GameObject pathogenTemplate)
         {
@@ -47,10 +58,11 @@ namespace ImmunologyTD.Pathogens
                 SpawnOne();
             }
 
-            if (tissueGrid.AdheredCount != lastAdheredCount)
+            fieldRecomputeTimer += Time.deltaTime;
+            if (fieldRecomputeTimer >= FieldRecomputeIntervalSeconds)
             {
-                lastAdheredCount = tissueGrid.AdheredCount;
-                cytokineField.Recompute(tissueGrid.AdheredCoords());
+                fieldRecomputeTimer = 0f;
+                cytokineField.Recompute(tissueGrid.InfectedSources(Time.time));
             }
         }
 

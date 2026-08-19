@@ -118,3 +118,42 @@ Section 6.1 for the intended format.
   build visually without a human watching: `PrintWindow` for screenshots,
   `AttachThreadInput` + `SetForegroundWindow` + `SendKeys` if input needs
   to reach a specific window.
+
+### Sprint 1 closing task — Code agent (2026-08-19, cytokine-sensing fix)
+- **The actual bug wasn't the bias math, it was what fed it.** The
+  original linear weighting (`1 + k * absoluteFieldValue`) looked
+  reasonable in isolation, but the field is bilinear-interpolated smoothly
+  across each coarse cell, so any four fine-tile neighbours have nearly
+  identical absolute values — no `k` fixes that, because the thing being
+  weighted barely varies. The fix that actually mattered was switching to
+  a softmax over each candidate's value *relative to the best candidate*,
+  which is only sensitive to the (small but real) local difference that
+  exists. Tip for next time a "the math should work but nothing visible
+  happens" bug shows up: check whether the SIGNAL being weighted actually
+  varies meaningfully between the choices being compared, before assuming
+  the weighting formula itself is wrong.
+- **Made `TissueGrid`/`CytokineField`/the new `Chemotaxis` static class
+  take simulated time and randomness as explicit inputs rather than
+  reading `UnityEngine.Time`/implicit state internally**, specifically so
+  a headless Editor-batchmode script (`CytokineVerification.cs`) could
+  drive the real production algorithm and print real before/after numbers
+  without needing play mode or any `GameObject`s. This paid off
+  immediately — it's also what let a same-process parameter sweep
+  (`Chemotaxis.GradientSharpness` from 2 to 20) run in one Unity launch
+  instead of one launch per value. Worth defaulting to this pattern
+  (explicit time/random inputs on core simulation classes) going forward,
+  not just when a verification harness is already planned — it's cheap to
+  do up front and expensive to retrofit.
+- **`Add-Type`-defined PowerShell types (the Win32 `PrintWindow`/
+  `AttachThreadInput` P/Invoke wrappers) do not persist across separate
+  PowerShell tool calls** in this environment (shell state resets between
+  calls, per the tool's own description — this is expected behavior, not
+  a bug, but easy to forget mid-task). Redefine the `Add-Type` block in
+  every call that uses it, or do the whole screenshot/input sequence in
+  one call.
+- **First `PrintWindow` capture attempt of this build returned a solid
+  black frame with flag `0`**; needed flag `2` (`PW_RENDERFULLCONTENT`)
+  to actually capture this build's D3D12-rendered content, consistent
+  with the tip already recorded above from Sprint 1 proper — re-confirming
+  it here since it's easy to reach for flag `0` as the "default" and lose
+  a round trip.

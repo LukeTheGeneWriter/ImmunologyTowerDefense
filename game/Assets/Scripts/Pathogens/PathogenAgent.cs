@@ -127,7 +127,7 @@ namespace ImmunologyTD.Pathogens
             foreach (var row in rowsByPreference)
             {
                 var candidate = new CoarseCoord(col, row);
-                if (tissueGrid.TryAdhere(candidate, this))
+                if (tissueGrid.TryAdhere(candidate, this, Time.time))
                 {
                     Current = new FineCoord(
                         candidate.Column * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2,

@@ -46,6 +46,9 @@ namespace ImmunologyTD.Rendering
 
             string toggleLine = $"Cytokine sensing: {(CytokineToggle.Enabled ? "ON" : "OFF")}   (press C to toggle)";
             GUI.Label(new Rect(16, 100, 720, 30), toggleLine, style);
+
+            string heatmapLine = "Orange tint on host cells = cytokine field strength (always visible; only pulls units when sensing is ON)";
+            GUI.Label(new Rect(16, 128, 900, 30), heatmapLine, style);
         }
     }
 }

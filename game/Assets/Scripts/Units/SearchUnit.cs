@@ -7,8 +7,12 @@ namespace ImmunologyTD.Units
     /// <summary>
     /// A hunting unit performing a random walk on the fine lattice (rung 1
     /// of GAME_DESIGN.md sections 7/9's search ladder), or a
-    /// cytokine-biased walk (rung 2) when CytokineToggle.Enabled is on.
-    /// Movement is four-neighbour (von Neumann) only.
+    /// cytokine-biased walk (rung 2) when CytokineToggle.Enabled is on. The
+    /// actual per-step choice is delegated to Chemotaxis.ChooseNextStep
+    /// (Units/Chemotaxis.cs) -- pulled out to a static method during the
+    /// Sprint 1 closing task so it could be verified headlessly, see that
+    /// file and Assets/Editor/CytokineVerification.cs. Movement is
+    /// four-neighbour (von Neumann) only.
     ///
     /// Movement/collision simplification (see docs/INTERFACE.md for the
     /// full note): units co-occupy fine tiles with host cells AND with
@@ -32,7 +36,10 @@ namespace ImmunologyTD.Units
         private Vector3 tickEndWorld;
         private float tickTimer;
 
-        private const float CytokineBiasStrength = 4f;
+        // Reused every StepOnce call so Chemotaxis.ChooseNextStep allocates
+        // nothing per step; one buffer pair per unit instance.
+        private readonly FineCoord[] candidateBuffer = new FineCoord[4];
+        private readonly float[] weightBuffer = new float[4];
 
         public void Initialize(BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField, UnitProfile profile, FineCoord start)
         {
@@ -81,37 +88,10 @@ namespace ImmunologyTD.Units
             CheckContact();
         }
 
-        private static readonly FineCoord[] candidates = new FineCoord[4];
-        private static readonly float[] weights = new float[4];
-
         private void StepOnce()
         {
-            int validCount = 0;
-            foreach (var offset in FineCoord.VonNeumannOffsets)
-            {
-                var candidate = Current.Add(offset);
-                if (!board.InFineBounds(candidate)) continue;
-                candidates[validCount] = candidate;
-                float bias = CytokineToggle.Enabled ? cytokineField.SampleFine(candidate) : 0f;
-                weights[validCount] = 1f + CytokineBiasStrength * bias;
-                validCount++;
-            }
-
-            if (validCount == 0) return; // shouldn't happen on any board >= 2x2 fine tiles
-
-            float totalWeight = 0f;
-            for (int i = 0; i < validCount; i++) totalWeight += weights[i];
-
-            float pick = Random.value * totalWeight;
-            int chosen = validCount - 1;
-            float running = 0f;
-            for (int i = 0; i < validCount; i++)
-            {
-                running += weights[i];
-                if (pick <= running) { chosen = i; break; }
-            }
-
-            Current = candidates[chosen];
+            Current = Chemotaxis.ChooseNextStep(
+                Current, board, cytokineField, CytokineToggle.Enabled, candidateBuffer, weightBuffer);
         }
 
         private void CheckContact()

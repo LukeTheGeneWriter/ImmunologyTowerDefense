@@ -12,19 +12,23 @@ namespace ImmunologyTD.Grid
     /// of diffusing directly.
     ///
     /// Implementation choice: rather than iterating a literal diffusion PDE
-    /// every tick, the field is recomputed from scratch whenever the set of
-    /// adhered pathogens changes, as an inverse-Manhattan-distance falloff
-    /// from every adhered pathogen's coarse slot. For a mostly-static set
-    /// of sources this reads the same as a settled diffusion field and is
-    /// far cheaper at this board scale (<=200 coarse cells). Recorded here
-    /// and in docs/INTERFACE.md as a documented simplification.
+    /// every tick, the field is recomputed from scratch on a timer (see
+    /// PathogenSpawner) as an inverse-Manhattan-distance falloff from every
+    /// infected coarse slot, weighted by that slot's own secretion strength
+    /// (TissueGrid.InfectedSources -- continuous, ramping per infected
+    /// cell, not a flat per-source constant). For a mostly-static set of
+    /// source LOCATIONS this reads the same as a settled diffusion field
+    /// and is far cheaper at this board scale (<=200 coarse cells); the
+    /// per-source STRENGTH still changes continuously as infections ramp,
+    /// which is why this is now recomputed periodically rather than only
+    /// when the adhered set changes (Sprint 1 closing task -- see
+    /// docs/INTERFACE.md). Recorded here and in docs/INTERFACE.md as a
+    /// documented simplification.
     /// </summary>
     public class CytokineField
     {
         private readonly BoardConfig board;
         private float[,] field;
-
-        private const float SourceStrength = 10f;
 
         public CytokineField(BoardConfig board)
         {
@@ -32,9 +36,9 @@ namespace ImmunologyTD.Grid
             field = new float[board.Columns, BoardConfig.Rows];
         }
 
-        public void Recompute(IEnumerable<CoarseCoord> sources)
+        public void Recompute(IEnumerable<(CoarseCoord Coord, float Strength)> sources)
         {
-            var sourceList = new List<CoarseCoord>(sources);
+            var sourceList = new List<(CoarseCoord Coord, float Strength)>(sources);
             var next = new float[board.Columns, BoardConfig.Rows];
             for (int col = 0; col < board.Columns; col++)
             {
@@ -43,8 +47,8 @@ namespace ImmunologyTD.Grid
                     float value = 0f;
                     foreach (var s in sourceList)
                     {
-                        int dist = System.Math.Abs(s.Column - col) + System.Math.Abs(s.Row - row);
-                        value += SourceStrength / (1f + dist);
+                        int dist = System.Math.Abs(s.Coord.Column - col) + System.Math.Abs(s.Coord.Row - row);
+                        value += s.Strength / (1f + dist);
                     }
                     next[col, row] = value;
                 }
@@ -58,6 +62,11 @@ namespace ImmunologyTD.Grid
             row = Mathf.Clamp(row, 0, BoardConfig.Rows - 1);
             return field[col, row];
         }
+
+        /// <summary>Raw coarse-cell field value, no interpolation --
+        /// used by BoardRenderer for the heatmap visual cue, which paints
+        /// per coarse cell rather than per fine tile.</summary>
+        public float CoarseValueAt(CoarseCoord c) => ValueAt(c.Column, c.Row);
 
         /// <summary>Bilinear-interpolated field value at a fine-grid
         /// coordinate, sampled from the surrounding coarse cells.</summary>

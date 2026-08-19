@@ -105,7 +105,7 @@ namespace ImmunologyTD.Bootstrap
             }
 
             var boardRenderer = gameObject.AddComponent<BoardRenderer>();
-            boardRenderer.Bind(board, tissueGrid, views);
+            boardRenderer.Bind(board, tissueGrid, cytokineField, views);
         }
 
         private GameObject BuildPathogenTemplate()
