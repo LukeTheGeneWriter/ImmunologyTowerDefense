@@ -1,9 +1,9 @@
 # Agent Handbook
 
-Curated and evergreen, owned by HR Claude — distilled from `TEAM_RETRO.md`.
-See `WORKFLOW.md` Section 6.2 for the intended format. Every brief to a
-fresh Code or UI session should point at this file alongside their own
-status doc.
+Curated and evergreen, distilled from `TEAM_RETRO.md` by the head session
+(or a dispatched Feedback agent). See `WORKFLOW.md` Section 6.2 for the
+intended format. Every brief to a dispatched agent should point at this
+file alongside `CLAUDE.md` and its own relevant status doc.
 
 ## Tips & tricks
 
@@ -29,11 +29,28 @@ status doc.
 
 ## Known points of difficulty
 
-- **Device-bridge git commands strand lock files.** Any `git` command run through the Claude desktop device bridge (`device_bash`) tends to leave a stray `.git/index.lock`, `.git/HEAD.lock`, and/or `.git/objects/maintenance.lock` behind, because the bridge can rename files but can't unlink them, and git sometimes needs a plain unlink to release its own lock. Left in place, this makes the Director's own git client fail with "another git process seems to be running." Standing fix: after any git command sequence run through the bridge, do one final pass moving any `.git/*.lock` (and `.git/objects/maintenance.lock`) into `_to_delete/`, as the *very last* step, with no git command after it (since even `git status` can strand a fresh one).
+- **(Retired 2026-08-19) Device-bridge git commands strand lock files.**
+  Applied only to the old Claude desktop device-bridge setup, which is no
+  longer how this project is worked on — sessions now run natively with a
+  real shell and real `rm`. Left here as a historical note in case a
+  device-bridge-style connection is ever reintroduced; the `_to_delete/`
+  convention it required is otherwise obsolete.
 
-## Contact protocol
+## Dispatch practices
 
-Default, per `WORKFLOW.md` Section 1: Code and UI route cross-cutting
-concerns through the Producer rather than messaging each other directly.
-No exceptions have been established yet — there isn't enough history to
-justify one.
+As of 2026-08-19, `WORKFLOW.md` was rewritten around a single head session
+that dispatches focused Code/Design/Feedback subagents directly (via the
+`Agent` tool) rather than several separate, persistent Claude Code sessions
+coordinating through a device bridge and per-role worktrees — see
+`WORKFLOW.md` Section 1 for why. Practices to carry forward:
+
+- Brief every dispatched agent like a cold start — point it at `CLAUDE.md`,
+  this file, and whichever status docs are relevant to its task. It has no
+  memory of prior sprints even if "the same kind of agent" did similar work
+  before.
+- Dispatched agents generally can't message each other directly (no shared
+  context) — cross-cutting questions get resolved by the head, same
+  practical effect as the old "route through the Producer" default, just
+  now structural rather than a convention.
+- No exceptions established yet beyond that — there isn't enough history
+  under the new model to justify one.
