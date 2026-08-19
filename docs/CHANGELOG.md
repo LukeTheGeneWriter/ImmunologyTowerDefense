@@ -12,6 +12,23 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 2 -- 2026-08-19
+Bone marrow is now a real, clickable placement area: 5 slots, free
+placement of Macrophage or Neutrophil progenitor towers, each emitting
+units from the blood edge on its own timer. Lymph node exists as a
+labeled placeholder space (not functional yet -- adaptive immunity is
+still a sprint or two out). Combat is real: pathogens now come in three
+classes (intracellular virus, intracellular bacterium, large bacterium),
+contact deals damage, and a depleted pathogen clears back to healthy
+tissue. Uncleared virus infections spread to a neighboring cell after an
+incubation period -- watch a slow (cytokine-off) search let an infection
+spread versus a fast one catching it first.
+
+Director playtested the same build directly and confirmed placement,
+combat, and cytokine sensing all read well. Also surfaced the next real
+problem: progenitors have no population cap, so active cell count grows
+unbounded over time -- scoped into Sprint 3.
+
 ## Sprint 1 -- 2026-08-19
 First playable slice: a tissue lattice (configurable-width coarse grid,
 7x7 fine sub-lattice for movement), pathogens that enter and adhere across
