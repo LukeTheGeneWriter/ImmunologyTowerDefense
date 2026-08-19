@@ -95,3 +95,37 @@ does cytokine sensing feel transformative when toggled on?** If the answer
 is no, the difficulty ladder in `GAME_DESIGN.md` §7/§9 needs rethinking
 before any economy work is worth doing — so don't build economy work yet
 regardless of how this sprint goes.
+
+## Closing task (added after first playtest, 2026-08-19)
+
+Director's playtest verdict: the random walk itself reads fine and the
+build is liked, but **the cytokine-sensing toggle produced no perceptible
+difference.** Root cause, confirmed by code review: the current field's
+sources are just "adhered pathogen coordinates" with no distinct infected-
+cell concept, and the resulting per-step bias is a real but very gradual
+statistical drift — not something a short playtest would ever notice, and
+there's no visual cue showing the field exists at all.
+
+**Sprint 1 closes once this is fixed and demonstrably visible:**
+
+- Introduce a real infected-cell concept: when a pathogen adheres to a
+  coarse slot, that host cell becomes **infected** (distinct from a bare
+  pathogen-occupied slot conceptually, even if the visual stays similar) —
+  and infected cells are what **secrete cytokines**, continuously, not a
+  one-shot static falloff computed from pathogen position alone.
+- Make the ON/OFF difference something the Director can see in a couple of
+  minutes, not just something that's statistically true over a long
+  session — strengthen the bias, and/or add a visible cue (a faint tint or
+  heatmap showing the gradient itself) so cause and effect are legible.
+  Both toggle states should be watchable side by side without needing to
+  infer anything.
+- Self-verify with more than "it compiles and launches" this time —
+  actually demonstrate the behavioral difference (e.g. log or visualize
+  average distance-to-nearest-infected-cell over time under both settings)
+  before reporting done.
+
+Once this lands and the Director confirms it reads as transformative,
+Sprint 1 is done. Next up (Sprint 2, not yet scoped in detail): bone
+marrow/lymph node compartments so the player has somewhere to place
+purchased cells, and some form of immune-cell/pathogen combat interaction
+so there's real functionality to see.

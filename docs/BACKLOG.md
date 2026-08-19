@@ -56,6 +56,27 @@ scoped to the search problem only, no economy/compartments beyond tissue).
   mutation (a discrete step-change discount) and additive to it if ever
   built.
 
+## Sprint 2 candidate scope (from Director's Sprint 1 playtest, 2026-08-19)
+
+Not yet written up as a formal `SPRINT_PLAN.md` — Sprint 1 isn't closed
+yet (see its closing task). Director's direction for what comes next:
+
+- **Bone marrow and lymph node as real, placeable spaces.** Per
+  `GAME_DESIGN.md` §1/§2a, progenitor towers are bought and placed in the
+  bone marrow, not in tissue — Sprint 1 has no such place, units just
+  debug-spawn. Needs actual layout/compartment work: a UI space for the
+  player to place purchased cells, and a lymph node area for adaptive
+  immunity coordination (dendritic cells, naive/activated T and B cells).
+  This is the first real placement decision the player gets.
+- **Immune cell / pathogen interaction ("combat").** Sprint 1's "contact"
+  is a visual flash only — nothing dies, nothing is damaged. Director
+  wants some functional interaction so there's something to actually see
+  happen, not just search-and-flash.
+- Scope, sequencing, and exact mechanics (does combat mean an instant
+  kill? A damage-over-time tick? Does it differ by unit type already, per
+  `GAME_DESIGN.md` §4's neutrophil/macrophage role split?) still need to
+  be worked out before writing the Sprint 2 brief.
+
 ## Everything else
 
-(Nothing else triaged yet — no playtests have happened.)
+(Nothing else triaged yet.)
