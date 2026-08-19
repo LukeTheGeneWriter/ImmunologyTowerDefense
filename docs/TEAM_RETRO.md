@@ -157,3 +157,146 @@ Section 6.1 for the intended format.
   with the tip already recorded above from Sprint 1 proper — re-confirming
   it here since it's easy to reach for flag `0` as the "default" and lose
   a round trip.
+
+### Sprint 2 — Code agent (2026-08-19, bone marrow placement + pathogen classes/combat)
+
+**Judgment calls made this sprint, consolidated here** (each is also noted
+inline in code comments and in `docs/INTERFACE.md`/`docs/ENGINE_STATUS.md`
+at the relevant spot — this is the one-stop list):
+
+- **Bone marrow slot count: 5** (`GameBootstrap.BoneMarrowSlotCount`).
+  `SPRINT_PLAN.md` says "a small number," no specific figure. Picked so a
+  mixed macrophage/neutrophil strategy (2-3 of each) is possible without
+  the strip visually dominating the layout next to a 30-column tissue
+  board.
+- **Bone marrow emission interval: 4 seconds per placed tower**
+  (`BoneMarrowManager.EmissionIntervalSeconds`). Not specified anywhere.
+  Chosen slower than `PathogenSpawner`'s 2.5s spawn interval on the
+  reasoning that a player can place several towers at once (each emitting
+  independently), so per-tower cadence should be a bit more conservative
+  than the single pathogen spawner's — but this is a guess, not a balance
+  pass, and there's currently no cap on total standing unit population
+  (see `docs/INTERFACE.md` open question 6) so a fully-built-out bone
+  marrow (5 towers) produces one new unit roughly every 0.8s on average,
+  which may prove too fast or too slow once there's an actual economy
+  constraining how many towers a player can afford.
+- **Pathogen class weights: 45% virus / 25% bacterium / 30% large
+  bacterium** (`PathogenAgent.VirusChance`/`BacteriumChance`). Not
+  specified. Weighted toward virus specifically because
+  `SPRINT_PLAN.md`/`GAME_DESIGN.md` both call viral spread "the sprint's
+  most important piece" — an equal three-way split risked the Director not
+  seeing much of it in a short playtest session purely by chance.
+- **Combat numbers: 1 flat damage per contact-tick; 12 HP for both
+  intracellular classes, 18 HP for large bacteria; 15s incubation before
+  an uncleared virus infection attempts to spread; 1s retry cadence if a
+  spread attempt is blocked.** All flat/simple per `SPRINT_PLAN.md`'s
+  explicit request, all picked to be "legible within a short playtest"
+  rather than balanced — same standard Sprint 1 used for
+  `Chemotaxis.GradientSharpness` and `InfectionRampSeconds`. The 15s
+  incubation number specifically was chosen relative to Sprint 1's own
+  measured search speeds (cytokine sensing reaches an infected cell in
+  ~4.5s on average; a rung-1 random walk doesn't reliably converge within
+  2.5 simulated minutes on a 30-wide board) so that fast search
+  comfortably beats the incubation window and slow search visibly doesn't
+  — this is the whole point of the mechanic, so the number wasn't picked
+  arbitrarily even though it's still a guess in absolute terms.
+- **Large bacteria and intracellular pathogens clear via the exact same
+  HP-depletion mechanic; only the rendering (and framing) differs.** The
+  design doc frames these as different in kind ("collateral damage to the
+  host cell" vs. "direct damage to the pathogen"), but building two
+  parallel combat systems for a difference that's currently only
+  cosmetic (no host-cell-health/fibrosis system exists yet to make
+  "collateral" mean something numerically distinct from "direct") would
+  have been speculative complexity for no observable payoff this sprint.
+  Flagging this explicitly since it's a real interpretation call, not an
+  oversight — when fibrosis/host-cell-health lands, this is the natural
+  point to actually split the two mechanics if they need to diverge
+  numerically.
+- **The scene file was not renamed from `Sprint1.unity` to
+  `Sprint2.unity`**, breaking the pattern Sprint 1 itself established
+  (`Sprint0.unity` → `Sprint1.unity`). Deliberate: the file's actual
+  content is just one `GameObject` with default-value serialized fields —
+  all real state is runtime-code-generated — so a rename would have been
+  purely cosmetic and cost a rebuild/re-verify cycle for zero functional
+  benefit. Flagged here so a future session doesn't read "Sprint1.unity"
+  as meaning stale/wrong content, and can rename it later in a lower-risk
+  moment (e.g. alongside an unrelated scene change) if keeping the naming
+  convention matters enough to the Director.
+
+**Two real bugs found this sprint, both worth remembering:**
+
+- **`MonoBehaviour.Awake()` is not guaranteed to fire from `AddComponent()`
+  outside Play Mode.** Assumed (wrongly) that it would, based on general
+  Unity folklore and the fact that Sprint 1's `CytokineVerification.cs`
+  never hit a counterexample (its dummy `GameObject`s never needed
+  `Awake()`-driven state). `PrefabPool.Awake()` builds the pool; a
+  headless `CombatVerification.cs` run hit a `NullReferenceException` in
+  `Get()` immediately. Fixed with a lazy `EnsurePool()` guard called from
+  `Get()`/`Release()` too, not just `Awake()`. **Tip for next time**: any
+  headless harness that `AddComponent`s something and expects its
+  `Awake()`-built state to be ready should either call an explicit init
+  method directly, or verify the component doesn't rely on `Awake()`
+  firing outside Play Mode before trusting it.
+- **A screenshot that looks like a camera-framing bug might be a DPI-scaling
+  bug in the screenshot tool instead.** The first real-build screenshot
+  this sprint appeared to show the right ~25% of the board cropped off and
+  the entire lymph node compartment missing. Spent real effort adding a
+  one-frame-later camera refit (`GameBootstrap.RefitCameraNextFrame`) to
+  fix what looked like a stale-`Camera.aspect`-at-Awake bug — a real and
+  worthwhile fix on its own merits, but it turned out **not** to be the
+  cause: the actual problem was that `GetWindowRect`, called from a
+  PowerShell process that hadn't called `SetProcessDPIAware()`, returned
+  window dimensions scaled down by this machine's 150% display scaling
+  (1707×1067 instead of Unity's real 2560×1600 render resolution). The
+  screenshot bitmap was allocated at the wrong (smaller) size, so
+  `PrintWindow` produced a visibly cropped/scaled capture even though the
+  game itself was rendering the full board correctly the whole time. Confirmed
+  by cross-checking a `Debug.Log`'d `Screen.width`/`height` (`2560x1600`)
+  against the un-aware `GetWindowRect` result. **Tip for next time**: on a
+  scaled Windows display, call `SetProcessDPIAware()` (or an equivalent
+  per-monitor-DPI-awareness call) *before* any `GetWindowRect`/
+  `SetCursorPos` call used for screenshot or input automation, or the
+  physical-pixel math will be off by the scale factor — and don't
+  necessarily trust a first-look "this looks cropped" diagnosis without
+  cross-checking the game's own reported `Screen.width`/`height` first.
+
+**A build's window not updating between screenshots isn't necessarily
+frozen/crashed — it might just not have OS focus.** Mid-verification, two
+screenshots taken several tool-calls apart came back pixel-identical
+(same unit positions to the pixel). Turned out the build's window had lost
+foreground focus, and this project's build has `Application.runInBackground`
+at Unity's default (off) — so the game simply stops ticking while
+unfocused, and resumes the instant focus returns (confirmed: forcing
+foreground via the `AttachThreadInput`/`SetForegroundWindow` trick made
+units visibly resume moving in the very next screenshot). Worth knowing
+before assuming a stale screenshot means something crashed.
+
+**Real, useful accident: it appears the Director interacted with the live
+build's window himself during this session** — this session never sent any
+click/key input until deliberately doing so near the end for a controlled,
+reproducible test, yet an early screenshot showed two bone marrow towers
+already placed (one Macrophage, one Neutrophil) and cytokine sensing
+toggled ON, in a pattern very consistent with a person clicking around out
+of curiosity (this machine has a real, visible desktop — see `CLAUDE.md`).
+If that's what happened: genuinely great unscripted evidence that the
+click-to-place UI works for an actual human, better than anything a
+synthetic click could prove. This session also performed its own fully
+controlled click-through afterward (open an empty slot's picker, choose
+Neutrophil, confirm the slot's label/color changed) using screen
+coordinates computed analytically from a logged
+camera-position/orthographic-size/aspect diagnostic rather than eyeballed
+— both landed correctly, which is good independent confirmation the
+placement math (`docs/ENGINE_STATUS.md`'s post-refit diagnostic line) is
+right, not just that a human happened to click near the right spot.
+
+**Headless verification continues to earn its keep.** `CombatVerification.cs`
+(35/35 assertions) caught the `PrefabPool.Awake()` bug immediately, before
+any build was attempted — cheaper by a wide margin than finding it via a
+build+screenshot cycle. It also proved the viral spread mechanic chains
+across generations (an origin infection spreading to a child, which itself
+later spreads to a grandchild) well before any build existed to watch it
+happen live, which mattered here since this sprint's real-build screenshot
+session didn't happen to catch a live spread event on camera (the 15s
+incubation window didn't line up with the screenshot timing) — without the
+headless proof, this sprint's evidence for the single most important
+mechanic in the brief would have been weaker than it should be.

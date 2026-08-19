@@ -20,8 +20,23 @@ namespace ImmunologyTD.Pooling
 
         private ObjectPool<GameObject> pool;
 
-        private void Awake()
+        private void Awake() => EnsurePool();
+
+        /// <summary>
+        /// Lazily builds the underlying ObjectPool if Awake() hasn't run
+        /// yet. Added during Sprint 2: Awake() is only guaranteed to fire
+        /// automatically inside Play Mode / a running build -- it does NOT
+        /// fire just from AddComponent() in Editor batchmode outside Play
+        /// Mode (a corrected assumption from Sprint 1 -- see
+        /// docs/TEAM_RETRO.md), which a headless verification harness
+        /// (Assets/Editor/CombatVerification.cs) hit directly as a
+        /// NullReferenceException in Get(). Idempotent and safe to call
+        /// from Get()/Release() as a defensive guard even in normal
+        /// gameplay, where Awake will already have run.
+        /// </summary>
+        private void EnsurePool()
         {
+            if (pool != null) return;
             pool = new ObjectPool<GameObject>(
                 createFunc: () => Instantiate(prefab),
                 actionOnGet: obj => obj.SetActive(true),
@@ -42,9 +57,9 @@ namespace ImmunologyTD.Pooling
         /// </summary>
         public void SetPrefab(GameObject prefabToUse) => prefab = prefabToUse;
 
-        public GameObject Get() => pool.Get();
+        public GameObject Get() { EnsurePool(); return pool.Get(); }
 
-        public void Release(GameObject instance) => pool.Release(instance);
+        public void Release(GameObject instance) { EnsurePool(); pool.Release(instance); }
 
         public int CountActive => pool?.CountActive ?? 0;
         public int CountInactive => pool?.CountInactive ?? 0;

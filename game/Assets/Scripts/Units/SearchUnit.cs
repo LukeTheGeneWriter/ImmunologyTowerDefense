@@ -1,6 +1,7 @@
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Rendering;
+using ImmunologyTD.Pathogens;
 
 namespace ImmunologyTD.Units
 {
@@ -16,11 +17,12 @@ namespace ImmunologyTD.Units
     ///
     /// Movement/collision simplification (see docs/INTERFACE.md for the
     /// full note): units co-occupy fine tiles with host cells AND with
-    /// adhered pathogens -- pathogens do not block unit movement this
-    /// sprint, since there's no combat/kill system yet to make blocking
-    /// meaningful. "Collision" is instead detected as the unit's current
-    /// tile falling in the same COARSE slot as an adhered pathogen, which
-    /// triggers a visible contact flash on the pathogen.
+    /// adhered pathogens -- pathogens still do not block unit movement.
+    /// "Collision" is detected as the unit's current tile falling in the
+    /// same COARSE slot as an adhered pathogen, which as of Sprint 2 deals
+    /// real flat contact damage (see CheckContact/PathogenAgent.ReceiveDamage)
+    /// on top of the existing visual flash -- clearing an infected/occupied
+    /// slot is a real, visible consequence now, not just a flash.
     /// </summary>
     public class SearchUnit : MonoBehaviour
     {
@@ -98,7 +100,14 @@ namespace ImmunologyTD.Units
         {
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
             var pathogen = tissueGrid.GetPathogenAt(coarse);
-            pathogen?.NotifyContact();
+            // Sprint 2: contact deals flat damage (GAME_DESIGN.md section 4a
+            // -- collateral damage to the whole infected cell for
+            // intracellular pathogens, direct damage to the pathogen for a
+            // large bacterium; mechanically the same call either way, see
+            // PathogenAgent.ReceiveDamage). Fires once per tick a unit's
+            // fine tile falls in the pathogen's coarse slot, same detection
+            // as Sprint 1's flash-only contact.
+            pathogen?.ReceiveDamage(PathogenAgent.ContactDamagePerHit);
         }
     }
 }

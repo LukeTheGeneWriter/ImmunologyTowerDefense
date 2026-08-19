@@ -18,15 +18,15 @@ namespace ImmunologyTD.Rendering
         private string infoLine;
         private GUIStyle style;
 
-        public void Bind(BoardConfig board, int macrophageCount, int macrophageSpeed, int neutrophilCount, int neutrophilSpeed)
+        public void Bind(BoardConfig board, int macrophageSpeed, int neutrophilSpeed)
         {
             this.board = board;
             infoLine =
-                "Immunology TD -- Sprint 1 search prototype\n" +
+                "Immunology TD -- Sprint 2 placement + combat prototype\n" +
                 $"Board: {board.Columns} x {BoardConfig.Rows} coarse cells, " +
                 $"{BoardConfig.FineSubdivision}x{BoardConfig.FineSubdivision} fine per cell\n" +
-                $"Macrophage: {macrophageCount} units, {macrophageSpeed} fine-tiles/tick\n" +
-                $"Neutrophil: {neutrophilCount} units, {neutrophilSpeed} fine-tiles/tick";
+                $"Macrophage speed: {macrophageSpeed} fine-tiles/tick   Neutrophil speed: {neutrophilSpeed} fine-tiles/tick\n" +
+                "Place bone marrow towers (below) to bring units into tissue -- nothing spawns until you do.";
         }
 
         private void OnGUI()
@@ -42,13 +42,13 @@ namespace ImmunologyTD.Rendering
                 };
             }
 
-            GUI.Label(new Rect(16, 12, 720, 90), infoLine, style);
+            GUI.Label(new Rect(16, 12, 820, 110), infoLine, style);
 
             string toggleLine = $"Cytokine sensing: {(CytokineToggle.Enabled ? "ON" : "OFF")}   (press C to toggle)";
-            GUI.Label(new Rect(16, 100, 720, 30), toggleLine, style);
+            GUI.Label(new Rect(16, 122, 720, 30), toggleLine, style);
 
             string heatmapLine = "Orange tint on host cells = cytokine field strength (always visible; only pulls units when sensing is ON)";
-            GUI.Label(new Rect(16, 128, 900, 30), heatmapLine, style);
+            GUI.Label(new Rect(16, 150, 900, 30), heatmapLine, style);
         }
     }
 }

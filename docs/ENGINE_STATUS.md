@@ -1,13 +1,12 @@
 # Engine Status
 
 Rewritten at the end of every sprint by the Code session, not just appended
-to. This version reflects the state after Sprint 1 (the search-problem
-prototype) plus Sprint 1's closing task (2026-08-19 — the cytokine-sensing
-legibility fix; see `SPRINT_PLAN.md`'s "Closing task" section and
-`docs/INTERFACE.md` for the full data-shape changes). Sprint 0's
+to. This version reflects the state after Sprint 2 (bone marrow placement,
+lymph node placeholder, pathogen classes + viral spread). Sprint 0's
 engine/platform decision section is preserved below since it's still
-accurate; the "current state" and "build status" sections reflect the
-state after the closing task, not just the original Sprint 1 drop.
+accurate; the "current state" and "build status" sections reflect Sprint 2.
+Sprint 1's own history (including its closing cytokine-sensing fix) is in
+`docs/CHANGELOG.md`; this file only carries forward what's still true.
 
 ## Engine & platform decision
 
@@ -28,298 +27,326 @@ Tradeoff accepted knowingly: Unity's WebGL builds are heavier than Godot's
 
 Unity Hub, the Unity Editor (`6000.5.8f1` at `C:\Program
 Files\Unity\Hub\Editor\6000.5.8f1\Editor\Unity.exe`), the Unity CLI, and an
-activated Personal license are installed on the Director's machine
-("lukesdecoder"). As of `WORKFLOW.md`'s 2026-08-19 rewrite, this is where
-the head session and dispatched Code agents run natively with real shell
-access — no device bridge, no sandbox. **No interactive Editor GUI session
-has been used for actual gameplay authoring through Sprint 1** — everything
-has been built via batchmode CLI + code, not by hand-placing GameObjects or
-dragging assets in the Editor window. See "Scene construction" below; this
-is a real constraint that shaped several implementation choices, not
-incidental.
+activated Personal license are installed on the Director's machine. As of
+`WORKFLOW.md`'s 2026-08-19 rewrite, this is where the head session and
+dispatched Code agents run natively with real shell access — no device
+bridge, no sandbox. **Still no interactive Editor GUI session used for
+gameplay authoring** through Sprint 2 — everything is built via batchmode
+CLI + code. See "Scene construction" below.
 
-## Current state (post–Sprint 1)
+## Current state (post–Sprint 2)
 
 ### Scene
 
-`Assets/Scenes/Sprint1.unity` (renamed from Sprint 0's `Sprint0.unity`,
-which has been deleted). Registered in `EditorBuildSettings`. Contains a
-single `GameObject` ("GameBootstrap") carrying `GameBootstrap` and
-`BoardConfig`; everything else in the running game — camera, board visual,
-unit/pathogen pools and instances, HUD — is constructed at runtime in
-`GameBootstrap.Awake()`. See `docs/INTERFACE.md`'s "Scene construction"
-section for why (short version: no interactive Editor session was
-available to hand-author a scene, so the scene builds itself from code
-instead).
+Still `Assets/Scenes/Sprint1.unity` — **not renamed this sprint**, a
+deliberate scope call (see `docs/TEAM_RETRO.md`): the file's content is
+just the single `GameBootstrap` object with default-value serialized
+fields, all real gameplay is code-driven at runtime, so renaming it would
+have been cosmetic-only and added a rebuild/re-verify cycle for zero
+functional benefit. Flagging clearly here so nobody reads "Sprint1.unity"
+as meaning the file is stale.
 
-`Assets/Editor/SceneSetup.cs` is the Editor-only script that creates and
-saves this scene (`SceneSetup.RebuildSprint1Scene`, also exposed as an
-Editor menu item `ImmunologyTD/Rebuild Sprint 1 Scene`). `BuildScript.cs`
-also knows how to recreate the same minimal scene from scratch as a
-fallback if the `.unity` file is ever missing.
+`Assets/Editor/SceneSetup.cs` and `BuildScript.cs` are unchanged from
+Sprint 1 (still point at `Sprint1.unity`).
 
-### Gameplay systems (all new this sprint)
+### Gameplay systems
 
-Implements `SPRINT_PLAN.md`'s Sprint 1 scope — the two-resolution lattice,
-host-cell occupancy, pathogen adhesion, two-unit-type random walk, and the
-cytokine-sensing debug toggle. Full data-shape documentation lives in
-`docs/INTERFACE.md`; summary:
+Builds on Sprint 1's two-resolution lattice, cytokine field, and random/
+biased-walk search. Sprint 2 additions, per `SPRINT_PLAN.md`'s three scope
+items:
 
-- **`Assets/Scripts/Grid/`** — `CoarseCoord`, `FineCoord`, `BoardConfig`
-  (board width is an Inspector field on the bootstrap object, `Range(24,
-  40)`, default 30), `TissueGrid` (coarse occupancy, **plus, as of the
-  closing task, per-slot infection timers and continuous secretion
-  strength** — see `docs/INTERFACE.md`), `CytokineField` (coarse-grid
-  gradient, bilinear-interpolated down to fine resolution per
-  `GAME_DESIGN.md` section 7's implementation note; now recomputed on a
-  timer from weighted infected-source strengths rather than only on
-  adhesion-count change).
-- **`Assets/Scripts/Units/`** — `UnitProfile` (per-type
-  fine-tiles-per-tick speed, footprint, color), `SearchUnit` (the
-  random-walk / cytokine-biased-walk mover — the per-step decision itself
-  now lives in `Chemotaxis`, see next), `Chemotaxis` (new this closing
-  task — static, side-effect-free per-step neighbour-choice algorithm,
-  pulled out of `SearchUnit` so a headless verification harness could call
-  the real production algorithm), `CytokineToggle` (the `C`-key runtime
-  debug toggle, works in a standalone build).
-- **`Assets/Scripts/Pathogens/`** — `PathogenAgent` (spawn → transit →
-  adhere, or transit-and-exit), `PathogenSpawner` (timed spawning through
-  `PrefabPool`; recomputes `CytokineField` on a fixed 0.4s timer as of the
-  closing task, not just on adhesion events).
-- **`Assets/Scripts/Rendering/`** — `RuntimeSprites` (procedural flat-color
-  square sprite, no imported art), `BoardRenderer` (coarse-cell
-  host-tissue-vs-pathogen coloring, **plus, as of the closing task, a
-  cytokine-field heatmap tint blended in on top** — see below), `HudOverlay`
-  (IMGUI debug text — deliberately not `UnityEngine.UI`, see below).
-- **`Assets/Scripts/Bootstrap/GameBootstrap.cs`** — builds the whole scene
-  at runtime; the closest thing this project has to a "main" entry point
-  right now.
-- **`Assets/Scripts/Pooling/PrefabPool.cs`** — unchanged from Sprint 0
-  except one addition, `public void SetPrefab(GameObject)`, needed because
-  Sprint 1's pools are wired up entirely from code (no Inspector
-  drag-and-drop available). Both units and pathogens go through this pool,
-  not raw `Instantiate`/`Destroy`, per `GAME_DESIGN.md` section 8. Host
-  cells (the coarse-grid background quads) do **not** go through the pool
-  — they're created once at startup and never churned, which is outside
-  what the pooling requirement targets (repeated spawn/destroy of
-  enemies/projectiles/effects).
-- **`Assets/Scripts/Platform/SteamStub.cs`** — unchanged from Sprint 0,
-  still a placeholder.
+**1. Bone marrow placement (replaces Sprint 1's debug spawn).**
+- **`Assets/Scripts/Units/BoneMarrowSlot.cs`** (new) — one clickable slot.
+  Click detection is Unity's legacy `OnMouseDown` message via a
+  `BoxCollider2D` + the main camera's physics raycast — no uGUI/
+  EventSystem needed (still no `com.unity.ugui` package this project).
+- **`Assets/Scripts/Units/BoneMarrowManager.cs`** (new) — owns
+  `BoneMarrowSlotCount` (5, a judgment call — see `docs/TEAM_RETRO.md`)
+  slots below the tissue board. An empty slot click opens an IMGUI
+  two-button picker (Macrophage/Neutrophil); `PlaceTower(index, kind)` is
+  free (no ATP cost, per `SPRINT_PLAN.md`) and starts a per-slot emission
+  timer. `Tick(float deltaTime)` — not an implicit `Update()` reading
+  `UnityEngine.Time` — is the real emission logic, matching the
+  `TissueGrid`/`CytokineField`/`Chemotaxis` pattern of taking explicit time
+  so a headless harness can drive it directly (see Verification below).
+  `EmissionIntervalSeconds = 4f` is a judgment call, not a balanced number.
+  A placed tower emits into tissue at a uniformly random column along the
+  **blood-adjacent edge** (the deepest fine row, `board.FineRows - 1`) —
+  rung-1 entry per `GAME_DESIGN.md` section 2a ("cells extravasate at
+  random points along the vessel").
+- **`GameBootstrap`** no longer spawns any units at startup. It builds the
+  (empty) macrophage/neutrophil `PrefabPool`s and hands them to
+  `BoneMarrowManager`, which is now the sole source of new units. Nothing
+  is on the board until the player places at least one tower — an
+  accepted, `GAME_DESIGN.md`-flagged consequence ("round 1 becomes
+  buy-then-observe").
 
-### Sprint 1 closing task: cytokine-sensing legibility fix (2026-08-19)
+**2. Lymph node placeholder.**
+- A labeled, reserved, non-functional compartment built directly in
+  `GameBootstrap` (a background `SpriteRenderer` + a
+  `Assets/Scripts/Rendering/CompartmentLabel.cs` text label), positioned to
+  the right of the tissue board. No behavior — exactly what
+  `SPRINT_PLAN.md` scoped ("visually reserved space... not a functional
+  lymph node").
+- **`CompartmentLabel.cs`** (new) — small reusable IMGUI label anchored to
+  a world-space point via `Camera.main.WorldToScreenPoint`, used for both
+  the lymph node's caption and the bone marrow strip's heading, to avoid
+  writing near-identical `OnGUI` boilerplate twice.
 
-First playtest verdict: the random walk read fine and the build was
-liked, but toggling cytokine sensing (`C` key) produced **no perceptible
-difference**. Diagnosis (see `SPRINT_PLAN.md`'s "Closing task" section):
-the field's sources were just "wherever a pathogen happens to be" with no
-distinct infected-cell concept and a flat one-shot strength, and the
-resulting per-step bias was real but too gradual to notice in a short
-session — compounded by there being no visual cue that a field existed at
-all. Three changes landed to fix this, all documented in detail in
-`docs/INTERFACE.md`:
+**3. Pathogen classes + combat (`GAME_DESIGN.md` section 4a).**
+- **`PathogenClass` enum** (new, in `PathogenAgent.cs`) —
+  `IntracellularVirus`, `IntracellularBacterium`, `LargeBacterium`.
+  Parasites (multi-slot footprint) remain out of scope, per
+  `SPRINT_PLAN.md`. Assigned per adhesion event via weighted random
+  (`VirusChance = 0.45`, `BacteriumChance = 0.25`, remainder
+  `LargeBacterium` — a judgment call, see `docs/TEAM_RETRO.md`, weighted
+  toward virus since spread is "the sprint's most important piece").
+- **Rendering split** — `BoardRenderer.ShowsAsPathogenItself(PathogenAgent)`
+  (new static, side-effect-free predicate, same extraction pattern as
+  Sprint 1's `Chemotaxis.ChooseNextStep`) decides per-cell background
+  color: `LargeBacterium` reads as itself (dark maroon); intracellular
+  classes read as bare host tissue (pink). A `PathogenAgent`'s own small
+  sprite is **disabled entirely** for intracellular classes (see "Notable
+  bug found and fixed" below for why an earlier version that tinted it
+  flat instead of hiding it was wrong) — the coarse-cell background
+  (heat-tinted per the existing cytokine mechanism) is the *only*
+  representation of an intracellular infection, exactly matching
+  `GAME_DESIGN.md`'s "visible as the host cell, not itself, until sensed."
+- **Combat** — `PathogenAgent.ReceiveDamage(float)` (new), called by
+  `SearchUnit.CheckContact` every tick a unit's fine tile falls in an
+  occupied coarse slot (`PathogenAgent.ContactDamagePerHit = 1f`, flat, per
+  `SPRINT_PLAN.md`'s "keep damage numbers simple"). `MaxHealth` is 12 for
+  both intracellular classes, 18 for `LargeBacterium` (judgment calls —
+  see `docs/TEAM_RETRO.md`). Reaching zero calls `TissueGrid.ReleaseSlot`
+  (unused since Sprint 1, now exercised) and returns the pathogen to its
+  pool via the existing `onExit` callback path — the same mechanism
+  Sprint 1's transit-and-exit case already used.
+- **Viral spread** — `PathogenAgent.TickCombat(float currentTime)` (new,
+  explicit-time like the rest of this sprint's testable surfaces) checks,
+  once `IncubationSeconds` (15f, judgment call) have elapsed on an
+  uncleared virus infection, whether to spread to a free adjacent coarse
+  slot via `PathogenSpawner.RequestSpread(CoarseCoord, float)` (new,
+  public — shuffles the four coarse von Neumann neighbours and spawns a
+  child `PathogenAgent` directly into `Adhered` state via
+  `PathogenAgent.InitializeAdheredDirect`, through the same
+  `PrefabPool` as ordinary spawns). Retries every `SpreadRetryIntervalSeconds`
+  (1f) if blocked, rather than giving up permanently. Bacterial
+  intracellular infections and large bacteria never spread (virus-specific
+  per `GAME_DESIGN.md`). Verified headlessly to chain across multiple
+  generations (see Verification below) — this is what gives search speed
+  its "compounding cost."
 
-1. **Infected-cell concept with continuous secretion**
-   (`TissueGrid.GetSecretionStrength`) — adhesion now starts a per-slot
-   infection timer; secretion ramps from `BaseSecretionStrength` (6) to
-   `MaxSecretionStrength` (32) over `InfectionRampSeconds` (20s), rather
-   than being a flat value from the moment of adhesion. `CytokineField` is
-   recomputed from this on a timer (every 0.4s, `PathogenSpawner`) instead
-   of only when the adhered-slot count changes, since the field now keeps
-   changing on its own.
-2. **Much stronger, differently-shaped bias** — the per-step neighbour
-   weighting (now `Chemotaxis.ChooseNextStep`, pulled out of
-   `SearchUnit.StepOnce` into its own static class) changed from a linear
-   function of each candidate's *absolute* field value to a softmax over
-   each candidate's value *relative to the best candidate* among the four,
-   which is what actually fixes the imperceptibility problem — a linear
-   weighting on absolute value barely distinguished four fine tiles a
-   coarse-cell's-width apart from each other, no matter how large the
-   coefficient. `Chemotaxis.GradientSharpness = 4f` (empirically tuned,
-   see Build status below).
-3. **Visible heatmap cue** (`BoardRenderer`) — coarse-cell background
-   quads now blend a warm orange tint proportional to local cytokine
-   field strength, on top of the existing host/pathogen coloring.
-   Deliberately shown regardless of the toggle state (the field exists in
-   the fiction whether or not a cell type can sense it yet), so cause (a
-   hot cell) and effect (units pulled toward it, only when sensing is ON)
-   are both on screen at once.
+### Notable bug found and fixed this sprint: `PrefabPool` didn't initialize outside Play Mode
 
-### Notable implementation choice: no `UnityEngine.UI` (uGUI)
+`PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
+assumption (mine, going in) that Unity calls `Awake()` synchronously on
+`AddComponent()` even outside Play Mode turned out to be wrong — it only
+fires reliably once the player loop is actually running (Play Mode, or a
+real build). A headless verification harness that `AddComponent`s a
+`PrefabPool` and calls `Get()` directly hit this as a
+`NullReferenceException`. Fixed by making pool construction lazy
+(`EnsurePool()`, called from `Awake()` **and** from `Get()`/`Release()`) —
+harmless in normal gameplay (`Awake()` already ran by the time anything
+calls `Get()`), and it's what let `Assets/Editor/CombatVerification.cs`
+drive the real `PathogenSpawner`/pool path headlessly. See
+`docs/TEAM_RETRO.md` for the full story.
 
-`game/Packages/manifest.json` doesn't include `com.unity.ugui` — Unity 6
-split legacy uGUI (`Canvas`, `Text`, `CanvasScaler`, etc.) out to its own
-package, and it isn't installed in this project. Adding a package needs
-network access and is normally an Editor-GUI/Director step (the same
-constraint Sprint 0 noted for Steamworks — see `SteamStub.cs`'s comment).
-Sprint 1 hit this directly: the first compile attempt used
-`UnityEngine.UI.Text` for the debug HUD and failed with `CS0234`. Rather
-than add the package mid-sprint, the HUD was rebuilt with IMGUI (`OnGUI`),
-which needs nothing extra and is a reasonable fit for a debug overlay.
-**If/when real UI work starts** (buy panel, unit inspector, etc. — all out
-of scope so far), installing `com.unity.ugui` (or evaluating UI Toolkit,
-which *is* available via `com.unity.modules.uielements`, already in the
-manifest) is a deliberate step to take then, not something to route around
-again.
+### Notable bug found and fixed this sprint: camera under-zoom from a stale `Camera.aspect`
 
-## Build status (Sprint 1, including the closing task)
+`GameBootstrap.BuildCamera` computes `orthographicSize` from
+`Camera.aspect` at `Awake()` time (frame 0), before the actual runtime
+window/render-target size has necessarily settled. In this sprint's first
+real-build screenshot the right ~25% of the board (and the entire lymph
+node compartment) was cropped out of frame. Fixed by refitting the camera
+a second time one frame later via a coroutine
+(`RefitCameraNextFrame`) — `FitCamera` is now a separate, reusable method
+called once immediately (a reasonable frame-0 fallback) and again after
+`yield return null`. **Turned out not to be the actual cause of the
+cropping seen in the first screenshot** (see Build verification below —
+that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
+the game), but the fix is real, cheap, and strictly more correct than
+relying on a single frame-0 aspect read, so it's kept.
 
-### Headless algorithm verification (closing task's required evidence)
+## Build status (Sprint 2)
 
-Before touching the build, `Assets/Editor/CytokineVerification.cs`
-(`Unity.exe -batchmode -quit -projectPath <path> -executeMethod
-CytokineVerification.RunComparison`) drove the actual production
-`Chemotaxis.ChooseNextStep`/`TissueGrid`/`CytokineField` classes headlessly
-(no `GameObject`s, no play mode) to measure the ON/OFF difference directly,
-per the closing task's explicit ask for more than "it compiles and
-launches." 10 simulated units (mixed macrophage/neutrophil speed) against
-5 infected sites on a 30x5 board, same random seed both runs, average
-unit-to-nearest-infected-cell distance in coarse cells (Manhattan):
+### Headless verification (`Assets/Editor/CombatVerification.cs`, new)
 
-| Window | OFF (rung 1) | ON (rung 2) |
-|---|---|---|
-| 0:00–1:00 | 2.99 | 0.20 |
-| 1:00–2:00 | 3.14 | 0.00 |
-| 2:00–2:30 | 2.84 | 0.00 |
+Same philosophy as Sprint 1 closing task's `CytokineVerification.cs` —
+drives the actual production classes (`TissueGrid`, `PathogenAgent`,
+`PathogenSpawner`, `BoardRenderer.ShowsAsPathogenItself`,
+`BoneMarrowManager`), not a reimplementation, with no play mode and no
+rendering. Run via `Unity.exe -batchmode -quit -projectPath <path>
+-executeMethod CombatVerification.RunAll`.
 
-OFF never meaningfully converges within the 2.5-minute simulated window
-(consistent with `GAME_DESIGN.md` section 7's own cover-time estimate for a
-30-wide board); ON reaches distance ~0 (a unit sitting in the same coarse
-cell as an infected site) for effectively the whole population well before
-the 1-minute mark. A finer-grained run (`RunFineGrainedSweep`, 10-second
-buckets, `Chemotaxis.GradientSharpness = 4f`) showed this isn't an instant
-snap: per-unit first-arrival times ranged 0.2s–16.4s (avg 4.5s across all
-10 units), and the 10s-bucket average distance stepped down gradually
-(1.00 → 0.21 → 0.00 → ...) rather than jumping straight to 0 — i.e. it
-reads as fast, visible drift, not teleportation. `GradientSharpness`
-itself was chosen by sweeping 2–20 and picking the smallest value that
-still produced a dramatic, fast difference (higher values converge even
-faster but make individual steps look closer to deterministic pathfinding,
-risking rung 2 reading like rung 3).
+**35/35 assertions passed.** Four groups:
 
-**Honesty check on what this evidence does and doesn't show:** this
-confirms the mechanism produces a large, fast, measurable difference in
-the exact algorithm the game runs, using a representative but hand-picked
-scenario (5 sources, 10 units, one seed). It is not a claim about how the
-Director will perceive it, which the screenshots and build below are
-closer to, and even those are still this session's read, not the
-Director's.
+1. **Damage → clear → slot release**, for all three pathogen classes:
+   confirms occupancy before the last hit, slot-free + `GetPathogenAt ==
+   null` + `onExit` fired exactly once after the last hit, for
+   `IntracellularVirus` (12 HP), `IntracellularBacterium` (12 HP), and
+   `LargeBacterium` (18 HP).
+2. **Render classification**: `BoardRenderer.ShowsAsPathogenItself` is
+   false for both intracellular classes and for a bare slot (`null`), true
+   for `LargeBacterium`.
+3. **Viral spread timing** — the flagship result. Three scenarios, all
+   driving the real `PathogenSpawner.RequestSpread`:
+   - Left uncleared: `AdheredCount` stays 1 right up to incubation, then
+     grows past 1 once incubation elapses, and reaches **3** (one origin +
+     two chain-spread children) within 43 simulated seconds — confirms
+     the spread isn't a one-shot event but chains across generations, each
+     with its own independent incubation timer, which is what
+     `GAME_DESIGN.md` section 4a's "compounding cost" language actually
+     means.
+   - Cleared (via `ReceiveDamage`) partway through incubation:
+     `AdheredCount` stays 0 for the rest of the simulated window — a
+     cleared infection genuinely cannot spread, the direct proof that
+     "fast search beats spread."
+   - `IntracellularBacterium`, ticked 45 simulated seconds (3x the virus
+     incubation window): never spreads.
+4. **Bone marrow emission**: a slot starts `Empty`; `PlaceTower` sets it to
+   `Placed`; `EmittedCount` is 0 before any `Tick`, reaches ≥2 after 10
+   simulated seconds (`EmissionIntervalSeconds = 4`); the last emitted
+   unit's row is exactly `board.FineRows - 1` (the blood-adjacent edge)
+   and its column is in bounds; placing on an already-placed slot is a
+   no-op.
+
+**Regression check**: re-ran `CytokineVerification.RunComparison` (Sprint
+1's closing-task harness, untouched this sprint) — numbers are
+**identical** to the values recorded in the Sprint 1 closing task (OFF:
+2.99/3.14/2.84, ON: 0.20/0.00/0.00 across the three time buckets). The
+cytokine-sensing mechanism did not regress from this sprint's changes.
 
 ### Real build + runtime verification
 
-Verified via `BuildScript.BuildWindows()` (`Unity.exe -batchmode -quit
--projectPath <path> -executeMethod BuildScript.BuildWindows`):
+`BuildScript.BuildWindows()` succeeded three times over the course of this
+sprint (iterating on the two bugs above), final result: `Succeeded, size:
+93289832 bytes, errors: 0`.
 
-- **Windows**: `Succeeded, size: 93277352 bytes, errors: 0` →
-  `Builds/Windows/ImmunologyTowerDefense.exe`. (Sprint 1's original build
-  was 93274792 bytes; the ~2.5KB difference is consistent with the new
-  `Chemotaxis.cs` and `CytokineVerification.cs` — the latter is
-  Editor-only and doesn't ship, so this is just the `Chemotaxis`/rework
-  code.)
-- Launched the built `.exe` directly (not the Editor) and confirmed:
-  process stayed alive for the full ~60s observation window (started,
-  screenshotted twice ~30s apart, then manually stopped — never crashed on
-  its own), and `Player.log`
-  (`%LOCALAPPDATA%\..\LocalLow\DefaultCompany\game\Player.log`) has no
-  `Exception`/`Error` lines, same clean-launch signature as Sprint 1's
-  original verification.
-  - Captured window contents via the Win32 `PrintWindow` API. **Note for
-    next time:** this sprint's build renders via D3D12 (see `Player.log`),
-    and `PrintWindow` with flag `0` (what worked in the original Sprint 1
-    verification, presumably a different renderer at the time) returned a
-    solid black frame this time — needed flag `2`
-    (`PW_RENDERFULLCONTENT`) to actually capture DirectX-composited
-    content. Worth trying `2` first if a future session hits the same
-    black-frame result. Also, `Add-Type`-defined PowerShell types don't
-    persist across separate tool calls — redefine them in the same call
-    that uses them.
-  - **Screenshot 1** (sensing OFF, ~8s after launch): host cells (pink)
-    visually distinct from adhered pathogens (dark maroon), **and** a
-    visible warm-orange tint gradient around infected cells — the heatmap
-    cue renders correctly and is legible even at this small a board
-    region. Units (blue macrophages, yellow neutrophils) scattered with no
-    obvious pull toward hot cells.
-  - **Screenshot 2** (sensing ON, ~25s after toggling `C` via a
-    `SendKeys` call through an `AttachThreadInput`-forced-foreground
-    window, ~33s further into the same run): three units — including a
-    macrophage and a neutrophil stacked on the same cell — now sitting
-    directly on top of infected/hot cells, versus zero doing so in
-    Screenshot 1. HUD line confirms "Cytokine sensing: ON". This is the
-    single clearest piece of visual evidence gathered this task: the same
-    running process, ~30 seconds apart, before/after the toggle, showing
-    units visibly relocating onto hot cells.
-  - Screenshots saved to `game/screenshot_before_toggle.png` and
-    `game/screenshot_after_toggle_on.png` (untracked, not committed — see
-    `.gitignore`'s log-file pattern doesn't cover these, they're just
-    left as loose evidence files for review).
-- **WebGL**: not re-verified this sprint (Sprint 0's WebGL build/serve
-  path is untouched by Sprint 1's changes and should still work per
-  `tools/serve_webgl.ps1`, but wasn't re-run — the brief only required
-  Windows-target verification, which is faster).
+Launched the built `.exe` and captured window contents via `PrintWindow`
+(flag `2`, per Sprint 1's tip). **Important tooling correction made this
+sprint**: the first screenshot attempt used `GetWindowRect` from a
+PowerShell process that was *not* DPI-aware, which on this machine (a
+150%-scaled display) returns window coordinates in a different scale than
+Unity's actual render resolution (`Screen.width`/`height` = 2560×1600, vs.
+the non-DPI-aware rect's 1707×1067 — exactly a 1.5x mismatch). This
+produced a screenshot that looked like a cropped board with no lymph node
+visible, which was initially (and incorrectly) diagnosed as a camera
+framing bug. Calling `SetProcessDPIAware()` in the capture script before
+`GetWindowRect` fixed the capture to match Unity's real resolution, at
+which point **the full 30-column board and the lymph node compartment were
+both visible and correctly positioned** — the camera math had been correct
+the whole time. (The camera refit-next-frame fix above is still kept, on
+its own merits, but wasn't the fix for this particular symptom.) Worth
+carrying forward: **on a scaled display, screenshot/click automation
+against a Windows app needs `SetProcessDPIAware()` before any
+`GetWindowRect`/`SetCursorPos` call**, or physical-pixel math will be
+wrong by the scale factor.
+
+Confirmed visually, across a sequence of screenshots over one running
+session (see `docs/TEAM_RETRO.md` for the full narrative, including that
+part of this session's evidence came from the Director apparently
+interacting with the live window himself):
+
+- **Bone marrow compartment**: 5 slots below the tissue board, labeled
+  "Bone Marrow — click an empty slot to place a tower." Clicking an empty
+  slot (verified with programmatically computed screen coordinates,
+  derived from a logged camera-position/orthographic-size/aspect
+  diagnostic — not eyeballed) opens the two-button picker; clicking
+  "Neutrophil" placed a tower, changing that slot's label and color
+  immediately. Two other slots were already showing "Macrophage tower" /
+  "Neutrophil tower" from earlier interaction.
+- **Lymph node compartment**: visible to the right of the tissue board,
+  labeled "Lymph Node (reserved — not functional yet)."
+- **Units actively spawning and moving**: successive screenshots a few
+  seconds apart (with the window focused — see below) show materially
+  different unit positions and a growing unit count, consistent with
+  multiple placed towers each emitting on their own ~4s timer and units
+  then random/cytokine-walking.
+- **Pathogen class rendering**: small dark-maroon squares (large bacteria,
+  visible as themselves) scattered on an otherwise uniformly
+  host-pink-colored board — no visible "tell" for intracellular
+  infections beyond the existing heatmap tint, confirming the
+  hide-the-small-sprite fix (see above) actually fixed the visual bug it
+  was meant to fix.
+- **Cytokine sensing / heatmap**: toggle read "ON" during this session
+  (again, likely toggled by the Director) with heat-tinted cells visible,
+  consistent with Sprint 1's unchanged mechanism.
+
+**One behavior worth knowing for future automated verification, not a
+bug**: the built game does **not** tick while its window lacks OS
+foreground focus — two screenshots taken several tool-calls apart with no
+focus in between were pixel-identical, and resumed changing the moment
+focus was re-established via the `AttachThreadInput`/`SetForegroundWindow`
+trick. `Application.runInBackground` is at its Unity default (unchecked).
+Not changed this sprint — flagged as a real consideration for anyone doing
+further scripted verification, and possibly worth revisiting when a real
+playtest build is being prepared (an idle/alt-tabbed player might be
+surprised the game paused).
+
+**Not re-verified this sprint**: WebGL (same as Sprint 1 — the brief
+prioritizes Windows-target verification).
 
 ### What was verified vs. what needs the Director's own eyes
 
-Verified directly this closing task: the algorithm produces a large,
-fast, measurable ON/OFF difference (headless numbers above); the build
-compiles and runs without exceptions; the heatmap tint renders and tracks
-infection; units visibly relocate onto infected cells within ~30 seconds
-of toggling sensing on, in an actual packaged build screenshot comparison.
+Verified directly: the pooled damage/clear/spread mechanics are correct
+against the real production code (headless, 35/35); the cytokine mechanism
+didn't regress (identical numbers to Sprint 1); the build compiles and
+runs without exceptions; bone marrow placement (click → picker → placed
+tower → periodic emission at the blood edge) works end-to-end in a real
+running build, confirmed with programmatically computed click coordinates,
+not just visual inspection; the lymph node placeholder renders and is
+labeled; intracellular pathogens do not visually reveal themselves outside
+the heatmap.
 
-**Not verified, and can't be from this session:** whether this now reads,
-to the Director, as "transformative" rather than merely "measurably
-different" — the actual bar `SPRINT_PLAN.md` sets. This session's read of
-its own screenshots is that the difference looks strong and immediate, but
-that's this session's judgment, not the Director's. Also unverified: taste
-questions this fix didn't try to answer — is `GradientSharpness = 4`
-*too* strong once real balance/economy exists around it (see
-`docs/INTERFACE.md`'s open question 4), does the orange heatmap read
-clearly against the pink/maroon board at a glance without the HUD's
-explainer line, and whether the original Sprint 1 question ("does the
-random walk read as frustrating-but-legible") still holds now that rung 2
-is dramatically stronger and easy to compare against.
-
-**Original Sprint 1 verification (still valid, not re-run this task):**
-confirming the toggle changes a visible label and confirming individual
-pathogen adhesion sites are spread across the board is not the same as
-watching ten minutes of movement and forming a felt judgment about pacing,
-tedium, or "aha, that's different now." That's inherently a
-Director-in-the-loop question; this session's screenshots are only
-evidence that the mechanism is wired up and running, not that it lands —
-same caveat as noted above for the closing task's own screenshots.
+**Not verified from this session, and can't be**: whether placement
+"feels like a real decision" or combat "gives the search loop a
+satisfying payoff" — `SPRINT_PLAN.md`'s own framing of what this sprint
+answers for the Director is explicitly a felt-experience question, not a
+mechanism-correctness one. Also not captured in a screenshot this
+session: an actual live viral-spread event (a second infected cell
+appearing next to an existing one) — the 15s incubation period didn't
+line up with this session's screenshot windows, though the headless
+harness proves the mechanism triggers and chains correctly. Worth the
+Director specifically watching for it in his own play session (leave
+cytokine sensing OFF and don't rush to clear an infection — it should
+visibly spread within about 15–20 seconds).
 
 ## Known issues
 
-- No multi-depth pathogen descent (out of scope this sprint by design —
-  see `docs/INTERFACE.md`'s pathogen section for the specific
-  simplification made: adhesion row is chosen randomly at spawn rather
-  than reached via burrowing).
-- No host cell health/damage/fibrosis (out of scope this sprint).
-- Units debug-spawn at randomized fine-grid positions rather than via real
-  bone-marrow placement / blood extravasation (out of scope this sprint —
-  see `docs/TEAM_RETRO.md`).
-- `UnityEngine.UI` is not installed in this project; any future UI work
-  needs a conscious package-installation step first (see above).
-- WebGL not re-verified this sprint or the closing task (see above) —
-  should still work but hasn't been re-confirmed against the current code.
+- Scene is still named `Sprint1.unity` (see "Scene" above) — cosmetic
+  only, not stale content.
+- `Application.runInBackground` is unchecked (Unity default) — the game
+  pauses when its window loses focus. Not a bug, just worth knowing before
+  assuming a "frozen" build has crashed.
+- No multi-depth pathogen descent (still out of scope — adhesion row is
+  still chosen randomly at spawn, unchanged from Sprint 1).
+- No host cell health/fibrosis as a tracked numeric system — contact
+  damage exists now (this sprint), but there's no fibrosis/scarring
+  consequence layered on top yet (explicitly out of scope, see
+  `SPRINT_PLAN.md`).
+- `UnityEngine.UI` is still not installed — bone marrow's picker and the
+  compartment labels are IMGUI, same reasoning as Sprint 1's HUD.
+- WebGL not re-verified this sprint (same as Sprint 1).
+- Pathogen class weights (`VirusChance`/`BacteriumChance`), combat numbers
+  (`ContactDamagePerHit`, `MaxHealth` per class), spread timing
+  (`IncubationSeconds`, `SpreadRetryIntervalSeconds`), and bone marrow
+  numbers (`BoneMarrowSlotCount`, `EmissionIntervalSeconds`) are all
+  judgment calls tuned for legibility within a short playtest, not
+  validated against balance — see `docs/TEAM_RETRO.md` for the reasoning
+  behind each, and expect all of them to be revisited once the ATP/economy
+  layer exists.
 - `Chemotaxis.GradientSharpness = 4f` and the infection-ramp constants in
-  `TissueGrid.cs` are tuned for legibility (this closing task's mandate),
-  not validated against balance/pacing — flagged as open questions in
-  `docs/INTERFACE.md`. Whoever builds the round 2 economy should expect to
-  revisit these.
-- The heatmap tint's saturation reference is `TissueGrid.MaxSecretionStrength`
-  (32), a single infected cell's own fully-ramped strength. Overlapping
-  falloff from multiple nearby infected cells can exceed that and clamp to
-  "fully hot" sooner than a single isolated cell would — visually fine
-  (reads as "very hot area"), just worth knowing if the tint ever looks
-  saturated across a wider area than expected.
+  `TissueGrid.cs` are unchanged from Sprint 1 — same caveats as before.
 
-## Addendum: what batchmode CLI can and can't do (relevant again this sprint)
+## Addendum: what batchmode CLI can and can't do (still true)
 
-Same limitation Sprint 0 recorded for the old device-bridge setup, still
-true for a native session running without an interactive Editor window:
-there is no way to drag a prefab into an Inspector field, hand-place a
-GameObject, or otherwise use Editor GUI affordances. Everything has to be
-either (a) generated at runtime from code (this sprint's approach — see
-`GameBootstrap`), or (b) built via an Editor script driven by
-`-executeMethod` in batchmode (this sprint's `SceneSetup.cs`). Both worked
-well. Worth carrying forward: don't assume a future Code agent has
-interactive Editor access unless told otherwise.
+No interactive Editor GUI access this sprint either. Everything built via
+runtime code (`GameBootstrap`) or Editor scripts driven by
+`-executeMethod` in batchmode. One correction to Sprint 1's own note on
+this topic: **`MonoBehaviour.Awake()` is not guaranteed to fire just from
+`AddComponent()` outside Play Mode** (see the `PrefabPool` bug above) —
+Sprint 1's closing task got lucky that none of its dummy `GameObject`s
+needed `Awake()`-driven initialization. Any future headless harness that
+needs a component's `Awake()`-built state should either call an explicit
+init method directly or use a lazy-init guard like `PrefabPool.EnsurePool()`
+now does, not assume `AddComponent` alone is enough.
