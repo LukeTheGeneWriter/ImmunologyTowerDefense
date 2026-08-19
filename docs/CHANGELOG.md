@@ -36,6 +36,16 @@ and the spatial lattice spec this sprint builds against) and restructured
 how the project runs (`WORKFLOW.md`, `CLAUDE.md`) -- see those files if
 curious, no impact on what's playable.
 
+**Closing update, same day:** first playtest found the cytokine toggle
+imperceptible. Root cause was a legibility bug, not a broken mechanism --
+fixed by making adhered pathogens genuinely infect their host cell
+(continuous cytokine secretion that ramps over ~20s) and switching the
+movement bias to weight each direction relative to the best local option
+instead of its raw field value. Also added a visible heatmap tint so the
+field itself is on screen, not just inferred from behavior. Director
+confirmed via his own playtest that the toggle now reads clearly. **Sprint
+1 is closed.**
+
 ## Sprint 0 -- 2026-08-18
 Project pipeline stood up end to end: Unity 6000.5.8f1 project initialized
 in `game/`, object-pooling utility and Steam stub in place, build script

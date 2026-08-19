@@ -56,10 +56,10 @@ scoped to the search problem only, no economy/compartments beyond tissue).
   mutation (a discrete step-change discount) and additive to it if ever
   built.
 
-## Sprint 2 candidate scope (from Director's Sprint 1 playtest, 2026-08-19)
+## Scheduled into Sprint 2 (see `docs/SPRINT_PLAN.md`)
 
-Not yet written up as a formal `SPRINT_PLAN.md` — Sprint 1 isn't closed
-yet (see its closing task). Director's direction for what comes next:
+Director's direction from the Sprint 1 playtest, now written up as a
+formal sprint plan:
 
 - **Bone marrow and lymph node as real, placeable spaces.** Per
   `GAME_DESIGN.md` §1/§2a, progenitor towers are bought and placed in the

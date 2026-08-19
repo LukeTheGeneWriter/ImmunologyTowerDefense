@@ -1,131 +1,96 @@
-# Sprint Plan — Sprint 1
+# Sprint Plan — Sprint 2
 
-## Context
+## Sprint 1 — closed 2026-08-19
 
-Sprint 0 stood up the pipeline (Unity project, object pooling utility,
-Steam stub, two build targets) with no gameplay. Since Sprint 0 closed, a
-large design pass landed (2026-08-19) — the full compartment model, tower
-lifespan, knowledge ladder, fibrosis, breach cost, and — most relevant to
-this sprint — the two-resolution spatial lattice, all now merged into
-`docs/GAME_DESIGN.md`. `WORKFLOW.md` was also rewritten the same day: this
-project is now run by one head session that dispatches focused subagents
-(Code, Design, Feedback) rather than several persistent, separately-started
-Claude Code sessions. See `CLAUDE.md` for orientation on that.
+Delivered: the tissue lattice, random-walk search, and a cytokine-sensing
+toggle that (after a same-day legibility fix — see `docs/CHANGELOG.md`)
+the Director confirmed reads clearly in his own playtest. Full history in
+`docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
 
-## Why Sprint 1 is scoped the way it is
+## Direction for Sprint 2 (Director, 2026-08-19)
 
-Per `docs/GAME_DESIGN.md` §9 and `docs/handoff-map01-intestine.md` §4: the
-random walk in round 1 is the game's central teaching device and the
-anchor of the entire upgrade economy. Everything downstream — the
-cytokine-sensing upgrade, the value of chemotaxis, whether round 1 reads as
-"frustrating-but-legible" instead of "broken" — depends on whether this
-core movement/search loop actually feels like something. The economy (ATP,
-buy panel, towers) is well-understood tower-defense plumbing and low risk;
-the search problem is not, and the design explicitly calls it out as the
-single most important thing to get right before building anything on top
-of it. So: **build the search problem first, build nothing else.**
+Two things, in his words: (1) layout changes so there's a place to place
+purchased cells — bone marrow for progenitors, a lymph node for adaptive
+immunity — and (2) some way for immune cells to actually interact with
+pathogens/infected cells, "so we can see some functionality."
 
 ## Scope
 
-- The tissue lattice: coarse grid (occupancy — one host cell or one
-  pathogen per slot) with a 7×7 fine sub-lattice per coarse slot for
-  movement (`GAME_DESIGN.md` §7).
-- Host-cell occupancy on the coarse grid.
-- Pathogen adhesion (entering at a coarse slot, "sticking") and descent
-  (moving toward depth 5 over time/rounds is out of scope for this
-  sprint's minimal slice — adhesion + presence is enough; full multi-depth
-  descent can follow once movement itself is proven out. Use judgment here
-  if a minimal single-layer-plus-adhesion version is clearly enough to
-  answer the sprint's core question; don't over-build depth mechanics
-  before they're needed).
-- Two unit types performing a **pure random walk** (uniform probability
-  across the four von Neumann neighbours) through the fine lattice,
-  co-occupying host-cell slots as they move.
-- A **debug toggle** for cytokine sensing (rung 2: neighbour probability
-  weighted by a gradient from adhered/pathogen-occupied slots) so the
-  "does this feel transformative" question in `GAME_DESIGN.md` §9 can
-  actually be tested against the random-walk baseline.
-- **Configurable board width** (coarse columns) as a build/inspector
-  parameter — not hardcoded. Per `GAME_DESIGN.md` §7, board width is the
-  primary difficulty knob and needs playtesting, not deriving. Start
-  somewhere in the 24–40 column range (30 is a reasonable default) and
-  make it trivially adjustable.
-- **Per-cell step length** (fine tiles per tick, varies by unit type) from
-  the start — required for 7×7 subdivision to cost nothing in pacing per
-  `GAME_DESIGN.md` §7. Don't hardcode one tile per tick.
-- Continue honoring the object-pooling requirement (`GAME_DESIGN.md` §8) —
-  pathogens and immune cells go through `PrefabPool.cs`, not raw
-  Instantiate/Destroy.
-- Draft a first pass of `docs/INTERFACE.md` reflecting whatever data shapes
-  actually get built (coarse/fine coordinates, unit/pathogen state) — it's
-  been an empty stub since Sprint 0 and there's finally something to
-  describe.
-- Update `docs/ENGINE_STATUS.md` to reflect what actually got built.
-- Append notes to `docs/TEAM_RETRO.md` — anything that was confusing or
-  worth flagging for next time.
+Both pieces close the loop Sprint 1 left open on purpose: units currently
+debug-spawn at random positions and "contact" is just a visual flash with
+no consequence. This sprint replaces both placeholders with the real
+mechanics, still without the economy layer.
 
-**Explicitly not in scope:** ATP, buy panel, round-end summary, art/visual
-polish beyond whatever makes the lattice and movement legible for a
-playtest, bone marrow UI, lymph node, adaptive immunity, knowledge
-percentage, fibrosis, breach cost, multiple compartments beyond tissue.
-Several of those are LOCKED in `GAME_DESIGN.md` and still should not be
-built yet — this sprint answers one question first.
+**1. Bone marrow — real placement, replacing debug spawn.**
+- A visually distinct area separate from the tissue board (per
+  `GAME_DESIGN.md` §1/§2a — bone marrow is its own compartment).
+- A small number of open slots. Clicking an open slot places a progenitor
+  tower — Macrophage or Neutrophil (the two Sprint 1 already has). Which
+  one is a player choice, however that's simplest to expose (e.g. a
+  two-button picker) — doesn't need to be polished.
+- A placed tower periodically emits a unit that enters tissue from the
+  blood-side edge, replacing `GameBootstrap`'s current random debug spawn.
+  Rung-1 entry only (uniform, per `GAME_DESIGN.md` §2a's entry table) —
+  cytokine-biased entry location is a later rung, not this sprint.
+- **No ATP cost yet.** Placement is free. This sprint is about proving the
+  placement → emission → tissue pipeline works, not the economy — that's
+  a deliberate, separate piece of scope (see `BACKLOG.md`'s round 1
+  economy question, still open).
+
+**2. Combat — units can actually clear an infected cell.**
+- When a unit is in contact with an infected cell (the existing
+  `SearchUnit.CheckContact`/`PathogenAgent.NotifyContact` hook — already
+  fires reliably, per `docs/INTERFACE.md`'s open questions from Sprint 1),
+  it now deals damage over time instead of just triggering a flash.
+- Once an infected cell's health is depleted, the pathogen clears: the
+  coarse slot releases (`TissueGrid.ReleaseSlot`, unused until now) and
+  returns to plain host tissue, the pathogen returns to its pool.
+- Keep this simple — a flat damage rate is fine. Differentiating
+  macrophage vs. neutrophil combat behavior (`GAME_DESIGN.md` §4's role
+  split — neutrophils are supposed to be strong DPS with collateral
+  damage, macrophages more measured) is a reasonable stretch goal if time
+  allows, but not required to hit this sprint's stopping point.
+
+**3. Lymph node — placeholder only, not functional.**
+- Full adaptive immunity (`GAME_DESIGN.md` §5 — knowledge percentage,
+  dendritic cells, T/B cells, the threshold ladder) is a large system on
+  its own and deliberately **not** in this sprint's scope.
+- What this sprint does add: a visually reserved space for it in the
+  layout (labeled, present, empty) so the compartment model is visible on
+  screen and the next sprint has somewhere to build into — not a
+  functional lymph node.
+- **Flagging this explicitly since it's a scope-narrowing call, not a
+  literal reading of "a lymph node for adaptive immunity to take place":**
+  if the intent was for something adaptive-immunity-related to actually
+  function this sprint, say so and this scope should change before work
+  starts.
+
+## Explicitly not in scope
+
+ATP/economy, knowledge percentage/adaptive immunity mechanics, fibrosis,
+breach cost/lives, multi-depth pathogen descent/burrowing, dendritic
+cell/lymph node travel delay, differentiated per-unit-type combat (stretch
+goal only, see above). Everything Sprint 1 already built (configurable
+board width, per-unit-type step speed, object pooling, the cytokine
+toggle and its heatmap cue) must keep working — this sprint extends it,
+doesn't replace it.
 
 ## Stopping point (definition of done)
 
-- [ ] A build the Director can open and watch for ten minutes.
-- [ ] The lattice is visible: host-cell occupancy at the coarse level,
-      readable at a glance.
-- [ ] Pathogens enter and adhere somewhere on the board.
-- [ ] Two units move via pure random walk and visibly search/collide with
-      adhered pathogens.
-- [ ] Flipping the cytokine-sensing debug toggle visibly changes movement
-      behavior — biased drift toward pathogen sites instead of uniform
-      wandering.
-- [ ] Board width is adjustable without a code change (inspector field or
-      equivalent).
-- [ ] Each unit type has its own configurable step length.
-- [ ] `docs/INTERFACE.md` has a real first draft.
-- [ ] `docs/ENGINE_STATUS.md` reflects reality.
+- [ ] Bone marrow is a visually distinct area with clickable open slots.
+- [ ] Placing a slot lets the player choose Macrophage or Neutrophil.
+- [ ] A placed tower periodically emits that unit type, entering tissue
+      from the blood-side edge — no more random debug spawn.
+- [ ] Lymph node has a visible, labeled, reserved space in the layout.
+- [ ] A unit in contact with an infected cell deals damage over time;
+      a sufficiently damaged infected cell clears back to healthy tissue.
+- [ ] Board width, per-unit-type step speed, object pooling, and the
+      cytokine-sensing toggle (with heatmap cue) all still work.
+- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect the new
+      systems.
 - [ ] `docs/TEAM_RETRO.md` has at least one new note.
 
-The single question this sprint exists to answer for the Director: **does
-the random walk read as frustrating-but-legible rather than broken, and
-does cytokine sensing feel transformative when toggled on?** If the answer
-is no, the difficulty ladder in `GAME_DESIGN.md` §7/§9 needs rethinking
-before any economy work is worth doing — so don't build economy work yet
-regardless of how this sprint goes.
-
-## Closing task (added after first playtest, 2026-08-19)
-
-Director's playtest verdict: the random walk itself reads fine and the
-build is liked, but **the cytokine-sensing toggle produced no perceptible
-difference.** Root cause, confirmed by code review: the current field's
-sources are just "adhered pathogen coordinates" with no distinct infected-
-cell concept, and the resulting per-step bias is a real but very gradual
-statistical drift — not something a short playtest would ever notice, and
-there's no visual cue showing the field exists at all.
-
-**Sprint 1 closes once this is fixed and demonstrably visible:**
-
-- Introduce a real infected-cell concept: when a pathogen adheres to a
-  coarse slot, that host cell becomes **infected** (distinct from a bare
-  pathogen-occupied slot conceptually, even if the visual stays similar) —
-  and infected cells are what **secrete cytokines**, continuously, not a
-  one-shot static falloff computed from pathogen position alone.
-- Make the ON/OFF difference something the Director can see in a couple of
-  minutes, not just something that's statistically true over a long
-  session — strengthen the bias, and/or add a visible cue (a faint tint or
-  heatmap showing the gradient itself) so cause and effect are legible.
-  Both toggle states should be watchable side by side without needing to
-  infer anything.
-- Self-verify with more than "it compiles and launches" this time —
-  actually demonstrate the behavioral difference (e.g. log or visualize
-  average distance-to-nearest-infected-cell over time under both settings)
-  before reporting done.
-
-Once this lands and the Director confirms it reads as transformative,
-Sprint 1 is done. Next up (Sprint 2, not yet scoped in detail): bone
-marrow/lymph node compartments so the player has somewhere to place
-purchased cells, and some form of immune-cell/pathogen combat interaction
-so there's real functionality to see.
+The question this sprint answers for the Director: **does placement feel
+like a real decision, and does combat give the search loop a satisfying
+payoff?** Once both land, decide what's next — likely the economy layer
+(ATP, costs) that both of these were deliberately built without.
