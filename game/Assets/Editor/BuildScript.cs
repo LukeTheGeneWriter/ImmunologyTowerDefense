@@ -2,17 +2,22 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
+using ImmunologyTD.Bootstrap;
 
 /// <summary>
-/// Sprint 0 build entry points. Run from PowerShell via:
+/// Build entry points. Run from PowerShell via:
 ///   Unity.exe -batchmode -quit -projectPath <path> -executeMethod BuildScript.BuildWindows
 ///   Unity.exe -batchmode -quit -projectPath <path> -executeMethod BuildScript.BuildWebGL
-/// Both ensure an empty scene exists and is in Build Settings before
-/// building, so no manual Editor step is needed first.
+/// Both ensure the Sprint 1 scene exists and is in Build Settings before
+/// building, so no manual Editor step is needed first. As of Sprint 1 the
+/// scene is Assets/Scenes/Sprint1.unity (renamed from Sprint0.unity) and
+/// carries a single GameBootstrap object that builds the rest of the
+/// scene at runtime -- see Assets/Editor/SceneSetup.cs and
+/// Assets/Scripts/Bootstrap/GameBootstrap.cs.
 /// </summary>
 public static class BuildScript
 {
-    private const string ScenePath = "Assets/Scenes/Sprint0.unity";
+    private const string ScenePath = "Assets/Scenes/Sprint1.unity";
 
     private static string EnsureSceneExists()
     {
@@ -20,6 +25,8 @@ public static class BuildScript
         {
             Directory.CreateDirectory("Assets/Scenes");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = new UnityEngine.GameObject("GameBootstrap");
+            go.AddComponent<GameBootstrap>();
             EditorSceneManager.SaveScene(scene, ScenePath);
         }
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };

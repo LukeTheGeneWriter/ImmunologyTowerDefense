@@ -119,7 +119,80 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &1219734603
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1219734606}
+  - component: {fileID: 1219734605}
+  - component: {fileID: 1219734604}
+  m_Layer: 0
+  m_Name: GameBootstrap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1219734604
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1219734603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36c5daa98a7698f4b9e3d26fe342b35a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ImmunologyTD.Bootstrap.GameBootstrap
+  macrophageProfile:
+    Kind: 0
+    DisplayName: Macrophage
+    FineTilesPerTick: 1
+    FootprintFineTiles: 5
+    Color: {r: 0.3, g: 0.4, b: 0.8, a: 1}
+  neutrophilProfile:
+    Kind: 1
+    DisplayName: Neutrophil
+    FineTilesPerTick: 3
+    FootprintFineTiles: 3
+    Color: {r: 0.95, g: 0.78, b: 0.25, a: 1}
+  macrophageCount: 4
+  neutrophilCount: 6
+--- !u!114 &1219734605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1219734603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b856dfe2b470b4a4b9724f3052e75215, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ImmunologyTD.Grid.BoardConfig
+  columns: 30
+--- !u!4 &1219734606
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1219734603}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
-  m_Roots: []
+  m_Roots:
+  - {fileID: 1219734606}

@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Sprint0.unity
-    guid: 750429481593371489ff04de9a3d2ebe
+    path: Assets/Scenes/Sprint1.unity
+    guid: be54ecb7ca6131c4c8e89bc6cbcb4860
   m_configObjects: {}

@@ -32,6 +32,16 @@ namespace ImmunologyTD.Pooling
                 maxSize: maxSize);
         }
 
+        /// <summary>
+        /// Runtime assignment of the pooled prefab, for pools built up
+        /// entirely from code (no Inspector-time drag-and-drop available)
+        /// -- e.g. Sprint 1's GameBootstrap, which constructs its own
+        /// template GameObjects at runtime. Safe to call any time before
+        /// the first Get(): the pool's createFunc closes over the `prefab`
+        /// field and reads it lazily, not at construction time.
+        /// </summary>
+        public void SetPrefab(GameObject prefabToUse) => prefab = prefabToUse;
+
         public GameObject Get() => pool.Get();
 
         public void Release(GameObject instance) => pool.Release(instance);
