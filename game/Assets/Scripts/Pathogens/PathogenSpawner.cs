@@ -146,7 +146,7 @@ namespace ImmunologyTD.Pathogens
                 var candidate = new CoarseCoord(source.Column + dc, source.Row + dr);
                 if (!board.InCoarseBounds(candidate)) continue;
                 if (board.BandOf(candidate) != BoardBand.Tissue) continue;
-                if (!tissueGrid.IsSlotFree(candidate)) continue;
+                if (!tissueGrid.IsOccupantFree(candidate)) continue;
 
                 var go = pool.Get();
                 var child = go.GetComponent<PathogenAgent>();

@@ -261,7 +261,7 @@ namespace ImmunologyTD.Units
 
         private bool TryDamageAt(CoarseCoord coarse)
         {
-            var pathogen = tissueGrid.GetPathogenAt(coarse);
+            var pathogen = tissueGrid.GetAttackableAt(coarse);
             if (pathogen == null) return false;
             if (!WithinContactRange(pathogen.Current)) return false;
             pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit, this);
@@ -341,7 +341,7 @@ namespace ImmunologyTD.Units
 
             if (tissueGrid == null) return;
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
-            var occupant = tissueGrid.GetPathogenAt(coarse);
+            var occupant = tissueGrid.GetAttackableAt(coarse);
             if (occupant == null) return;
             occupant.ReceiveDamage(PathogenAgent.ContactDamagePerHit * tuning.DegranulationBurstMultiplier, this);
         }

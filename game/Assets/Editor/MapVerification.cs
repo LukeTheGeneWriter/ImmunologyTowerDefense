@@ -260,7 +260,7 @@ public static class MapVerification
         Check("...its exit callback fired (returned to the pool)", exited);
         Check($"...and it counted as excreted, not as a breach ({rig.Tally.Excreted})", rig.Tally.Excreted == 1);
         Check("...with no penalty: nothing reached the base", rig.Tally.ReachedBase == 0);
-        Check("...and it never touched tissue", rig.Grid.AdheredCount == 0);
+        Check("...and it never touched tissue", rig.Grid.TissuePathogenCount == 0);
 
         InvasionTuning.ResetToDefaults();
         rig.Dispose();
@@ -515,7 +515,7 @@ public static class MapVerification
         Check($"Stepping into the base counts it ({rig.Tally.ReachedBase})", rig.Tally.ReachedBase == 1);
         Check("...and the pathogen is removed from play", agent.State == PathogenState.Cleared);
         Check("...via the pool exit path, not Destroy", exited);
-        Check("...and it did not leave an occupied tissue slot behind", rig.Grid.AdheredCount == 0);
+        Check("...and it did not leave an occupied tissue slot behind", rig.Grid.TissuePathogenCount == 0);
 
         InvasionTuning.ResetToDefaults();
         rig.Dispose();

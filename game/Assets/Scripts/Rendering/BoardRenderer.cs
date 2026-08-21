@@ -31,10 +31,33 @@ namespace ImmunologyTD.Rendering
         private CytokineField cytokineField;
         private SpriteRenderer[,] views;
         private Color[,] baseColors;
+        private bool[,] isHostGround;
         private float refreshTimer;
 
-        public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, healthy (and intracellular-infected) tissue
+        public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, a HEALTHY host cell
         public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- pathogens visible as themselves
+
+        /// <summary>An INFECTED host cell (GAME_DESIGN.md section 1c). A
+        /// bruised violet: recognisably still tissue (same value as
+        /// HostColor, so it does not read as a hole) but off-hue enough that
+        /// a spreading infection draws a visible shape across the band.
+        /// Note the cytokine heat tint also lands here -- infection is the
+        /// main thing that secretes -- so in practice an infected cell reads
+        /// as violet shading toward orange as it ramps.</summary>
+        public static readonly Color InfectedHostColor = new Color(0.54f, 0.36f, 0.60f);
+
+        /// <summary>DEBRIS: a dead host cell. Desaturated grey-brown, darker
+        /// and colder than living tissue -- necrotic, not merely empty. It
+        /// has to be told apart from bare ground at a glance, which is why
+        /// it is browner AND lighter than EmptyGroundColor rather than just
+        /// darker than tissue.</summary>
+        public static readonly Color DebrisColor = new Color(0.38f, 0.34f, 0.28f);
+
+        /// <summary>Bare `Empty` ground -- cleaned, cell-free, regrowing.
+        /// Very dark and neutral: a hole in the tissue, and visibly the
+        /// absence of something rather than a substance in its own
+        /// right.</summary>
+        public static readonly Color EmptyGroundColor = new Color(0.13f, 0.11f, 0.12f);
 
         /// <summary>The base band: the player's blood/production compartment
         /// and the endzone. A cold desaturated blue-violet, deliberately far
@@ -60,9 +83,16 @@ namespace ImmunologyTD.Rendering
             this.views = views;
 
             baseColors = new Color[board.Columns, board.Rows];
+            isHostGround = new bool[board.Columns, board.Rows];
             for (int col = 0; col < board.Columns; col++)
+            {
                 for (int row = 0; row < board.Rows; row++)
-                    baseColors[col, row] = BandColor(board.BandOf(new CoarseCoord(col, row)));
+                {
+                    var coord = new CoarseCoord(col, row);
+                    baseColors[col, row] = BandColor(board.BandOf(coord));
+                    isHostGround[col, row] = tissueGrid.IsHostGround(coord);
+                }
+            }
 
             Refresh();
         }
@@ -95,14 +125,34 @@ namespace ImmunologyTD.Rendering
                 for (int row = 0; row < rows; row++)
                 {
                     var coord = new CoarseCoord(col, row);
-                    Color baseColor = baseColors[col, row];
+                    Color baseColor = isHostGround[col, row]
+                        ? HostStateColor(tissueGrid.GetHostState(coord))
+                        : baseColors[col, row];
 
-                    var pathogen = tissueGrid.GetPathogenAt(coord);
+                    var pathogen = tissueGrid.GetOccupantAt(coord);
                     if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
 
                     float intensity = Mathf.Clamp01(cytokineField.CoarseValueAt(coord) / TissueGrid.MaxSecretionStrength);
                     views[col, row].color = Color.Lerp(baseColor, HotColor, intensity * HeatmapBlendMax);
                 }
+            }
+        }
+
+        /// <summary>
+        /// The host layer's four states, as four distinguishable colours
+        /// (SPRINT_PLAN.md scope item 3: "if the Director cannot tell them
+        /// apart at a glance the model is invisible"). Static and
+        /// side-effect-free so a harness can assert the four are actually
+        /// distinct without binding a SpriteRenderer array.
+        /// </summary>
+        public static Color HostStateColor(HostState state)
+        {
+            switch (state)
+            {
+                case HostState.Healthy: return HostColor;
+                case HostState.Infected: return InfectedHostColor;
+                case HostState.Dead: return DebrisColor;
+                default: return EmptyGroundColor;
             }
         }
 

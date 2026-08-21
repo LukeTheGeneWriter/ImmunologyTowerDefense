@@ -365,7 +365,7 @@ public static class LifecycleVerification
             Check("ResolveDepletionIfDue reports the unit depleted", depleted);
             Check($"Degranulation dealt a {expectedBurst}x-flat collateral burst to the occupied slot ({before} -> {pathogen.Health})",
                 Mathf.Approximately(pathogen.Health, before - expectedBurst));
-            Check("Occupant survived a non-lethal burst and still holds its slot", !rig.Grid.IsSlotFree(slot));
+            Check("Occupant survived a non-lethal burst and still holds its slot", !rig.Grid.IsOccupantFree(slot));
             Check("Degranulated neutrophil freed its tower's population slot", rig.Manager.GetActiveChildren(0) == 0);
             Check("Despawned unit was reset for the pool (kill count cleared)", unit.Kills == 0);
             Check("Despawned unit's GameObject is inactive (returned to the pool, not destroyed)", !unit.gameObject.activeSelf);
@@ -381,14 +381,14 @@ public static class LifecycleVerification
             var slot = new CoarseCoord(7, 1);
             var pathogen = SeedPathogen(rig, slot, PathogenClass.LargeBacterium);
             pathogen.ReceiveDamage(pathogen.MaxHealth - 2f, null); // soften to 2 HP, unattributed
-            Check($"Softened occupant is at {pathogen.Health} HP and still adhered", pathogen.Health <= 2f && !rig.Grid.IsSlotFree(slot));
+            Check($"Softened occupant is at {pathogen.Health} HP and still adhered", pathogen.Health <= 2f && !rig.Grid.IsOccupantFree(slot));
 
             var unit = EmitAt(rig, 0, CenterOf(slot));
             for (int i = 0; i < unit.KillLimit; i++) unit.RegisterKill();
             unit.ResolveDepletionIfDue();
 
-            Check("A lethal degranulation burst clears the slot", rig.Grid.IsSlotFree(slot));
-            Check("...and GetPathogenAt is null afterwards", rig.Grid.GetPathogenAt(slot) == null);
+            Check("A lethal degranulation burst clears the slot", rig.Grid.IsOccupantFree(slot));
+            Check("...and GetPathogenAt is null afterwards", rig.Grid.GetAttackableAt(slot) == null);
             Check("...and the degranulating unit still freed its tower slot", rig.Manager.GetActiveChildren(0) == 0);
 
             rig.Dispose();
@@ -404,7 +404,7 @@ public static class LifecycleVerification
             for (int i = 0; i < unit.KillLimit; i++) unit.RegisterKill();
             bool ok = unit.ResolveDepletionIfDue();
             Check("Degranulating on bare host tissue is harmless and still despawns", ok && rig.Manager.GetActiveChildren(0) == 0);
-            Check("Bare slot stays bare", rig.Grid.IsSlotFree(bare));
+            Check("Bare slot stays bare", rig.Grid.IsOccupantFree(bare));
             rig.Dispose();
         }
     }
@@ -436,7 +436,7 @@ public static class LifecycleVerification
 
         Check("Macrophage retires at 20 kills", depleted);
         Check($"Quiet retirement dealt NO collateral damage (occupant still at {pathogen.Health} HP)", Mathf.Approximately(pathogen.Health, before));
-        Check("Occupied slot is untouched by a retirement", !rig.Grid.IsSlotFree(slot));
+        Check("Occupied slot is untouched by a retirement", !rig.Grid.IsOccupantFree(slot));
         Check("Retired macrophage freed its tower's population slot", rig.Manager.GetActiveChildren(0) == 0);
         Check("Retired macrophage returned to its pool (inactive), not destroyed", !unit.gameObject.activeSelf);
 
@@ -476,13 +476,13 @@ public static class LifecycleVerification
         pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit, unitA);
         pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit, unitB);
         Check("Extra same-tick hits on an already-cleared pathogen credit nobody (A=0, B=1)", unitA.Kills == 0 && unitB.Kills == 1);
-        Check("Cleared pathogen's slot is free", rig.Grid.IsSlotFree(slot));
+        Check("Cleared pathogen's slot is free", rig.Grid.IsOccupantFree(slot));
 
         // Null source stays legal (spread/environmental damage + harness use).
         var slot2 = new CoarseCoord(9, 2);
         var pathogen2 = SeedPathogen(rig, slot2, PathogenClass.IntracellularVirus);
         pathogen2.ReceiveDamage(pathogen2.MaxHealth, null);
-        Check("ReceiveDamage with a null source still clears the pathogen (no exception, credited to nobody)", rig.Grid.IsSlotFree(slot2));
+        Check("ReceiveDamage with a null source still clears the pathogen (no exception, credited to nobody)", rig.Grid.IsOccupantFree(slot2));
 
         rig.Dispose();
     }

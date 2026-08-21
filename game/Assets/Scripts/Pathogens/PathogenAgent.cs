@@ -238,7 +238,7 @@ namespace ImmunologyTD.Pathogens
             lastSpreadAttemptTime = float.NegativeInfinity;
 
             infectionStartTime = currentTime;
-            tissueGrid.TryAdhere(slot, this, infectionStartTime);
+            tissueGrid.TryClaimOccupant(slot, this, infectionStartTime);
             CurrentCoarse = slot;
             Current = board.CoarseCenterFine(slot);
             State = PathogenState.InTissue;
@@ -434,7 +434,7 @@ namespace ImmunologyTD.Pathogens
             if (board.BandOf(slot) != BoardBand.Tissue) return false;
 
             infectionStartTime = currentTime;
-            if (!tissueGrid.TryAdhere(slot, this, infectionStartTime)) return false;
+            if (!tissueGrid.TryClaimOccupant(slot, this, infectionStartTime)) return false;
 
             State = PathogenState.InTissue;
             InterfacePosition = -1;
@@ -483,7 +483,7 @@ namespace ImmunologyTD.Pathogens
                 if (band == BoardBand.Lumen) return;
 
                 var candidate = board.CoarseFromAxis(axisIndex, crossIndex);
-                if (!reachesBase && !tissueGrid.IsSlotFree(candidate)) return;
+                if (!reachesBase && !tissueGrid.IsOccupantFree(candidate)) return;
 
                 advanceCandidates[count] = candidate;
                 advanceWeights[count] = weight;
@@ -516,13 +516,13 @@ namespace ImmunologyTD.Pathogens
                 return;
             }
 
-            tissueGrid.ReleaseSlot(CurrentCoarse);
-            if (!tissueGrid.TryAdhere(advanceCandidates[chosen], this, infectionStartTime))
+            tissueGrid.ReleaseOccupant(CurrentCoarse);
+            if (!tissueGrid.TryClaimOccupant(advanceCandidates[chosen], this, infectionStartTime))
             {
                 // Should be unreachable (freshness was checked above and this
                 // is single-threaded), but never leave a live pathogen
                 // unowned: take the old slot back.
-                tissueGrid.TryAdhere(CurrentCoarse, this, infectionStartTime);
+                tissueGrid.TryClaimOccupant(CurrentCoarse, this, infectionStartTime);
                 return;
             }
 
@@ -540,7 +540,7 @@ namespace ImmunologyTD.Pathogens
         private void ReachBase()
         {
             if (tally != null) tally.ReachedBase++;
-            tissueGrid.ReleaseSlot(CurrentCoarse);
+            tissueGrid.ReleaseOccupant(CurrentCoarse);
             State = PathogenState.Cleared;
             onExit?.Invoke(this);
         }
@@ -628,7 +628,7 @@ namespace ImmunologyTD.Pathogens
         private void ClearFromCombat()
         {
             State = PathogenState.Cleared;
-            tissueGrid.ReleaseSlot(CurrentCoarse);
+            tissueGrid.ReleaseOccupant(CurrentCoarse);
             onExit?.Invoke(this);
         }
 

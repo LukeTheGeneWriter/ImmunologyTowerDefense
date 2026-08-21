@@ -78,7 +78,7 @@ public static class CytokineVerification
             var agentGo = new GameObject("DummyInfectedSource");
             var agent = agentGo.AddComponent<PathogenAgent>();
             dummyAgentObjects.Add(agentGo);
-            tissueGrid.TryAdhere(c, agent, simTime);
+            tissueGrid.TryClaimOccupant(c, agent, simTime);
         }
         cytokineField.Recompute(tissueGrid.InfectedSources(simTime));
 
@@ -185,7 +185,7 @@ public static class CytokineVerification
             var agentGo = new GameObject("DummyInfectedSource");
             var agent = agentGo.AddComponent<PathogenAgent>(); // never Initialize()'d -- only used as a non-null occupancy token
             dummyAgentObjects.Add(agentGo);
-            tissueGrid.TryAdhere(c, agent, simTime);
+            tissueGrid.TryClaimOccupant(c, agent, simTime);
         }
         cytokineField.Recompute(tissueGrid.InfectedSources(simTime));
 

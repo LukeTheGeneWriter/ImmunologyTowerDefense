@@ -252,7 +252,7 @@ namespace ImmunologyTD.Grid
                         int cross = position + spread * sign;
                         if (!board.InCrossBounds(cross)) continue;
                         var candidate = board.CoarseFromAxis(axisIndex, cross);
-                        if (!tissueGrid.IsSlotFree(candidate)) continue;
+                        if (!tissueGrid.IsOccupantFree(candidate)) continue;
                         slot = candidate;
                         return true;
                     }

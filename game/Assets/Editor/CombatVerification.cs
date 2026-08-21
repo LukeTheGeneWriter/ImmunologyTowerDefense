@@ -116,7 +116,7 @@ public static class CombatVerification
         bool exited = false;
         agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, t) => false, slot, pClass, 0f);
 
-        Check($"{pClass} occupies {slot} after adhering", !tissueGrid.IsSlotFree(slot) && tissueGrid.GetPathogenAt(slot) == agent);
+        Check($"{pClass} occupies {slot} after adhering", !tissueGrid.IsOccupantFree(slot) && tissueGrid.GetAttackableAt(slot) == agent);
 
         float maxHealth = agent.MaxHealth;
         int hitsToClear = Mathf.CeilToInt(maxHealth / PathogenAgent.ContactDamagePerHit);
@@ -125,11 +125,11 @@ public static class CombatVerification
         {
             agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null); // Sprint 3: null source stays legal (SPRINT_PLAN.md item 6)
         }
-        Check($"{pClass} still occupies {slot} before its last hit ({hitsToClear - 1}/{hitsToClear} hits landed, MaxHealth={maxHealth})", !tissueGrid.IsSlotFree(slot));
+        Check($"{pClass} still occupies {slot} before its last hit ({hitsToClear - 1}/{hitsToClear} hits landed, MaxHealth={maxHealth})", !tissueGrid.IsOccupantFree(slot));
 
         agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null); // Sprint 3: null source stays legal (SPRINT_PLAN.md item 6)
-        Check($"{pClass} slot {slot} is free after {hitsToClear} hits", tissueGrid.IsSlotFree(slot));
-        Check($"{pClass} GetPathogenAt({slot}) is null after clearing", tissueGrid.GetPathogenAt(slot) == null);
+        Check($"{pClass} slot {slot} is free after {hitsToClear} hits", tissueGrid.IsOccupantFree(slot));
+        Check($"{pClass} GetPathogenAt({slot}) is null after clearing", tissueGrid.GetAttackableAt(slot) == null);
         Check($"{pClass} onExit fired exactly once on clear", exited);
 
         Object.DestroyImmediate(go);
@@ -215,7 +215,7 @@ public static class CombatVerification
         float simTime = 0f;
         origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpread, originCoord, PathogenClass.IntracellularVirus, simTime);
 
-        Check($"[{label}] AdheredCount is 1 right after seeding the origin infection", tissueGrid.AdheredCount == 1);
+        Check($"[{label}] AdheredCount is 1 right after seeding the origin infection", tissueGrid.TissuePathogenCount == 1);
 
         const float dt = 0.5f;
         bool clearedEarly = false;
@@ -233,7 +233,7 @@ public static class CombatVerification
             foreach (var a in new List<PathogenAgent>(spawner.Live)) a.TickCombat(simTime);
         }
         Check($"[{label}] AdheredCount as expected just before incubation would elapse (no premature spread)",
-            clearedEarly ? tissueGrid.AdheredCount == 0 : tissueGrid.AdheredCount == 1);
+            clearedEarly ? tissueGrid.TissuePathogenCount == 0 : tissueGrid.TissuePathogenCount == 1);
 
         // Run well past incubation (several retry intervals) to let a
         // spread attempt land, then far enough past a SECOND incubation
@@ -251,12 +251,12 @@ public static class CombatVerification
 
         if (clearOriginEarly)
         {
-            Check($"[{label}] AdheredCount stayed 0 well past incubation (cleared infection cannot spread)", tissueGrid.AdheredCount == 0);
+            Check($"[{label}] AdheredCount stayed 0 well past incubation (cleared infection cannot spread)", tissueGrid.TissuePathogenCount == 0);
         }
         else
         {
-            Check($"[{label}] AdheredCount grew beyond 1 well past incubation (spread happened)", tissueGrid.AdheredCount > 1);
-            Debug.Log($"[CombatVerification] [{label}] AdheredCount after {target:F1}s simulated: {tissueGrid.AdheredCount} (chain-spread children tracked by spawner: {spawner.Live.Count})");
+            Check($"[{label}] AdheredCount grew beyond 1 well past incubation (spread happened)", tissueGrid.TissuePathogenCount > 1);
+            Debug.Log($"[CombatVerification] [{label}] AdheredCount after {target:F1}s simulated: {tissueGrid.TissuePathogenCount} (chain-spread children tracked by spawner: {spawner.Live.Count})");
         }
 
         Object.DestroyImmediate(originGo);
@@ -294,7 +294,7 @@ public static class CombatVerification
             origin.TickCombat(simTime);
         }
 
-        Check($"Bacterium never spreads even {target:F0}s past the virus incubation window (AdheredCount stayed 1)", tissueGrid.AdheredCount == 1);
+        Check($"Bacterium never spreads even {target:F0}s past the virus incubation window (AdheredCount stayed 1)", tissueGrid.TissuePathogenCount == 1);
 
         Object.DestroyImmediate(go);
         Object.DestroyImmediate(spawnerGo);

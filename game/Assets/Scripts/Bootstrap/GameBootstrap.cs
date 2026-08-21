@@ -117,6 +117,10 @@ namespace ImmunologyTD.Bootstrap
             tally = new InvasionTally();
             gutInterface = new GutInterface(board, tissueGrid, tally);
 
+            // Sprint 5: the host layer heals on its own clock, independent
+            // of whether anything is invading (GAME_DESIGN.md section 1c).
+            gameObject.AddComponent<TissueDriver>().Bind(tissueGrid);
+
             var layout = BuildLayout();
 
             BuildCamera(layout.Bounds);
