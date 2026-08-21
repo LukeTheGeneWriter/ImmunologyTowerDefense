@@ -254,17 +254,55 @@ that, and it is also what makes the parasite class (multi-slot footprint,
   fibrosis somewhere concrete to live, and gives the macrophage its
   real second job (clearing debris — efferocytosis) beyond killing things.
 
-### Two questions this raises that the Director should rule on
+### Debris — LOCKED (Director, 2026-08-21)
 
-1. **Does debris block anything?** Candidates: it blocks host-cell regrowth
-   until cleared (so unattended damage compounds); it slows immune cell
-   movement through it; it does nothing yet. This is the hinge between
-   "damage is cosmetic" and "damage is terrain," and §6's fibrosis-as-terrain
-   proposal already leans toward terrain.
-2. **What clears debris, and how fast?** If macrophages clear it, that is a
-   real competing demand on the same units doing the killing, which is
-   biologically right and mechanically interesting. If it decays on a
-   timer, it is simpler but inert.
+A dead host cell leaves **debris**, and debris is real terrain, not a
+decal:
+
+- **Debris blocks healthy-cell regeneration.** A position holding debris
+  cannot regrow a host cell until it is cleared. This is what makes
+  unattended damage compound: ground you never clean up stays dead, and
+  since a virus can only spread into `Healthy` cells (§1b step 4), dead
+  ground is simultaneously a firebreak against viral spread and a
+  permanent hole in your own tissue. Both consequences are intended.
+- **A macrophage clears it.** This is efferocytosis, and it is the
+  macrophage's real second job — which means the same units doing the
+  killing are also the only fast way to recover ground. That competing
+  demand is the point: it is biologically correct and it gives the
+  macrophage a role the neutrophil cannot fill.
+- **It also dissipates on its own, slowly.** So a player who never
+  invests in clearance is not permanently locked out of their own tissue
+  — just very slow to recover it. Rate is a tuning value; "slowly" means
+  slow enough that macrophage clearance is clearly the better answer.
+- **A dendritic cell can carry debris to the lymph node to learn from
+  it.** See below — this is the mechanism the knowledge system needed.
+
+### Debris is the input to adaptive immunity (Director, 2026-08-21)
+
+The Director's third debris rule connects two systems that were previously
+specified independently, and it is worth stating loudly because it changes
+what debris *is*:
+
+§5 (pathogen knowledge) describes a threshold ladder where the adaptive
+system accumulates knowledge of a pathogen species, and
+`BACKLOG.md` has carried an open question about the **lymph node arrival
+delay** — a dendritic cell must travel to the lymph node before anything
+adaptive comes online. Neither specified **what the dendritic cell actually
+picks up, or where.**
+
+Debris is the answer. Dead host cells are the antigen source. That makes
+the loop: pathogens kill host cells → debris accumulates → dendritic cells
+sample it and carry it to the lymph node → knowledge accrues → adaptive
+immunity unlocks. **Tissue damage is therefore not purely a cost** — it is
+also the raw material for the entire adaptive half of the game, which is a
+genuinely elegant tension: a perfectly clean defence learns nothing.
+
+It also creates a real competition for the same resource, since a
+macrophage clearing debris is removing what a dendritic cell would have
+sampled. Whether that tension is left sharp or softened (e.g. sampling
+being instant while clearance takes time) is a **balance question for
+whenever this is built** — not resolved here, and not in Sprint 4 or 5.
+
 
 ## 2. Tower / unit lifespan model — LOCKED
 

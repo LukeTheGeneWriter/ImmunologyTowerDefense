@@ -149,3 +149,31 @@ cells entering at the blood-adjacent deepest row. Those are orthogonal, and
 that mismatch is arguably the root of the "flying across the board" feel.
 See `docs/INTERFACE.md` open question 1, which has flagged this since
 Sprint 1.
+
+## Answered 2026-08-21 (Director)
+
+- **Debris behavior** — blocks host-cell regeneration until cleared;
+  macrophages clear it (efferocytosis); it also dissipates slowly on its
+  own; dendritic cells can carry it to the lymph node to learn from it.
+  Now written up in `GAME_DESIGN.md` §1c.
+- **Lymph node arrival delay — partially answered.** The open question
+  above asked what a dendritic cell samples and where. **Debris is the
+  answer** (`GAME_DESIGN.md` §1c). Still open: the actual travel duration
+  and how it is shown on screen.
+- **Round-1 economy, grid dimensions** — grid is settled by Map 01's
+  layout (`GAME_DESIGN.md` §1a): 100×40 host cells, three lateral bands.
+  The "24–40 coarse columns × 5 rows" working figure above is retired.
+
+## New, opened 2026-08-21
+
+- **Debris vs. sampling competition.** A macrophage clearing debris
+  removes what a dendritic cell would have sampled, so tissue recovery and
+  adaptive learning compete for the same resource. Whether that tension
+  stays sharp or gets softened (instant sampling vs. slow clearance) is a
+  balance question for whenever adaptive immunity is built. Flagged
+  because it is a genuinely interesting design pressure, not a problem:
+  a perfectly clean defence learns nothing.
+- **Host-cell regeneration rate.** Regeneration now has a blocker (debris)
+  but no rate. Needed before §6 tissue recovery is buildable.
+- **Debris dissipation rate.** "Slowly" needs a number — slow enough that
+  macrophage clearance is clearly the better answer.
