@@ -115,6 +115,157 @@ coarse cell. The numbers are workable as stated; they are recorded here so
 a later change to fine subdivision or unit speed is understood to move
 them.
 
+## 1b. Invasion, breach, and pathogen advance — LOCKED (Director, 2026-08-21)
+
+How a pathogen gets from the lumen into the tissue, and how it moves once
+there. Replaces Sprints 1–3's behavior entirely: those spawned a pathogen
+at the board edge, marched it across, and adhered it at a **uniformly
+random column**, which is what produced the "flying across the board"
+problem this section exists to fix.
+
+### Step 1 — Adhesion is proximity-gated
+
+A pathogen riding the lumen flow has a **chance to adhere that depends on
+its distance from the gut interface**. Close to the boundary, it likely
+adheres; far out in the channel, it likely does not and simply flows past.
+
+This makes lateral position in the lumen meaningful rather than decorative,
+and it means the flow itself does real work: a pathogen's lane through the
+lumen determines its odds of ever becoming the player's problem. A pathogen
+that never adheres rides the flow out the bottom and is excreted, with no
+penalty — the deliberate break from Bloons TD 6 (`handoff-map01-intestine.md`
+§1) that this layout preserves.
+
+**On adhering, the pathogen moves to the boundary** and sits there. It is
+now colonising the gut interface (`GAME_DESIGN.md` §6b) — not yet in the
+tissue, and not yet the player's problem, but accumulating.
+
+### Step 2 — Breach is per-position and releases everything at once
+
+**Each position along the boundary carries its own breach chance**, rolled
+per tick (or every X ticks — a tuning decision, and rolling less often with
+a correspondingly larger chance is the cheaper implementation on a
+40-row boundary).
+
+When a position's breach trips, **every pathogen adhered at that position
+is released at once** into the first layer of healthy tissue.
+
+This is the shape that makes the mechanic good, and it should be preserved
+even if the numbers move: pressure at a boundary position **builds
+visibly** as pathogens pile up, and then **bursts**. The player can see a
+dangerous position forming before it breaks, which is what makes defending
+it a decision rather than a reaction. A trickle of independent single
+invasions would lose that entirely.
+
+### Step 3 — Advance is toward the base, not "leftward"
+
+Once in tissue, a motile pathogen performs a **strongly biased random walk
+in the direction of the base**. The fiction: they are chasing the resources
+in the blood.
+
+**"Direction of the base" is the specification, not "left"** — the
+Director's explicit framing, and an architectural requirement rather than a
+wording preference. The base direction is a **property of the map**, so a
+later map can put the base anywhere (right side, a corner, the centre)
+without touching pathogen movement code. Nothing in the movement
+implementation may hardcode a leftward or negative-X assumption.
+
+### Step 4 — Advance differs by pathogen class
+
+The three classes reach the base by genuinely different means, which is
+what should make a front look different depending on what is attacking it.
+
+**Viruses — diffusive, self-limiting.** A virus spreads **cell to cell in
+all directions**, with no base bias at all. What limits it is that a virus
+which does not find a host quickly **dies**. So its only real progress
+comes from randomly choosing a direction that happens to hold a healthy
+cell. A viral front therefore advances through *intact* tissue and stalls
+against ground it has already killed — it is fastest where the tissue is
+healthiest, and it cannot cross a gap of dead cells. Note this makes viral
+advance genuinely emergent rather than scripted, and it is the mechanic
+that most rewards clearing infections early.
+
+**Intracellular bacteria — biased when out, hidden when in.** While
+**outside** a host cell they chase the blood on the same base-biased random
+walk as anything else motile. Once inside a host cell they are
+intracellular: hidden, not visible as themselves (per §4a), and no longer
+walking.
+
+**Large bacteria — straightforwardly motile.** Base-biased random walk,
+visible as themselves the whole time.
+
+### Step 5 — Reaching the base costs a life
+
+Per §6c's 100-life pool. The base is simultaneously the player's production
+and the lose condition, exactly as §1 describes.
+
+## 1c. Host cell states and lattice occupancy — Director-set states, structure proposed (2026-08-21)
+
+The Director's requirement: **a host cell has three states — healthy,
+infected, dead — and that state influences the state of the lattice
+position** (occupied by a cell, debris, free, occupied by bacteria, …).
+
+This section separates those two ideas explicitly, because conflating them
+is what makes occupancy models rot. **The three host-cell states are the
+Director's; the two-layer structure below is the head session's proposal
+and is the part to push back on.**
+
+### Two layers per lattice position
+
+A coarse position holds **two independent slots**:
+
+**1. The host layer — what the tissue itself is doing here.**
+
+| Host state | Meaning |
+|---|---|
+| `Healthy` | An intact host cell. What a virus needs to spread into. |
+| `Infected` | A host cell harbouring an intracellular pathogen (virus or intracellular bacterium). Renders as the host cell, not as the pathogen (§4a), and secretes cytokines. |
+| `Dead` | The cell is gone. The position holds **debris**. |
+| `Empty` | No cell and no debris — bare ground, available for regrowth. |
+
+**2. The occupant layer — what is standing here that is not the tissue.**
+
+Extracellular things: a large bacterium, an intracellular bacterium that is
+currently *outside* a cell, a free virus particle between hosts. Immune
+cells are tracked on the fine lattice and are not part of this layer.
+
+### Why two layers rather than one enum
+
+Because the states genuinely co-occur, and a single enum forces
+false choices. A motile bacterium crawling toward the base passes **over
+ground that still has living host cells in it** — tissue is packed with
+cells and bacteria squeeze between them; "occupied by bacteria" and
+"occupied by a healthy cell" are simultaneously true. Sprint 1–3's
+`TissueGrid` has exactly one occupant per coarse slot, which cannot express
+that, and it is also what makes the parasite class (multi-slot footprint,
+`BACKLOG.md`) hard to add.
+
+### What this buys mechanically
+
+- **A virus can only spread into a `Healthy` neighbour.** Combined with
+  §1b's "a virus that doesn't find a host dies," a viral front literally
+  cannot cross ground it has already killed. Dead tissue is a firebreak —
+  emergent, not scripted.
+- **An intracellular bacterium entering a cell** flips the host layer
+  `Healthy → Infected` and clears its occupant-layer entry. Killing it
+  flips the host back toward `Dead` or `Healthy` depending on how much
+  damage the cell took.
+- **Debris is a real board state**, which gives §6's tissue recovery and
+  fibrosis somewhere concrete to live, and gives the macrophage its
+  real second job (clearing debris — efferocytosis) beyond killing things.
+
+### Two questions this raises that the Director should rule on
+
+1. **Does debris block anything?** Candidates: it blocks host-cell regrowth
+   until cleared (so unattended damage compounds); it slows immune cell
+   movement through it; it does nothing yet. This is the hinge between
+   "damage is cosmetic" and "damage is terrain," and §6's fibrosis-as-terrain
+   proposal already leans toward terrain.
+2. **What clears debris, and how fast?** If macrophages clear it, that is a
+   real competing demand on the same units doing the killing, which is
+   biologically right and mechanically interesting. If it decays on a
+   timer, it is simpler but inert.
+
 ## 2. Tower / unit lifespan model — LOCKED
 
 Adopts the Bloons division between a persistent tower and a transient thing

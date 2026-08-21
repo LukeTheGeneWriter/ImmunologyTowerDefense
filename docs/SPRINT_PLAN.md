@@ -1,209 +1,176 @@
-# Sprint Plan — Sprint 3
+# Sprint Plan — Sprint 4
 
-## Sprint 2 — closed 2026-08-19
+## Sprint 3 — closed 2026-08-21
 
-Delivered: bone marrow placement, a lymph node placeholder, and
-pathogen-class combat with viral spread. Director playtested it directly
-and confirmed it works — and surfaced the next real problem: progenitors
-have no population cap, so active cell count grows unbounded over time.
-Full history in `docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
+Delivered: per-progenitor population cap, kill-count depletion (neutrophil
+degranulation / macrophage retirement), kill attribution, and fine-tile
+proximity contact. Verified 79/79 headless, both prior harnesses clean,
+Windows build good. The Director playtested and reported: population is
+under control, immune cells overwhelmingly win, and **balance tuning is
+explicitly deferred** — mechanics first. Full history in
+`docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
 
-## Direction for Sprint 3 (Director, 2026-08-19)
+Same-day follow-up, already shipped: progenitor upgrades now apply
+instantly to a tower's living children as well as its future ones
+(`GAME_DESIGN.md` §6d).
 
-Fix the unbounded growth with a population cap **tied to each individual
-progenitor**, not a systemic/global signal — a deliberate break from real
-hematopoiesis, made because it keeps individual towers (and eventually
-their upgrades) meaningful. Full design writeup is in `docs/GAME_DESIGN.md`
-§6d — read that first, this is the implementation brief for it.
+## Direction for Sprint 4 (Director, 2026-08-21)
 
-**Update (Director, 2026-08-21).** Two changes on top of the above: the
-macrophage kill limit goes to **20** (15 read as too low), and all
-lifecycle numbers must be **parameterized rather than hardcoded**, so a
-future progenitor upgrade can offer "bump this tower's kill counts" as a
-purchasable option — see scope items 4 and 5. Two gaps the head session
-surfaced when reading the Sprint 2 code (kill attribution doesn't exist;
-contact detection is coarse-slot-level, not per-unit) were also folded
-into this sprint's scope rather than deferred — items 6 and 7.
+**Build Map 01's real geometry.** The Director specified the map, which
+resolved the axis ambiguity that had been open since Sprint 1 — read
+`GAME_DESIGN.md` **§1a, §1b, and §1c** before anything else; they are the
+authority for this sprint and this document is the implementation brief for
+them.
+
+The short version: a 100×40 grid of host cells in three lateral bands —
+**base** (leftmost 25 columns: bone marrow, lymph node, immune cell entry,
+and the lose condition), **tissue** (middle 50), **lumen** (rightmost 25).
+Pathogens flow top-to-bottom down the lumen for free, adhere to the gut
+interface with a proximity-gated chance, accumulate there, and **burst into
+the tissue when a boundary position's breach roll trips**. In tissue they
+make a strongly biased random walk **toward the base**.
+
+## Scope split — why this is Sprint 4 and not one giant sprint
+
+The Director's 2026-08-21 design covers more than one sprint's worth of
+work. It is split so something is playable at the end of each:
+
+- **Sprint 4 (this one): the map and the invasion loop.** Geometry, bands,
+  lumen flow, proximity adhesion, boundary accumulation, per-position
+  breach, base-directed advance. All three pathogen classes move the same
+  way for now.
+- **Sprint 5 (next): the tissue state model.** Host cells as
+  healthy/infected/dead with two-layer lattice occupancy (`GAME_DESIGN.md`
+  §1c), which then enables the class-specific advance behaviors of §1b step
+  4 — viral diffusion that dies without a host, intracellular bacteria
+  entering and leaving cells — plus debris and the real life pool.
+
+**Do not pull Sprint 5's work forward.** §1c's two-layer occupancy is a
+`TissueGrid` rewrite (it currently holds exactly one pathogen per coarse
+slot and has no host-cell concept whatsoever), and doing it at the same
+time as the geometry change would make both unreviewable.
 
 ## Scope
 
-**1. Max active children per tower (new).** Each bone marrow slot/tower
-tracks how many of its own emitted units are currently alive. Once at the
-cap, the tower stops emitting — even if its emission timer has elapsed —
-until one of its children dies and frees a slot. Requires each emitted
-unit to know which tower it came from and to notify that tower on death
-(depletion or otherwise), so `BoneMarrowManager` can decrement the count.
-Starting default: **10** per tower — the Director's own example number,
-treat as tunable.
+**1. Board geometry: 100×40 with three bands.** `BoardConfig` currently
+hardcodes `Rows = 5` as a const and clamps columns to 24–40. Both go. The
+board becomes 100 coarse columns × 40 coarse rows, still 7×7 fine
+subdivision, with a **band concept**: which columns are base, tissue, and
+lumen. Bands must be data, not magic numbers scattered through the code — a
+later map will use different proportions.
 
-**2. Emission-rate cap (already exists, keep it).**
-`BoneMarrowManager.EmissionIntervalSeconds` (Sprint 2, currently 4s)
-already throttles how fast a tower can produce a *new* cell. Per
-`GAME_DESIGN.md` §6d this is deliberately kept as a *second*, independent
-cap — it's what stops a tower whose whole population just died at once
-from instantly bursting back to full. No change needed here beyond making
-sure it still applies once the max-children cap exists (a tower at zero
-children but still mid-cooldown should not emit early).
+Scale is confirmed by the Director: **100×40 counts host cells, not
+sub-lattice tiles.** So the tissue band is 50×40 = 2,000 host cells, and the
+full field is 4,000 — roughly 10× Sprint 3's board. See `GAME_DESIGN.md`
+§1a's scale note: at the existing 0.12s tick this puts a neutrophil at ~14s
+to cross the tissue laterally and a macrophage at ~42s, which is the
+intended spread. **Do not change `TickIntervalSeconds`, `FineSubdivision`,
+or unit speeds to "fix" that** — it is the design.
 
-**3. Neutrophil kill-count depletion → degranulation.** Track kills per
-neutrophil (increment when a `ReceiveDamage` call from that unit is the
-one that actually clears a pathogen — needs a way for `PathogenAgent` to
-report back which unit landed the killing hit, not just that it died).
-At the kill-count limit, the neutrophil **degranulates**: destroys itself
-and deals a burst of collateral damage to whatever's in its current
-coarse slot, then notifies its tower (frees a max-children slot). Starting
-default: **5 kills**, collateral burst **3x** `ContactDamagePerHit`. Since
-there's no host-cell-health/fibrosis system yet (`GAME_DESIGN.md` §6 is
-still unbuilt), "collateral damage" this sprint means: if an infected/
-occupied slot is present at the degranulation site, deal the burst damage
-to it same as combat damage; if the slot is bare host tissue, there's
-nothing to damage yet — that's fine, the mechanism is what matters this
-sprint, fibrosis accounting comes later. Make the degranulation event
-visibly distinct (a brief flash/effect) so the Director can actually see
-it happen, not just watch a unit quietly disappear.
+**2. Camera and rendering at the new scale.** The field is 2.5:1; it fits
+16:9 at roughly 28px per coarse cell. **This is the sprint's main
+performance risk** — 4,000 coarse cells rendered, plus a cytokine field over
+all of them, against a hard project requirement that everything is pooled
+from first implementation (`GAME_DESIGN.md` §8, restated in `CLAUDE.md`).
+Sprint 1–3's `BoardRenderer` was written for 150 cells. Measure the frame
+cost and report it as a number; if per-cell `SpriteRenderer`s do not hold
+up, say so with measurements rather than silently redesigning.
 
-**4. Macrophage kill-count depletion → quiet retirement.** Same
-kill-tracking mechanism, higher limit, no collateral damage — the
-macrophage just despawns cleanly and frees its tower's slot. **Limit:
-20 kills** (Director, 2026-08-21 — he judged the previously drafted 15
-"a little low"; 20 is four times the neutrophil's, keeping the
-"longer lived, less prone to a terminal burst" contrast from
-`GAME_DESIGN.md` §6d intact).
+**3. "Direction of the base" as a map property.** The Director was explicit
+that pathogen advance is specified as *toward the base*, **not** as
+*leftward*, so later maps can put the base anywhere without touching
+pathogen code. **No movement code may hardcode a leftward or negative-X
+assumption.** Expose the base direction (or the base region) from the map /
+board config and have movement consult it. This is an architectural
+requirement, not a style preference — call it out in `INTERFACE.md`.
 
-**5. All lifecycle numbers must be parameterized, not hardcoded consts
-(Director, 2026-08-21).** Max active children, neutrophil kill limit,
-macrophage kill limit, and degranulation burst multiplier are all
-**tuning fields, not `const`s** — the explicit reason is that progenitor
-upgrades will later offer "bump this tower's kill count" as a purchasable
-option, so the values have to be per-tower mutable state from the start.
-Concretely:
-- Defaults live on `UnitProfile` (per unit kind), the existing home for
-  per-kind tuning.
-- Each bone marrow slot/tower holds its **own** current values, seeded
-  from the profile defaults at placement. A future upgrade mutates the
-  tower's copy; nothing else needs to change.
-- An emitted unit is given its tower's current values **at emission
-  time** and keeps them for life. A tower upgraded mid-round therefore
-  improves its *future* children, not the ones already in the field —
-  simpler, and it reads correctly (a cell doesn't retroactively gain
-  granules). Flagged as a judgment call in case the Director wants
-  retroactive upgrades instead.
-- No upgrade UI or purchase path this sprint — only the parameterization
-  that makes one buildable later.
+**4. Lumen flow.** Pathogens enter at the top of the lumen band and are
+carried **downward**. A pathogen that reaches the bottom is excreted —
+despawned, no penalty, per `handoff-map01-intestine.md` §1's
+deliberately-kept "transit is not a fail state." While in the lumen a
+pathogen cannot be attacked and does not interact with tissue.
 
-**6. Kill attribution (new — required infrastructure, folded in
-2026-08-21).** Items 3 and 4 are unbuildable without it:
-`PathogenAgent.ReceiveDamage(float)` currently takes a bare amount, so
-nothing knows *which* unit landed a killing hit. Change it to carry the
-attacking `SearchUnit` (e.g. `ReceiveDamage(float amount, SearchUnit
-source)`), and when health crosses zero, credit exactly one kill to that
-source. Exactly one: if several units damage the same pathogen on the
-same tick, only the hit that actually crosses zero counts — no split or
-shared credit. Update `SearchUnit.CheckContact` and
-`Assets/Editor/CombatVerification.cs` accordingly. A `null` source must
-stay legal (spread/environmental damage, and the existing harness
-assertions that call `ReceiveDamage` directly).
+**5. Proximity-gated adhesion.** Per `GAME_DESIGN.md` §1b step 1: a
+pathogen's chance to adhere depends on **its distance from the gut
+interface** — near the boundary it likely adheres, far out in the channel it
+likely does not. On adhering it **moves to the boundary** and stays there,
+colonising the interface. Curve shape is yours to choose; state what you
+chose and why, and make it tunable.
 
-**7. Contact detection: coarse slot → fine-tile proximity (new, folded in
-2026-08-21).** Documented as open question 3 in `docs/INTERFACE.md`:
-contact currently fires whenever a unit's fine tile falls anywhere in an
-occupied *coarse* slot, so **every** unit in that 7×7 slot damages the
-pathogen every tick — an accidental stacking bonus, and now that kills
-are attributed it would also scatter kill credit semi-randomly among
-units that were never actually near the target.
+**6. Per-position breach that releases everything at once.** Per §1b step 2:
+**each boundary position has its own breach chance**, rolled per tick or
+every X ticks. When it trips, **every pathogen adhered at that position is
+released into the first tissue column at once.**
 
-Replace with a proximity test against the pathogen's stored `Current`
-fine coordinate: a unit deals contact damage only if it is within
-`ContactRadiusFineTiles` of it (Chebyshev/Manhattan distance on the fine
-lattice — implementer's call, state which was chosen). **Starting default:
-2 fine tiles**, a tunable field, not a const.
+The burst is the point, not an implementation detail — pressure must
+*visibly build* at a position and then break. Do not "simplify" this into
+per-pathogen independent invasion rolls; that produces a trickle and
+destroys the mechanic. Rolling less often with a correspondingly larger
+chance is fine (and cheaper across 40 boundary positions) — rolling
+per-pathogen is not.
 
-**Do not make this an exact-tile test.** With 49 fine tiles per coarse
-slot, requiring exact coincidence would make a random-walking unit almost
-never connect, and combat would effectively stop working. The radius is
-the point: close enough to touch, loose enough to actually happen. If the
-resulting time-to-clear feels wrong in playtest, tune the radius — don't
-revert to coarse-slot detection.
+Make an accumulating boundary position visibly distinct from an empty one,
+so the player can see danger forming.
 
-Consequence to expect and verify: clearing gets somewhat slower across
-the board (fewer simultaneous attackers per tick), and Sprint 2's
-combat-timing figures no longer hold. That's intended, but it interacts
-with the population cap — if clears get much slower while emission stays
-capped, pathogens may outpace the player. Report the observed change
-rather than silently re-tuning other numbers to hide it.
+**7. Base-directed advance in tissue.** Per §1b step 3: a pathogen in tissue
+performs a **strongly biased random walk toward the base**. All three
+classes move this way this sprint — the class-specific behaviors (§1b step
+4) need Sprint 5's host-cell states and are explicitly deferred. Bias
+strength is tunable, not a const.
 
-**8. Explicitly not in scope.** Any upgrade system (reducing degranulation
-damage, player-triggered timed self-destruct — both named in
-`GAME_DESIGN.md` §6d as the eventual payoff, neither buildable without an
-upgrade system that doesn't exist yet). ATP/economy. Real fibrosis
-accounting. Parasites. Adaptive immunity. Everything Sprint 1/2 already
-built (lattice, search, cytokine sensing + heatmap, placement, pathogen
-classes, viral spread) must keep working unchanged.
+**8. Compartments move into the base band.** Bone marrow and the lymph node
+placeholder currently render below and to the right of the board as
+free-floating strips. They belong in the base band now. Immune cells enter
+tissue at the **base-side edge of the tissue band**, not at the old
+"blood-adjacent deepest fine row." Keep placement working exactly as it does
+today — click an empty slot, pick a kind — this is a relocation, not a
+redesign.
+
+**9. Reaching the base is a real event, minimally.** A pathogen that reaches
+the base band despawns and increments a visible counter in the HUD. **The
+100-life pool and the actual lose condition are Sprint 5** — this sprint
+only needs the endzone to exist and register, so the loop is observable end
+to end.
+
+**10. Explicitly not in scope.** Host cell states / two-layer occupancy
+(§1c). Debris. Class-specific advance (§1b step 4). The life pool and lose
+condition. Balance tuning of any kind — **the Director's standing
+instruction is mechanics first, and immune cells currently winning easily is
+known and accepted** (`BACKLOG.md`). Any upgrade system, ATP, economy.
+Parasites. Adaptive immunity.
+
+Everything Sprints 1–3 built must keep working: per-tower population caps,
+kill-count depletion and degranulation, kill attribution, proximity contact,
+cytokine sensing + heatmap, pooling, the `C` toggle.
 
 ## Stopping point (definition of done)
 
-- [x] A tower placed and left alone stops emitting once it hits its
-      max-active-children cap, and resumes once a child dies.
-- [x] A tower whose entire population dies at once still only refills at
-      its emission-rate cap, not instantly.
-- [ ] A neutrophil that reaches its kill limit visibly degranulates
-      (self-destructs with a visible effect) and deals collateral damage
-      if something occupies its slot.
-- [x] A macrophage that reaches its (higher) kill limit quietly retires,
-      no collateral damage.
-- [x] Both depletion paths correctly free their tower's population slot.
-- [x] Kill limits, max-active-children, degranulation burst, and contact
-      radius are all mutable tuning fields (per-tower where the design
-      calls for it), not `const`s — an upgrade system could bump a single
-      tower's kill limit without touching any other code.
-- [x] Kill credit goes to exactly one unit — the one whose hit crossed
-      zero — and `ReceiveDamage` with a `null` source still works.
-- [x] Contact damage requires fine-tile proximity, not just sharing a
-      coarse slot; a unit at the far corner of a 7×7 slot no longer
-      damages a pathogen at the opposite corner.
-- [ ] Total active unit count visibly stays bounded over an extended play
-      session instead of growing indefinitely — the actual problem this
-      sprint exists to fix.
-- [x] Everything from Sprint 1/2 still works: board width, per-unit step
-      speed, pooling, cytokine toggle + heatmap, placement, pathogen
-      classes, viral spread.
-- [x] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect the new
-      systems.
-- [x] `docs/TEAM_RETRO.md` has at least one new note.
+- [ ] The board is 100×40 host cells in three visually distinct bands, and
+      the whole field is legible on screen at once.
+- [ ] Pathogens flow down the lumen and are excreted at the bottom with no
+      penalty.
+- [ ] Adhesion probability visibly depends on distance from the interface —
+      pathogens hugging the boundary adhere far more often than ones out in
+      the channel.
+- [ ] Adhered pathogens accumulate at boundary positions, and an
+      accumulating position looks different from an empty one.
+- [ ] A breach releases **every** pathogen at that position simultaneously,
+      as a visible burst, not a trickle.
+- [ ] Pathogens in tissue advance toward the base by a biased random walk,
+      and **nothing in the movement code hardcodes "left"** — moving the
+      base in config moves the advance direction with it.
+- [ ] Bone marrow and lymph node sit in the base band; placement still
+      works; emitted cells enter at the tissue's base-side edge.
+- [ ] A pathogen reaching the base despawns and increments a visible
+      counter.
+- [ ] Frame cost at 4,000 cells is measured and reported as a number.
+- [ ] Everything from Sprints 1–3 still works.
+- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
+      `docs/TEAM_RETRO.md` has a new note. **Write these as you go, not at
+      the end** — Sprint 3's agent hit its usage limit before writing any
+      docs and the head session had to reconstruct all four.
 
-The question this sprint answers for the Director: **does population
-finally stay under control, and do the two depletion behaviors (neutrophil
-burst vs. macrophage quiet exit) read as intentionally different from each
-other, not just as a bug where units randomly vanish?**
-
-## Verification result — head session, 2026-08-21
-
-Two boxes above are deliberately left unticked. Both are the same gap:
-**nothing was confirmed through the running build's UI this session**,
-because scripted clicks could not take window focus (`SetForegroundWindow`
-refused; the build doesn't tick unfocused, so two captures 75s apart came
-back pixel-identical). The build itself launches clean, renders, ticks, and
-shows the new HUD readout.
-
-- *"A neutrophil that reaches its kill limit **visibly** degranulates"* —
-  the mechanism, the collateral burst, the freed slot, and the pooled
-  return are all verified headlessly, and `DegranulationFlash` exists and
-  is distinct in code. Whether the flash **reads** as an event has not been
-  seen by anyone yet.
-- *"Total active unit count **visibly** stays bounded over an extended play
-  session"* — verified in simulation (5 towers, 300 simulated seconds,
-  peak 50 ≤ 50, never exceeded at any point, against 375 uncapped) and the
-  HUD line that would show it renders correctly at zero. Not yet watched
-  climbing to a cap and holding there in a real session.
-
-Everything else passed: 76/76 new lifecycle assertions, Sprint 2's 35/35
-combat assertions, Sprint 1's cytokine numbers identical (OFF
-2.99/3.14/2.84, ON 0.20/0.00/0.00), Windows build succeeded (93,295,368
-bytes, 0 errors), zero runtime exceptions. Full detail in
-`docs/ENGINE_STATUS.md`.
-
-**Flagged for the Director, not silently absorbed** (per item 7's own
-instruction): proximity contact cut hit frequency to ~50% of the Sprint 2
-rate — macrophage 50.0%, neutrophil 49.2%, measured over 200k simulated
-ticks. Clearing is about half as fast per unit, at the same time as a
-population cap. Nothing else was re-tuned to compensate.
+The question this sprint answers for the Director: **does the invasion loop
+read?** Can he watch pressure build at a spot on the gut wall, see it burst,
+and then see the immune response converge on the breach — and does that feel
+like defending a front rather than watching pathogens teleport?
