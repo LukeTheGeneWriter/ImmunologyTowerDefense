@@ -300,3 +300,77 @@ session didn't happen to catch a live spread event on camera (the 15s
 incubation window didn't line up with the screenshot timing) — without the
 headless proof, this sprint's evidence for the single most important
 mechanic in the brief would have been weaker than it should be.
+
+### Sprint 3 — Code agent + head session (2026-08-21, population homeostasis)
+
+**Process lesson, the big one: the dispatched Code agent hit its usage
+limit mid-sprint.** It had done the hard part — code committed (`8eaca14`),
+`LifecycleVerification.cs` written, a successful Windows build — and then
+died partway through the doc updates, having written **none** of them. Its
+last words were "While that runs, I'll update the docs. Starting with
+`INTERFACE.md`."
+
+What saved the sprint: the code was committed with a genuinely explanatory
+commit message (every judgment call, with reasoning), and the verification
+harness was itself committed and re-runnable. The head session re-ran
+everything from scratch and reconstructed all four docs from the commit
+message, the code comments, and fresh harness output. Nothing was lost.
+
+**Two practices to carry forward:**
+- **Brief dispatched agents to write docs incrementally, not as a final
+  step.** Docs written last are the docs that don't get written. Better:
+  update `INTERFACE.md` as each signature changes, and append to this file
+  when each judgment call is *made*, not in a retrospective sweep.
+- **A verbose, reasoning-heavy commit message is cheap insurance.** It was
+  the primary recovery artifact here. "Explain why, not just what"
+  (`WORKFLOW.md` §2) turned out to matter for a reason nobody anticipated:
+  it's what a *successor* reads when the author is gone mid-task.
+
+**Judgment calls made this sprint:**
+- **Chebyshev, not Manhattan, for contact radius.** Matches the square
+  footprints these units already render as; the Manhattan diamond covers
+  half the tiles and would have halved contact frequency a second time on
+  top of the intended reduction.
+- **The blocked emission timer clamps rather than banks.** Not specified
+  anywhere, and it's load-bearing: if a blocked tower accumulated the
+  emissions it was "owed," a tower whose population died at once would
+  dump ~10 units the instant a slot freed, defeating the second cap
+  entirely. `GAME_DESIGN.md` §6d's "neither cap alone is sufficient" only
+  holds with the clamp.
+- **Units get a value snapshot of their tower's tuning, not a live
+  reference.** A mid-round upgrade improves future children only. Flagged
+  to the Director, unruled — deliberately left as a one-line change.
+- **A `depleting` guard on the degranulation path.** A degranulation burst
+  can land a kill, which would otherwise re-trigger depletion on a unit
+  already mid-despawn.
+
+**The number worth watching: contact frequency halved.** Proximity contact
+dropped hit rate to ~50% of Sprint 2's (macrophage 50.0%, neutrophil 49.2%
+over 200k simulated ticks). That is intended and was anticipated in
+`SPRINT_PLAN.md` item 7, but it arrived in the same sprint as a population
+cap, so two independent nerfs to clearing throughput landed together. The
+harness prints this as a no-assertion diagnostic specifically so nobody has
+to rediscover it by feel. Resisted the temptation to compensate by bumping
+damage or the cap — that would have hidden the interaction the Director
+needs to actually judge.
+
+**Windows tip, new: you may not be able to drive the built game's input at
+all.** Sprint 2 successfully clicked the running build with computed
+coordinates. This session could not: `SetForegroundWindow` was refused
+(Windows foreground lock — the Director confirmed afterwards that he was
+actively using another window at the time, which is exactly when Windows
+refuses the steal; a process that doesn't own the foreground generally
+can't steal it), and since `Application.runInBackground` is off, the
+unfocused build doesn't tick either. **The tell is a pixel-identical
+capture across a long wait** — two shots 75 seconds apart were byte-for-byte
+the same, which reads as "frozen build" but is actually "never had focus."
+Check for that before diagnosing a hang. `PrintWindow` still captures an
+unfocused window fine, so screenshots work even when input doesn't.
+
+**Follow-up on the focus failure (same day):** the Director was working in
+another window while the automation ran, which is the ordinary cause — not
+a hard environmental limit. **Practical rule: scripted input against the
+built game needs the machine otherwise idle.** Either run it when nobody's
+using the machine, or just hand the build to the Director and let him
+click. Sprint 2's successful click automation was probably a quiet machine
+as much as good coordinate math.

@@ -1,91 +1,71 @@
-# Session Handoff — 2026-08-21 (mid–Sprint 3)
+# Session Handoff — 2026-08-21 (Sprint 3 built and verified, awaiting playtest)
 
-A checkpoint written by the head session because it was approaching its
-usage limit mid-sprint. **This is a living file — overwrite it at the next
-checkpoint rather than accumulating dated copies.** It is not one of
-`WORKFLOW.md` §3's canonical docs; if it contradicts `SPRINT_PLAN.md`,
-`ENGINE_STATUS.md`, or `INTERFACE.md`, those win.
+A checkpoint written by the head session. **This is a living file —
+overwrite it at the next checkpoint rather than accumulating dated copies.**
+It is not one of `WORKFLOW.md` §3's canonical docs; if it contradicts
+`SPRINT_PLAN.md`, `ENGINE_STATUS.md`, or `INTERFACE.md`, those win.
 
-## Where the sprint stands
+## Status: Sprint 3 is code-complete, verified, and documented
 
-Sprint 3 (per-progenitor population cap + unit depletion) is **in flight,
-not finished, and not verified by the head session.**
+Everything in `SPRINT_PLAN.md`'s scope is built. All verification was run
+by the head session directly (see `ENGINE_STATUS.md` → "Build status
+(Sprint 3)" for the actual numbers). **The one thing left is the Director's
+playtest.**
 
-Commits on `main` this session:
+Commits on `main`, all pushed:
 
 | Commit | What |
 |---|---|
-| `830e1e5` | "Sprint 3 plans" — the previously staged planning docs, committed unchanged at the Director's request |
-| `74a2fb6` | Director's 2026-08-21 revisions layered on top as a separate commit (see below) |
-| `8eaca14` | Code agent's implementation commit — **written by the dispatched agent, NOT yet reviewed or verified by the head** |
+| `830e1e5` | "Sprint 3 plans" — previously staged planning docs, committed unchanged |
+| `74a2fb6` | Director's 2026-08-21 revisions (macrophage 20, parameterization, items 6–7 folded in) |
+| `8eaca14` | Code agent's implementation |
+| *(this)* | Head session's verification pass + all four doc updates |
 
-`830e1e5` and `74a2fb6` are pushed. **`8eaca14` was not pushed** — check
-`git status` / `git log origin/main..main` before assuming remote state.
+## What happened to the Code agent
 
-## Director decisions this session (2026-08-21) — all already in the docs
+It hit its usage limit mid-sprint, after committing working code and a
+successful build but **before writing any documentation**. The head session
+re-ran every verification from scratch and wrote `ENGINE_STATUS.md`,
+`INTERFACE.md`, `TEAM_RETRO.md`, and `CHANGELOG.md` from the commit
+message, code comments, and fresh harness output. Nothing was lost. The
+process lesson is recorded in `TEAM_RETRO.md`: **brief agents to write docs
+incrementally, not as a final step.**
 
-1. **Macrophage kill limit 15 → 20.** Now marked Director-confirmed in
-   `GAME_DESIGN.md` §6d; it had been an unconfirmed working default.
-2. **Parameterize every lifecycle number.** Defaults on `UnitProfile` per
-   unit kind; each tower holds its own mutable copy seeded at placement;
-   units receive their tower's values at emission time. The stated reason
-   is that a future progenitor upgrade should be "buy a higher kill count
-   for this tower" — one field write, no other code change.
-3. **Two Sprint 2 gaps folded into Sprint 3** rather than deferred:
-   kill attribution and coarse-slot contact detection (scope items 6/7).
+## The two things the Director needs to look at
 
-## Open question the Director has NOT answered
+1. **Does population visibly stay bounded, and do the two deaths read as
+   different?** That's `SPRINT_PLAN.md`'s own question. Place towers, watch
+   the HUD's active-unit count climb and stop. A neutrophil hitting 5 kills
+   should flash and burst; a macrophage hitting 20 should just go.
+2. **Clearing is ~50% slower per unit than Sprint 2** — measured, intended,
+   and flagged rather than compensated for. Proximity contact and the
+   population cap landed in the same sprint, so if the board starts losing
+   ground, that interaction is why. The knob is `ContactRadiusFineTiles`
+   (per-tower, default 2). **Do not** revert to coarse-slot detection.
 
-**Do progenitor upgrades apply retroactively to living cells?** The
-implementation currently says no — a unit keeps the tuning values it was
-born with, so upgrading a tower improves its *future* children only. That
-was the head session's judgment call (simpler; reads correctly — a cell
-does not retroactively gain granules), flagged to the Director but not
-ruled on. Cheap to change now, much less so once an upgrade UI exists.
+## Still-open question the Director has not answered
 
-## What the head session found reading the Sprint 2 code
+**Do progenitor upgrades apply retroactively to living cells?** Currently
+no — a unit holds a value snapshot of its tower's tuning from emission
+time, so upgrading a tower improves only its future children. Head
+session's judgment call, flagged but unruled. A one-line change today; not
+one once an upgrade UI exists.
 
-Both were folded into the agent's brief; recorded here so they are not
-rediscovered a third time:
+## Known gap in verification
 
-- **Units had no despawn path at all.** `PrefabPool.Release` was never
-  called for a `SearchUnit` — `BoneMarrowManager.Emit` called `pool.Get()`
-  and that was the whole lifecycle. Every depletion behavior in this
-  sprint depends on that path existing, plus a pool reset so a recycled
-  unit does not carry a stale kill count or tower back-reference.
-- **A strict exact-fine-tile contact test would break combat.** With 49
-  fine tiles per coarse slot a random-walking unit would almost never
-  connect. `SPRINT_PLAN.md` item 7 therefore specifies a tunable
-  *proximity radius* (default 2 fine tiles), with an explicit warning not
-  to "fix" it into an exact-tile test later.
+**Placement was never exercised through the running build's UI this
+session.** Scripted clicks couldn't take foreground focus
+(`SetForegroundWindow` refused — the Director was using another window at the
+time; an unfocused build doesn't tick, so two
+captures 75s apart came back pixel-identical — that's the tell, not a
+hang). The click/picker path is unchanged code that Sprint 2 verified, and
+the real `PlaceTower`/emission path is driven headlessly by
+`LifecycleVerification`, so the mechanism is covered. But the first real
+click belongs to the Director.
 
-## Immediate next step for whoever picks this up
+## Next sprint's likely scope (not yet proposed to the Director)
 
-The head session's **integration and re-verification has not happened**
-(`WORKFLOW.md` §5 step 5 / §5.3). Nothing here has reached the Director.
-Specifically unverified by the head:
-
-- the headless harnesses (`CombatVerification`, the agent's new
-  `LifecycleVerification`) actually pass, and against real production
-  classes rather than reimplementations;
-- the Sprint 1 cytokine regression numbers still match exactly
-  (OFF: 2.99/3.14/2.84, ON: 0.20/0.00/0.00 — a difference is a real
-  regression, do not re-baseline it);
-- a Windows build compiles, launches, and reaches a playable state;
-- **the interaction flagged in `SPRINT_PLAN.md` item 7**: proximity
-  contact makes clearing slower while emission stays capped, so pathogens
-  may now outpace the player. The agent was told to report the observed
-  change rather than quietly re-tuning other numbers to hide it — check
-  that it did.
-- `ENGINE_STATUS.md`, `INTERFACE.md` (open questions 3 and 6 should now be
-  resolved, not still reading as open), and an appended `TEAM_RETRO.md`
-  Sprint 3 entry.
-
-Run `WORKFLOW.md` §5.3's stopping-point checklist plus `SPRINT_PLAN.md`'s
-own definition of done before any build reaches the Director.
-
-## Environment note
-
-This session's memory directory for the project was **empty** — every fact
-above came from the repo, which is `WORKFLOW.md` §2 working as intended.
-Keep it that way: put things in the repo, not in session memory.
+Depends entirely on how the playtest goes. If population and pacing feel
+right, `BACKLOG.md`'s open design questions are the queue — the ATP/economy
+layer is the biggest unblocked one, and most of Sprint 2–3's numbers are
+explicitly waiting on it before they can be balanced rather than guessed.

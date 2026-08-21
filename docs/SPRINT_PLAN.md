@@ -142,36 +142,68 @@ classes, viral spread) must keep working unchanged.
 
 ## Stopping point (definition of done)
 
-- [ ] A tower placed and left alone stops emitting once it hits its
+- [x] A tower placed and left alone stops emitting once it hits its
       max-active-children cap, and resumes once a child dies.
-- [ ] A tower whose entire population dies at once still only refills at
+- [x] A tower whose entire population dies at once still only refills at
       its emission-rate cap, not instantly.
 - [ ] A neutrophil that reaches its kill limit visibly degranulates
       (self-destructs with a visible effect) and deals collateral damage
       if something occupies its slot.
-- [ ] A macrophage that reaches its (higher) kill limit quietly retires,
+- [x] A macrophage that reaches its (higher) kill limit quietly retires,
       no collateral damage.
-- [ ] Both depletion paths correctly free their tower's population slot.
-- [ ] Kill limits, max-active-children, degranulation burst, and contact
+- [x] Both depletion paths correctly free their tower's population slot.
+- [x] Kill limits, max-active-children, degranulation burst, and contact
       radius are all mutable tuning fields (per-tower where the design
       calls for it), not `const`s — an upgrade system could bump a single
       tower's kill limit without touching any other code.
-- [ ] Kill credit goes to exactly one unit — the one whose hit crossed
+- [x] Kill credit goes to exactly one unit — the one whose hit crossed
       zero — and `ReceiveDamage` with a `null` source still works.
-- [ ] Contact damage requires fine-tile proximity, not just sharing a
+- [x] Contact damage requires fine-tile proximity, not just sharing a
       coarse slot; a unit at the far corner of a 7×7 slot no longer
       damages a pathogen at the opposite corner.
 - [ ] Total active unit count visibly stays bounded over an extended play
       session instead of growing indefinitely — the actual problem this
       sprint exists to fix.
-- [ ] Everything from Sprint 1/2 still works: board width, per-unit step
+- [x] Everything from Sprint 1/2 still works: board width, per-unit step
       speed, pooling, cytokine toggle + heatmap, placement, pathogen
       classes, viral spread.
-- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect the new
+- [x] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect the new
       systems.
-- [ ] `docs/TEAM_RETRO.md` has at least one new note.
+- [x] `docs/TEAM_RETRO.md` has at least one new note.
 
 The question this sprint answers for the Director: **does population
 finally stay under control, and do the two depletion behaviors (neutrophil
 burst vs. macrophage quiet exit) read as intentionally different from each
 other, not just as a bug where units randomly vanish?**
+
+## Verification result — head session, 2026-08-21
+
+Two boxes above are deliberately left unticked. Both are the same gap:
+**nothing was confirmed through the running build's UI this session**,
+because scripted clicks could not take window focus (`SetForegroundWindow`
+refused; the build doesn't tick unfocused, so two captures 75s apart came
+back pixel-identical). The build itself launches clean, renders, ticks, and
+shows the new HUD readout.
+
+- *"A neutrophil that reaches its kill limit **visibly** degranulates"* —
+  the mechanism, the collateral burst, the freed slot, and the pooled
+  return are all verified headlessly, and `DegranulationFlash` exists and
+  is distinct in code. Whether the flash **reads** as an event has not been
+  seen by anyone yet.
+- *"Total active unit count **visibly** stays bounded over an extended play
+  session"* — verified in simulation (5 towers, 300 simulated seconds,
+  peak 50 ≤ 50, never exceeded at any point, against 375 uncapped) and the
+  HUD line that would show it renders correctly at zero. Not yet watched
+  climbing to a cap and holding there in a real session.
+
+Everything else passed: 76/76 new lifecycle assertions, Sprint 2's 35/35
+combat assertions, Sprint 1's cytokine numbers identical (OFF
+2.99/3.14/2.84, ON 0.20/0.00/0.00), Windows build succeeded (93,295,368
+bytes, 0 errors), zero runtime exceptions. Full detail in
+`docs/ENGINE_STATUS.md`.
+
+**Flagged for the Director, not silently absorbed** (per item 7's own
+instruction): proximity contact cut hit frequency to ~50% of the Sprint 2
+rate — macrophage 50.0%, neutrophil 49.2%, measured over 200k simulated
+ticks. Clearing is about half as fast per unit, at the same time as a
+population cap. Nothing else was re-tuned to compensate.

@@ -211,21 +211,32 @@ transition than a true diffused field would.
 judgment call and not obviously implied by the design doc:** units
 co-occupy fine tiles with adhered pathogens exactly as they co-occupy with
 host cells — a pathogen still does **not** block unit movement.
-"Collision" is detected as the unit's current tile falling in the same
-*coarse* slot as an adhered pathogen (`SearchUnit.CheckContact`, called
-once per tick after the unit's fine-tiles-per-tick steps resolve).
+"Collision" is detected as the unit's fine tile falling **within
+`ContactRadiusFineTiles` (Chebyshev, default 2) of the pathogen's own fine
+tile** (`SearchUnit.CheckContact`, called once per tick after the unit's
+fine-tiles-per-tick steps resolve).
 
-**Sprint 2 change: contact now deals real damage, not just a flash.**
-`CheckContact` calls `pathogen?.ReceiveDamage(PathogenAgent.ContactDamagePerHit)`
-(see Pathogens section below) instead of Sprint 1's flash-only
-`NotifyContact()`. The 0.25s color-flash-toward-a-highlight-color visual is
-still there (now inside `ReceiveDamage`), but reaching zero health now has
-a real, visible, persistent consequence: the slot clears and the pathogen
-returns to its pool. Every unit in the same coarse slot as an occupied
-slot deals damage every tick it's there, so multiple units clear a
-pathogen faster — not a designed stacking mechanic, just a natural
-consequence of the detection being coarse-slot-level (see open question 3
-below, unchanged from Sprint 1).
+**Sprint 3 change: contact is a proximity test, not a coarse-slot test.**
+Through Sprint 2 a unit damaged a pathogen from anywhere in its 7×7 coarse
+slot, so every unit in that slot landed a hit every tick (an accidental
+stacking bonus — this was open question 3, now resolved). `CheckContact`
+now calls `pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit, this)`
+only within the radius, and passes **itself** as the attacker so the kill
+can be attributed (see Pathogens below).
+
+Chebyshev rather than Manhattan because it matches the square footprints
+these units render as; the Manhattan diamond covers half the tiles and
+would have halved contact frequency again. **It is deliberately a radius,
+not an exact-tile test** — with 49 fine tiles per coarse slot, requiring
+exact coincidence would mean a random-walking unit almost never connects.
+Anyone tempted to "tighten" this further should read `SPRINT_PLAN.md` item
+7 first. Measured cost of the change: contact frequency dropped to ~50% of
+the Sprint 2 rate (macrophage 50.0%, neutrophil 49.2% — see
+`ENGINE_STATUS.md`), i.e. clearing is about half as fast per unit.
+
+The 0.25s color-flash-toward-a-highlight-color visual is still there
+(inside `ReceiveDamage`), and reaching zero health still clears the slot
+and returns the pathogen to its pool.
 
 ## Bone marrow / placement (`ImmunologyTD.Units`, new this sprint)
 
@@ -311,7 +322,23 @@ rung-1 entry table.
     `currentTime` is an explicit parameter (not read via `UnityEngine.Time`)
     so this stays headlessly testable — see
     `Assets/Editor/CombatVerification.cs`.
-  - **`ReceiveDamage(float amount)`** (new) — flat per-hit damage
+  - **`ReceiveDamage(float amount, SearchUnit source)`** (signature
+    changed in Sprint 3 — was `ReceiveDamage(float)`) — flat per-hit damage
+    (`ContactDamagePerHit = 1f`, per `SPRINT_PLAN.md`'s "keep damage
+    numbers simple"). No-op unless `State == Adhered`.
+
+    `source` is the unit that landed the hit, and drives kill attribution:
+    **exactly one unit is ever credited with a kill — whoever's hit crosses
+    zero.** Earlier hits from other units credit nothing, and later hits on
+    the same tick no-op at the `State` guard, so there is no split or
+    shared credit. Credit is applied *before* `ClearFromCombat()`, because
+    clearing can return this instance to its pool. That single credit is
+    what drives unit depletion (`SearchUnit.RegisterKill`, below).
+
+    **`source` may be null, and always will be legal** — viral spread,
+    degranulation collateral, and harness fixtures all pass an attacker
+    where crediting makes no sense or none exists. A null source simply
+    means nobody is credited.
     (`ContactDamagePerHit = 1f`, per `SPRINT_PLAN.md`'s "keep damage
     numbers simple"). No-op unless `State == Adhered`. Triggers the
     existing 0.25s flash-toward-highlight visual on every hit (for
@@ -563,6 +590,82 @@ in touch with whoever's touching the scene before changing that assumption
 though, since e.g. `BuildCamera()` unconditionally creates a new Main
 Camera regardless of whether one already exists.
 
+## Unit lifecycle and per-tower tuning (`ImmunologyTD.Units`, new Sprint 3)
+
+The contract that bounds population. Design rationale: `GAME_DESIGN.md`
+§6d. **Nothing in this section is a `const` — that is the whole point.**
+
+### `UnitLifecycleTuning` (new class)
+
+The mutable, per-tower copy of a unit kind's lifecycle numbers. Plain
+public fields on a reference type:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `MaxActiveChildren` | 10 | Ceiling on one tower's simultaneously-alive children |
+| `KillLimit` | 5 neutrophil / **20 macrophage** | Kills before the unit depletes |
+| `DegranulatesOnDepletion` | true neutrophil / false macrophage | Burst-and-die vs. quiet retirement |
+| `DegranulationBurstMultiplier` | 3 | Collateral burst as a multiple of `ContactDamagePerHit` |
+| `ContactRadiusFineTiles` | 2 | Chebyshev contact range |
+
+- `UnitLifecycleTuning.FromProfile(UnitProfile)` — builds a fresh instance
+  from the per-*kind* defaults, which live as serialized fields on
+  `UnitProfile`.
+- `BoneMarrowManager.PlaceTower` calls it once per tower, so **each tower
+  owns its own instance**. A future upgrade is a write to one tower's
+  field and nothing else — that is the Director's stated requirement
+  (2026-08-21), and it is why the cap is per-progenitor rather than
+  systemic.
+- `BoneMarrowManager.GetTuning(index)` hands a tower's instance out.
+- **An emitted unit receives a value snapshot, not the tower's live
+  reference.** A mid-round upgrade therefore improves a tower's *future*
+  children, not the ones already fielded. Flagged as a judgment call in
+  `SPRINT_PLAN.md` item 5, still awaiting a Director ruling; making it
+  retroactive is a one-line change (hand out `slot.Tuning` directly).
+
+### `BoneMarrowManager` additions
+
+- `TotalActiveUnits` — sum of live children across all towers. The
+  headline observable; shown in the HUD.
+- `SlotCount`, `LastEmittedUnit`, per-slot live-children access for the
+  HUD and harness.
+- A tower **stops emitting at `MaxActiveChildren`** even when its emission
+  timer has elapsed, and resumes when a child dies.
+- **The blocked emission timer is clamped at the interval, not banked.**
+  This is what keeps the two caps independent per §6d — a tower whose
+  whole population dies at once refills at one cell per
+  `EmissionIntervalSeconds`, rather than discharging every emission it was
+  "owed" while blocked. Do not change this to accumulate.
+
+### `SearchUnit` additions (all harness-callable, none read `UnityEngine.Time`)
+
+- `Kills` / `RegisterKill()` — kill count; called only by
+  `PathogenAgent.ReceiveDamage` on the hit that crosses zero.
+- `KillLimit`, `DegranulatesOnDepletion`, `ContactRadiusFineTiles` —
+  read-through to this unit's snapshot.
+- `OwnerSlotIndex` — which tower emitted this unit (`-1` if none).
+- `IsDepletionDue` — `Kills >= KillLimit` and not already depleting.
+- `ResolveDepletionIfDue()` — the depletion transition. Degranulates first
+  if this kind does, then despawns; returns whether it fired. A
+  `depleting` guard prevents a kill landed *by* the degranulation burst
+  from recursing into a second depletion.
+- `SimulationTick()` / `CheckContact()` — explicit-time movement and
+  contact, per the project convention.
+- `ResetForPool()` — clears kill count, tower back-reference, and transient
+  state so a recycled unit carries nothing stale.
+- **Despawn returns the unit to its `PrefabPool` and notifies its tower**,
+  which decrements its live-children count. This return path did not exist
+  before Sprint 3 — `PrefabPool.Release` was never called for a
+  `SearchUnit` at all.
+
+### `DegranulationFlash` (`ImmunologyTD.Rendering`, new)
+
+- `Configure(PrefabPool)` — wired once by `GameBootstrap`.
+- `Play(Vector3 worldPosition, float worldSize)` — a 0.45s pale-yellow
+  expanding burst, pooled like everything else (`GAME_DESIGN.md` §8). It
+  exists so the two depletion paths are visually distinguishable; a
+  neutrophil's death should read as an event, not as a unit vanishing.
+
 ## Open questions for whoever builds on this next
 
 1. **Coarse `Row` vs. the four-compartment depth-5 model.** This sprint's
@@ -575,18 +678,19 @@ Camera regardless of whether one already exists.
    above — this sprint scatters adhesion across all coarse rows for search
    variety, which may not match the Director's mental model of "adhering
    to the mucus layer."
-3. **Contact detection is coarse-slot-level, not fine-tile-level — and now
-   deals real damage, not just a flash.** Still true as of Sprint 2:
-   `SearchUnit.CheckContact` fires (and now calls
-   `PathogenAgent.ReceiveDamage`) once per tick a unit's fine tile falls in
-   the same coarse slot as an occupied one, not the pathogen's exact fine
-   tile. A consequence worth flagging now that damage is real: **every**
-   unit sharing that coarse slot deals damage that tick, so a crowded
-   coarse cell clears noticeably faster than a lone unit would — not a
-   designed stacking bonus, just what the coarse-level detection produces
-   once contact has a real effect. `PathogenAgent`'s stored `Current` fine
-   coordinate still has what's needed to tighten this to fine-tile-level
-   if that stacking behavior ever needs fixing.
+3. **~~Contact detection is coarse-slot-level~~ — RESOLVED in Sprint 3.**
+   Contact is now a fine-tile proximity test (`ContactRadiusFineTiles`,
+   Chebyshev, default 2) against the pathogen's own `Current` coordinate,
+   so a unit at the far corner of a pathogen's coarse slot no longer
+   damages it and the accidental stacking bonus is gone. What replaced the
+   open question: **contact frequency fell to ~50% of the Sprint 2 rate**
+   (macrophage 50.0%, neutrophil 49.2%, measured over 200k simulated
+   ticks), so clearing is about half as fast per unit — and that landed in
+   the same sprint as a population cap. Whether the two together tip the
+   board toward the pathogens is a **balance question for playtest**, and
+   the radius is the knob (per-tower, tunable). Do not "fix" it by
+   reverting to coarse-slot detection or by tightening to an exact-tile
+   test — see `SPRINT_PLAN.md` item 7.
 4. **`Chemotaxis.GradientSharpness = 4f` is tuned for legibility, not
    balance.** The closing task's own verification numbers show units
    reaching an infected cell in ~4.5 simulated seconds on average once
@@ -605,16 +709,18 @@ Camera regardless of whether one already exists.
    short playtest," not validated against any particular pacing target.**
    Fine for this sprint's legibility goal; worth a real look once round
    length/pacing is being tuned deliberately.
-6. **(New, Sprint 2) Bone marrow emission has no population cap beyond
-   `PathogenSpawner.maxLivePathogens`-style throttling on the unit side —
-   there isn't one.** Each placed tower emits every
-   `BoneMarrowManager.EmissionIntervalSeconds` (4s) indefinitely; with all
-   5 slots filled that's a steadily growing standing unit population,
-   since nothing despawns units (no "cells die at end of round" lifecycle
-   exists yet — `GAME_DESIGN.md` section 2's round model isn't built).
-   Not a bug this sprint (there's no round loop for it to violate yet),
-   but whoever builds the round/economy layer should expect to add either
-   a cap or an end-of-round despawn here.
+6. **~~Bone marrow emission has no population cap~~ — RESOLVED in Sprint 3.**
+   This was the problem Sprint 3 existed to fix. Population is now bounded
+   two independent ways per `GAME_DESIGN.md` §6d: a per-tower
+   `MaxActiveChildren` ceiling (10) and the pre-existing
+   `EmissionIntervalSeconds` rate cap (4s), with units despawning on
+   kill-count depletion. Verified over 300 simulated seconds with all 5
+   towers placed: active count never exceeded towers × cap at any point
+   (peak 50 ≤ 50), against 375 unbounded. **Still genuinely open**: there
+   is no end-of-round despawn, because `GAME_DESIGN.md` §2's round model
+   still isn't built — whoever builds the round/economy layer decides
+   whether cells persist across rounds or clear at the boundary. The cap
+   makes that a design choice rather than a leak.
 7. **(New, Sprint 2) All pathogen-class weights, combat numbers, and
    spread/emission timings are judgment calls, not balance-tested** —
    `PathogenAgent.VirusChance`/`BacteriumChance`, `IntracellularMaxHealth`/
@@ -639,3 +745,17 @@ Camera regardless of whether one already exists.
    `BoardRenderer` (the coarse-cell background itself, the only thing
    actually visible for that slot) rather than by `PathogenAgent`'s own
    sprite — not attempted this sprint, flagged as a plausible next step.
+9. **(New, Sprint 3) Do progenitor upgrades apply retroactively to living
+   cells?** Currently **no** — a unit holds a value snapshot of its
+   tower's tuning taken at emission time, so upgrading a tower improves
+   only its future children. This was the head session's judgment call
+   (simpler, and it reads correctly — a cell doesn't retroactively gain
+   granules), flagged to the Director and **not yet ruled on**. Nothing
+   depends on it until an upgrade system exists, and it is a one-line
+   change today; it stops being one once an upgrade UI has shipped.
+10. **(New, Sprint 3) Sprint 3's numbers are defaults, not balance
+   results** — `MaxActiveChildren` 10, neutrophil `KillLimit` 5,
+   `DegranulationBurstMultiplier` 3, `ContactRadiusFineTiles` 2. Only the
+   macrophage `KillLimit` of 20 is Director-confirmed. All are fields on
+   `UnitProfile`/`UnitLifecycleTuning`, never consts, so tuning them
+   requires no code restructuring.
