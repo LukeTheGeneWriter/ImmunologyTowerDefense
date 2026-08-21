@@ -669,16 +669,23 @@ public fields on a reference type:
 
 ## Open questions for whoever builds on this next
 
-1. **Coarse `Row` vs. the four-compartment depth-5 model.** This sprint's
-   `CoarseCoord.Row` (`0..4`) is a tissue-internal coarse band, not
-   `GAME_DESIGN.md` section 1's depth-5 blood/breach axis. When bone
-   marrow/blood/lymph node get built, something has to reconcile "tissue
-   row 0..4" with "compartment depth 0..5" — they're not currently the
-   same numbering and nothing enforces a relationship between them.
-2. **Does "adhesion" mean depth-1 specifically?** See the pathogen section
-   above — this sprint scatters adhesion across all coarse rows for search
-   variety, which may not match the Director's mental model of "adhering
-   to the mucus layer."
+1. **~~Coarse `Row` vs. the four-compartment depth-5 model~~ — RESOLVED by
+   Map 01's layout (Director, 2026-08-21).** The two axes are no longer in
+   tension because depth is no longer a row. **Columns are the threat
+   axis**: lumen on the right, tissue in the middle, base on the left, with
+   pathogens advancing right→left. **Rows are lanes**, 40 of them, carrying
+   no depth meaning at all. See `GAME_DESIGN.md` §1a. Nothing in the engine
+   implements this yet — `BoardConfig` is still 30 columns × 5 rows with no
+   band concept — so this is the next sprint's main structural work, but
+   the ambiguity itself is settled.
+2. **~~Does "adhesion" mean depth-1 specifically?~~ — RESOLVED by the same
+   layout.** Adhesion is not a depth-1 event; it is a **lumen→tissue
+   invasion** across the gut interface at the lumen/tissue seam. A pathogen
+   riding the lumen flow either colonises that interface (`GAME_DESIGN.md`
+   §6b barrier colonisation), jumps left into tissue, or is excreted out
+   the bottom with no penalty. Scattering adhesion uniformly across the
+   board — which is what Sprints 1–3 do — is exactly the behavior the
+   Director rejected on 2026-08-21.
 3. **~~Contact detection is coarse-slot-level~~ — RESOLVED in Sprint 3.**
    Contact is now a fine-tile proximity test (`ContactRadiusFineTiles`,
    Chebyshev, default 2) against the pathogen's own `Current` coordinate,

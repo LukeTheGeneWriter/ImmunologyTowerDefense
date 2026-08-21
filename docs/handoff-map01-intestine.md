@@ -1,5 +1,14 @@
 # Handoff — Map 01: Small Intestine, Rounds 1–2
 
+> **⚠️ SPATIALLY SUPERSEDED, 2026-08-21.** Section 2's spatial model — lumen
+> along the top flowing left→right, tissue depth as five *vertical* layers —
+> is retired. Map 01 is now three **lateral** bands (base | tissue | lumen)
+> with the threat axis running right→left, Plants vs. Zombies style. See
+> `docs/GAME_DESIGN.md` §1a, which is authoritative for anything spatial.
+> The rest of this document — the round-1 script, the search-progression
+> ladder in §4, art direction, and the screens list — is still current.
+
+
 **For:** Claude Design
 **Purpose:** Produce screen designs for the first playable slice. This document specifies what the game does; it does not specify how it should look, except where noted under *Art direction*.
 **Status:** Round 1 was locked at the time of writing; **corrected 2026-08-19** against `docs/GAME_DESIGN.md` following that day's Director decisions (see the correction notes inline below and in `docs/BACKLOG.md`). Round 2 is directional. Mid/late game is context only — do not design for it yet.

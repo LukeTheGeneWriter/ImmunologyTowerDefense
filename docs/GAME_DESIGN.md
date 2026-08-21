@@ -49,6 +49,72 @@ descend. Immune cells enter from blood (depth 5) and ascend. The tissue is
 the contested middle — a departure from the pure Bloons model (static
 towers, fixed enemy path), closer to Plants vs. Zombies in geometry.
 
+## 1a. Map 01 layout — three lateral bands, LOCKED (Director, 2026-08-21)
+
+The abstract compartment model above becomes concrete geometry here. Map 01
+is a **Plants vs. Zombies–style lateral map**: threat comes from the right,
+the player's base is on the left, and the contested ground is the middle.
+
+**This supersedes `docs/handoff-map01-intestine.md` §2**, which put the
+lumen along the top flowing left→right and made depth a *vertical* axis of
+five layers. That model is retired. The threat axis is now **horizontal**,
+and the old doc should be read as historical for everything spatial (its
+round script, art direction, and search-progression sections are still
+current).
+
+### The bands
+
+Working figure: a **100 × 40 grid of coarse cells**, split laterally into
+three bands, each the full 40 cells tall.
+
+| Columns | Band | Role |
+|---|---|---|
+| 0–24 (leftmost quarter) | **Base** | Bone marrow + lymph node. Immune cells enter tissue from here. **Pathogens reaching it cost the player health** — this is the endzone. |
+| 25–74 (middle half) | **Tissue** | The host-cell lattice already built. All combat happens here. |
+| 75–99 (rightmost quarter) | **Lumen** | Pathogens flow **top to bottom** freely. Reaching the bottom = excreted, no penalty. |
+
+### How pathogens behave
+
+- **In the lumen they are safe and free.** They flow down the channel with
+  no consequence and no way to be attacked. A pathogen that simply rides
+  the flow out of the bottom is excreted — **not** a fail state, which is
+  the deliberate break from Bloons TD 6 that `handoff-map01-intestine.md`
+  §1 already describes and this layout preserves.
+- **From the lumen they choose to invade.** Two ways off the flow:
+  colonising the **gut interface** (the epithelial boundary at the
+  lumen/tissue seam — this is where `GAME_DESIGN.md` §6b's barrier
+  colonisation lives), or **jumping leftward into the tissue** proper.
+- **In tissue they push a front leftward toward the base.** This is the
+  battlefront the Director asked for (2026-08-21): pathogens should
+  *advance and be held*, not teleport to arbitrary positions. Slipping past
+  one or two cells is allowed and occasional — the fiction is cracks and
+  vessels — but the default is a contested line that advances when the
+  pathogens win ground and recedes when immune cells clear it.
+- **Reaching the base costs a life**, per §6c's 100-life pool. Base is
+  simultaneously the player's production and the lose condition, exactly as
+  §1 describes — that is what sepsis is.
+
+### Why this geometry
+
+It puts both sides on **one axis**, which the previous arrangement did not:
+pathogens transited laterally (along columns) while immune cells entered
+from the bottom edge and wandered upward, so the two never opposed each
+other along a shared line and no front could form. That mismatch is the
+root of the "pathogens fly across the board" problem the Director
+identified, and it is what `docs/INTERFACE.md` open question 1 has been
+flagging since Sprint 1. This layout resolves it: **right-to-left is the
+threat axis, and the 40 rows are lanes.**
+
+### Scale note
+
+At the existing 7×7 fine sub-lattice and 0.12s tick, a 50-cell-wide tissue
+band works out to roughly **14 seconds for a neutrophil to cross laterally
+and ~42 for a macrophage** — a good spread, and slow enough that holding a
+line matters. The whole 100×40 field fits a 16:9 screen at about 28px per
+coarse cell. The numbers are workable as stated; they are recorded here so
+a later change to fine subdivision or unit speed is understood to move
+them.
+
 ## 2. Tower / unit lifespan model — LOCKED
 
 Adopts the Bloons division between a persistent tower and a transient thing
