@@ -232,3 +232,27 @@ Sprint 1.
   pathogens in tissue. Expected, not a bug — but it means the endzone
   counter needs a longer sitting to demonstrate, and it is worth checking
   whether the pacing is right once the Director plays it.
+
+## Decided 2026-08-21 (Director), and what they open
+
+- **ATP income: a lump sum on starting a round, plus per-pathogen-kill
+  income.** Interim ("for now"), see `GAME_DESIGN.md` §5b. Supersedes the
+  round-1 economy question above only in part — unit *prices* are still
+  unset.
+- **A round loop is now needed, and is the blocker under the above.** The
+  game runs as one continuous session with no waves or round boundaries, so
+  "starting a round" has nothing to attach to. Director has called it out
+  as needed soon. Until it exists, round-start ATP can only be a one-off
+  grant at session start. **This is the most likely candidate for Sprint 6
+  to absorb alongside the buying tab.**
+- **Knowledge is earned by DC:lymphocyte encounters, not a timer**
+  (`GAME_DESIGN.md` §5a). This answers the long-open "lymph node arrival
+  delay" question above: the delay is not a number to pick, it is however
+  long the DC's walk takes. Opens instead: cargo capacity, per-encounter
+  probability, increment size, how many T/B cells populate the node and
+  where they come from, and whether a spent DC dies or returns empty.
+- **The lymph node becomes a second search arena.** DC-finds-lymphocyte is
+  the same random-walk-and-collide dynamic as tissue, so node crowding
+  becomes a real variable — a sparse node learns slowly however much
+  antigen arrives. Worth watching for whether that is interesting or just
+  another thing to wait on.

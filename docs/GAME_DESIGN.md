@@ -533,6 +533,73 @@ memory-storage role a visible payoff.
 
 Open question on mutation interacting with banked memory — see `BACKLOG.md`.
 
+## 5a. How knowledge is actually earned — the DC shuttle — LOCKED (Director, 2026-08-21)
+
+§5 says knowledge accrues toward thresholds. This section says **by what
+mechanism**, and the answer is deliberately not a timer or a passive drip.
+
+**The loop:**
+
+1. A **dendritic cell in tissue picks up cargo from debris** (§1c — debris
+   is the antigen source; dead host cells are what there is to learn from).
+2. It **migrates to the lymph node**.
+3. Inside the node it **bumps into the T and B cells hanging out there**.
+   Every encounter carries a **stochastic chance to increment knowledge**
+   of that pathogen species.
+4. **The DC eventually loses its cargo** and must return to tissue to get
+   more.
+
+**Why encounters rather than a timer.** This mirrors the real DC:T cell
+network — antigen shuttled to the lymph node is *presented* to T and B
+cells, and antigen-specific learning comes out of those interactions. The
+Director's framing: it should be the meeting that teaches, not the clock.
+
+Two consequences worth stating, because they are what make this a mechanic
+rather than flavour:
+
+- **The lymph node becomes a second arena with its own search problem.** A
+  DC finding lymphocytes is the same random-walk-and-collide dynamic the
+  tissue already runs, which means the engine's existing search and contact
+  code applies — and it means **how crowded the node is matters**. A node
+  with few lymphocytes teaches slowly no matter how much antigen arrives.
+- **Cargo depletion forces a round trip**, so a DC is not a
+  fire-and-forget upgrade. It is a unit with a job that keeps taking it
+  back and forth across the map, and its travel time is a real cost. This
+  is also the concrete answer to `BACKLOG.md`'s long-open "lymph node
+  arrival delay" question: the delay is not a configured number, it is
+  however long the walk takes.
+
+**Numbers not yet chosen:** cargo capacity (how many presentations before
+it is spent), per-encounter knowledge probability, how much a successful
+encounter increments, how many T/B cells populate the node and where they
+come from, and whether a spent DC dies or returns empty. All tuning, none
+blocking the sprints before this one.
+
+## 5b. ATP income — LOCKED for now (Director, 2026-08-21)
+
+Two sources:
+
+- **Starting a round** pays a lump sum.
+- **Killing a pathogen** pays per kill.
+
+Explicitly an interim answer — the Director's words were "for now" — chosen
+so the progenitor buying tab has something real to spend before the full
+economy exists.
+
+**This creates a dependency the project has been deferring: there is no
+round loop.** The game currently runs as one continuous, unbounded session
+— no waves, no round boundaries, no between-round interval. "Starting a
+round" has nothing to attach to yet. The Director has flagged a round loop
+as needed soon; until it exists, the round-start payment can only be a
+one-off grant at session start.
+
+Note the two sources pull in different directions, which is probably
+healthy: the round-start lump rewards surviving to the next round, while
+per-kill income rewards active clearing over letting pathogens transit.
+Whether per-kill income makes a passive "let them through" strategy
+non-viable — or whether it should — is a balance question for when the
+economy is real.
+
 ## 6. Tissue recovery and fibrosis — LOCKED in principle
 
 Host cells refill damaged coordinates between rounds. Damage is inevitable
