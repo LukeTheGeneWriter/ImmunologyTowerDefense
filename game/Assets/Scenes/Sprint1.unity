@@ -175,7 +175,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b856dfe2b470b4a4b9724f3052e75215, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ImmunologyTD.Grid.BoardConfig
-  columns: 100
+  columns: 25
 --- !u!4 &1219734606
 Transform:
   m_ObjectHideFlags: 0

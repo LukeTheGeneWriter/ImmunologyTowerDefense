@@ -57,10 +57,10 @@ namespace ImmunologyTD.Grid
     {
         [Header("Board size, in COARSE cells (host cells, not fine tiles)")]
         [Tooltip("Coarse columns. Map 01 (GAME_DESIGN.md section 1a) is 100 columns x 40 rows of HOST CELLS -- the 7x7 fine sub-lattice sits underneath that.")]
-        [SerializeField] private int columns = 100;
+        [SerializeField] private int columns = 25;
 
         [Tooltip("Coarse rows. On Map 01 these are the 40 lanes; they carry no depth meaning (INTERFACE.md open question 1, resolved 2026-08-21).")]
-        [SerializeField] private int rows = 40;
+        [SerializeField] private int rows = 10;
 
         [Header("Band layout (GAME_DESIGN.md section 1a) -- data, not magic numbers")]
         [Tooltip("Which axis the bands run along. Horizontal = bands are columns and rows are lanes (Map 01).")]
@@ -70,10 +70,10 @@ namespace ImmunologyTD.Grid
         [SerializeField] private AxisEnd baseEnd = AxisEnd.Negative;
 
         [Tooltip("Cells of BASE band, counted from the base end. Map 01: 25.")]
-        [SerializeField] private int baseBandCells = 25;
+        [SerializeField] private int baseBandCells = 6;
 
         [Tooltip("Cells of LUMEN band, counted from the far end. Map 01: 25. Tissue is whatever is left in between.")]
-        [SerializeField] private int lumenBandCells = 25;
+        [SerializeField] private int lumenBandCells = 6;
 
         [Tooltip("Which end of the CROSS axis the lumen flow carries pathogens toward. Map 01: Positive = increasing row = downward on screen (FineToWorld puts row 0 at the top).")]
         [SerializeField] private AxisEnd lumenFlowEnd = AxisEnd.Positive;
