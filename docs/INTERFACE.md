@@ -617,11 +617,12 @@ public fields on a reference type:
   (2026-08-21), and it is why the cap is per-progenitor rather than
   systemic.
 - `BoneMarrowManager.GetTuning(index)` hands a tower's instance out.
-- **An emitted unit receives a value snapshot, not the tower's live
-  reference.** A mid-round upgrade therefore improves a tower's *future*
-  children, not the ones already fielded. Flagged as a judgment call in
-  `SPRINT_PLAN.md` item 5, still awaiting a Director ruling; making it
-  retroactive is a one-line change (hand out `slot.Tuning` directly).
+- **An emitted unit holds a LIVE REFERENCE to its tower's tuning, not a
+  snapshot** (Director, 2026-08-21). An upgrade therefore applies instantly
+  to every one of that tower's currently-fielded children as well as its
+  future ones — spending ATP is meant to make an immediate difference. It
+  does not leak across towers, and never mutates the shared `UnitProfile`
+  default. Do not reintroduce snapshot semantics.
 
 ### `BoneMarrowManager` additions
 
@@ -745,15 +746,17 @@ public fields on a reference type:
    `BoardRenderer` (the coarse-cell background itself, the only thing
    actually visible for that slot) rather than by `PathogenAgent`'s own
    sprite — not attempted this sprint, flagged as a plausible next step.
-9. **(New, Sprint 3) Do progenitor upgrades apply retroactively to living
-   cells?** Currently **no** — a unit holds a value snapshot of its
-   tower's tuning taken at emission time, so upgrading a tower improves
-   only its future children. This was the head session's judgment call
-   (simpler, and it reads correctly — a cell doesn't retroactively gain
-   granules), flagged to the Director and **not yet ruled on**. Nothing
-   depends on it until an upgrade system exists, and it is a one-line
-   change today; it stops being one once an upgrade UI has shipped.
-10. **(New, Sprint 3) Sprint 3's numbers are defaults, not balance
+9. **~~Do progenitor upgrades apply retroactively to living cells?~~ —
+   ANSWERED (Director, 2026-08-21): yes, instantly.** An upgrade applies
+   to every one of that progenitor's currently-fielded children as well as
+   its future ones, because spending ATP should make an immediate visible
+   difference. A `SearchUnit` therefore holds a **live reference** to its
+   tower's `UnitLifecycleTuning`, not a snapshot — writing
+   `manager.GetTuning(i).KillLimit = n` is immediately visible to all of
+   tower `i`'s live units. Verified in `LifecycleVerification`: the change
+   reaches every live child of that tower, reaches its future emissions,
+   and touches neither another tower's children nor the shared
+   `UnitProfile` default. Do not reintroduce snapshot semantics.
    results** — `MaxActiveChildren` 10, neutrophil `KillLimit` 5,
    `DegranulationBurstMultiplier` 3, `ContactRadiusFineTiles` 2. Only the
    macrophage `KillLimit` of 20 is Director-confirmed. All are fields on

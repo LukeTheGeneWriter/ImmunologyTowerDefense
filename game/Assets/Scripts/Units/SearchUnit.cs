@@ -53,12 +53,23 @@ namespace ImmunologyTD.Units
         private UnitProfile profile;
         private SpriteRenderer sr;
 
-        /// <summary>This unit's own snapshot of its tower's lifecycle
-        /// numbers, taken at emission time and kept for life (see
-        /// UnitLifecycleTuning). Allocated once per instance and refilled by
-        /// CopyFrom on every Initialize, so recycling a pooled unit doesn't
-        /// allocate.</summary>
-        private readonly UnitLifecycleTuning tuning = new UnitLifecycleTuning();
+        /// <summary>A LIVE REFERENCE to this unit's tower's lifecycle
+        /// numbers -- not a copy (Director, 2026-08-21). Sprint 3 originally
+        /// handed each unit a value snapshot at emission time, so upgrading
+        /// a tower only improved its future children. The Director ruled
+        /// against that: an upgrade should make an INSTANT difference the
+        /// moment ATP is spent, so it applies to every one of that
+        /// progenitor's currently-fielded children as well as future ones.
+        /// Writing to a tower's UnitLifecycleTuning is therefore immediately
+        /// visible to all of its live units, by design -- do not "fix" this
+        /// back into a copy.
+        ///
+        /// fallbackTuning is used only when a unit is created outside the
+        /// tower path (headless harness fixtures pass no tower tuning), so
+        /// the accessors below never null-dereference and pooled reuse still
+        /// allocates nothing.</summary>
+        private UnitLifecycleTuning tuning;
+        private readonly UnitLifecycleTuning fallbackTuning = new UnitLifecycleTuning();
 
         private System.Action<SearchUnit> onDespawn;
 
@@ -120,7 +131,18 @@ namespace ImmunologyTD.Units
             this.onDespawn = onDespawn;
             Current = start;
 
-            tuning.CopyFrom(towerTuning ?? UnitLifecycleTuning.FromProfile(profile));
+            // Hold the tower's OWN instance, so an upgrade bought mid-round
+            // reaches this unit immediately (Director, 2026-08-21). Only a
+            // tower-less unit (harness fixture) gets a private fallback.
+            if (towerTuning != null)
+            {
+                tuning = towerTuning;
+            }
+            else
+            {
+                fallbackTuning.CopyFromProfile(profile);
+                tuning = fallbackTuning;
+            }
             OwnerSlotIndex = ownerSlotIndex;
             Kills = 0;
             depleting = false;
@@ -361,6 +383,7 @@ namespace ImmunologyTD.Units
             cytokineField = null;
             profile = null;
             onDespawn = null;
+            tuning = fallbackTuning; // drop the tower reference; Initialize reassigns before use
             Kills = 0;
             depleting = false;
             OwnerSlotIndex = -1;

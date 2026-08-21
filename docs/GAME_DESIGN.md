@@ -391,7 +391,6 @@ rather than waiting for the kill counter) instead of only ever being
 forced into it passively. Added to that list: **upgrading a progenitor to
 raise its cells' kill counts**, i.e. buying longer-lived output from one
 specific tower.
-
 No upgrade system exists yet, so none of these are purchasable. What the
 Director *did* rule is that the implementation must not foreclose them:
 every lifecycle number (max active children, both kill limits,
@@ -400,6 +399,25 @@ default**, never a hardcoded constant. An upgrade, when it lands, should
 be a write to one tower's field and nothing more. This is the concrete
 reason the cap is per-progenitor rather than systemic (see the top of this
 section) — a global cap would have nothing for such an upgrade to attach
+to.
+
+**Upgrades apply instantly to living cells — LOCKED (Director, 2026-08-21).**
+When a progenitor is upgraded, the change takes effect immediately on
+**every one of that progenitor's currently-fielded children as well as all
+future ones.** The Director's reasoning is a game-feel one and overrides
+the biological reading: spending ATP should make an instant, visible
+difference, not a difference that only arrives as old cells cycle out.
+
+Sprint 3 originally shipped the opposite (each unit held a value snapshot
+of its tower's numbers taken at emission time, so an upgrade improved only
+future children). That was a head-session judgment call — simpler, and
+arguably more realistic, since a mature neutrophil doesn't retroactively
+gain granules — and the Director overruled it. Implementation: a unit
+holds a **live reference** to its tower's `UnitLifecycleTuning`, so writing
+to the tower's instance is immediately visible to all of its live units.
+Do not "fix" this back into a copy; it is deliberate. Note the mechanism
+does **not** leak across towers — each progenitor still owns its own
+instance, and the shared per-kind `UnitProfile` defaults are never mutated.
 to.
 
 Numbers (max active children, neutrophil kill-count limit, macrophage

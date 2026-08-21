@@ -194,11 +194,13 @@ that anything worth verifying takes time/state explicitly.
   HP afterwards.
 - Both free their tower's population slot and return to the `PrefabPool`
   (verified inactive, not destroyed), with kill count cleared for reuse.
-- **A unit gets a value snapshot of its tower's tuning at emission time**,
-  not a live reference, so a mid-round upgrade improves that tower's
-  *future* children and not the ones already fielded (`SPRINT_PLAN.md` item
-  5 — flagged there as a judgment call; making it retroactive is a one-line
-  change, hand out `slot.Tuning` directly instead of a snapshot).
+- **A unit holds a live reference to its tower's tuning** (Director,
+  2026-08-21), so an upgrade applies instantly to that tower's
+  already-fielded children as well as its future ones. Sprint 3 first
+  shipped a value snapshot (future children only); the Director overruled
+  it — an ATP purchase should change the board immediately. Isolation still
+  holds: no cross-tower leakage, and the shared `UnitProfile` defaults are
+  never mutated.
 
 **4. Kill attribution (`PathogenAgent.ReceiveDamage(float, SearchUnit)`).**
 Signature changed to carry the attacker. **Exactly one** unit is ever
@@ -390,10 +392,10 @@ prioritizes the Windows target).
   UI this sprint** — scripted clicks could not take foreground focus. See
   "What was NOT verified" above. Unchanged code path, verified headlessly
   and in Sprint 2's own session, but it is unconfirmed for this build.
-- **(New, Sprint 3) A mid-round tower upgrade would not affect already-
-  fielded units** (they hold a value snapshot of their tower's tuning).
-  Deliberate, flagged in `SPRINT_PLAN.md` item 5, and awaiting a Director
-  ruling — no upgrade system exists yet, so nothing depends on it today.
+- **(New, 2026-08-21) A tower upgrade reaches its already-fielded children
+  instantly** — units hold a live reference to their tower's tuning, on the
+  Director's ruling. Nothing depends on it until an upgrade system exists,
+  but the semantics are now locked and verified.
 - **(New, Sprint 3) Every Sprint 3 number is a tuning default, not a
   balance result** — `MaxActiveChildren` 10, neutrophil `KillLimit` 5,
   macrophage `KillLimit` 20 (the one Director-confirmed value),

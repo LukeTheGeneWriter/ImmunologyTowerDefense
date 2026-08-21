@@ -65,6 +65,18 @@ namespace ImmunologyTD.Units
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles,
         };
 
+        /// <summary>Allocation-free equivalent of FromProfile, for filling an
+        /// already-allocated instance (SearchUnit's fallback for units built
+        /// without a tower).</summary>
+        public void CopyFromProfile(UnitProfile profile)
+        {
+            MaxActiveChildren = profile.MaxActiveChildren;
+            KillLimit = profile.KillLimit;
+            DegranulatesOnDepletion = profile.DegranulatesOnDepletion;
+            DegranulationBurstMultiplier = profile.DegranulationBurstMultiplier;
+            ContactRadiusFineTiles = profile.ContactRadiusFineTiles;
+        }
+
         /// <summary>Value copy, used to snapshot a tower's current numbers
         /// onto a unit at emission time (see class comment).</summary>
         public void CopyFrom(UnitLifecycleTuning other)

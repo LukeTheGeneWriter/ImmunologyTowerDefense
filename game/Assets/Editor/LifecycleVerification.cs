@@ -61,6 +61,19 @@ public static class LifecycleVerification
         }
     }
 
+    /// <summary>True when every unit in the list reports the given kill
+    /// limit. Used to prove an upgrade reached ALL of a tower's live
+    /// children, not just the first one (Director, 2026-08-21).</summary>
+    private static bool AllKillLimitsAre(IReadOnlyList<SearchUnit> units, int expected)
+    {
+        if (units.Count == 0) return false; // an empty list must not pass vacuously
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (units[i].KillLimit != expected) return false;
+        }
+        return true;
+    }
+
     private static void Check(string label, bool condition)
     {
         if (condition)
@@ -533,17 +546,26 @@ public static class LifecycleVerification
         Check("Tower 0's children carry the upgraded kill limit", rig.Manager.GetChildren(0)[0].KillLimit == 9);
         Check("Tower 1's children carry the un-upgraded kill limit", rig.Manager.GetChildren(1)[0].KillLimit == 5);
 
-        // Snapshot semantics: a mid-life upgrade improves FUTURE children,
-        // not the ones already in the field (SPRINT_PLAN.md item 5's flagged
-        // judgment call -- change this by handing out slot.Tuning directly
-        // instead of a snapshot if the Director wants it retroactive).
+        // Live-reference semantics (Director, 2026-08-21): an upgrade takes
+        // effect INSTANTLY on every one of that progenitor's current
+        // children as well as its future ones -- the point being that
+        // spending ATP makes an immediate difference. Sprint 3 originally
+        // shipped snapshot semantics (future children only); this is the
+        // ruling that replaced it.
         var alreadyFielded = rig.Manager.GetChildren(1)[0];
         rig.Manager.GetTuning(1).KillLimit = 40;
-        Check("A mid-life upgrade does NOT retroactively change an already-fielded unit", alreadyFielded.KillLimit == 5);
+        Check("A mid-life upgrade DOES immediately change an already-fielded unit",
+            alreadyFielded.KillLimit == 40);
+        Check("...and every other already-fielded child of that tower, not just one",
+            AllKillLimitsAre(rig.Manager.GetChildren(1), 40));
+        Check("...while a DIFFERENT tower's already-fielded children are untouched",
+            AllKillLimitsAre(rig.Manager.GetChildren(0), 9));
+        Check("...and the shared UnitProfile default is still untouched", rig.Neu.KillLimit == 5);
 
         DepleteThroughRealPath(alreadyFielded);
         for (int i = 0; i < 100; i++) rig.Manager.Tick(Dt);
-        Check("...but the NEXT unit that tower emits gets the upgraded limit", rig.Manager.LastEmittedUnit.KillLimit == 40);
+        Check("...and the NEXT unit that tower emits also gets the upgraded limit",
+            rig.Manager.LastEmittedUnit.KillLimit == 40);
 
         rig.Dispose();
     }

@@ -107,3 +107,45 @@ formal sprint plan (`docs/GAME_DESIGN.md` §6d has the full design):
 ## Everything else
 
 (Nothing else triaged yet.)
+
+## Triaged from the Sprint 3 playtest (Director, 2026-08-21)
+
+- **Immune cells overwhelmingly win. Deliberately not being fixed yet** —
+  the Director's call: focus on mechanics now, tune balance later. Do not
+  "helpfully" rebalance damage, kill limits, spawn rates, or the contact
+  radius in the meantime; the numbers are all tunable fields precisely so
+  this can be a deliberate pass once the mechanics are settled. Note this
+  is the *opposite* direction from Sprint 3's measured ~50% contact-rate
+  reduction, which was expected to make things harder — worth understanding
+  why before tuning anything.
+- **Neutrophil degranulation still unwatched.** The Director closed the
+  build before seeing one fire. Mechanism is verified headlessly; the
+  visual (`DegranulationFlash`) has never been seen by a human. Carried
+  forward to the next playtest.
+- **Progenitor upgrades apply instantly to living cells** — decided and
+  implemented same day, see `GAME_DESIGN.md` §6d. No longer open.
+- **Pathogen movement: no more skipping across the board** — scoped as the
+  next sprint's main work, see below.
+
+## Next up: pathogen battlefront (Director, 2026-08-21)
+
+Current behavior, which the Director objects to: a pathogen enters at fine
+column 0, marches right at 2 fine tiles/tick, and adheres at a **uniformly
+random target column** anywhere on the board, passing straight through
+everything in between. So infections appear at arbitrary depth with no
+relationship to where the immune cells are.
+
+Wanted instead: pathogens **push a battlefront**. They advance until they
+meet resistance and largely stop there, so the infection has a *frontier*
+that advances when they win ground and recedes when the immune cells clear
+it. Slipping past one or two cells should be possible but occasional — the
+Director's fiction for it is cracks and vessels — not the default.
+
+Open sub-question the head session flagged, needs a Director call before
+this is buildable: **which axis is the front?** Pathogens currently transit
+along columns (lateral), but `GAME_DESIGN.md` §1's depth model and
+`BoneMarrowManager`'s own row convention treat *rows* as depth, with immune
+cells entering at the blood-adjacent deepest row. Those are orthogonal, and
+that mismatch is arguably the root of the "flying across the board" feel.
+See `docs/INTERFACE.md` open question 1, which has flagged this since
+Sprint 1.
