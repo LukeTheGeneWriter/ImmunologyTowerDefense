@@ -6,28 +6,41 @@ using ImmunologyTD.Pooling;
 namespace ImmunologyTD.Pathogens
 {
     /// <summary>
-    /// Periodically spawns pathogens from a pooled template
-    /// (GAME_DESIGN.md section 8 -- no raw Instantiate/Destroy). Recomputes
-    /// the cytokine field on a timer, and releases transited-through or
-    /// combat-cleared pathogens back to the pool via OnPathogenExit.
+    /// Drives the pathogen half of the simulation: spawns into the lumen
+    /// from a pooled template (GAME_DESIGN.md section 8 -- no raw
+    /// Instantiate/Destroy), advances the gut interface's breach clock,
+    /// recomputes the cytokine field on a timer, and returns excreted /
+    /// cleared / base-reached pathogens to the pool.
     ///
-    /// Sprint 2 addition: RequestSpread is the production implementation of
-    /// GAME_DESIGN.md section 4a's viral spread -- the callback an adhered
-    /// PathogenAgent invokes (via PathogenAgent.TickCombat) once its
-    /// incubation period elapses. Also spawns new pathogen instances
-    /// through the same pool as normal spawns (still no raw
-    /// Instantiate/Destroy), so a spreading infection is just as pooled as
-    /// an ordinary one.
+    /// **Sprint 4** moved the spawn point from "fine column 0, march right"
+    /// to "a uniformly random position across the width of the lumen band,
+    /// at the upstream end of the flow" (GAME_DESIGN.md section 1a), and
+    /// made this the owner of GutInterface.Tick -- the per-position breach
+    /// rolls have to be driven by something, and this class already owns the
+    /// pathogen lifecycle.
     /// </summary>
     public class PathogenSpawner : MonoBehaviour
     {
         private BoardConfig board;
         private TissueGrid tissueGrid;
         private CytokineField cytokineField;
+        private GutInterface gutInterface;
+        private InvasionTally tally;
         private PrefabPool pool;
 
-        [SerializeField] private float spawnIntervalSeconds = 2.5f;
-        [SerializeField] private int maxLivePathogens = 40;
+        /// <summary>Seconds between spawns into the lumen.
+        ///
+        /// **Raised from Sprint 3's 2.5s, and the live cap from 40.** This
+        /// is a SCALE correction, not balance tuning (SPRINT_PLAN.md item 10
+        /// forbids the latter): the board went from 150 coarse cells to
+        /// 4,000, the lumen alone is 1,000 cells across 40 lanes, and a
+        /// pathogen now spends ~14s riding the flow before it can even
+        /// adhere. At Sprint 3's rate the channel would read as empty and
+        /// the Director could not judge whether the invasion loop works at
+        /// all. Flagged in docs/TEAM_RETRO.md as the one number this sprint
+        /// moved for reasons other than mechanics.</summary>
+        [SerializeField] private float spawnIntervalSeconds = 0.8f;
+        [SerializeField] private int maxLivePathogens = 150;
 
         /// <summary>How often the field is recomputed from the current
         /// infected-source set.</summary>
@@ -42,19 +55,21 @@ namespace ImmunologyTD.Pathogens
         private float spawnTimer;
         private float fieldRecomputeTimer;
 
-        /// <summary>Read-only view of currently live pathogens -- exposed
-        /// for Assets/Editor/CombatVerification.cs, which needs to advance
-        /// every live agent's combat tick (including spread-created
-        /// children) with an explicit simulated time rather than relying on
-        /// Unity's Update() loop, which doesn't run in Editor batchmode
-        /// outside play mode.</summary>
+        /// <summary>Read-only view of currently live pathogens -- exposed so
+        /// a headless harness can advance every agent with an explicit
+        /// simulated clock (Unity's Update() does not run in Editor
+        /// batchmode outside play mode).</summary>
         public IReadOnlyList<PathogenAgent> Live => live;
 
-        public void Initialize(BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField, GameObject pathogenTemplate)
+        public void Initialize(
+            BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField,
+            GutInterface gutInterface, InvasionTally tally, GameObject pathogenTemplate)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
             this.cytokineField = cytokineField;
+            this.gutInterface = gutInterface;
+            this.tally = tally;
 
             pool = gameObject.AddComponent<PrefabPool>();
             pool.SetPrefab(pathogenTemplate);
@@ -63,19 +78,35 @@ namespace ImmunologyTD.Pathogens
         private void Update()
         {
             if (board == null) return;
+            Tick(Time.deltaTime, Time.time);
+        }
 
-            spawnTimer += Time.deltaTime;
+        /// <summary>
+        /// Real spawn / breach / field-recompute logic, taking time
+        /// explicitly rather than reading UnityEngine.Time -- this project's
+        /// standing convention, so a headless harness can drive the
+        /// production path. Update() forwards the real clock.
+        ///
+        /// Note this does NOT tick the individual agents: PathogenAgent has
+        /// its own Update() in a real build, and a harness advances the
+        /// agents it cares about itself via Live/SimulationTick.
+        /// </summary>
+        public void Tick(float deltaTime, float currentTime)
+        {
+            spawnTimer += deltaTime;
             if (spawnTimer >= spawnIntervalSeconds && live.Count < maxLivePathogens)
             {
                 spawnTimer = 0f;
                 SpawnOne();
             }
 
-            fieldRecomputeTimer += Time.deltaTime;
+            if (gutInterface != null) gutInterface.Tick(deltaTime, currentTime);
+
+            fieldRecomputeTimer += deltaTime;
             if (fieldRecomputeTimer >= FieldRecomputeIntervalSeconds)
             {
                 fieldRecomputeTimer = 0f;
-                cytokineField.Recompute(tissueGrid.InfectedSources(Time.time));
+                cytokineField.Recompute(tissueGrid.InfectedSources(currentTime));
             }
         }
 
@@ -83,17 +114,18 @@ namespace ImmunologyTD.Pathogens
         {
             var go = pool.Get();
             var agent = go.GetComponent<PathogenAgent>();
-            agent.Initialize(board, tissueGrid, OnPathogenExit, RequestSpread);
+            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpread);
             live.Add(agent);
         }
 
         /// <summary>
         /// Attempts to spread a virus infection from <paramref name="source"/>
-        /// into one free, in-bounds, coarse-grid von Neumann neighbour.
-        /// Neighbour order is shuffled each call so spread doesn't visibly
-        /// favor one direction. Public (not just called by PathogenAgent)
-        /// so Assets/Editor/CombatVerification.cs can drive the exact same
-        /// production method a real infection would call.
+        /// into one free, in-bounds, TISSUE-BAND coarse neighbour. Neighbour
+        /// order is shuffled each call so spread doesn't favour a direction.
+        ///
+        /// Sprint 4 added the band check: without it a virus at the tissue's
+        /// lumen edge could spread a new infection into the channel, where
+        /// nothing would ever be able to reach it.
         /// </summary>
         public bool RequestSpread(CoarseCoord source, float currentTime)
         {
@@ -113,11 +145,14 @@ namespace ImmunologyTD.Pathogens
                 var (dc, dr) = CoarseNeighborOffsets[idx];
                 var candidate = new CoarseCoord(source.Column + dc, source.Row + dr);
                 if (!board.InCoarseBounds(candidate)) continue;
+                if (board.BandOf(candidate) != BoardBand.Tissue) continue;
                 if (!tissueGrid.IsSlotFree(candidate)) continue;
 
                 var go = pool.Get();
                 var child = go.GetComponent<PathogenAgent>();
-                child.InitializeAdheredDirect(board, tissueGrid, OnPathogenExit, RequestSpread, candidate, PathogenClass.IntracellularVirus, currentTime);
+                child.InitializeInTissueDirect(
+                    board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpread,
+                    candidate, PathogenClass.IntracellularVirus, currentTime);
                 live.Add(child);
                 return true;
             }
@@ -125,11 +160,34 @@ namespace ImmunologyTD.Pathogens
             return false;
         }
 
+        /// <summary>Single exit path for every way a pathogen leaves play --
+        /// excreted out the bottom of the lumen, killed in tissue, or
+        /// despawned on reaching the base. Also detaches it from the gut
+        /// interface if it was still colonising, so a pile never holds a
+        /// pooled instance.</summary>
         private void OnPathogenExit(PathogenAgent agent)
         {
             live.Remove(agent);
+            if (gutInterface != null) gutInterface.Remove(agent);
             agent.ResetForPool();
             pool.Release(agent.gameObject);
+        }
+
+        /// <summary>How many live pathogens are currently in each stage of
+        /// the invasion loop -- HUD copy, and a cheap sanity read for a
+        /// harness.</summary>
+        public void CountByState(out int inLumen, out int atInterface, out int inTissue)
+        {
+            inLumen = atInterface = inTissue = 0;
+            for (int i = 0; i < live.Count; i++)
+            {
+                switch (live[i].State)
+                {
+                    case PathogenState.Lumen: inLumen++; break;
+                    case PathogenState.AtInterface: atInterface++; break;
+                    case PathogenState.InTissue: inTissue++; break;
+                }
+            }
         }
     }
 }

@@ -271,23 +271,31 @@ namespace ImmunologyTD.Units
             var pool = PoolFor(slot.Kind);
 
             // Rung-1 entry per GAME_DESIGN.md section 2a: "cells
-            // extravasate at random points along the vessel" -- uniform
-            // random column, fixed at the blood-adjacent edge row (the
-            // deepest fine row -- CoarseCoord's Row convention is "0 =
-            // shallowest/nearest the lumen," so the deepest row is the
-            // blood-adjacent edge; see docs/INTERFACE.md open question 1
-            // on reconciling this coarse-row axis with the full
-            // compartment depth model).
-            int col = Random.Range(0, board.FineColumns);
-            int row = board.FineRows - 1;
-            var start = new FineCoord(col, row);
+            // extravasate at random points along the vessel."
+            //
+            // **Sprint 4 (SPRINT_PLAN.md item 8) moved this.** Through
+            // Sprint 3 units entered at the deepest fine ROW, which was the
+            // "blood-adjacent edge" back when the board was tissue-only and
+            // depth was vertical. Map 01 makes the base a lateral BAND, so
+            // the vessel is the tissue's base-side edge: units now enter at
+            // a uniformly random lane along that edge and walk outward into
+            // the contested middle, directly opposing the pathogen front.
+            //
+            // Expressed in BoardConfig's axis frame, so moving the base in
+            // config moves the entry line with it -- the same architectural
+            // rule PathogenAgent.StepTissue follows.
+            var entryCell = board.CoarseFromAxis(
+                board.TissueBaseEdgeAxisIndex,
+                Random.Range(0, board.CrossLength));
+            var start = board.CoarseCenterFine(entryCell);
 
             var go = pool.Get();
             var unit = go.GetComponent<SearchUnit>();
-            // The unit gets a SNAPSHOT of this tower's numbers as they stand
-            // right now and keeps them for life -- a tower upgraded mid-round
-            // improves its future children, not the ones already in the
-            // field (SPRINT_PLAN.md item 5, flagged there as a judgment call).
+            // The unit receives this tower's LIVE tuning instance, not a
+            // copy (Director, 2026-08-21): upgrading a progenitor applies
+            // instantly to every one of its currently-fielded children as
+            // well as its future ones, because spending ATP should make an
+            // immediate difference. See GAME_DESIGN.md section 6d.
             unit.Initialize(board, tissueGrid, cytokineField, profile, start,
                 slot.Tuning, slotIndex, slot.OnChildDespawned);
             slot.Children.Add(unit);

@@ -28,38 +28,52 @@ namespace ImmunologyTD.Grid
     public class CytokineField
     {
         private readonly BoardConfig board;
-        private float[,] field;
+        private readonly float[,] field;
+
+        /// <summary>Reused across Recompute calls. Sprint 1-3 allocated a
+        /// fresh float[,] plus a fresh source List every recompute, which
+        /// was 150 floats on a 30x5 board and is 4,000 on Map 01 -- 2.5
+        /// allocations a second of steadily-growing garbage, against
+        /// GAME_DESIGN.md section 8's no-per-frame-allocation rule. Both
+        /// buffers are now owned and cleared in place.</summary>
+        private readonly List<(CoarseCoord Coord, float Strength)> sourceBuffer =
+            new List<(CoarseCoord Coord, float Strength)>(64);
 
         public CytokineField(BoardConfig board)
         {
             this.board = board;
-            field = new float[board.Columns, BoardConfig.Rows];
+            field = new float[board.Columns, board.Rows];
         }
 
         public void Recompute(IEnumerable<(CoarseCoord Coord, float Strength)> sources)
         {
-            var sourceList = new List<(CoarseCoord Coord, float Strength)>(sources);
-            var next = new float[board.Columns, BoardConfig.Rows];
-            for (int col = 0; col < board.Columns; col++)
+            sourceBuffer.Clear();
+            foreach (var s in sources) sourceBuffer.Add(s);
+
+            int columns = board.Columns;
+            int rows = board.Rows;
+            int sourceCount = sourceBuffer.Count;
+
+            for (int col = 0; col < columns; col++)
             {
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < rows; row++)
                 {
                     float value = 0f;
-                    foreach (var s in sourceList)
+                    for (int i = 0; i < sourceCount; i++)
                     {
+                        var s = sourceBuffer[i];
                         int dist = System.Math.Abs(s.Coord.Column - col) + System.Math.Abs(s.Coord.Row - row);
                         value += s.Strength / (1f + dist);
                     }
-                    next[col, row] = value;
+                    field[col, row] = value;
                 }
             }
-            field = next;
         }
 
         private float ValueAt(int col, int row)
         {
             col = Mathf.Clamp(col, 0, board.Columns - 1);
-            row = Mathf.Clamp(row, 0, BoardConfig.Rows - 1);
+            row = Mathf.Clamp(row, 0, board.Rows - 1);
             return field[col, row];
         }
 

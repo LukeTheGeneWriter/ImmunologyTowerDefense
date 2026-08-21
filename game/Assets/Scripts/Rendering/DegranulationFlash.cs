@@ -49,7 +49,15 @@ namespace ImmunologyTD.Rendering
         /// <summary>Hot granule yellow-white, deliberately unlike anything
         /// else on the board (host pink, pathogen maroon, macrophage blue,
         /// neutrophil amber, marrow tan, lymph green).</summary>
-        private static readonly Color BurstColor = new Color(1f, 0.97f, 0.72f);
+        public static readonly Color GranuleBurstColor = new Color(1f, 0.97f, 0.72f);
+
+        /// <summary>Sprint 4: a gut-wall breach burst. Hot pathogen red,
+        /// deliberately unlike the neutrophil's granule yellow -- the two
+        /// events must never be confused for one another, since one is the
+        /// player winning and the other is the player losing ground.</summary>
+        public static readonly Color BreachBurstColor = new Color(1f, 0.35f, 0.22f);
+
+        private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;
 
@@ -68,25 +76,32 @@ namespace ImmunologyTD.Rendering
 
         /// <summary>Spawns one burst. Silently no-ops if no pool has been
         /// configured (headless harness, or before bootstrap finishes).</summary>
-        public static void Play(Vector3 worldPosition, float worldSize)
+        public static void Play(Vector3 worldPosition, float worldSize) =>
+            Play(worldPosition, worldSize, GranuleBurstColor);
+
+        /// <summary>Same burst, in a caller-chosen colour -- so a second
+        /// kind of event (Sprint 4's breach) can reuse the pooled effect
+        /// instead of duplicating it.</summary>
+        public static void Play(Vector3 worldPosition, float worldSize, Color color)
         {
             if (pool == null) return;
             var go = pool.Get();
             go.transform.position = worldPosition;
             var flash = go.GetComponent<DegranulationFlash>();
-            if (flash != null) flash.Begin(worldSize);
+            if (flash != null) flash.Begin(worldSize, color);
         }
 
-        private void Begin(float worldSize)
+        private void Begin(float worldSize, Color color)
         {
             baseSize = worldSize;
+            burstColor = color;
             age = 0f;
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
             sr.sprite = RuntimeSprites.SquareSprite;
             sr.sortingOrder = 30; // above units (10) and pathogens (20)
-            sr.color = BurstColor;
+            sr.color = burstColor;
             sr.enabled = true;
             ApplyScale(0f);
         }
@@ -99,7 +114,7 @@ namespace ImmunologyTD.Rendering
             float t = Mathf.Clamp01(age / DurationSeconds);
             ApplyScale(t);
 
-            var c = BurstColor;
+            var c = burstColor;
             c.a = 1f - t;
             sr.color = c;
 

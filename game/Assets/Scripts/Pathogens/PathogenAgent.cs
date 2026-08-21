@@ -5,275 +5,544 @@ using ImmunologyTD.Units;
 
 namespace ImmunologyTD.Pathogens
 {
-    public enum PathogenState { Transiting, Adhered, Cleared }
+    /// <summary>
+    /// Where a pathogen is in GAME_DESIGN.md section 1b's invasion loop.
+    ///
+    /// **Sprint 4 replaced the old `{ Transiting, Adhered, Cleared }`
+    /// entirely.** The old `Transiting` was a rightward march across the
+    /// whole board and the old `Adhered` meant "sitting in a tissue slot,
+    /// attackable" -- the behaviour the Director rejected on 2026-08-21
+    /// ("pathogens fly across the board skipping places"). The names below
+    /// are deliberately different rather than reused, so no Sprint 1-3 call
+    /// site can quietly keep compiling with the wrong meaning.
+    /// </summary>
+    public enum PathogenState
+    {
+        /// <summary>Riding the lumen flow. Safe, free, and irrelevant to the
+        /// player -- cannot be attacked and does not touch tissue.</summary>
+        Lumen,
+
+        /// <summary>Colonising the gut interface at one boundary position
+        /// (GutInterface). Off the flow, but NOT yet in the tissue and not
+        /// yet attackable -- "accumulating," per section 1b step 1.</summary>
+        AtInterface,
+
+        /// <summary>Inside the tissue band, occupying a TissueGrid coarse
+        /// slot, advancing toward the base, and attackable. This is the
+        /// state Sprint 1-3 called `Adhered`.</summary>
+        InTissue,
+
+        /// <summary>Gone -- killed, excreted out the bottom of the lumen, or
+        /// despawned on reaching the base. Awaiting pool return.</summary>
+        Cleared,
+    }
 
     /// <summary>
-    /// Pathogen classes, per GAME_DESIGN.md section 4a (Director, 2026-08-19).
-    /// Only three of the design doc's four classes exist this sprint --
-    /// parasites (multi-coarse-slot footprint) are explicitly deferred, see
-    /// SPRINT_PLAN.md.
+    /// Pathogen classes, per GAME_DESIGN.md section 4a (Director,
+    /// 2026-08-19). Parasites (multi-coarse-slot footprint) remain out of
+    /// scope. **All three move identically in Sprint 4** -- the
+    /// class-specific advance behaviours of section 1b step 4 need Sprint
+    /// 5's host-cell states and are explicitly deferred (SPRINT_PLAN.md item
+    /// 10).
     /// </summary>
     public enum PathogenClass { IntracellularVirus, IntracellularBacterium, LargeBacterium }
 
     /// <summary>
-    /// A pathogen that enters at the lumen edge, transits rightward for a
-    /// random distance, then either adheres to a coarse slot near where it
-    /// stopped or transits straight across and exits (unchanged from
-    /// Sprint 1 -- see class comment history in docs/ENGINE_STATUS.md).
+    /// One pathogen, running GAME_DESIGN.md section 1b's four-step invasion
+    /// loop:
     ///
-    /// Sprint 2 addition: on adhesion, a pathogen is assigned one of three
-    /// classes (GAME_DESIGN.md section 4a). Intracellular pathogens (virus,
-    /// bacterium) infect the slot's host cell without replacing it -- the
-    /// slot keeps reading as host tissue (see restColor/HideAsHostCell
-    /// below); a large bacterium kills and occupies the slot outright,
-    /// visible as itself. All three clear the same way mechanically (flat
-    /// per-contact damage to Health, see ReceiveDamage) -- the
-    /// "collateral damage to the host cell" vs. "direct damage to the
-    /// pathogen" distinction from the design doc is a rendering/identity
-    /// difference on top of one shared HP-depletion mechanic, not two
-    /// separate combat systems; see docs/TEAM_RETRO.md for why that's a
-    /// reasonable scope call for this sprint (flat damage numbers requested
-    /// explicitly by SPRINT_PLAN.md).
+    ///  1. **Enter the lumen at the upstream end and be carried downstream**
+    ///     (<see cref="StepLumen"/>). Free, safe, unattackable. Carried off
+    ///     the downstream end = excreted, no penalty -- the deliberate break
+    ///     from Bloons TD 6 that handoff-map01-intestine.md section 1 keeps.
+    ///  2. **Roll proximity-gated adhesion on every lumen step**
+    ///     (InvasionTuning.AdhesionChanceAtWall / AdhesionFalloffCells). The
+    ///     chance falls off exponentially with distance from the gut wall,
+    ///     so the lane a pathogen rides genuinely decides its odds of ever
+    ///     becoming the player's problem. On success it MOVES TO THE
+    ///     BOUNDARY and joins the pile at that position.
+    ///  3. **Wait on the wall until its position breaches** -- not its own
+    ///     decision; GutInterface rolls per position and releases everyone
+    ///     there at once (<see cref="EnterTissueAt"/>).
+    ///  4. **Advance toward the base by a strongly biased random walk**
+    ///     (<see cref="StepTissue"/>). Reaching the base despawns it and
+    ///     increments InvasionTally.ReachedBase.
     ///
-    /// Virus-class infections left uncleared through an incubation period
-    /// spread to one adjacent uninfected coarse slot (TickCombat below) --
-    /// the sprint's most important piece, see GAME_DESIGN.md section 4a.
+    /// ## The base-direction rule
+    ///
+    /// <see cref="StepTissue"/> is the one piece of movement code the
+    /// Director called out personally (GAME_DESIGN.md section 1b step 3):
+    /// advance is specified as **toward the base**, never as "leftward."
+    /// Every step in this file is expressed through
+    /// BoardConfig.OffsetInAxisFrame, where a delta of -1 on the axis always
+    /// means "one cell toward the base," whatever direction that is in world
+    /// space. **There is no `-1`, no `Column - 1`, and no negative-X
+    /// assumption anywhere in this class**, and
+    /// Assets/Editor/MapVerification.cs proves it by running the same code
+    /// with the base configured on the opposite side.
+    ///
+    /// ## Explicit time
+    ///
+    /// <see cref="SimulationTick"/> and <see cref="TickCombat"/> take time
+    /// as parameters and read no UnityEngine.Time, per this project's
+    /// standing convention (TissueGrid, CytokineField, Chemotaxis,
+    /// BoneMarrowManager.Tick, SearchUnit.SimulationTick). Update() only
+    /// drives the visual tween and forwards the real clock.
     /// </summary>
     public class PathogenAgent : MonoBehaviour
     {
         private BoardConfig board;
         private TissueGrid tissueGrid;
+        private GutInterface gutInterface;
+        private InvasionTally tally;
         private System.Action<PathogenAgent> onExit;
         private System.Func<CoarseCoord, float, bool> onSpreadRequested;
 
         public PathogenState State { get; private set; }
+
+        /// <summary>Fine-lattice position. Pathogens do not walk the fine
+        /// lattice -- this is the centre of whatever coarse cell they occupy,
+        /// kept because SearchUnit.CheckContact measures Chebyshev fine-tile
+        /// distance against it.</summary>
         public FineCoord Current { get; private set; }
+
+        /// <summary>The coarse cell this pathogen occupies (lumen cell while
+        /// flowing, tissue slot while invading). Undefined while
+        /// AtInterface -- use <see cref="InterfacePosition"/> then.</summary>
+        public CoarseCoord CurrentCoarse { get; private set; }
+
+        /// <summary>Which gut-interface position (lane) this pathogen is
+        /// colonising, or -1 when it is not AtInterface.</summary>
+        public int InterfacePosition { get; private set; } = -1;
+
         public PathogenClass Class { get; private set; }
         public float Health { get; private set; }
         public float MaxHealth { get; private set; }
 
-        private int targetFineColumn;
-        private int targetRow;
-        private bool willAdhere;
+        private Vector3 moveStartWorld;
+        private Vector3 moveEndWorld;
+        private float moveElapsed;
+        private float moveDuration = 1f;
 
-        private Vector3 tickStartWorld;
-        private Vector3 tickEndWorld;
-        private float tickTimer;
-        private const int TransitFineTilesPerTick = 2;
+        private float stepTimer;
 
         private SpriteRenderer sr;
         private float contactFlashTimer;
-        private Color restColor; // what the sprite shows when not mid-flash -- PathogenColor while transiting/large-bacterium, HostColor while an intracellular infection sits still and unnoticed
+        private Color restColor;
         private static readonly Color FlashColor = new Color(0.95f, 0.85f, 0.3f);
 
+        /// <summary>Reused every advance step so StepTissue allocates
+        /// nothing (GAME_DESIGN.md section 8) -- same pattern as
+        /// SearchUnit's candidateBuffer/weightBuffer.</summary>
+        private readonly CoarseCoord[] advanceCandidates = new CoarseCoord[4];
+        private readonly float[] advanceWeights = new float[4];
+        private readonly bool[] advanceReachesBase = new bool[4];
+
         // -- Class assignment weights (judgment call, see docs/TEAM_RETRO.md) --
-        // Not specified by SPRINT_PLAN.md/GAME_DESIGN.md. Weighted so virus
-        // is the most common class -- viral spread is explicitly "the
-        // sprint's most important piece" (SPRINT_PLAN.md), so it needs to
-        // be the class the Director actually sees most often in a short
-        // playtest, not an equal three-way split that might not surface it.
+        // Weighted toward virus, unchanged from Sprint 2: viral spread is
+        // still the mechanic most worth surfacing in a short playtest.
+        // **Sprint 4 moved the assignment from adhesion time to SPAWN time**
+        // -- a pathogen is a virus or a bacterium when it enters the lumen,
+        // not when it happens to touch tissue.
         public const float VirusChance = 0.45f;
         public const float BacteriumChance = 0.25f; // remaining 0.30 is LargeBacterium
 
         // -- Combat numbers (judgment call, see docs/TEAM_RETRO.md) --
-        // SPRINT_PLAN.md asks for "simple, flat" numbers, not balanced
-        // ones. A neutrophil (3 fine-tiles/tick, so it re-enters an
-        // infected coarse slot on almost every tick while wandering
-        // through it) clears a 12-HP intracellular infection in roughly a
-        // couple of seconds of sustained presence; a large bacterium's
-        // higher HP is meant to read as "tankier, stands alone" rather
-        // than anything precisely tuned.
+        // Unchanged from Sprint 2; SPRINT_PLAN.md item 10 forbids balance
+        // tuning this sprint.
         public const float IntracellularMaxHealth = 12f;
         public const float LargeBacteriumMaxHealth = 18f;
         public const float ContactDamagePerHit = 1f;
 
         // -- Viral spread timing (judgment call, see docs/TEAM_RETRO.md) --
-        // 15s incubation: long enough that clearing it with cytokine
-        // sensing (which finds an infected cell in ~4.5s on average per
-        // docs/ENGINE_STATUS.md) comfortably beats it, short enough that a
-        // rung-1 random walk (which does not reliably converge within
-        // 2.5 simulated minutes on a 30-wide board, same source) visibly
-        // fails to beat it in a short playtest -- this gap is the whole
-        // point (GAME_DESIGN.md section 4a: "makes search speed matter in
-        // a way the player can watch happen").
         public const float IncubationSeconds = 15f;
-        public const float SpreadRetryIntervalSeconds = 1f; // if the incubation elapses but every neighbour is occupied, keep trying at this cadence rather than giving up permanently
+        public const float SpreadRetryIntervalSeconds = 1f;
 
         private bool hasSpread;
+
+        /// <summary>When THIS infection began -- carried by the pathogen, not
+        /// stored only in the slot, because a pathogen now moves between
+        /// slots roughly once a second and the cytokine secretion ramp must
+        /// not restart on every step. See TissueGrid.TryAdhere's comment.</summary>
         private float infectionStartTime;
         private float lastSpreadAttemptTime = float.NegativeInfinity;
 
-        public void Initialize(BoardConfig board, TissueGrid tissueGrid, System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested)
+        // ------------------------------------------------------------------
+        // Initialization
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Spawns a pathogen into the lumen at the upstream end, at a
+        /// uniformly random position across the width of the channel. That
+        /// uniform choice is what makes proximity-gated adhesion interesting
+        /// -- most spawns are far from the wall and simply flow past, and
+        /// which lane a pathogen happens to draw genuinely decides whether
+        /// it ever becomes the player's problem.
+        ///
+        /// <paramref name="gutInterface"/> and <paramref name="tally"/> may
+        /// be null for harness fixtures that only exercise combat; adhesion
+        /// and the base counter then simply do nothing.
+        /// </summary>
+        public void Initialize(
+            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested)
         {
-            this.board = board;
-            this.tissueGrid = tissueGrid;
-            this.onExit = onExit;
-            this.onSpreadRequested = onSpreadRequested;
+            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpreadRequested);
+            EnsureSprite();
 
-            sr = GetComponent<SpriteRenderer>();
-            if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
-            sr.sortingOrder = 20;
-            float worldSize = BoardConfig.FineTileWorldSize * 1.5f;
-            transform.localScale = new Vector3(worldSize, worldSize, 1f);
+            Class = PickRandomClass();
+            SetHealthForClass();
 
-            int entryRow = Random.Range(0, BoardConfig.Rows);
-            int entryFineRow = entryRow * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2;
-            Current = new FineCoord(0, entryFineRow);
+            int axisIndex = Random.Range(board.LumenNearWallAxisIndex, board.AxisLength);
+            CurrentCoarse = board.CoarseFromAxis(axisIndex, board.LumenEntryCrossIndex);
+            Current = board.CoarseCenterFine(CurrentCoarse);
 
-            targetRow = Random.Range(0, BoardConfig.Rows);
-            willAdhere = Random.value < 0.7f; // ~70% adhere, ~30% transit straight through and exit
-            targetFineColumn = willAdhere ? Random.Range(1, board.FineColumns - 1) : board.FineColumns;
-
-            State = PathogenState.Transiting;
-            contactFlashTimer = 0f;
+            State = PathogenState.Lumen;
+            InterfacePosition = -1;
             hasSpread = false;
-            restColor = BoardRenderer.PathogenColor; // visible as itself while transiting, regardless of eventual class
+            contactFlashTimer = 0f;
+            lastSpreadAttemptTime = float.NegativeInfinity;
+
+            restColor = BoardRenderer.PathogenColor; // visible as itself in the channel, whatever its class
             sr.color = restColor;
             sr.enabled = true;
-            tickStartWorld = tickEndWorld = board.FineToWorld(Current);
-            transform.position = tickStartWorld;
-            tickTimer = Random.Range(0f, BoardConfig.TickIntervalSeconds);
+
+            SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
+            // Desync step clocks so a batch of spawns doesn't move in
+            // lockstep down the channel.
+            stepTimer = Random.Range(0f, InvasionTuning.LumenStepIntervalSeconds);
         }
 
         /// <summary>
-        /// Places a pathogen directly into the Adhered state at a known
-        /// coarse slot, bypassing the transit walk entirely. Used for
-        /// viral spread (a new infection appears in an adjacent slot the
-        /// instant an incubated infection spreads, not by "walking" there)
-        /// -- see PathogenSpawner.RequestSpread, the only production
-        /// caller. currentTime is explicit (not read via UnityEngine.Time)
-        /// so this stays headlessly testable, matching the rest of this
-        /// sprint's simulation classes -- see
-        /// Assets/Editor/CombatVerification.cs.
+        /// Places a pathogen directly into tissue at a known coarse slot,
+        /// bypassing the lumen and the wall entirely. Two production
+        /// callers: PathogenSpawner.RequestSpread (a viral spread event
+        /// creates a new infection instantly) and GutInterface.Breach via
+        /// <see cref="EnterTissueAt"/>'s sibling path for a fresh agent.
+        /// Renamed from Sprint 2's `InitializeAdheredDirect` because
+        /// "adhered" now means the gut wall, not tissue.
         /// </summary>
-        public void InitializeAdheredDirect(
-            BoardConfig board, TissueGrid tissueGrid,
+        public void InitializeInTissueDirect(
+            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
             System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested,
             CoarseCoord slot, PathogenClass pClass, float currentTime)
         {
+            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpreadRequested);
+            EnsureSprite();
+
+            Class = pClass;
+            SetHealthForClass();
+            InterfacePosition = -1;
+            hasSpread = false;
+            contactFlashTimer = 0f;
+            lastSpreadAttemptTime = float.NegativeInfinity;
+
+            infectionStartTime = currentTime;
+            tissueGrid.TryAdhere(slot, this, infectionStartTime);
+            CurrentCoarse = slot;
+            Current = board.CoarseCenterFine(slot);
+            State = PathogenState.InTissue;
+            ApplyRestColorForCurrentClass();
+            SnapTo(board.CoarseToWorldCenter(slot));
+            stepTimer = Random.Range(0f, InvasionTuning.TissueStepIntervalSeconds);
+        }
+
+        private void BindContext(
+            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested)
+        {
             this.board = board;
             this.tissueGrid = tissueGrid;
+            this.gutInterface = gutInterface;
+            this.tally = tally;
             this.onExit = onExit;
             this.onSpreadRequested = onSpreadRequested;
+        }
 
+        private void EnsureSprite()
+        {
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
             sr.sprite = RuntimeSprites.SquareSprite;
             sr.sortingOrder = 20;
-            float worldSize = BoardConfig.FineTileWorldSize * 1.5f;
+            float worldSize = BoardConfig.FineTileWorldSize * 3.5f;
             transform.localScale = new Vector3(worldSize, worldSize, 1f);
-
-            Class = pClass;
-            SetHealthForClass();
-
-            tissueGrid.TryAdhere(slot, this, currentTime);
-
-            Current = new FineCoord(
-                slot.Column * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2,
-                slot.Row * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2);
-            State = PathogenState.Adhered;
-            infectionStartTime = currentTime;
-            hasSpread = false;
-            lastSpreadAttemptTime = float.NegativeInfinity;
-            contactFlashTimer = 0f;
-            ApplyRestColorForCurrentClass();
-            tickStartWorld = tickEndWorld = board.FineToWorld(Current);
-            transform.position = tickEndWorld;
         }
+
+        // ------------------------------------------------------------------
+        // Simulation
+        // ------------------------------------------------------------------
 
         private void Update()
         {
             if (board == null) return;
 
-            if (State == PathogenState.Adhered)
+            SimulationTick(Time.deltaTime, Time.time);
+
+            if (moveDuration > 0f && moveElapsed < moveDuration)
             {
-                TickCombat(Time.time);
+                moveElapsed += Time.deltaTime;
+                transform.position = Vector3.Lerp(moveStartWorld, moveEndWorld, Mathf.Clamp01(moveElapsed / moveDuration));
+            }
+        }
+
+        /// <summary>
+        /// One slice of simulated time for this pathogen: lumen flow +
+        /// adhesion rolls, or a tissue advance step, plus the viral-spread
+        /// check. Reads no UnityEngine.Time -- Update() forwards the real
+        /// clock, and Assets/Editor/MapVerification.cs forwards a fake one.
+        ///
+        /// A `while` rather than an `if` on the step clock so a harness can
+        /// legitimately advance in coarse slices (e.g. one call per
+        /// simulated second) without silently dropping steps.
+        /// </summary>
+        public void SimulationTick(float deltaTime, float currentTime)
+        {
+            if (board == null || State == PathogenState.Cleared) return;
+
+            if (State == PathogenState.Lumen)
+            {
+                float interval = Mathf.Max(0.0001f, InvasionTuning.LumenStepIntervalSeconds);
+                stepTimer += deltaTime;
+                while (stepTimer >= interval && State == PathogenState.Lumen)
+                {
+                    stepTimer -= interval;
+                    StepLumen(currentTime);
+                }
                 return;
             }
 
-            if (State != PathogenState.Transiting) return;
-
-            tickTimer += Time.deltaTime;
-            float t = Mathf.Clamp01(tickTimer / BoardConfig.TickIntervalSeconds);
-            transform.position = Vector3.Lerp(tickStartWorld, tickEndWorld, t);
-
-            if (tickTimer >= BoardConfig.TickIntervalSeconds)
+            if (State == PathogenState.InTissue)
             {
-                tickTimer -= BoardConfig.TickIntervalSeconds;
-                DoTick();
+                float interval = Mathf.Max(0.0001f, InvasionTuning.TissueStepIntervalSeconds);
+                stepTimer += deltaTime;
+                while (stepTimer >= interval && State == PathogenState.InTissue)
+                {
+                    stepTimer -= interval;
+                    StepTissue();
+                }
+                TickCombat(currentTime);
             }
+
+            // AtInterface: nothing to do. A colonising pathogen sits still
+            // and waits for GutInterface to roll its position's breach --
+            // deliberately NOT its own decision (SPRINT_PLAN.md item 6).
         }
 
-        private void DoTick()
+        /// <summary>
+        /// One step down the channel, then one proximity-gated adhesion
+        /// roll (GAME_DESIGN.md section 1b step 1). Carried off the
+        /// downstream end = excreted, no penalty.
+        ///
+        /// Order matters: the pathogen moves first and then rolls, so the
+        /// entry cell gets exactly one roll like every other cell rather
+        /// than two.
+        /// </summary>
+        private void StepLumen(float currentTime)
         {
-            tickStartWorld = transform.position;
-
-            for (int i = 0; i < TransitFineTilesPerTick && State == PathogenState.Transiting; i++)
+            int nextCross = board.CrossIndex(CurrentCoarse) + board.FlowCrossStep;
+            if (board.IsExcretedCrossIndex(nextCross))
             {
-                int nextCol = Current.Column + 1;
-                if (nextCol >= board.FineColumns)
-                {
-                    Exit();
-                    return;
-                }
-                Current = new FineCoord(nextCol, Current.Row);
-
-                if (willAdhere && Current.Column >= targetFineColumn)
-                {
-                    TryAdhereHere();
-                    if (State != PathogenState.Transiting) return;
-                }
+                if (tally != null) tally.Excreted++;
+                Exit();
+                return;
             }
 
-            tickEndWorld = board.FineToWorld(Current);
+            CurrentCoarse = board.CoarseFromAxis(board.AxisIndex(CurrentCoarse), nextCross);
+            Current = board.CoarseCenterFine(CurrentCoarse);
+            MoveTo(board.CoarseToWorldCenter(CurrentCoarse), InvasionTuning.LumenStepIntervalSeconds);
+
+            if (gutInterface == null) return;
+            int depth = board.LumenDepthFromInterface(CurrentCoarse);
+            if (depth < 0) return; // not actually in the channel; nothing to adhere to
+            if (Random.value >= AdhesionChanceAt(depth)) return;
+
+            AdhereToInterface(board.CrossIndex(CurrentCoarse));
         }
 
-        private void TryAdhereHere()
+        /// <summary>Per-step adhesion probability as a function of distance
+        /// from the gut wall, in coarse cells. Exponential falloff -- see
+        /// InvasionTuning for the shape and why it was chosen.</summary>
+        public static float AdhesionChanceAt(int lumenDepthFromInterface)
         {
-            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
-            int col = coarse.Column;
+            if (lumenDepthFromInterface < 0) return 0f;
+            float falloff = Mathf.Max(0.0001f, InvasionTuning.AdhesionFalloffCells);
+            return Mathf.Clamp01(InvasionTuning.AdhesionChanceAtWall) *
+                   Mathf.Exp(-lumenDepthFromInterface / falloff);
+        }
 
-            // Prefer the row chosen at spawn; otherwise take the nearest
-            // free row in the same column.
-            var rowsByPreference = new System.Collections.Generic.List<int> { targetRow };
-            for (int dr = 1; dr < BoardConfig.Rows; dr++)
+        /// <summary>
+        /// Leaves the flow and colonises the gut interface at
+        /// <paramref name="position"/>. Per section 1b step 1 the pathogen
+        /// **moves to the boundary** -- it does not adhere where it was
+        /// floating -- so its rendered position snaps to the wall
+        /// immediately. Public so a harness can put a pathogen on the wall
+        /// deterministically without waiting on a roll.
+        /// </summary>
+        public bool AdhereToInterface(int position)
+        {
+            if (gutInterface == null || State == PathogenState.Cleared) return false;
+            if (!board.InCrossBounds(position)) return false;
+
+            int stackIndex = gutInterface.AdheredCountAt(position);
+            if (!gutInterface.Adhere(position, this)) return false;
+
+            State = PathogenState.AtInterface;
+            InterfacePosition = position;
+            CurrentCoarse = board.CoarseFromAxis(board.LumenNearWallAxisIndex, position);
+            Current = board.CoarseCenterFine(CurrentCoarse);
+            restColor = BoardRenderer.PathogenColor;
+            if (sr != null) { sr.color = restColor; sr.enabled = true; }
+            SnapTo(InterfaceStackWorldPosition(position, stackIndex));
+            return true;
+        }
+
+        /// <summary>
+        /// Where the Nth pathogen in a boundary pile is drawn: at the seam,
+        /// pushed back OUT INTO THE CHANNEL by its depth in the pile, so a
+        /// dangerous position literally reads as a queue of pathogens
+        /// pressing against the wall (SPRINT_PLAN.md item 6: "make an
+        /// accumulating boundary position visibly distinct from an empty
+        /// one"). Direction is derived from the two cells either side of the
+        /// seam, so it follows the map's orientation rather than assuming
+        /// the lumen is on the right.
+        /// </summary>
+        private Vector3 InterfaceStackWorldPosition(int position, int stackIndex)
+        {
+            var seam = board.InterfaceWorldCenter(position);
+            var tissueSide = board.CoarseToWorldCenter(board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex, position));
+            var outward = (seam - tissueSide);
+            if (outward.sqrMagnitude > 0.0001f) outward.Normalize();
+            const int VisualStackCap = 7; // beyond this the pile stops growing outward and just overlaps
+            float step = board.CoarseCellWorldSize * 0.55f;
+            return seam + outward * (Mathf.Min(stackIndex, VisualStackCap) * step);
+        }
+
+        /// <summary>
+        /// Enters the tissue at <paramref name="slot"/>. Called by
+        /// GutInterface.Breach for every pathogen at a breaching position,
+        /// in one pass, so a burst genuinely lands in a single tick.
+        ///
+        /// Deliberately does NOT remove itself from the interface pile --
+        /// GutInterface owns pile membership and compacts it around the
+        /// pathogens that did move, which is what keeps "released
+        /// everything at once" a single, auditable operation.
+        /// </summary>
+        public bool EnterTissueAt(CoarseCoord slot, float currentTime)
+        {
+            if (board == null || State == PathogenState.Cleared) return false;
+            if (board.BandOf(slot) != BoardBand.Tissue) return false;
+
+            infectionStartTime = currentTime;
+            if (!tissueGrid.TryAdhere(slot, this, infectionStartTime)) return false;
+
+            State = PathogenState.InTissue;
+            InterfacePosition = -1;
+            CurrentCoarse = slot;
+            Current = board.CoarseCenterFine(slot);
+            hasSpread = false;
+            lastSpreadAttemptTime = float.NegativeInfinity;
+            ApplyRestColorForCurrentClass();
+            MoveTo(board.CoarseToWorldCenter(slot), InvasionTuning.TissueStepIntervalSeconds * 0.5f);
+            stepTimer = Random.Range(0f, InvasionTuning.TissueStepIntervalSeconds);
+            return true;
+        }
+
+        /// <summary>
+        /// One step of the strongly biased random walk toward the base
+        /// (GAME_DESIGN.md section 1b step 3).
+        ///
+        /// The four candidates are built in the axis frame: one step toward
+        /// the base, one step away, and the two sideways steps along the
+        /// lanes. Weights come from InvasionTuning. A candidate is dropped
+        /// if it leaves the board, leaves the tissue band on the lumen side
+        /// (a pathogen inside the body does not climb back into the
+        /// channel), or is already occupied -- so a blocked front slides
+        /// sideways instead of jamming. If nothing is legal the pathogen
+        /// holds its ground, which is exactly what a contested line should
+        /// look like.
+        ///
+        /// The one special case: a base-ward step whose destination is in
+        /// the BASE band is not a move at all, it is the endzone
+        /// (<see cref="ReachBase"/>).
+        /// </summary>
+        private void StepTissue()
+        {
+            int count = 0;
+            float total = 0f;
+
+            void Consider(int deltaAxis, int deltaCross, float weight)
             {
-                int up = targetRow - dr;
-                int down = targetRow + dr;
-                if (up >= 0) rowsByPreference.Add(up);
-                if (down < BoardConfig.Rows) rowsByPreference.Add(down);
+                if (weight <= 0f) return;
+                int axisIndex = board.AxisIndex(CurrentCoarse) + deltaAxis;
+                int crossIndex = board.CrossIndex(CurrentCoarse) + deltaCross;
+                if (!board.InAxisBounds(axisIndex) || !board.InCrossBounds(crossIndex)) return;
+
+                var band = board.BandAtAxisIndex(axisIndex);
+                bool reachesBase = band == BoardBand.Base;
+                if (band == BoardBand.Lumen) return;
+
+                var candidate = board.CoarseFromAxis(axisIndex, crossIndex);
+                if (!reachesBase && !tissueGrid.IsSlotFree(candidate)) return;
+
+                advanceCandidates[count] = candidate;
+                advanceWeights[count] = weight;
+                advanceReachesBase[count] = reachesBase;
+                total += weight;
+                count++;
             }
 
-            foreach (var row in rowsByPreference)
+            // -1 on the AXIS is "toward the base," always. Never a column
+            // decrement -- see the class comment.
+            Consider(-1, 0, InvasionTuning.AdvanceBaseWeight);
+            Consider(0, -1, InvasionTuning.AdvanceLateralWeight);
+            Consider(0, +1, InvasionTuning.AdvanceLateralWeight);
+            Consider(+1, 0, InvasionTuning.AdvanceAwayWeight);
+
+            if (count == 0 || total <= 0f) return; // held -- no legal step
+
+            float pick = Random.value * total;
+            int chosen = count - 1;
+            float running = 0f;
+            for (int i = 0; i < count; i++)
             {
-                var candidate = new CoarseCoord(col, row);
-                if (tissueGrid.TryAdhere(candidate, this, Time.time))
-                {
-                    Current = new FineCoord(
-                        candidate.Column * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2,
-                        candidate.Row * BoardConfig.FineSubdivision + BoardConfig.FineSubdivision / 2);
-                    State = PathogenState.Adhered;
-                    Class = PickRandomClass();
-                    SetHealthForClass();
-                    infectionStartTime = Time.time;
-                    hasSpread = false;
-                    lastSpreadAttemptTime = float.NegativeInfinity;
-                    ApplyRestColorForCurrentClass();
-                    tickEndWorld = board.FineToWorld(Current);
-                    transform.position = tickEndWorld;
-                    return;
-                }
+                running += advanceWeights[i];
+                if (pick <= running) { chosen = i; break; }
             }
 
-            // Column is full top to bottom -- keep transiting and retry
-            // adhesion one coarse cell further along instead of giving up.
-            targetFineColumn = Current.Column + BoardConfig.FineSubdivision;
-            if (targetFineColumn >= board.FineColumns)
+            if (advanceReachesBase[chosen])
             {
-                willAdhere = false;
-                targetFineColumn = board.FineColumns;
+                ReachBase();
+                return;
             }
+
+            tissueGrid.ReleaseSlot(CurrentCoarse);
+            if (!tissueGrid.TryAdhere(advanceCandidates[chosen], this, infectionStartTime))
+            {
+                // Should be unreachable (freshness was checked above and this
+                // is single-threaded), but never leave a live pathogen
+                // unowned: take the old slot back.
+                tissueGrid.TryAdhere(CurrentCoarse, this, infectionStartTime);
+                return;
+            }
+
+            CurrentCoarse = advanceCandidates[chosen];
+            Current = board.CoarseCenterFine(CurrentCoarse);
+            MoveTo(board.CoarseToWorldCenter(CurrentCoarse), InvasionTuning.TissueStepIntervalSeconds);
+        }
+
+        /// <summary>
+        /// SPRINT_PLAN.md item 9: a pathogen that reaches the base band
+        /// despawns and increments a counter, and that is deliberately ALL
+        /// it does. The 100-life pool and the real lose condition are Sprint
+        /// 5 (GAME_DESIGN.md section 6c).
+        /// </summary>
+        private void ReachBase()
+        {
+            if (tally != null) tally.ReachedBase++;
+            tissueGrid.ReleaseSlot(CurrentCoarse);
+            State = PathogenState.Cleared;
+            onExit?.Invoke(this);
         }
 
         private static PathogenClass PickRandomClass()
@@ -291,92 +560,67 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>GAME_DESIGN.md section 4a: intracellular pathogens are
-        /// "visible as the host cell, not itself" -- large bacteria are
-        /// "visible as itself, no disguise." Large bacteria keep their own
-        /// small sprite visible (and flash on hit, see LateUpdate).
-        /// Intracellular pathogens instead disable their own sprite
-        /// entirely: an early version tried tinting it to flat HostColor
-        /// and leaving it enabled, but BoardRenderer's coarse-cell
-        /// background is HEAT-BLENDED (host color lerped toward orange by
-        /// local cytokine strength -- see BoardRenderer.Refresh) while a
-        /// flat-tinted small sprite sitting on top of it is not, so the
-        /// unblended square was visibly a different shade than its
-        /// surroundings -- an accidental "tell" that defeated the whole
-        /// point of "not visible as itself, until sensed." Disabling the
-        /// sprite outright removes that artifact at the cost of losing the
-        /// small per-hit flash for intracellular combat specifically (see
-        /// docs/TEAM_RETRO.md) -- large bacteria still flash normally.</summary>
+        /// "visible as the host cell, not itself"; large bacteria are
+        /// "visible as itself, no disguise." Applies only once a pathogen is
+        /// IN TISSUE -- in the lumen and on the wall there is no host cell to
+        /// hide inside, so every class is drawn as itself there. See
+        /// docs/ENGINE_STATUS.md for why intracellular classes disable the
+        /// sprite outright rather than tinting it to HostColor.</summary>
         private void ApplyRestColorForCurrentClass()
         {
             bool isLargeBacterium = Class == PathogenClass.LargeBacterium;
             restColor = isLargeBacterium ? BoardRenderer.PathogenColor : BoardRenderer.HostColor;
+            if (sr == null) return;
             sr.color = restColor;
             sr.enabled = isLargeBacterium;
         }
 
         /// <summary>
-        /// Per-frame check (Update calls this with Time.time; a headless
-        /// harness can call it directly with simulated time -- see
-        /// Assets/Editor/CombatVerification.cs) for whether an uncleared
-        /// virus infection should spread to an adjacent coarse slot.
-        /// Bacterial intracellular infections and large bacteria never
-        /// spread (GAME_DESIGN.md section 4a: virus-specific). Retries on
-        /// SpreadRetryIntervalSeconds if the attempt fails (every neighbour
-        /// occupied) rather than giving up after one try, so a
-        /// still-uncleared infection keeps pressing outward as
-        /// opportunities open up.
+        /// The viral spread check (GAME_DESIGN.md section 4a). No-ops unless
+        /// this is an uncleared virus infection sitting in tissue past its
+        /// incubation. Called from SimulationTick, and callable directly
+        /// with simulated time by a harness.
         /// </summary>
         public void TickCombat(float currentTime)
         {
-            if (State != PathogenState.Adhered) return;
+            if (State != PathogenState.InTissue) return;
             if (Class != PathogenClass.IntracellularVirus) return;
             if (hasSpread) return;
             if (currentTime - infectionStartTime < IncubationSeconds) return;
             if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
 
             lastSpreadAttemptTime = currentTime;
-            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
-            if (onSpreadRequested != null && onSpreadRequested(coarse, currentTime))
+            if (onSpreadRequested != null && onSpreadRequested(CurrentCoarse, currentTime))
             {
                 hasSpread = true;
             }
         }
 
         /// <summary>
-        /// Flat per-contact damage (SPRINT_PLAN.md: "keep damage numbers
-        /// simple, flat rates are fine"), called by SearchUnit each tick a
-        /// unit comes within contact range of this pathogen's fine tile
-        /// (Sprint 3 tightened that from "shares this pathogen's coarse
-        /// slot" -- see SearchUnit.CheckContact). Reaching zero health
-        /// clears the infection/pathogen back to bare host tissue --
-        /// releases the TissueGrid slot (unused since Sprint 1) and returns
-        /// this instance to its pool via onExit, exactly like the existing
-        /// transit-and-exit path.
+        /// Flat per-contact damage, called by SearchUnit.CheckContact.
         ///
-        /// **Sprint 3: kill attribution (SPRINT_PLAN.md item 6).**
-        /// <paramref name="source"/> is the unit that landed this hit.
-        /// EXACTLY ONE unit is ever credited with a kill: whoever's hit
-        /// crosses zero. If several units damage the same pathogen on the
-        /// same tick, the earlier hits credit nothing and the later ones
-        /// no-op entirely (State is already Cleared by then, so this method
-        /// returns at the first line) -- no split or shared credit. That
-        /// single credit is what drives the depleting-unit lifecycle in
-        /// GAME_DESIGN.md section 6d.
+        /// **Sprint 4 narrowed the guard from `Adhered` to
+        /// <see cref="PathogenState.InTissue"/>.** A pathogen in the lumen
+        /// or colonising the wall cannot be attacked -- GAME_DESIGN.md
+        /// section 1a states that outright for the lumen, and the wall is
+        /// the epithelial barrier, outside the tissue the immune cells walk.
+        /// See docs/TEAM_RETRO.md: making the wall attackable would need
+        /// multi-occupancy contact detection, which is Sprint 5's TissueGrid
+        /// rewrite, and the mechanic this sprint is proving is the burst,
+        /// not the siege.
         ///
-        /// A NULL source stays legal and always will: viral spread,
-        /// environmental/collateral damage, and harness fixtures all pass
-        /// null. It simply means the kill is credited to nobody.
+        /// Kill attribution is unchanged from Sprint 3: exactly one unit is
+        /// ever credited, whoever's hit crosses zero, credited before
+        /// clearing (which can pool this instance). A null source stays
+        /// legal and always will.
         /// </summary>
         public void ReceiveDamage(float amount, SearchUnit source)
         {
-            if (State != PathogenState.Adhered) return;
+            if (State != PathogenState.InTissue) return;
             contactFlashTimer = 0.25f;
             Health -= amount;
             if (Health > 0f) return;
 
-            // Credit before clearing: ClearFromCombat can return this
-            // instance to the pool via onExit, and the credited unit should
-            // not depend on anything this object still holds afterwards.
             if (source != null) source.RegisterKill();
             ClearFromCombat();
         }
@@ -384,8 +628,7 @@ namespace ImmunologyTD.Pathogens
         private void ClearFromCombat()
         {
             State = PathogenState.Cleared;
-            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
-            tissueGrid.ReleaseSlot(coarse);
+            tissueGrid.ReleaseSlot(CurrentCoarse);
             onExit?.Invoke(this);
         }
 
@@ -393,6 +636,25 @@ namespace ImmunologyTD.Pathogens
         {
             State = PathogenState.Cleared;
             onExit?.Invoke(this);
+        }
+
+        // ------------------------------------------------------------------
+        // Visual helpers
+        // ------------------------------------------------------------------
+
+        private void SnapTo(Vector3 world)
+        {
+            moveStartWorld = moveEndWorld = world;
+            moveElapsed = moveDuration = 0f;
+            transform.position = world;
+        }
+
+        private void MoveTo(Vector3 world, float durationSeconds)
+        {
+            moveStartWorld = transform.position;
+            moveEndWorld = world;
+            moveElapsed = 0f;
+            moveDuration = Mathf.Max(0.0001f, durationSeconds);
         }
 
         private void LateUpdate()
@@ -410,16 +672,23 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>Called by PathogenSpawner just before returning this
-        /// instance to the pool (transit/exit case, or a combat-cleared
-        /// pathogen -- both funnel through the same onExit callback).</summary>
+        /// instance to the pool. Every exit path funnels through onExit, so
+        /// this is the single place stale state is cleared.</summary>
         public void ResetForPool()
         {
-            State = PathogenState.Transiting;
+            State = PathogenState.Cleared;
             board = null;
             tissueGrid = null;
+            gutInterface = null;
+            tally = null;
             onSpreadRequested = null;
+            onExit = null;
+            InterfacePosition = -1;
             contactFlashTimer = 0f;
             hasSpread = false;
+            lastSpreadAttemptTime = float.NegativeInfinity;
+            stepTimer = 0f;
+            moveElapsed = moveDuration = 0f;
             Health = 0f;
             MaxHealth = 0f;
         }

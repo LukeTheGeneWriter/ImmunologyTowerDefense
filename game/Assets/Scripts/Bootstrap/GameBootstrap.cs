@@ -8,22 +8,20 @@ using ImmunologyTD.Rendering;
 namespace ImmunologyTD.Bootstrap
 {
     /// <summary>
-    /// Entry point. Builds the whole scene at runtime -- camera, board
-    /// visualization, bone marrow / lymph node compartments, unit/pathogen
+    /// Entry point. Builds the whole scene at runtime -- camera, the coarse
+    /// cell grid, the gut wall, the base-band compartments, unit/pathogen
     /// pools, HUD -- from a single GameObject (see
-    /// Assets/Editor/SceneSetup.cs, which is what puts this component into
-    /// Sprint1.unity). Nothing is hand laid out in the Editor; see
-    /// docs/INTERFACE.md for the data shapes wired together here.
+    /// Assets/Editor/SceneSetup.cs). Nothing is hand laid out in the Editor;
+    /// see docs/INTERFACE.md for the data shapes wired together here.
     ///
-    /// Sprint 2 change: units no longer debug-spawn at random positions at
-    /// startup. GameBootstrap now only builds the (initially empty) unit
-    /// pools and hands them to BoneMarrowManager, which is the sole source
-    /// of new units from here on (GAME_DESIGN.md section 2a) -- nothing is
-    /// on the tissue board until the player places at least one bone
-    /// marrow tower. Also builds two new compartments (GAME_DESIGN.md
-    /// section 1): the bone marrow (functional placement, see
-    /// BoneMarrowManager) and the lymph node (a labeled, reserved,
-    /// non-functional placeholder -- SPRINT_PLAN.md).
+    /// **Sprint 4 rebuilt the layout around Map 01 (GAME_DESIGN.md section
+    /// 1a).** Bone marrow and the lymph node were free-floating strips below
+    /// and to the right of a 30x5 tissue board; they now sit INSIDE the base
+    /// band of a 100x40 map, which is the whole point of item 8 -- the
+    /// player's production and the endzone are the same compartment, and it
+    /// should look that way. Camera framing is correspondingly simpler:
+    /// every compartment is inside the board now, so the camera fits the
+    /// board and nothing else.
     /// </summary>
     [RequireComponent(typeof(BoardConfig))]
     public class GameBootstrap : MonoBehaviour
@@ -37,10 +35,6 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 1,
             FootprintFineTiles = 5,
             Color = new Color(0.30f, 0.40f, 0.80f),
-            // Lifecycle defaults, GAME_DESIGN.md section 6d / SPRINT_PLAN.md
-            // items 1, 4, 5. Macrophages are the longer-lived, quiet-exit
-            // half of the contrast: 20 kills (Director, 2026-08-21 -- four
-            // times the neutrophil's), no degranulation, no collateral.
             MaxActiveChildren = 10,
             KillLimit = 20,
             DegranulatesOnDepletion = false,
@@ -56,10 +50,6 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 3,
             FootprintFineTiles = 3,
             Color = new Color(0.95f, 0.78f, 0.25f),
-            // Lifecycle defaults, GAME_DESIGN.md section 6d / SPRINT_PLAN.md
-            // items 1, 3, 5. Neutrophils are the short-lived, violent-exit
-            // half: 5 kills, then degranulation -- a 3x ContactDamagePerHit
-            // burst into whatever occupies their coarse slot.
             MaxActiveChildren = 10,
             KillLimit = 5,
             DegranulatesOnDepletion = true,
@@ -67,16 +57,15 @@ namespace ImmunologyTD.Bootstrap
             ContactRadiusFineTiles = 2
         };
 
-        /// <summary>Bone marrow slot count -- a judgment call (see
-        /// docs/TEAM_RETRO.md), "a small number" per SPRINT_PLAN.md.
-        /// Chosen so a player can run a mixed macrophage/neutrophil
-        /// strategy (2-3 of each) without the strip dominating the
-        /// screen.</summary>
+        /// <summary>Bone marrow slot count -- unchanged from Sprint 2, a
+        /// judgment call (see docs/TEAM_RETRO.md).</summary>
         private const int BoneMarrowSlotCount = 5;
 
         private BoardConfig board;
         private TissueGrid tissueGrid;
         private CytokineField cytokineField;
+        private GutInterface gutInterface;
+        private InvasionTally tally;
 
         private struct Layout
         {
@@ -94,12 +83,14 @@ namespace ImmunologyTD.Bootstrap
             board = GetComponent<BoardConfig>();
             tissueGrid = new TissueGrid(board);
             cytokineField = new CytokineField(board);
+            tally = new InvasionTally();
+            gutInterface = new GutInterface(board, tissueGrid, tally);
 
-            float coarseCellSize = BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision;
-            var layout = BuildLayout(coarseCellSize);
+            var layout = BuildLayout();
 
             BuildCamera(layout.Bounds);
             BuildBoardVisual();
+            BuildGutInterfaceVisual();
             BuildBoneMarrowBackdrop(layout);
             BuildLymphNodeBackdrop(layout);
 
@@ -110,73 +101,71 @@ namespace ImmunologyTD.Bootstrap
             var neutrophilPool = BuildUnitPool(neutrophilProfile);
             var boneMarrow = BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool);
 
-            // Sprint 3: pooled degranulation burst effect. Built here (not
-            // lazily on first use) so the very first neutrophil to deplete
-            // renders its burst, and pooled because GAME_DESIGN.md section 8
-            // names effects explicitly alongside enemies and projectiles.
             BuildDegranulationFlashPool();
-
             BuildHud(boneMarrow);
 
-            // Diagnostic only -- lets a headless/scripted verification pass
-            // (no interactive Editor session this project, see
-            // docs/ENGINE_STATUS.md) recover exact world-space compartment
-            // positions and camera framing from Player.log after launching
-            // a real build, without needing to guess pixel coordinates for
-            // simulated mouse clicks.
             Debug.Log(
-                $"[GameBootstrap] Layout diagnostic -- camera pos ({Camera.main.transform.position.x:F3}, {Camera.main.transform.position.y:F3}), " +
+                $"[GameBootstrap] Map 01 -- {board.Columns}x{board.Rows} coarse cells; " +
+                $"base axis 0..{board.BaseBandCells - 1}, tissue {board.TissueBaseEdgeAxisIndex}..{board.TissueLumenEdgeAxisIndex}, " +
+                $"lumen {board.LumenNearWallAxisIndex}..{board.AxisLength - 1}; " +
+                $"base end {board.BaseEnd}, threat axis {board.ThreatAxis}\n" +
+                $"  camera pos ({Camera.main.transform.position.x:F3}, {Camera.main.transform.position.y:F3}), " +
                 $"orthoSize {Camera.main.orthographicSize:F3}, aspect {Camera.main.aspect:F4}\n" +
                 $"  BoneMarrowSlot[0] world ({layout.MarrowSlotPositions[0].x:F3}, {layout.MarrowSlotPositions[0].y:F3}), slotSize {layout.MarrowSlotSize:F3}\n" +
                 $"  LymphNode world ({layout.LymphCenter.x:F3}, {layout.LymphCenter.y:F3})");
         }
 
-        private Layout BuildLayout(float coarseCellSize)
+        /// <summary>
+        /// Places the two base-band compartments. Everything is derived from
+        /// BoardConfig.BandWorldRect(BoardBand.Base), so the layout follows
+        /// the band wherever config puts it rather than assuming "left."
+        ///
+        /// Bone marrow is a COLUMN of slots rather than Sprint 2's
+        /// horizontal strip: the base band is tall and narrow (25 x 40 cells
+        /// on Map 01), and stacking the slots vertically both fits that
+        /// shape and lines each tower up with the lanes its cells will walk
+        /// out into.
+        /// </summary>
+        private Layout BuildLayout()
         {
-            float tissueHalfW = board.BoardWorldWidth * 0.5f;
-            float tissueHalfH = board.BoardWorldHeight * 0.5f;
+            float cell = board.CoarseCellWorldSize;
+            var baseRect = board.BandWorldRect(BoardBand.Base);
 
-            // Bone marrow: a horizontal strip of slots below the tissue
-            // board, adjacent to the blood-side edge -- CoarseCoord's Row
-            // convention puts Row 0 (shallowest, nearest the lumen) at the
-            // top of the screen (BoardConfig.FineToWorld), so the deepest
-            // row -- the blood-adjacent edge new units extravasate from,
-            // see BoneMarrowManager.Emit -- renders at the bottom. Placing
-            // bone marrow below the board keeps that spatial story
-            // legible even though nothing this sprint draws a literal
-            // connecting path.
-            float marrowSlotSize = coarseCellSize * 0.9f;
-            float marrowSlotGap = coarseCellSize * 0.3f;
-            float marrowGapFromTissue = coarseCellSize * 1.1f;
-            float marrowStripWidth = BoneMarrowSlotCount * marrowSlotSize + (BoneMarrowSlotCount - 1) * marrowSlotGap;
-            float marrowCenterY = -tissueHalfH - marrowGapFromTissue - marrowSlotSize * 0.5f;
-            float marrowStartX = -marrowStripWidth * 0.5f + marrowSlotSize * 0.5f;
+            float marrowSlotSize = cell * 2.2f;
+            float marrowSlotGap = cell * 0.9f;
+            float marrowStripHeight = BoneMarrowSlotCount * marrowSlotSize + (BoneMarrowSlotCount - 1) * marrowSlotGap;
+
+            // Marrow occupies the upper-middle of the base band; the lymph
+            // node sits below it with room to breathe.
+            float marrowCenterY = baseRect.center.y + baseRect.height * 0.18f;
+            float marrowCenterX = baseRect.center.x;
+            float topSlotY = marrowCenterY + marrowStripHeight * 0.5f - marrowSlotSize * 0.5f;
 
             var slotPositions = new Vector3[BoneMarrowSlotCount];
             for (int i = 0; i < BoneMarrowSlotCount; i++)
             {
-                float x = marrowStartX + i * (marrowSlotSize + marrowSlotGap);
-                slotPositions[i] = new Vector3(x, marrowCenterY, 0f);
+                float y = topSlotY - i * (marrowSlotSize + marrowSlotGap);
+                slotPositions[i] = new Vector3(marrowCenterX, y, 0f);
             }
 
-            var marrowBackdropSize = new Vector2(marrowStripWidth + marrowSlotGap, marrowSlotSize + marrowSlotGap);
-            var marrowBackdropCenter = new Vector3(0f, marrowCenterY, 0f);
+            var marrowBackdropSize = new Vector2(marrowSlotSize + marrowSlotGap, marrowStripHeight + marrowSlotGap);
+            var marrowBackdropCenter = new Vector3(marrowCenterX, marrowCenterY, 0f);
 
-            // Lymph node: a labeled, reserved box to the right of the
-            // tissue board -- GAME_DESIGN.md section 1's fourth
-            // compartment, not functional this sprint (SPRINT_PLAN.md).
-            float lymphGap = coarseCellSize * 1.1f;
-            var lymphSize = new Vector2(coarseCellSize * 2.4f, coarseCellSize * 2.0f);
-            var lymphCenter = new Vector3(tissueHalfW + lymphGap + lymphSize.x * 0.5f, 0f, 0f);
+            var lymphSize = new Vector2(cell * 6f, cell * 4f);
+            var lymphCenter = new Vector3(
+                marrowCenterX,
+                baseRect.center.y - baseRect.height * 0.30f,
+                0f);
 
-            float minX = Mathf.Min(-tissueHalfW, marrowBackdropCenter.x - marrowBackdropSize.x * 0.5f);
-            float maxX = Mathf.Max(tissueHalfW, lymphCenter.x + lymphSize.x * 0.5f);
-            float minY = Mathf.Min(marrowBackdropCenter.y - marrowBackdropSize.y * 0.5f, lymphCenter.y - lymphSize.y * 0.5f);
-            float maxY = Mathf.Max(tissueHalfH, lymphCenter.y + lymphSize.y * 0.5f);
+            // Every compartment is inside the board now, so the camera fits
+            // the board itself -- no more union-of-scattered-strips bounds.
+            var bounds = Rect.MinMaxRect(
+                -board.BoardWorldWidth * 0.5f, -board.BoardWorldHeight * 0.5f,
+                board.BoardWorldWidth * 0.5f, board.BoardWorldHeight * 0.5f);
 
             return new Layout
             {
-                Bounds = Rect.MinMaxRect(minX, minY, maxX, maxY),
+                Bounds = bounds,
                 MarrowSlotPositions = slotPositions,
                 MarrowSlotSize = marrowSlotSize,
                 MarrowBackdropCenter = marrowBackdropCenter,
@@ -193,7 +182,7 @@ namespace ImmunologyTD.Bootstrap
             var camGo = new GameObject("MainCamera");
             mainCamera = camGo.AddComponent<Camera>();
             mainCamera.orthographic = true;
-            mainCamera.backgroundColor = new Color(0.07f, 0.07f, 0.09f);
+            mainCamera.backgroundColor = new Color(0.05f, 0.05f, 0.07f);
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             camGo.tag = "MainCamera";
 
@@ -202,22 +191,19 @@ namespace ImmunologyTD.Bootstrap
         }
 
         /// <summary>
-        /// Fits the camera's orthographic size to <paramref name="bounds"/>
-        /// using Camera.aspect at call time. Sprint 2 bug found via build
-        /// screenshot (not the headless verification, which can't see
-        /// rendering -- see docs/TEAM_RETRO.md): Camera.aspect read during
-        /// Awake() -- frame 0, before the actual window size has settled --
-        /// does not reliably match the real runtime window's aspect ratio,
-        /// which under-sized the fit enough to crop the right edge of the
-        /// board and push the lymph node fully off-screen in a real build.
-        /// FitCamera is called once immediately (so there's a reasonable
-        /// frame-0 fallback) and again one frame later via
-        /// RefitCameraNextFrame, by which point Screen.width/height (and
-        /// therefore Camera.aspect) reflect the real window.
+        /// Fits the camera's orthographic size to <paramref name="bounds"/>.
+        /// Called once immediately and again a frame later, because
+        /// Camera.aspect read during Awake() (frame 0) does not reliably
+        /// match the real runtime window -- see docs/ENGINE_STATUS.md for
+        /// the Sprint 2 story behind this.
+        ///
+        /// Padding is tighter than Sprint 3's 1.1: the field is 2.5:1 and
+        /// nearly fills a 16:9 frame on its own, so generous padding wastes
+        /// pixels the 40 lanes need.
         /// </summary>
         private static void FitCamera(Camera cam, Rect bounds)
         {
-            const float padding = 1.1f;
+            const float padding = 1.04f;
             Vector2 center = bounds.center;
             float halfHeight = bounds.height * 0.5f * padding;
             float aspect = cam.aspect > 0 ? cam.aspect : 16f / 9f;
@@ -231,25 +217,24 @@ namespace ImmunologyTD.Bootstrap
             yield return null;
             if (mainCamera == null) yield break;
             FitCamera(mainCamera, bounds);
-
-            // Diagnostic only -- see the frame-0 log in Awake() for why this
-            // is logged again post-refit: this is the value a scripted
-            // verification pass should actually use to compute screen
-            // coordinates for simulated clicks.
             Debug.Log(
                 $"[GameBootstrap] Post-refit camera diagnostic -- pos ({mainCamera.transform.position.x:F3}, {mainCamera.transform.position.y:F3}), " +
                 $"orthoSize {mainCamera.orthographicSize:F3}, aspect {mainCamera.aspect:F4}, Screen {Screen.width}x{Screen.height}");
         }
 
+        /// <summary>One SpriteRenderer per coarse cell -- 4,000 of them on
+        /// Map 01, up from 150. SPRINT_PLAN.md item 2 names this as the
+        /// sprint's main performance risk; measured frame cost is in
+        /// docs/ENGINE_STATUS.md.</summary>
         private void BuildBoardVisual()
         {
             var container = new GameObject("HostCellGrid").transform;
-            var views = new SpriteRenderer[board.Columns, BoardConfig.Rows];
-            float size = BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * 0.92f;
+            var views = new SpriteRenderer[board.Columns, board.Rows];
+            float size = board.CoarseCellWorldSize * 0.94f;
 
             for (int col = 0; col < board.Columns; col++)
             {
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < board.Rows; row++)
                 {
                     var cellGo = new GameObject($"Cell_{col}_{row}");
                     cellGo.transform.SetParent(container, false);
@@ -266,6 +251,13 @@ namespace ImmunologyTD.Bootstrap
             boardRenderer.Bind(board, tissueGrid, cytokineField, views);
         }
 
+        private void BuildGutInterfaceVisual()
+        {
+            var go = new GameObject("GutInterfaceRenderer");
+            var renderer = go.AddComponent<GutInterfaceRenderer>();
+            renderer.Bind(board, gutInterface);
+        }
+
         private void BuildBoneMarrowBackdrop(Layout layout)
         {
             var go = new GameObject("BoneMarrowBackdrop");
@@ -273,12 +265,12 @@ namespace ImmunologyTD.Bootstrap
             go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = RuntimeSprites.SquareSprite;
-            sr.color = new Color(0.30f, 0.24f, 0.16f); // dark bone-marrow brown, distinct from tissue's pink
+            sr.color = new Color(0.30f, 0.24f, 0.16f); // bone-marrow brown, distinct from the base band's blue-violet
             sr.sortingOrder = 1;
 
             var labelGo = new GameObject("BoneMarrowLabel");
             var label = labelGo.AddComponent<CompartmentLabel>();
-            var labelPos = layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f + 0.35f, 0f);
+            var labelPos = layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f + 0.9f, 0f);
             label.Initialize(labelPos, "Bone Marrow -- click an empty slot to place a tower", new Vector2(440, 34));
         }
 
@@ -289,7 +281,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = RuntimeSprites.SquareSprite;
-            sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green, distinct from tissue/bone marrow
+            sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
             sr.sortingOrder = 1;
 
             var labelGo = new GameObject("LymphNodeLabel");
@@ -310,8 +302,11 @@ namespace ImmunologyTD.Bootstrap
         {
             var spawnerGo = new GameObject("PathogenSpawner");
             var spawner = spawnerGo.AddComponent<PathogenSpawner>();
-            spawner.Initialize(board, tissueGrid, cytokineField, pathogenTemplate);
+            spawner.Initialize(board, tissueGrid, cytokineField, gutInterface, tally, pathogenTemplate);
+            pathogenSpawner = spawner;
         }
+
+        private PathogenSpawner pathogenSpawner;
 
         private PrefabPool BuildUnitPool(UnitProfile profile)
         {
@@ -338,11 +333,6 @@ namespace ImmunologyTD.Bootstrap
             return manager;
         }
 
-        /// <summary>Sprint 3: the pooled burst effect a depleting neutrophil
-        /// plays (see Rendering/DegranulationFlash.cs). Same
-        /// runtime-template + PrefabPool pattern as the unit and pathogen
-        /// pools -- no .prefab assets in this project, and no raw
-        /// Instantiate/Destroy anywhere (GAME_DESIGN.md section 8).</summary>
         private void BuildDegranulationFlashPool()
         {
             var template = new GameObject("DegranulationFlashTemplate");
@@ -361,7 +351,8 @@ namespace ImmunologyTD.Bootstrap
             var hudGo = new GameObject("HUD");
             hudGo.AddComponent<CytokineToggle>();
             var overlay = hudGo.AddComponent<HudOverlay>();
-            overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick, boneMarrow);
+            overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick,
+                boneMarrow, gutInterface, tally, pathogenSpawner);
         }
     }
 }

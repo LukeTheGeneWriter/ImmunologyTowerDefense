@@ -52,6 +52,32 @@ public static class CombatVerification
         }
     }
 
+
+    // ---------------------------------------------------------------
+    // Sprint 4 shim: PathogenAgent.InitializeAdheredDirect became
+    // InitializeInTissueDirect and now takes the GutInterface and
+    // InvasionTally, because "adhered" means the gut wall in Sprint 4's
+    // model, not tissue. These harness fixtures don't exercise the wall,
+    // so they share one throwaway interface/tally per BoardConfig.
+    // ---------------------------------------------------------------
+    private static InvasionTally harnessTally;
+    private static BoardConfig harnessGutBoard;
+    private static GutInterface harnessGut;
+
+    private static InvasionTally HarnessTally =>
+        harnessTally ?? (harnessTally = new InvasionTally());
+
+    private static GutInterface HarnessGut(BoardConfig board, TissueGrid grid)
+    {
+        if (harnessGut == null || harnessGutBoard != board)
+        {
+            harnessTally = new InvasionTally();
+            harnessGut = new GutInterface(board, grid, harnessTally);
+            harnessGutBoard = board;
+        }
+        return harnessGut;
+    }
+
     private static void Check(string label, bool condition)
     {
         if (condition)
@@ -88,7 +114,7 @@ public static class CombatVerification
         var go = new GameObject($"CombatVerification_{pClass}");
         var agent = go.AddComponent<PathogenAgent>();
         bool exited = false;
-        agent.InitializeAdheredDirect(board, tissueGrid, a => exited = true, (c, t) => false, slot, pClass, 0f);
+        agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, t) => false, slot, pClass, 0f);
 
         Check($"{pClass} occupies {slot} after adhering", !tissueGrid.IsSlotFree(slot) && tissueGrid.GetPathogenAt(slot) == agent);
 
@@ -122,17 +148,17 @@ public static class CombatVerification
 
         var virusGo = new GameObject("Virus");
         var virus = virusGo.AddComponent<PathogenAgent>();
-        virus.InitializeAdheredDirect(board, tissueGrid, null, (c, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
+        virus.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
         Check("Intracellular virus does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(virus));
 
         var bacGo = new GameObject("Bacterium");
         var bac = bacGo.AddComponent<PathogenAgent>();
-        bac.InitializeAdheredDirect(board, tissueGrid, null, (c, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
+        bac.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
         Check("Intracellular bacterium does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(bac));
 
         var largeGo = new GameObject("LargeBacterium");
         var large = largeGo.AddComponent<PathogenAgent>();
-        large.InitializeAdheredDirect(board, tissueGrid, null, (c, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
+        large.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
         Check("Large bacterium DOES show as itself", BoardRenderer.ShowsAsPathogenItself(large));
 
         Check("BoardRenderer.ShowsAsPathogenItself(null) is false (bare host tissue)", !BoardRenderer.ShowsAsPathogenItself(null));
@@ -181,13 +207,13 @@ public static class CombatVerification
         template.AddComponent<SpriteRenderer>();
         template.AddComponent<PathogenAgent>();
         template.SetActive(false);
-        spawner.Initialize(board, tissueGrid, cytokineField, template);
+        spawner.Initialize(board, tissueGrid, cytokineField, HarnessGut(board, tissueGrid), HarnessTally, template);
 
         var originCoord = new CoarseCoord(board.Columns / 2, 2);
         var originGo = new GameObject("OriginVirus");
         var origin = originGo.AddComponent<PathogenAgent>();
         float simTime = 0f;
-        origin.InitializeAdheredDirect(board, tissueGrid, a => { }, spawner.RequestSpread, originCoord, PathogenClass.IntracellularVirus, simTime);
+        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpread, originCoord, PathogenClass.IntracellularVirus, simTime);
 
         Check($"[{label}] AdheredCount is 1 right after seeding the origin infection", tissueGrid.AdheredCount == 1);
 
@@ -252,12 +278,12 @@ public static class CombatVerification
         template.AddComponent<SpriteRenderer>();
         template.AddComponent<PathogenAgent>();
         template.SetActive(false);
-        spawner.Initialize(board, tissueGrid, cytokineField, template);
+        spawner.Initialize(board, tissueGrid, cytokineField, HarnessGut(board, tissueGrid), HarnessTally, template);
 
         var coord = new CoarseCoord(board.Columns / 2, 2);
         var go = new GameObject("OriginBacterium");
         var origin = go.AddComponent<PathogenAgent>();
-        origin.InitializeAdheredDirect(board, tissueGrid, a => { }, spawner.RequestSpread, coord, PathogenClass.IntracellularBacterium, 0f);
+        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpread, coord, PathogenClass.IntracellularBacterium, 0f);
 
         float simTime = 0f;
         const float dt = 0.5f;
@@ -314,7 +340,17 @@ public static class CombatVerification
         }
 
         Check($"EmittedCount >= 2 after {total:F1}s ({BoneMarrowManager.EmissionIntervalSeconds}s interval)", manager.EmittedCount >= 2);
-        Check("Last emitted unit's row is the blood-adjacent edge (board.FineRows - 1)", manager.LastEmittedStart.Row == board.FineRows - 1);
+        // Sprint 4 (SPRINT_PLAN.md item 8) moved unit entry from the
+        // deepest fine ROW ("blood-adjacent edge", meaningful only while
+        // depth was vertical) to the tissue band's BASE-SIDE EDGE, since
+        // Map 01 makes the base a lateral band. Asserted in the axis frame
+        // rather than against a literal column, so this stays true if the
+        // base is configured onto the other side of the map.
+        var emittedCell = manager.LastEmittedStart.ToCoarse(BoardConfig.FineSubdivision);
+        Check("Last emitted unit starts at the tissue band's base-side edge",
+            board.AxisIndex(emittedCell) == board.TissueBaseEdgeAxisIndex);
+        Check("Last emitted unit starts inside the tissue band, not the base or lumen",
+            board.BandOf(emittedCell) == BoardBand.Tissue);
         Check("Last emitted unit's column is in bounds", manager.LastEmittedStart.Column >= 0 && manager.LastEmittedStart.Column < board.FineColumns);
         Check("Last emitted kind is Macrophage (only slot 0 is placed)", manager.LastEmittedKind == UnitKind.Macrophage);
 

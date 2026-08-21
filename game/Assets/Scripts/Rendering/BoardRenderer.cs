@@ -5,20 +5,24 @@ using ImmunologyTD.Pathogens;
 namespace ImmunologyTD.Rendering
 {
     /// <summary>
-    /// Colours each coarse cell's background quad by occupant. As of
-    /// Sprint 2 (GAME_DESIGN.md section 4a), "occupant" is class-dependent:
-    /// intracellular pathogens (virus, bacterium) infect the slot's host
-    /// cell without replacing it, so the cell still reads as host tissue;
-    /// a large bacterium kills and occupies the slot outright and reads as
-    /// itself. See ShowsAsPathogenItself below.
+    /// Colours each coarse cell's background quad.
+    ///
+    /// **Sprint 4** made the base colour depend on the cell's BAND
+    /// (GAME_DESIGN.md section 1a) rather than being host pink everywhere:
+    /// base / tissue / lumen have to be visually distinct or the map does
+    /// not read as three bands. Occupant colouring (section 4a's
+    /// intracellular-vs-large-bacterium split) still applies on top, and
+    /// only inside tissue.
     ///
     /// Also blends in a faint warm "heatmap" tint proportional to the
-    /// cytokine field's strength at that cell (Sprint 1 closing task), so
-    /// the field itself is visible on screen -- not just inferred from unit
-    /// behaviour. This is now the primary way an intracellular infection is
-    /// visually legible at all, since it no longer changes the cell's base
-    /// color. Deliberately independent of CytokineToggle -- see original
-    /// comment history in docs/ENGINE_STATUS.md.
+    /// cytokine field at that cell, so the field is visible rather than
+    /// inferred. Deliberately independent of CytokineToggle -- see the
+    /// original comment history in docs/ENGINE_STATUS.md.
+    ///
+    /// **Scale note (SPRINT_PLAN.md item 2).** This class was written for
+    /// 150 cells and now drives 4,000, one SpriteRenderer each. The band
+    /// lookup per cell is cached at Bind time so Refresh is a flat array
+    /// walk; measured frame cost is recorded in docs/ENGINE_STATUS.md.
     /// </summary>
     public class BoardRenderer : MonoBehaviour
     {
@@ -26,16 +30,26 @@ namespace ImmunologyTD.Rendering
         private TissueGrid tissueGrid;
         private CytokineField cytokineField;
         private SpriteRenderer[,] views;
+        private Color[,] baseColors;
         private float refreshTimer;
 
-        public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, healthy tissue (and, as of Sprint 2, intracellular-infected tissue -- it keeps reading as host cell)
-        public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- transiting pathogens and adhered large bacteria only, as of Sprint 2
+        public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, healthy (and intracellular-infected) tissue
+        public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- pathogens visible as themselves
+
+        /// <summary>The base band: the player's blood/production compartment
+        /// and the endzone. A cold desaturated blue-violet, deliberately far
+        /// from tissue pink and from the warm lumen so the three bands
+        /// separate at a glance even on a small screenshot.</summary>
+        public static readonly Color BaseBandColor = new Color(0.20f, 0.21f, 0.34f);
+
+        /// <summary>The lumen channel: dark, warm, organic -- gut contents,
+        /// not tissue.</summary>
+        public static readonly Color LumenBandColor = new Color(0.19f, 0.16f, 0.11f);
+
         private static readonly Color HotColor = new Color(1.00f, 0.55f, 0.05f); // warm glow, cytokine signal
 
         /// <summary>How far the tint can push toward HotColor at full
-        /// (normalized 1.0) field strength -- kept below 1 so a fully "hot"
-        /// cell still visibly reads as host tissue or pathogen underneath,
-        /// not a solid orange square.</summary>
+        /// (normalized 1.0) field strength.</summary>
         private const float HeatmapBlendMax = 0.65f;
 
         public void Bind(BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField, SpriteRenderer[,] views)
@@ -44,7 +58,23 @@ namespace ImmunologyTD.Rendering
             this.tissueGrid = tissueGrid;
             this.cytokineField = cytokineField;
             this.views = views;
+
+            baseColors = new Color[board.Columns, board.Rows];
+            for (int col = 0; col < board.Columns; col++)
+                for (int row = 0; row < board.Rows; row++)
+                    baseColors[col, row] = BandColor(board.BandOf(new CoarseCoord(col, row)));
+
             Refresh();
+        }
+
+        public static Color BandColor(BoardBand band)
+        {
+            switch (band)
+            {
+                case BoardBand.Base: return BaseBandColor;
+                case BoardBand.Lumen: return LumenBandColor;
+                default: return HostColor;
+            }
         }
 
         private void Update()
@@ -58,13 +88,17 @@ namespace ImmunologyTD.Rendering
 
         private void Refresh()
         {
-            for (int col = 0; col < board.Columns; col++)
+            int columns = board.Columns;
+            int rows = board.Rows;
+            for (int col = 0; col < columns; col++)
             {
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < rows; row++)
                 {
                     var coord = new CoarseCoord(col, row);
+                    Color baseColor = baseColors[col, row];
+
                     var pathogen = tissueGrid.GetPathogenAt(coord);
-                    Color baseColor = ShowsAsPathogenItself(pathogen) ? PathogenColor : HostColor;
+                    if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
 
                     float intensity = Mathf.Clamp01(cytokineField.CoarseValueAt(coord) / TissueGrid.MaxSecretionStrength);
                     views[col, row].color = Color.Lerp(baseColor, HotColor, intensity * HeatmapBlendMax);
@@ -73,11 +107,10 @@ namespace ImmunologyTD.Rendering
         }
 
         /// <summary>GAME_DESIGN.md section 4a's occupant/render split, as a
-        /// static, side-effect-free predicate (same reasoning as pulling
-        /// Chemotaxis.ChooseNextStep out to its own static method in the
-        /// Sprint 1 closing task) so Assets/Editor/CombatVerification.cs
-        /// can assert this directly for all three classes without needing
-        /// a bound BoardRenderer/SpriteRenderer array.</summary>
+        /// static side-effect-free predicate so a headless harness can
+        /// assert it without a bound SpriteRenderer array. True only for a
+        /// LargeBacterium; false for both intracellular classes and for
+        /// null.</summary>
         public static bool ShowsAsPathogenItself(PathogenAgent pathogen) =>
             pathogen != null && pathogen.Class == PathogenClass.LargeBacterium;
     }

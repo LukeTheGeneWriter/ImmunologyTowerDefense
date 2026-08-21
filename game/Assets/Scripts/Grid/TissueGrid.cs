@@ -56,21 +56,37 @@ namespace ImmunologyTD.Grid
         public TissueGrid(BoardConfig board)
         {
             this.board = board;
-            pathogenBySlot = new PathogenAgent[board.Columns, BoardConfig.Rows];
-            adhesionStartTime = new float[board.Columns, BoardConfig.Rows];
+            pathogenBySlot = new PathogenAgent[board.Columns, board.Rows];
+            adhesionStartTime = new float[board.Columns, board.Rows];
             for (int col = 0; col < board.Columns; col++)
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < board.Rows; row++)
                     adhesionStartTime[col, row] = -1f;
         }
 
         public bool IsSlotFree(CoarseCoord c) =>
             board.InCoarseBounds(c) && pathogenBySlot[c.Column, c.Row] == null;
 
-        public bool TryAdhere(CoarseCoord c, PathogenAgent pathogen, float currentTime)
+        /// <summary>
+        /// Claims a coarse slot for a pathogen. False if already occupied.
+        ///
+        /// **Sprint 4 renamed the third parameter from `currentTime` to
+        /// `infectionStartTime`, and the distinction now matters.** Through
+        /// Sprint 3 a pathogen never moved once it adhered, so "when this
+        /// slot was claimed" and "when this infection began" were the same
+        /// instant. Pathogens now perform a base-directed walk through
+        /// tissue (GAME_DESIGN.md section 1b step 3), releasing one slot and
+        /// claiming the next roughly once a second. If each claim restarted
+        /// the secretion ramp, no infection would ever get past
+        /// BaseSecretionStrength and the cytokine mechanic would silently
+        /// stop working. So a moving pathogen carries its own infection
+        /// start time and passes it here on every step; only a NEW infection
+        /// passes the current time.
+        /// </summary>
+        public bool TryAdhere(CoarseCoord c, PathogenAgent pathogen, float infectionStartTime)
         {
             if (!IsSlotFree(c)) return false;
             pathogenBySlot[c.Column, c.Row] = pathogen;
-            adhesionStartTime[c.Column, c.Row] = currentTime;
+            adhesionStartTime[c.Column, c.Row] = infectionStartTime;
             AdheredCount++;
             return true;
         }
@@ -112,7 +128,7 @@ namespace ImmunologyTD.Grid
         public IEnumerable<CoarseCoord> AdheredCoords()
         {
             for (int col = 0; col < board.Columns; col++)
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < board.Rows; row++)
                     if (pathogenBySlot[col, row] != null)
                         yield return new CoarseCoord(col, row);
         }
@@ -125,7 +141,7 @@ namespace ImmunologyTD.Grid
         public IEnumerable<(CoarseCoord Coord, float Strength)> InfectedSources(float currentTime)
         {
             for (int col = 0; col < board.Columns; col++)
-                for (int row = 0; row < BoardConfig.Rows; row++)
+                for (int row = 0; row < board.Rows; row++)
                     if (pathogenBySlot[col, row] != null)
                     {
                         var coord = new CoarseCoord(col, row);

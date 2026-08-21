@@ -74,6 +74,32 @@ public static class LifecycleVerification
         return true;
     }
 
+
+    // ---------------------------------------------------------------
+    // Sprint 4 shim: PathogenAgent.InitializeAdheredDirect became
+    // InitializeInTissueDirect and now takes the GutInterface and
+    // InvasionTally, because "adhered" means the gut wall in Sprint 4's
+    // model, not tissue. These harness fixtures don't exercise the wall,
+    // so they share one throwaway interface/tally per BoardConfig.
+    // ---------------------------------------------------------------
+    private static InvasionTally harnessTally;
+    private static BoardConfig harnessGutBoard;
+    private static GutInterface harnessGut;
+
+    private static InvasionTally HarnessTally =>
+        harnessTally ?? (harnessTally = new InvasionTally());
+
+    private static GutInterface HarnessGut(BoardConfig board, TissueGrid grid)
+    {
+        if (harnessGut == null || harnessGutBoard != board)
+        {
+            harnessTally = new InvasionTally();
+            harnessGut = new GutInterface(board, grid, harnessTally);
+            harnessGutBoard = board;
+        }
+        return harnessGut;
+    }
+
     private static void Check(string label, bool condition)
     {
         if (condition)
@@ -218,7 +244,7 @@ public static class LifecycleVerification
         var go = new GameObject($"Pathogen_{slot}");
         rig.Junk.Add(go);
         var agent = go.AddComponent<PathogenAgent>();
-        agent.InitializeAdheredDirect(rig.Board, rig.Grid, a => { }, (c, t) => false, slot, pClass, 0f);
+        agent.InitializeInTissueDirect(rig.Board, rig.Grid, HarnessGut(rig.Board, rig.Grid), HarnessTally, a => { }, (c, t) => false, slot, pClass, 0f);
         return agent;
     }
 
