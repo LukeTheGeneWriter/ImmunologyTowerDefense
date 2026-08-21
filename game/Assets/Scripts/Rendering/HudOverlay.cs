@@ -31,6 +31,7 @@ namespace ImmunologyTD.Rendering
         private PathogenSpawner spawner;
         private string infoLine;
         private GUIStyle style;
+        private float smoothedFrameMs;
 
         public void Bind(
             BoardConfig board, int macrophageSpeed, int neutrophilSpeed, BoneMarrowManager boneMarrow,
@@ -63,6 +64,17 @@ namespace ImmunologyTD.Rendering
                 };
             }
 
+            // Map 01's base band now sits underneath this text, so the HUD
+            // needs to stop being transparent white-on-whatever. A dimming
+            // panel keeps both the readout and the board readable; without
+            // it the bone marrow slot labels and these lines overprint each
+            // other into mush.
+            var panel = new Rect(0, 0, 1180, 296);
+            var prev = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.72f);
+            GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            GUI.color = prev;
+
             GUI.Label(new Rect(16, 12, 820, 110), infoLine, style);
 
             string toggleLine = $"Cytokine sensing: {(CytokineToggle.Enabled ? "ON" : "OFF")}   (press C to toggle)";
@@ -74,6 +86,31 @@ namespace ImmunologyTD.Rendering
             GUI.Label(new Rect(16, 178, 900, 30), BuildPopulationLine(), style);
             GUI.Label(new Rect(16, 206, 1100, 30), BuildPathogenLine(), style);
             GUI.Label(new Rect(16, 234, 1100, 30), BuildInvasionLine(), style);
+            GUI.Label(new Rect(16, 262, 1100, 30), BuildPerformanceLine(), style);
+        }
+
+        /// <summary>Frame cost, on screen. SPRINT_PLAN.md item 2 asks for a
+        /// measured number rather than an assurance: Map 01 renders 4,000
+        /// coarse cells where Sprint 1-3 rendered 150, and BoardRenderer
+        /// still gives each cell its own SpriteRenderer. Smoothed so it is
+        /// readable rather than flickering.</summary>
+        private string BuildPerformanceLine()
+        {
+            float ms = smoothedFrameMs;
+            return ms <= 0f
+                ? string.Empty
+                : $"Frame: {ms:F2} ms ({(1000f / Mathf.Max(0.01f, ms)):F0} fps)   " +
+                  $"cells rendered: {board.Columns * board.Rows}";
+        }
+
+        private void Update()
+        {
+            // Exponential smoothing; unscaledDeltaTime so a future pause or
+            // speed control doesn't distort the reading.
+            float frameMs = Time.unscaledDeltaTime * 1000f;
+            smoothedFrameMs = smoothedFrameMs <= 0f
+                ? frameMs
+                : Mathf.Lerp(smoothedFrameMs, frameMs, 0.05f);
         }
 
         /// <summary>Where the pathogens currently are, by band. Sprint 4's

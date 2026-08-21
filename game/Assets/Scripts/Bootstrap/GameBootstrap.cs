@@ -78,9 +78,40 @@ namespace ImmunologyTD.Bootstrap
             public Vector2 LymphSize;
         }
 
+        /// <summary>
+        /// Shouts if the band layout is degenerate. This is here because it
+        /// already bit once: the scene asset still carried Sprint 1's
+        /// serialized `columns: 30`, which silently overrode Map 01's
+        /// default of 100. Since BaseBandCells and LumenBandCells are
+        /// clamped against the axis length, the shortfall landed entirely on
+        /// the tissue band -- 25 base + 5 lumen + **0 tissue** -- so
+        /// pathogens piled up on a gut wall with nothing behind it and
+        /// nothing could ever enter tissue. The game ran, rendered, and
+        /// reported no errors; the only tell was the HUD's band readout.
+        ///
+        /// A silent zero-width playfield is worth an error in the log.
+        /// </summary>
+        private void WarnOnDegenerateBands()
+        {
+            if (board.TissueBandCells <= 0)
+            {
+                Debug.LogError(
+                    $"[GameBootstrap] Tissue band is {board.TissueBandCells} cells wide -- there is no playfield. " +
+                    $"Axis length {board.AxisLength} cannot hold base {board.BaseBandCells} + lumen {board.LumenBandCells}. " +
+                    "Check BoardConfig's serialized columns/rows on the scene object (GAME_DESIGN.md section 1a: Map 01 is 100x40).");
+            }
+            else if (board.LumenBandCells <= 0 || board.BaseBandCells <= 0)
+            {
+                Debug.LogError(
+                    $"[GameBootstrap] Degenerate band layout: base {board.BaseBandCells}, tissue {board.TissueBandCells}, " +
+                    $"lumen {board.LumenBandCells} on an axis of {board.AxisLength}.");
+            }
+        }
+
         private void Awake()
         {
             board = GetComponent<BoardConfig>();
+            WarnOnDegenerateBands();
             tissueGrid = new TissueGrid(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
