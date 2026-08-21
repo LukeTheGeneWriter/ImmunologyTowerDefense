@@ -23,11 +23,35 @@ namespace ImmunologyTD.Units
     /// extravasate at random points along the vessel") -- no ATP cost this
     /// sprint (SPRINT_PLAN.md: placement is free).
     ///
+    /// **Sprint 3: population homeostasis (GAME_DESIGN.md section 6d).**
+    /// Sprint 2's tower emitted forever and nothing ever despawned, so the
+    /// active unit count grew without bound -- the problem Sprint 3 exists
+    /// to fix. A tower is now bounded two ways at once, deliberately, each
+    /// doing a different job:
+    ///
+    ///  - **Emission rate** (EmissionIntervalSeconds, unchanged from
+    ///    Sprint 2) -- one new cell per interval at most, which is the
+    ///    tower's DPS cap. Kept as an independent second cap specifically so
+    ///    a tower whose whole population just died cannot burst back to
+    ///    full instantly.
+    ///  - **Max active children** (new) -- a hard ceiling on how many of a
+    ///    tower's OWN children are alive at once. At the ceiling the tower
+    ///    stops emitting even if its timer has elapsed, until a child dies.
+    ///    Per-tower, NOT systemic: an explicit break from real
+    ///    hematopoiesis (which is G-CSF-regulated body-wide), made because
+    ///    it is what gives a future per-tower upgrade something to attach
+    ///    to. Do not "fix" this back toward biological accuracy without
+    ///    reading GAME_DESIGN.md section 6d first.
+    ///
+    /// Each tower owns a mutable UnitLifecycleTuning seeded from its kind's
+    /// UnitProfile defaults at placement; GetTuning(index) hands it out so a
+    /// future upgrade is one field write and nothing more.
+    ///
     /// Tick(float deltaTime) -- not an implicit Update() reading
     /// UnityEngine.Time -- is the actual emission-timer logic, matching the
     /// project's established pattern (TissueGrid/CytokineField/Chemotaxis)
     /// of taking explicit time so a headless verification harness can drive
-    /// the real production method (see Assets/Editor/CombatVerification.cs).
+    /// the real production method (see Assets/Editor/LifecycleVerification.cs).
     /// Update() just calls Tick(Time.deltaTime).
     /// </summary>
     public class BoneMarrowManager : MonoBehaviour
@@ -39,6 +63,23 @@ namespace ImmunologyTD.Units
             public float EmissionTimer;
             public SpriteRenderer Visual;
             public Vector3 WorldPosition;
+
+            /// <summary>This tower's own mutable lifecycle numbers, seeded
+            /// from the kind's UnitProfile defaults at PlaceTower time. A
+            /// future upgrade writes here and nothing else.</summary>
+            public UnitLifecycleTuning Tuning;
+
+            /// <summary>This tower's currently-alive children. A list rather
+            /// than a bare counter so the HUD, the verification harness, and
+            /// any future "recall your cells" mechanic can actually reach
+            /// them. Bounded by Tuning.MaxActiveChildren (10 by default), so
+            /// the O(n) Remove on despawn is trivially cheap.</summary>
+            public readonly List<SearchUnit> Children = new List<SearchUnit>();
+
+            /// <summary>Cached despawn callback handed to every child this
+            /// tower emits -- built once at placement so emission allocates
+            /// no closure per unit (GAME_DESIGN.md section 8).</summary>
+            public System.Action<SearchUnit> OnChildDespawned;
         }
 
         /// <summary>Seconds between emissions from a placed tower. A
@@ -46,7 +87,10 @@ namespace ImmunologyTD.Units
         /// docs/TEAM_RETRO.md. Chosen slower than PathogenSpawner's 2.5s
         /// spawn interval since a player can place several towers at once
         /// (each one emitting independently), but fast enough that placing
-        /// a tower and watching it work reads within a few seconds.</summary>
+        /// a tower and watching it work reads within a few seconds.
+        ///
+        /// Sprint 3 keeps this exactly as it was, per SPRINT_PLAN.md item 2
+        /// -- it is the second, independent cap.</summary>
         public const float EmissionIntervalSeconds = 4f;
 
         private static readonly Color EmptySlotColor = new Color(0.62f, 0.56f, 0.42f); // pale bone-ish tan
@@ -66,12 +110,29 @@ namespace ImmunologyTD.Units
         private GUIStyle buttonStyle;
 
         /// <summary>Testable hooks for headless verification (see
-        /// Assets/Editor/CombatVerification.cs) -- the same reasoning as
+        /// Assets/Editor/LifecycleVerification.cs) -- the same reasoning as
         /// Chemotaxis/TissueGrid exposing explicit-time methods rather than
         /// only being observable through rendered output.</summary>
         public int EmittedCount { get; private set; }
         public FineCoord LastEmittedStart { get; private set; }
         public UnitKind LastEmittedKind { get; private set; }
+        public SearchUnit LastEmittedUnit { get; private set; }
+
+        /// <summary>Total units alive across every tower. Sprint 3's headline
+        /// observable: this is the number that used to grow without bound.
+        /// Shown in the HUD (HudOverlay) so the Director can watch it stay
+        /// bounded rather than being asked to trust it.</summary>
+        public int TotalActiveUnits
+        {
+            get
+            {
+                int total = 0;
+                for (int i = 0; i < slots.Count; i++) total += slots[i].Children.Count;
+                return total;
+            }
+        }
+
+        public int SlotCount => slots.Count;
 
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField,
@@ -124,7 +185,11 @@ namespace ImmunologyTD.Units
         /// <summary>Places a tower -- public so both the IMGUI picker
         /// buttons and a headless verification harness call the same real
         /// placement path. No-ops on an already-placed slot (no upgrade/
-        /// replace mechanic this sprint).</summary>
+        /// replace mechanic this sprint).
+        ///
+        /// Sprint 3: this is also where the tower's own mutable lifecycle
+        /// numbers are seeded from the kind's UnitProfile defaults, and
+        /// where its per-child despawn callback is built once.</summary>
         public void PlaceTower(int index, UnitKind kind)
         {
             if (index < 0 || index >= slots.Count) return;
@@ -134,6 +199,9 @@ namespace ImmunologyTD.Units
             slot.State = BoneMarrowSlotState.Placed;
             slot.Kind = kind;
             slot.EmissionTimer = 0f;
+            slot.Tuning = UnitLifecycleTuning.FromProfile(ProfileFor(kind));
+            int capturedIndex = index;
+            slot.OnChildDespawned = unit => OnChildDespawned(capturedIndex, unit);
             slot.Visual.color = kind == UnitKind.Macrophage ? macrophageProfile.Color : neutrophilProfile.Color;
 
             if (pendingChoiceIndex == index) pendingChoiceIndex = null;
@@ -141,6 +209,21 @@ namespace ImmunologyTD.Units
 
         public BoneMarrowSlotState GetSlotState(int index) => slots[index].State;
         public UnitKind GetSlotKind(int index) => slots[index].Kind;
+
+        /// <summary>How many of this tower's own children are alive right
+        /// now. Compared against GetTuning(index).MaxActiveChildren.</summary>
+        public int GetActiveChildren(int index) => slots[index].Children.Count;
+
+        /// <summary>This tower's live, mutable tuning instance -- null until
+        /// the slot is placed. Handed out by reference on purpose: a future
+        /// progenitor upgrade is meant to be
+        /// `manager.GetTuning(i).KillLimit += 5` and nothing else
+        /// (GAME_DESIGN.md section 6d, Director 2026-08-21).</summary>
+        public UnitLifecycleTuning GetTuning(int index) => slots[index].Tuning;
+
+        /// <summary>Read-only view of one tower's live children, for the
+        /// HUD and for Assets/Editor/LifecycleVerification.cs.</summary>
+        public IReadOnlyList<SearchUnit> GetChildren(int index) => slots[index].Children;
 
         /// <summary>Real emission-timer tick, taking deltaTime explicitly
         /// rather than reading UnityEngine.Time -- see class comment.
@@ -155,15 +238,37 @@ namespace ImmunologyTD.Units
 
                 slot.EmissionTimer += deltaTime;
                 if (slot.EmissionTimer < EmissionIntervalSeconds) continue;
+
+                // At the max-active-children ceiling: hold the timer AT the
+                // interval instead of letting it bank up. This is what makes
+                // the two caps genuinely independent (SPRINT_PLAN.md item 2 /
+                // GAME_DESIGN.md section 6d): a tower whose entire population
+                // dies at once has at most one emission ready to go, and then
+                // has to wait a full interval for each subsequent cell --
+                // it refills at the emission rate, it does not burst back to
+                // full. Without the clamp, a tower blocked for 40s would bank
+                // ten emissions and dump them all on the tick a child died.
+                if (slot.Children.Count >= slot.Tuning.MaxActiveChildren)
+                {
+                    slot.EmissionTimer = EmissionIntervalSeconds;
+                    continue;
+                }
+
                 slot.EmissionTimer -= EmissionIntervalSeconds;
-                Emit(slot.Kind);
+                Emit(i, slot);
             }
         }
 
-        private void Emit(UnitKind kind)
+        private UnitProfile ProfileFor(UnitKind kind) =>
+            kind == UnitKind.Macrophage ? macrophageProfile : neutrophilProfile;
+
+        private PrefabPool PoolFor(UnitKind kind) =>
+            kind == UnitKind.Macrophage ? macrophagePool : neutrophilPool;
+
+        private void Emit(int slotIndex, Slot slot)
         {
-            var profile = kind == UnitKind.Macrophage ? macrophageProfile : neutrophilProfile;
-            var pool = kind == UnitKind.Macrophage ? macrophagePool : neutrophilPool;
+            var profile = ProfileFor(slot.Kind);
+            var pool = PoolFor(slot.Kind);
 
             // Rung-1 entry per GAME_DESIGN.md section 2a: "cells
             // extravasate at random points along the vessel" -- uniform
@@ -178,11 +283,38 @@ namespace ImmunologyTD.Units
             var start = new FineCoord(col, row);
 
             var go = pool.Get();
-            go.GetComponent<SearchUnit>().Initialize(board, tissueGrid, cytokineField, profile, start);
+            var unit = go.GetComponent<SearchUnit>();
+            // The unit gets a SNAPSHOT of this tower's numbers as they stand
+            // right now and keeps them for life -- a tower upgraded mid-round
+            // improves its future children, not the ones already in the
+            // field (SPRINT_PLAN.md item 5, flagged there as a judgment call).
+            unit.Initialize(board, tissueGrid, cytokineField, profile, start,
+                slot.Tuning, slotIndex, slot.OnChildDespawned);
+            slot.Children.Add(unit);
 
             EmittedCount++;
             LastEmittedStart = start;
-            LastEmittedKind = kind;
+            LastEmittedKind = slot.Kind;
+            LastEmittedUnit = unit;
+        }
+
+        /// <summary>
+        /// The other half of Sprint 3's lifecycle: a child that depleted
+        /// (degranulated or retired) calls back here. Frees its slot in this
+        /// tower's max-active-children count and returns the instance to its
+        /// PrefabPool -- the despawn path that simply did not exist before
+        /// this sprint (nothing ever called PrefabPool.Release for a
+        /// SearchUnit). Public so a harness can exercise it directly.
+        /// </summary>
+        public void OnChildDespawned(int slotIndex, SearchUnit unit)
+        {
+            if (slotIndex < 0 || slotIndex >= slots.Count || unit == null) return;
+            var slot = slots[slotIndex];
+            slot.Children.Remove(unit);
+
+            var pool = PoolFor(slot.Kind);
+            unit.ResetForPool();
+            pool.Release(unit.gameObject);
         }
 
         private void Update()
@@ -200,9 +332,12 @@ namespace ImmunologyTD.Units
             {
                 var slot = slots[i];
                 var screen = WorldToGui(slot.WorldPosition);
+                // Sprint 3: a placed tower shows "children alive / cap" so
+                // the max-active-children ceiling is observable in seconds of
+                // play rather than being something the player has to trust.
                 string label = slot.State == BoneMarrowSlotState.Empty
                     ? "empty\n(click)"
-                    : $"{(slot.Kind == UnitKind.Macrophage ? "Macrophage" : "Neutrophil")}\ntower";
+                    : $"{(slot.Kind == UnitKind.Macrophage ? "Macrophage" : "Neutrophil")}\n{slot.Children.Count}/{slot.Tuning.MaxActiveChildren} alive";
                 GUI.Label(new Rect(screen.x - 45, screen.y - 40, 90, 40), label, labelStyle);
             }
 

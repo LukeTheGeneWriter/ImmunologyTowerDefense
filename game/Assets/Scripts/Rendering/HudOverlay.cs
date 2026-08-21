@@ -11,18 +11,29 @@ namespace ImmunologyTD.Rendering
     /// Director step (see CytokineToggle.cs for the same note). IMGUI
     /// needs nothing extra and is a reasonable fit for a "debug toggle"
     /// sprint's HUD.
+    ///
+    /// Sprint 3 adds a live active-unit-count line. That number is the
+    /// entire point of the sprint (GAME_DESIGN.md section 6d): before it,
+    /// towers emitted forever and nothing despawned, so the count grew
+    /// without bound. Showing it -- next to the theoretical ceiling -- is
+    /// what turns "the population is capped, trust me" into something the
+    /// Director can confirm in ten seconds of play. Per-tower
+    /// "children alive / cap" is drawn on the marrow slots themselves
+    /// (BoneMarrowManager.OnGUI).
     /// </summary>
     public class HudOverlay : MonoBehaviour
     {
         private BoardConfig board;
+        private BoneMarrowManager boneMarrow;
         private string infoLine;
         private GUIStyle style;
 
-        public void Bind(BoardConfig board, int macrophageSpeed, int neutrophilSpeed)
+        public void Bind(BoardConfig board, int macrophageSpeed, int neutrophilSpeed, BoneMarrowManager boneMarrow)
         {
             this.board = board;
+            this.boneMarrow = boneMarrow;
             infoLine =
-                "Immunology TD -- Sprint 2 placement + combat prototype\n" +
+                "Immunology TD -- Sprint 3 unit lifecycle prototype\n" +
                 $"Board: {board.Columns} x {BoardConfig.Rows} coarse cells, " +
                 $"{BoardConfig.FineSubdivision}x{BoardConfig.FineSubdivision} fine per cell\n" +
                 $"Macrophage speed: {macrophageSpeed} fine-tiles/tick   Neutrophil speed: {neutrophilSpeed} fine-tiles/tick\n" +
@@ -49,6 +60,27 @@ namespace ImmunologyTD.Rendering
 
             string heatmapLine = "Orange tint on host cells = cytokine field strength (always visible; only pulls units when sensing is ON)";
             GUI.Label(new Rect(16, 150, 900, 30), heatmapLine, style);
+
+            GUI.Label(new Rect(16, 178, 900, 30), BuildPopulationLine(), style);
+        }
+
+        private string BuildPopulationLine()
+        {
+            if (boneMarrow == null) return string.Empty;
+
+            int active = boneMarrow.TotalActiveUnits;
+            int placed = 0;
+            int ceiling = 0;
+            for (int i = 0; i < boneMarrow.SlotCount; i++)
+            {
+                if (boneMarrow.GetSlotState(i) != BoneMarrowSlotState.Placed) continue;
+                placed++;
+                ceiling += boneMarrow.GetTuning(i).MaxActiveChildren;
+            }
+
+            return placed == 0
+                ? "Active units: 0   (no towers placed yet)"
+                : $"Active units: {active} / {ceiling} max   ({placed} tower{(placed == 1 ? "" : "s")} placed; units deplete after their kill limit and free a slot)";
         }
     }
 }

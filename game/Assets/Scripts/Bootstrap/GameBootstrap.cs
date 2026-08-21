@@ -36,7 +36,16 @@ namespace ImmunologyTD.Bootstrap
             DisplayName = "Macrophage",
             FineTilesPerTick = 1,
             FootprintFineTiles = 5,
-            Color = new Color(0.30f, 0.40f, 0.80f)
+            Color = new Color(0.30f, 0.40f, 0.80f),
+            // Lifecycle defaults, GAME_DESIGN.md section 6d / SPRINT_PLAN.md
+            // items 1, 4, 5. Macrophages are the longer-lived, quiet-exit
+            // half of the contrast: 20 kills (Director, 2026-08-21 -- four
+            // times the neutrophil's), no degranulation, no collateral.
+            MaxActiveChildren = 10,
+            KillLimit = 20,
+            DegranulatesOnDepletion = false,
+            DegranulationBurstMultiplier = 0f,
+            ContactRadiusFineTiles = 2
         };
 
         [SerializeField]
@@ -46,7 +55,16 @@ namespace ImmunologyTD.Bootstrap
             DisplayName = "Neutrophil",
             FineTilesPerTick = 3,
             FootprintFineTiles = 3,
-            Color = new Color(0.95f, 0.78f, 0.25f)
+            Color = new Color(0.95f, 0.78f, 0.25f),
+            // Lifecycle defaults, GAME_DESIGN.md section 6d / SPRINT_PLAN.md
+            // items 1, 3, 5. Neutrophils are the short-lived, violent-exit
+            // half: 5 kills, then degranulation -- a 3x ContactDamagePerHit
+            // burst into whatever occupies their coarse slot.
+            MaxActiveChildren = 10,
+            KillLimit = 5,
+            DegranulatesOnDepletion = true,
+            DegranulationBurstMultiplier = 3f,
+            ContactRadiusFineTiles = 2
         };
 
         /// <summary>Bone marrow slot count -- a judgment call (see
@@ -90,9 +108,15 @@ namespace ImmunologyTD.Bootstrap
 
             var macrophagePool = BuildUnitPool(macrophageProfile);
             var neutrophilPool = BuildUnitPool(neutrophilProfile);
-            BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool);
+            var boneMarrow = BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool);
 
-            BuildHud();
+            // Sprint 3: pooled degranulation burst effect. Built here (not
+            // lazily on first use) so the very first neutrophil to deplete
+            // renders its burst, and pooled because GAME_DESIGN.md section 8
+            // names effects explicitly alongside enemies and projectiles.
+            BuildDegranulationFlashPool();
+
+            BuildHud(boneMarrow);
 
             // Diagnostic only -- lets a headless/scripted verification pass
             // (no interactive Editor session this project, see
@@ -302,7 +326,7 @@ namespace ImmunologyTD.Bootstrap
             return pool;
         }
 
-        private void BuildBoneMarrowManager(Layout layout, PrefabPool macrophagePool, PrefabPool neutrophilPool)
+        private BoneMarrowManager BuildBoneMarrowManager(Layout layout, PrefabPool macrophagePool, PrefabPool neutrophilPool)
         {
             var go = new GameObject("BoneMarrowManager");
             var manager = go.AddComponent<BoneMarrowManager>();
@@ -311,14 +335,33 @@ namespace ImmunologyTD.Bootstrap
                 macrophageProfile, macrophagePool,
                 neutrophilProfile, neutrophilPool,
                 layout.MarrowSlotPositions, layout.MarrowSlotSize);
+            return manager;
         }
 
-        private void BuildHud()
+        /// <summary>Sprint 3: the pooled burst effect a depleting neutrophil
+        /// plays (see Rendering/DegranulationFlash.cs). Same
+        /// runtime-template + PrefabPool pattern as the unit and pathogen
+        /// pools -- no .prefab assets in this project, and no raw
+        /// Instantiate/Destroy anywhere (GAME_DESIGN.md section 8).</summary>
+        private void BuildDegranulationFlashPool()
+        {
+            var template = new GameObject("DegranulationFlashTemplate");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<DegranulationFlash>();
+            template.SetActive(false);
+
+            var poolGo = new GameObject("DegranulationFlashPool");
+            var pool = poolGo.AddComponent<PrefabPool>();
+            pool.SetPrefab(template);
+            DegranulationFlash.Configure(pool);
+        }
+
+        private void BuildHud(BoneMarrowManager boneMarrow)
         {
             var hudGo = new GameObject("HUD");
             hudGo.AddComponent<CytokineToggle>();
             var overlay = hudGo.AddComponent<HudOverlay>();
-            overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick);
+            overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick, boneMarrow);
         }
     }
 }

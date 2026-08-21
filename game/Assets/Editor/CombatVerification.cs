@@ -97,11 +97,11 @@ public static class CombatVerification
 
         for (int i = 0; i < hitsToClear - 1; i++)
         {
-            agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit);
+            agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null); // Sprint 3: null source stays legal (SPRINT_PLAN.md item 6)
         }
         Check($"{pClass} still occupies {slot} before its last hit ({hitsToClear - 1}/{hitsToClear} hits landed, MaxHealth={maxHealth})", !tissueGrid.IsSlotFree(slot));
 
-        agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit);
+        agent.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null); // Sprint 3: null source stays legal (SPRINT_PLAN.md item 6)
         Check($"{pClass} slot {slot} is free after {hitsToClear} hits", tissueGrid.IsSlotFree(slot));
         Check($"{pClass} GetPathogenAt({slot}) is null after clearing", tissueGrid.GetPathogenAt(slot) == null);
         Check($"{pClass} onExit fired exactly once on clear", exited);
@@ -200,7 +200,7 @@ public static class CombatVerification
             simTime += dt;
             if (clearOriginEarly && !clearedEarly && simTime >= PathogenAgent.IncubationSeconds * 0.5f)
             {
-                origin.ReceiveDamage(origin.MaxHealth); // one hit for full health clears it outright
+                origin.ReceiveDamage(origin.MaxHealth, null); // one hit for full health clears it outright
                 clearedEarly = true;
             }
             origin.TickCombat(simTime);

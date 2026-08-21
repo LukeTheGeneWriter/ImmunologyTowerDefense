@@ -1,6 +1,7 @@
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Rendering;
+using ImmunologyTD.Units;
 
 namespace ImmunologyTD.Pathogens
 {
@@ -344,18 +345,40 @@ namespace ImmunologyTD.Pathogens
         /// <summary>
         /// Flat per-contact damage (SPRINT_PLAN.md: "keep damage numbers
         /// simple, flat rates are fine"), called by SearchUnit each tick a
-        /// unit's fine tile falls in this pathogen's coarse slot. Reaching
-        /// zero health clears the infection/pathogen back to bare host
-        /// tissue -- releases the TissueGrid slot (unused since Sprint 1)
-        /// and returns this instance to its pool via onExit, exactly like
-        /// the existing transit-and-exit path.
+        /// unit comes within contact range of this pathogen's fine tile
+        /// (Sprint 3 tightened that from "shares this pathogen's coarse
+        /// slot" -- see SearchUnit.CheckContact). Reaching zero health
+        /// clears the infection/pathogen back to bare host tissue --
+        /// releases the TissueGrid slot (unused since Sprint 1) and returns
+        /// this instance to its pool via onExit, exactly like the existing
+        /// transit-and-exit path.
+        ///
+        /// **Sprint 3: kill attribution (SPRINT_PLAN.md item 6).**
+        /// <paramref name="source"/> is the unit that landed this hit.
+        /// EXACTLY ONE unit is ever credited with a kill: whoever's hit
+        /// crosses zero. If several units damage the same pathogen on the
+        /// same tick, the earlier hits credit nothing and the later ones
+        /// no-op entirely (State is already Cleared by then, so this method
+        /// returns at the first line) -- no split or shared credit. That
+        /// single credit is what drives the depleting-unit lifecycle in
+        /// GAME_DESIGN.md section 6d.
+        ///
+        /// A NULL source stays legal and always will: viral spread,
+        /// environmental/collateral damage, and harness fixtures all pass
+        /// null. It simply means the kill is credited to nobody.
         /// </summary>
-        public void ReceiveDamage(float amount)
+        public void ReceiveDamage(float amount, SearchUnit source)
         {
             if (State != PathogenState.Adhered) return;
             contactFlashTimer = 0.25f;
             Health -= amount;
-            if (Health <= 0f) ClearFromCombat();
+            if (Health > 0f) return;
+
+            // Credit before clearing: ClearFromCombat can return this
+            // instance to the pool via onExit, and the credited unit should
+            // not depend on anything this object still holds afterwards.
+            if (source != null) source.RegisterKill();
+            ClearFromCombat();
         }
 
         private void ClearFromCombat()
