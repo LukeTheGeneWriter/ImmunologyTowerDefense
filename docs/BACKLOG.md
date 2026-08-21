@@ -200,3 +200,35 @@ Sprint 1.
   *lost* to inaction, which is the pressure that makes deliberate shuttling
   worth paying for. Needs a number, and needs to be visible enough that a
   player understands why their knowledge is not accruing.
+
+## Opened by Sprint 4 (2026-08-21)
+
+- **Cytokine sensing is much weaker at Map 01 scale.** Measured, not
+  suspected: on the 30×5 board sensing drove unit-to-infection distance to
+  0.20/0.00/0.00 while OFF sat at ~3; on 100×40 it goes 45.29/40.42/37.38
+  while OFF sits flat at ~47. The mechanism works — ON closes steadily,
+  OFF does not — but it no longer converges. Cause: `CytokineField` is
+  `strength / (1 + distance)` with no cutoff, which is a steep gradient at
+  3 cells and nearly flat at 47. Sprint 1 called this mechanic "should feel
+  transformative"; at map scale it currently isn't. Candidate fixes (all
+  tuning, none applied): steeper falloff (1/r²), a finite radius with a
+  stronger local gradient, or a higher `Chemotaxis.GradientSharpness`.
+  **Deliberately not tuned** — the Director's standing instruction is
+  mechanics first.
+- **Frame cost is vsync-capped, so unmeasured.** 4,000 cells report 8.35
+  ms/frame, which is exactly the 120 Hz refresh interval. True cost is at
+  most that; actual headroom is unknown. Re-measure with vsync disabled
+  before trusting it, especially before adding host-cell state rendering in
+  Sprint 5.
+- **Base-band layout is crowded.** Bone marrow slots, the lymph node
+  placeholder, and the HUD all occupy the same corner and overprint each
+  other. A dimming panel behind the HUD makes it readable, but the marrow
+  strip's own labels still collide with it. Needs a real layout pass —
+  plausibly the first genuine job for a dispatched Design agent, which this
+  project has never used.
+- **Nothing reaches the base yet in a short session.** With no towers
+  placed, tissue crossing takes ~70s+ at a 1s step interval and 0.7
+  toward-base weight, so a 60s observation showed 0 reached base despite 12
+  pathogens in tissue. Expected, not a bug — but it means the endzone
+  counter needs a longer sitting to demonstrate, and it is worth checking
+  whether the pacing is right once the Director plays it.

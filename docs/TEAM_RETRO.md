@@ -374,3 +374,88 @@ built game needs the machine otherwise idle.** Either run it when nobody's
 using the machine, or just hand the build to the Director and let him
 click. Sprint 2's successful click automation was probably a quiet machine
 as much as good coordinate math.
+
+### Sprint 4 — Code agent + head session (2026-08-21, Map 01 geometry and the invasion loop)
+
+**The dispatched agent hit its usage limit again — and this time nothing
+was committed.** Sprint 3's agent at least left a commit; this one left
+~1,600 lines of uncommitted working-tree changes, no verification harness,
+no docs, and code that did not compile. Its last words were "Now
+generalizing the flash effect and adding the interface renderer."
+
+What the head session found and did, in order:
+
+1. **It didn't compile.** `HudOverlay` had never been updated: `BoardConfig.Rows`
+   stopped being a `static const` and `Bind` had grown from 4 args to 7.
+2. **Both existing harnesses didn't compile either**, because
+   `PathogenAgent.InitializeAdheredDirect` was renamed to
+   `InitializeInTissueDirect` and now takes the `GutInterface` and
+   `InvasionTally`. Added a shared fixture shim rather than passing nulls.
+3. **One Sprint 2 assertion was testing a retired contract** — units
+   entering at the "blood-adjacent" deepest fine row. Item 8 moved entry to
+   the tissue band's base-side edge. Rewrote it in the axis frame so it
+   survives the base being reconfigured.
+4. **Wrote `MapVerification.cs` from scratch** (71 assertions). The agent
+   had added `BoardConfig.ConfigureForTest` *specifically for this file* and
+   referenced it by name in a doc comment — it knew what it owed.
+5. **Found the bug that mattered** (below).
+
+**Lesson, stronger than last sprint's: tell dispatched agents to commit
+early and often, not just to write docs as they go.** "Write docs
+incrementally" was in this sprint's brief and it still produced zero docs,
+because the agent batched *everything* to the end — including the commit.
+An uncommitted, non-compiling tree is far worse to inherit than a
+half-finished committed one. Next brief should say: commit after each scope
+item, even if incomplete, even if ugly.
+
+**The bug worth remembering: a stale serialized field silently deleted the
+playfield.** `Sprint1.unity` still carried Sprint 1's `columns: 30`. Unity
+deserialization applies stored YAML over field initializers, so the new
+`columns = 100` default lost to a value written three sprints ago. Because
+`BaseBandCells` and `LumenBandCells` are clamped against the axis length,
+the shortfall did not distribute — it landed entirely on the tissue band:
+**25 base + 5 lumen + 0 tissue.** The game launched, rendered a board, threw
+no exceptions, and was utterly unplayable.
+
+Three things to take from it:
+- **A new serialized field with a sensible default is not the same as that
+  default being used.** Any scene authored before the field existed keeps
+  its old value forever. Check the scene asset, not just the C# default.
+- **Clamping can concentrate an error instead of spreading it.** Clamping
+  the two outer bands was locally reasonable and globally catastrophic,
+  because the middle band absorbed 100% of the discrepancy.
+- **The harness could not have caught this.** `MapVerification` builds its
+  own boards through `ConfigureForTest` and never loads the scene — correct
+  for unit-style testing, and precisely why it was blind here. Added
+  `GameBootstrap.WarnOnDegenerateBands` so the *runtime* complains. Consider
+  a scene-level smoke check if this recurs.
+- The only reason it was caught at all is that the HUD prints the band
+  layout. Building the readout first, before looking at the board, paid for
+  itself within one screenshot.
+
+**Judgment calls made by the head session:**
+- **Harness fixtures share one throwaway `GutInterface`/`InvasionTally` per
+  `BoardConfig`** rather than passing null, so the production code path is
+  exercised as written.
+- **Adhesion proximity is proven statistically, end to end** — cohorts of
+  400 pathogens run the whole channel with a wall-only falloff versus a
+  depth-blind one — rather than by re-deriving the curve in the test. A test
+  that recomputes the formula only proves arithmetic.
+- **Frame cost is reported on the HUD** rather than measured once and
+  written down, so it stays honest as the board grows.
+
+**Numbers observed, for whoever tunes later:**
+- 4,000 coarse cells render at **8.35 ms/frame (120 fps)**. Note that is
+  *exactly* the display refresh rate, so it is vsync-capped: true cost is
+  **at most** 8.35 ms and the real headroom is unknown. Measure with vsync
+  off if a number with meaning is needed.
+- **Cytokine sensing got dramatically weaker at map scale**, and this is the
+  finding most likely to matter. Sprint 1–3 (30×5 board): OFF 2.99/3.14/2.84,
+  ON 0.20/0.00/0.00 — sensing converged to zero within a minute. Map 01
+  (100×40): OFF 46.93/46.83/47.05, ON 45.29/40.42/37.38. The mechanism still
+  works — ON closes steadily while OFF stays flat — but it no longer
+  converges within the window. Cause is not a regression: `CytokineField`
+  uses `strength / (1 + distance)` with no cutoff, and at the old board's
+  ~3-cell separations that gradient was steep, while at Map 01's ~47-cell
+  average separation it is nearly flat. **Not tuned, per the Director's
+  standing "mechanics first" instruction** — flagged in `BACKLOG.md`.

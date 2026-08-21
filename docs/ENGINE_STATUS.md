@@ -1,19 +1,20 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 3** (per-progenitor population cap, unit
-depletion/despawn, kill attribution, fine-tile proximity contact). Sprint
-0's engine/platform decision section is preserved below since it's still
-accurate. Sprint 1's and Sprint 2's own histories are in
-`docs/CHANGELOG.md`; this file only carries forward what's still true.
+reflects the state after **Sprint 4** (Map 01's three-band geometry and the
+invasion loop). Sprint 0's engine/platform decision section is preserved
+below since it is still accurate. Earlier sprints' histories are in
+`docs/CHANGELOG.md`; this file only carries forward what is still true.
 
-**Sprint 3 was implemented by a dispatched Code agent that hit its usage
-limit partway through**, after committing working, verified code
-(`8eaca14`) and a successful build, but before writing any of the docs. The
-head session ran the verification itself and wrote this file, `INTERFACE.md`,
-`TEAM_RETRO.md`, and `CHANGELOG.md` afterwards. Anything below that says
-"verified" was verified by the head session directly, from actual command
-output — see "Build status (Sprint 3)" for what that did and did not cover.
+**Sprints 3 and 4 were both implemented by dispatched Code agents that hit
+their usage limits mid-task.** Sprint 3's agent committed working code but
+no docs. Sprint 4's agent committed **nothing** — it left ~1,600 lines of
+uncommitted, non-compiling working tree with no verification harness. In
+both cases the head session repaired, verified, and documented the work
+itself. Anything below that says "verified" was verified by the head
+session directly, from actual command output — see "Build status (Sprint 4)"
+for exactly what that did and did not cover, and `docs/TEAM_RETRO.md` for
+the process lesson.
 
 ## Engine & platform decision
 
@@ -41,7 +42,7 @@ bridge, no sandbox. **Still no interactive Editor GUI session used for
 gameplay authoring** through Sprint 3 — everything is built via batchmode
 CLI + code. See "Scene construction" below.
 
-## Current state (post–Sprint 3)
+## Current state (post–Sprint 4)
 
 ### Scene
 
@@ -235,6 +236,97 @@ shown against the theoretical ceiling, and each marrow slot label shows
 rather than be asked to trust it — this sprint's headline claim is a
 number, and now that number is on screen.
 
+### Sprint 4 additions — Map 01 geometry and the invasion loop
+
+Implements `GAME_DESIGN.md` §1a/§1b. This is the sprint that gave the game
+a real map: three lateral bands with the threat axis running right-to-left,
+replacing Sprints 1–3's single tissue-only board where pathogens adhered at
+a uniformly random column.
+
+**1. `BoardConfig` — an axis frame and data-driven bands.** `Rows` stopped
+being a `const 5` and the `[Range(24,40)]` clamp on columns is gone; Map 01
+is **100 × 40 coarse cells**, still 7×7 fine subdivision.
+
+The important part is the **axis frame**, which is how
+`SPRINT_PLAN.md` item 3's "advance toward the base, never leftward"
+requirement is actually enforced:
+- `ThreatAxis` (Horizontal/Vertical) and `BaseEnd` (Negative/Positive) are
+  configuration.
+- `AxisIndex(coord)` returns **distance from the base**, flipping
+  internally when `BaseEnd` is Positive. Axis index 0 is always the
+  outermost base cell whichever world side that is.
+- `CoarseFromAxis`, `OffsetInAxisFrame`, `InAxisBounds`, `CrossIndex`,
+  `CrossLength` complete the frame. `OffsetInAxisFrame(c, -1, 0)` is the
+  *only* sanctioned way to step toward the base.
+- Bands are cell counts (`BaseBandCells` 25, `LumenBandCells` 25,
+  `TissueBandCells` derived), with `BandAtAxisIndex`/`BandOf` classifying,
+  and named edges: `TissueBaseEdgeAxisIndex`, `TissueLumenEdgeAxisIndex`,
+  `LumenNearWallAxisIndex`, `LumenDepthFromInterface`.
+- Lumen flow direction is its own axis end (`FlowCrossStep`,
+  `LumenEntryCrossIndex`, `IsExcretedCrossIndex`).
+- `ConfigureForTest(...)` builds non-default geometry from code; it exists
+  so `MapVerification` can prove the abstraction on a mirrored board.
+
+**2. `GutInterface` (new) — the wall, and the burst.** One pile per lane
+(`PositionCount == CrossLength`). `Adhere` adds to a position; `Remove`
+handles a pathogen cleared while still on the wall; `AdheredCountAt`,
+`AdheredAt`, `TotalAdhered`, `PeakAdhered` expose pressure.
+- `BreachChanceAt(position)` is `1 - (1 - perPathogen)^n`, so **a position's
+  breach odds rise with the pile on it** — pressure builds toward its own
+  release rather than being memoryless.
+- `Tick(deltaTime, currentTime)` advances a roll clock and rolls every
+  *occupied* position when due. The clock is held at zero while the wall is
+  clean so the first pathogen to adhere waits a full interval.
+- `Breach(position, currentTime)` releases **every** pathogen at that
+  position in one call — the mechanic `SPRINT_PLAN.md` item 6 insists on. A
+  pathogen that cannot find a release slot stays on the wall rather than
+  being dropped. Public, so a harness (or a future "pop the abscess"
+  ability) can trip a position deterministically.
+- A `Breached(position, count)` **event** rather than polling, because
+  script execution order between `PathogenSpawner` (which ticks this) and a
+  renderer's `Update()` is undefined; polling would silently drop about half
+  the bursts, and an undrawn burst is the one thing item 6 says must be
+  legible.
+
+**3. `PathogenAgent` — largely rewritten.** States are now `Lumen`,
+`AtInterface`, `InTissue`, `Cleared`.
+- **Lumen:** enters at the upstream end of the flow at a random distance
+  from the wall, steps along the cross axis every
+  `LumenStepIntervalSeconds`, and is **excreted with no penalty** off the
+  downstream end. Unattackable while flowing.
+- **Adhesion:** after each step, one roll against
+  `AdhesionChanceAt(depth)` = `AdhesionChanceAtWall * exp(-depth / falloff)`
+  — a static, side-effect-free function, the same extraction pattern as
+  `Chemotaxis.ChooseNextStep`. On success `AdhereToInterface(position)`
+  **moves the pathogen to the wall**, per §1b step 1.
+- **Tissue:** `StepTissue` picks among toward-base / two lateral / away
+  candidates by weight (0.70 / 0.13 each / 0.04), consulting the axis frame
+  only. Reaching a `Base`-band cell despawns the pathogen and increments
+  `InvasionTally.ReachedBase`.
+- `InitializeAdheredDirect` became `InitializeInTissueDirect` — "adhered"
+  now means the gut wall, not tissue.
+
+**4. `InvasionTuning` (new) — every invasion number in one place**, all
+mutable statics with `ResetToDefaults()`: lumen/tissue step intervals,
+`AdhesionChanceAtWall` 0.12, `AdhesionFalloffCells` 5, breach roll cadence
+1s, `PerPathogenBreachChance` 0.012, release spread limits, advance weights.
+
+**5. `InvasionTally` (new)** — `Adhesions`, `Breaches`,
+`ReleasedIntoTissue`, `Excreted`, `ReachedBase`. Drives the HUD.
+
+**6. Compartments moved into the base band**, and units now enter at
+`TissueBaseEdgeAxisIndex` on a random lane — expressed in the axis frame, so
+moving the base moves the entry line with it. Placement UX is unchanged.
+
+**7. `CytokineField` is now allocation-free.** Sprints 1–3 allocated a fresh
+`float[,]` plus a source `List` every recompute — 150 floats on the old
+board, 4,000 on Map 01, ~2.5 allocations/second of steadily growing garbage
+against `GAME_DESIGN.md` §8. Both buffers are owned and cleared in place.
+
+**8. HUD** shows the band layout, pathogen counts by band, the invasion
+tally including `REACHED BASE`, and a live frame-cost readout. A dimming
+panel sits behind it because the base band is now underneath the text.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -266,165 +358,140 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 3)
+## Build status (Sprint 4)
 
-All of the following was run by the **head session**, not the Code agent,
-after that agent hit its usage limit. Numbers below are copied from actual
-command output.
+All run by the **head session**, after the dispatched agent hit its usage
+limit having committed nothing. Numbers are copied from actual output.
 
 ### Headless verification
 
-**`Assets/Editor/LifecycleVerification.cs` (new) — 76 passed, 0 failed.**
-Drives the real production classes (`BoneMarrowManager`, `SearchUnit`,
-`PathogenAgent`, `UnitLifecycleTuning`, `TissueGrid`) with no Play Mode and
-no rendering, same philosophy as Sprints 1–2. Run with:
+| Harness | Result |
+|---|---|
+| `MapVerification.RunAll` (**new**, Sprint 4) | **71 passed, 0 failed** |
+| `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
+| `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-```
-Unity.exe -batchmode -quit -projectPath <repo>\game -executeMethod LifecycleVerification.RunAll
-```
+`MapVerification` covers band layout and boundaries, axis-frame
+round-tripping, lumen flow and excretion, proximity-gated adhesion, the
+breach burst, base-directed advance, and the reached-base event. Two groups
+carry most of the weight:
 
-Groups, with the results that actually matter:
-1. **Max active children** — a tower saturates at 10 after 500 simulated
-   seconds and emits exactly 10 units total, where uncapped Sprint 2
-   behavior would have emitted **125**; depleting one child frees exactly
-   one slot; the tower refills and holds at the cap through another 125s.
-2. **Emission-rate cap after mass death** — the independence proof above
-   (1 cell immediately, 1 at 3.875s, 2 at 7.875s, cap only after ~40s).
-3. **Neutrophil degranulation** — fires at exactly 5 kills, not 4; deals a
-   flat 3× burst (an 18 HP occupant → 15); a lethal burst clears the slot
-   and `GetPathogenAt` returns null; degranulating on bare tissue is
-   harmless and still despawns; the slot is freed and the unit returns to
-   the pool inactive with its kill count cleared.
-4. **Macrophage retirement** — not due at 19/20, retires at 20, occupant
-   still at full 18 HP (no collateral), slot freed, pooled not destroyed.
-5. **Kill attribution** — after 11 non-lethal hits from unit A, nobody is
-   credited; the unit whose hit crosses zero (B) gets the kill and A gets
-   nothing (no split credit); extra same-tick hits credit nobody; a `null`
-   source still clears the pathogen with no exception.
-6. **Proximity contact** — radius default 2; a unit on the pathogen's own
-   tile and one at exactly Chebyshev 2 both connect; a unit at the far
-   corner of the *same coarse slot* does **not** (asserted to still be in
-   that coarse slot, so this is genuinely a proximity test and not an
-   out-of-slot test); neighbouring-slot centre does not connect.
-7. **Per-tower independence** — two towers of a kind get separate tuning
-   instances; upgrading tower 0 leaves tower 1's cap, tower 1's kill limit,
-   and the shared `UnitProfile` default untouched; tower 0 then caps at its
-   own new max while tower 1 still caps at 10; a mid-life upgrade does not
-   retroactively change an already-fielded unit but the tower's next
-   emission does carry it.
-8. **Long-run boundedness — the point of the sprint.** 5 towers, 300
-   simulated seconds of churn: active count **never exceeded** towers × cap
-   at any point (peak 50 ≤ 50), ended at 50, against Sprint 2's unbounded
-   375 over the same window — while towers kept genuinely producing
-   throughout (283 emitted vs. a 50-unit initial fill).
+- **The burst.** Six pathogens piled at one wall position; one `Breach`
+  call releases all six into the tissue band, empties that position, fires
+  **one** event carrying the count, and leaves a second pile at another
+  position completely untouched. Asserted directly because item 6 warns
+  that degrading this into a trickle destroys the mechanic.
+- **The mirrored map.** The same advance code runs on a board configured
+  with the base on the opposite end. The pathogen still closes on the base
+  in the axis frame, which *there* means its world column **increases**.
+  That is the real test of item 3 — advance follows configuration, not a
+  hardcoded direction.
 
-### Regressions — both clean
+Adhesion proximity is proven end-to-end rather than by re-deriving the
+curve: cohorts of 400 pathogens run the full channel with a wall-only
+falloff versus a depth-blind one, and the depth-blind curve adheres several
+times as many. Closing the gate entirely (`AdhesionChanceAtWall = 0`) yields
+exactly zero adhesions, proving the gate is actually wired into the
+production path.
 
-- **`CombatVerification.RunAll` (Sprint 2): 35 passed, 0 failed**, with its
-  `ReceiveDamage` call sites updated for the new signature.
-- **`CytokineVerification.RunComparison` (Sprint 1): numbers identical to
-  the Sprint 1 and Sprint 2 recordings** — OFF 2.99 / 3.14 / 2.84, ON 0.20
-  / 0.00 / 0.00. Movement and cytokine sensing did not regress.
+`CombatVerification` gained one assertion (35 → 36): its "units enter at the
+blood-adjacent deepest fine row" check tested a contract item 8 retired, and
+was rewritten in the axis frame as two checks.
 
-### Contact-rate change — a real balance consequence, not a rounding error
+### Cytokine sensing is much weaker at map scale — measured
 
-`LifecycleVerification` prints a no-assertion diagnostic for exactly this,
-because it is the thing most likely to bite in playtest:
+| Board | OFF (0–1m / 1–2m / 2–2.5m) | ON |
+|---|---|---|
+| 30×5 (Sprints 1–3) | 2.99 / 3.14 / 2.84 | 0.20 / 0.00 / 0.00 |
+| 100×40 (Map 01) | 46.93 / 46.83 / 47.05 | 45.29 / 40.42 / 37.38 |
 
-- 25 of the 49 tiles in a coarse slot are within Chebyshev radius 2 of its
-  centre (51.0%).
-- Over 200,000 simulated ticks starting from the pathogen's tile, the
-  macrophage lands **280 hits where the Sprint 2 rule would have landed 560
-  (50.0%)**; the neutrophil lands **612 vs. 1245 (49.2%)**.
+**Not a regression.** The mechanism works — ON closes steadily while OFF
+stays flat — but it no longer converges within the window. `CytokineField`
+computes `strength / (1 + distance)` with no cutoff: a steep gradient across
+the old board's ~3-cell separations, nearly flat across Map 01's ~47-cell
+average. Sprint 1 called this mechanic "should feel transformative"; at map
+scale, right now, it isn't. **Deliberately not tuned** — the Director's
+standing instruction is mechanics first. Logged in `BACKLOG.md`.
 
-**Clearing is therefore roughly half as fast per unit as in Sprint 2**, and
-that lands at the same time as a population cap. If pathogens now outpace
-the player, this interaction is the first place to look — `SPRINT_PLAN.md`
-item 7 anticipated it and asked for it to be reported rather than papered
-over by quietly re-tuning other numbers. Nothing else was re-tuned.
+### Performance at 4,000 cells
 
-### Real build + runtime
+`BuildScript.BuildWindows()` — **Succeeded, 93,310,960 bytes, 0 errors.**
+Launched clean: **0 exceptions** in `Player.log`.
 
-`BuildScript.BuildWindows()` — **Succeeded, size 93,295,368 bytes, errors:
-0** (Sprint 2 was 93,289,832). Note that Unity's incremental player build
-left the on-disk artifacts from the Code agent's own earlier build of the
-same commit untouched; the build genuinely ran and reported success.
+**8.35 ms/frame (120 fps) with 4,000 coarse cells rendered**, each still its
+own `SpriteRenderer`, plus the cytokine field over all of them. So per-cell
+`SpriteRenderer`s **do** hold up at Map 01's scale and no renderer redesign
+was needed.
 
-Launched the built `.exe` and captured it with a DPI-aware `PrintWindow`
-script: **0 exceptions in `Player.log`**, board renders (30×5, lymph node
-compartment, 5 empty marrow slots), pathogens visible, and the new HUD line
-reads `Active units: 0 (no towers placed yet)`. Board state changed between
-successive captures, so the simulation is genuinely running.
+**Honest caveat:** 8.35 ms is *exactly* the 120 Hz refresh interval, so this
+is vsync-capped. True cost is **at most** 8.35 ms; actual headroom is
+unknown. Re-measure with vsync off before adding Sprint 5's host-cell state
+rendering.
 
-### What was NOT verified, and why
+### The invasion loop, running in a real build
 
-**Placement was not exercised through the real build's UI this session.**
-Scripted clicks did not land: `SetForegroundWindow` was refused because the
-Director was actively using another window at the time — Windows declines
-the steal in exactly that case, so this is a scheduling problem, not an
-environmental limit. Because `Application.runInBackground` is off, an
-unfocused build does not tick — two captures 75s apart came back
-pixel-identical, which is the tell. The click/picker path itself is
-unchanged code that Sprint 2 verified end-to-end with computed coordinates,
-and `LifecycleVerification` drives the real `PlaceTower`/`Tick`/emission
-path headlessly, so the mechanism is covered — but "click a slot in the
-running game and watch the counter stop at 10" is **the Director's to
-confirm**, and it is the first thing worth doing in the playtest.
+From the HUD after ~60s unattended, no towers placed: 11 pathogens in the
+lumen, **18 piled on the gut wall**, 12 loose in tissue, **6 breaches having
+released 11**, 32 excreted harmlessly, 0 reached base. All three bands
+render distinctly and the whole 100×40 field is on screen at once.
 
-Also unverified, deliberately: whether degranulation *reads* as
-intentionally different from a quiet retirement. The flash exists and is
-distinct in code; whether it lands as an event or as noise is a
-felt-experience question, which is exactly what `SPRINT_PLAN.md` says this
-sprint asks the Director.
+### What was NOT verified
 
-**Not re-verified this sprint**: WebGL (same as Sprints 1–2 — the brief
-prioritizes the Windows target).
+- **Nobody has watched a breach happen.** The counters prove bursts occur
+  and the harness proves they release everything at once, but the *visual*
+  build-then-burst — the sprint's whole question — has not been seen by a
+  human. It needs a sustained watch of one wall position, which is the
+  Director's playtest.
+- **Placement was not exercised through the running build's UI**, same as
+  Sprint 3: scripted clicks cannot take foreground focus while the machine
+  is in use. Unchanged code path, covered headlessly.
+- **Nothing reached the base in a 60s observation.** Expected — tissue
+  crossing takes ~70s+ at a 1s step and 0.7 toward-base weight — but it
+  means the endzone counter is unproven in a live build.
+- **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
 
-- **(New, Sprint 3) Clearing is ~50% slower per unit than in Sprint 2**, as
-  a direct and intended consequence of proximity contact — measured, see
-  "Contact-rate change" above. Arriving simultaneously with a population
-  cap, this is the most likely source of "the board feels like it's losing
-  ground." Tune `ContactRadiusFineTiles` (per-tower, default 2) first; do
-  not revert to coarse-slot detection.
-- **(New, Sprint 3) Placement was not exercised through the running build's
-  UI this sprint** — scripted clicks could not take foreground focus. See
-  "What was NOT verified" above. Unchanged code path, verified headlessly
-  and in Sprint 2's own session, but it is unconfirmed for this build.
-- **(New, 2026-08-21) A tower upgrade reaches its already-fielded children
-  instantly** — units hold a live reference to their tower's tuning, on the
-  Director's ruling. Nothing depends on it until an upgrade system exists,
-  but the semantics are now locked and verified.
-- **(New, Sprint 3) Every Sprint 3 number is a tuning default, not a
-  balance result** — `MaxActiveChildren` 10, neutrophil `KillLimit` 5,
-  macrophage `KillLimit` 20 (the one Director-confirmed value),
-  `DegranulationBurstMultiplier` 3, `ContactRadiusFineTiles` 2. All live on
-  `UnitProfile`/`UnitLifecycleTuning` as fields precisely so they can move.
-- Scene is still named `Sprint1.unity` (see "Scene" above) — cosmetic
-  only, not stale content. Unchanged through Sprint 3 for the same reason.
+- **(New, Sprint 4) A stale serialized field silently deleted the
+  playfield — fixed, but the class of bug is live.** `Sprint1.unity` still
+  carried Sprint 1's `columns: 30`, which beat Map 01's `columns = 100`
+  default, and because the outer bands clamp against axis length the whole
+  shortfall hit the middle: 25 base + 5 lumen + **0 tissue**. It ran, drew,
+  and threw nothing. `GameBootstrap.WarnOnDegenerateBands` now logs an
+  error, but note **`MapVerification` cannot catch this class of bug** — it
+  builds boards via `ConfigureForTest` and never loads the scene.
+- **(New, Sprint 4) Cytokine sensing is much weaker at map scale.** See
+  Build status. Measured, not tuned, per the mechanics-first instruction.
+- **(New, Sprint 4) Frame cost is vsync-capped and therefore unmeasured.**
+  8.35 ms is the refresh interval, not necessarily the cost.
+- **(New, Sprint 4) The base band is visually crowded.** Bone marrow slots,
+  the lymph node placeholder, and the HUD share a corner and overprint. A
+  dimming panel makes the HUD readable; the marrow labels still collide
+  with it. Wants a real layout pass — plausibly the first genuine job for a
+  dispatched Design agent, which this project has never used.
+- **(New, Sprint 4) All invasion numbers are unvalidated defaults** —
+  `InvasionTuning`'s adhesion chance/falloff, breach cadence and
+  per-pathogen chance, release spread limits, and advance weights. Grouped
+  in one file with `ResetToDefaults()` precisely so a tuning pass is cheap.
+- Scene is still named `Sprint1.unity` — cosmetic only, unchanged through
+  Sprint 4 for the same reason as before. Note it now also carries real
+  serialized state that matters (see the first item).
 - `Application.runInBackground` is unchecked (Unity default) — the game
-  pauses when its window loses focus. Not a bug, just worth knowing before
-  assuming a "frozen" build has crashed.
-- No multi-depth pathogen descent (still out of scope — adhesion row is
-  still chosen randomly at spawn, unchanged from Sprint 1).
-- No host cell health/fibrosis as a tracked numeric system — contact
-  damage exists since Sprint 2, but there's no fibrosis/scarring
-  consequence layered on top yet (explicitly out of scope, see
-  `SPRINT_PLAN.md`).
-- `UnityEngine.UI` is still not installed — bone marrow's picker and the
-  compartment labels are IMGUI, same reasoning as Sprint 1's HUD.
-- WebGL not re-verified this sprint (same as Sprints 1-2).
-- Pathogen class weights (`VirusChance`/`BacteriumChance`), combat numbers
-  (`ContactDamagePerHit`, `MaxHealth` per class), spread timing
-  (`IncubationSeconds`, `SpreadRetryIntervalSeconds`), and bone marrow
-  numbers (`BoneMarrowSlotCount`, `EmissionIntervalSeconds`) are all
-  judgment calls tuned for legibility within a short playtest, not
-  validated against balance — see `docs/TEAM_RETRO.md` for the reasoning
-  behind each, and expect all of them to be revisited once the ATP/economy
-  layer exists.
+  pauses when its window loses focus. Not a bug, but it means scripted
+  input/screenshot verification needs the machine otherwise idle.
+- No host cell health/fibrosis, no debris, no host-cell states — all
+  Sprint 5 (`GAME_DESIGN.md` §1c).
+- Class-specific pathogen advance (viral diffusion, intracellular bacteria
+  entering/leaving cells) is **not** built — all three classes advance
+  identically. Deferred with Sprint 5's state model, which it depends on.
+- `UnityEngine.UI` is still not installed — HUD, marrow picker and
+  compartment labels are IMGUI.
+- WebGL not re-verified (unchanged since Sprint 1).
+- Sprint 3's contact-rate reduction (~50% of Sprint 2's) and all Sprint 3
+  lifecycle numbers are unchanged and still unvalidated.
 - `Chemotaxis.GradientSharpness = 4f` and the infection-ramp constants in
-  `TissueGrid.cs` are unchanged from Sprint 1 — same caveats as before.
+  `TissueGrid.cs` are unchanged from Sprint 1 — and `GradientSharpness` is
+  now a candidate lever for the cytokine-range problem above.
 
 ## Addendum: what batchmode CLI can and can't do (still true)
 

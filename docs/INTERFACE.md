@@ -667,6 +667,129 @@ public fields on a reference type:
   exists so the two depletion paths are visually distinguishable; a
   neutrophil's death should read as an event, not as a unit vanishing.
 
+## Map 01 geometry (`ImmunologyTD.Grid.BoardConfig`, rewritten Sprint 4)
+
+Design: `GAME_DESIGN.md` §1a. The board is **100 × 40 coarse cells** in
+three lateral bands. `Rows` is no longer a `static const` — it is an
+instance property, and the `[Range(24,40)]` clamp on columns is gone.
+
+### The axis frame — read this before writing any movement code
+
+**Constraint, not a convention: no movement code may hardcode a direction.**
+Pathogen advance is specified as *toward the base*, and the base is a map
+property so later maps can put it anywhere (Director, 2026-08-21).
+
+| Member | Meaning |
+|---|---|
+| `ThreatAxis` | `Horizontal` or `Vertical` |
+| `BaseEnd` | Which end of that axis the base occupies |
+| `AxisIndex(CoarseCoord)` | **Distance from the base.** 0 = outermost base cell, always, whichever world side that is |
+| `CrossIndex(CoarseCoord)` | Lane index, perpendicular to the threat axis |
+| `AxisLength` / `CrossLength` | 100 / 40 on Map 01 |
+| `CoarseFromAxis(axis, cross)` | Inverse of the two above |
+| `OffsetInAxisFrame(c, dAxis, dCross)` | **The only sanctioned way to step along the threat axis.** `dAxis = -1` is always one cell toward the base |
+| `InAxisBounds` / `InCrossBounds` | Bounds in the frame |
+
+`AxisIndex` flips internally when `BaseEnd == Positive`, which is what makes
+"−1 is toward the base" true in both configurations while pointing at
+opposite world columns. `MapVerification` asserts exactly this on a mirrored
+board.
+
+### Bands
+
+`BaseBandCells` (25), `LumenBandCells` (25), `TissueBandCells` (derived,
+50). `BandAtAxisIndex(int)` / `BandOf(CoarseCoord)` return
+`BoardBand.Base | Tissue | Lumen`. Named edges: `TissueBaseEdgeAxisIndex`
+(where units enter), `TissueLumenEdgeAxisIndex`, `LumenNearWallAxisIndex`,
+and `LumenDepthFromInterface(...)` (0 = hugging the wall).
+
+**The outer two band sizes are clamped against the axis length, so a board
+too small to hold them silently starves the tissue band to zero.** That
+shipped once — see `ENGINE_STATUS.md` known issues.
+`GameBootstrap.WarnOnDegenerateBands` now logs an error for it.
+
+Lumen flow has its own end: `FlowCrossStep`, `LumenEntryCrossIndex`,
+`IsExcretedCrossIndex(int)`.
+
+`ConfigureForTest(columns, rows, axis, baseEnd, baseCells, lumenCells, flowEnd)`
+builds non-default geometry from code. Test/bootstrap only.
+
+## Gut interface (`ImmunologyTD.Grid.GutInterface`, new Sprint 4)
+
+One pile of adhered pathogens per lane; `PositionCount == CrossLength`.
+
+- `Adhere(position, pathogen)` / `Remove(pathogen)` — the latter for a
+  pathogen cleared while still on the wall.
+- `AdheredCountAt(position)`, `AdheredAt(position)`, `TotalAdhered`,
+  `PeakAdhered` — pressure, for the renderer and HUD.
+- `BreachChanceAt(position)` = `1 - (1 - PerPathogenBreachChance)^n`, so a
+  position's odds **rise with the pile on it**.
+- `Tick(deltaTime, currentTime)` — advances the roll clock, rolls every
+  occupied position when due, returns the positions that breached. The
+  clock is held at zero while the wall is clean, so the first pathogen to
+  adhere waits a full interval instead of catching a stale roll.
+- **`Breach(position, currentTime)` releases EVERY pathogen at that
+  position in one call** and returns how many entered tissue. This is
+  `SPRINT_PLAN.md` item 6's mechanic: **do not** reshape it into
+  per-pathogen rolls. A pathogen with nowhere to go stays on the wall
+  rather than being dropped. Public so a harness — or a future
+  player-triggered ability — can trip a position deterministically.
+- **`event Breached(position, releasedCount)`** — subscribe rather than
+  poll `BreachedThisTick`. Script execution order between `PathogenSpawner`
+  (which ticks this) and a renderer's `Update()` is undefined, so polling
+  drops roughly half the bursts, and an undrawn burst defeats the mechanic.
+
+## Invasion state and tuning (`ImmunologyTD.Pathogens`, new Sprint 4)
+
+**`InvasionTally`** — `Adhesions`, `Breaches`, `ReleasedIntoTissue`,
+`Excreted`, `ReachedBase`, plus `Reset()`. Drives the HUD; `ReachedBase` is
+this sprint's endzone counter (the 100-life pool is Sprint 5).
+
+**`InvasionTuning`** — every invasion number as a mutable static, with
+`ResetToDefaults()`: `LumenStepIntervalSeconds` 0.35,
+`AdhesionChanceAtWall` 0.12, `AdhesionFalloffCells` 5,
+`BreachRollIntervalSeconds` 1, `PerPathogenBreachChance` 0.012,
+`MaxReleaseAxisDepth` 3, `MaxReleaseCrossSpread` 20,
+`TissueStepIntervalSeconds` 1, and advance weights
+`AdvanceBaseWeight` 0.70 / `AdvanceLateralWeight` 0.13 / `AdvanceAwayWeight`
+0.04. **All are unvalidated defaults.** Harnesses that change them must
+call `ResetToDefaults()` afterwards.
+
+## Pathogen lifecycle (`PathogenAgent`, largely rewritten Sprint 4)
+
+`PathogenState` is now `Lumen | AtInterface | InTissue | Cleared`.
+
+- `Initialize(board, tissueGrid, gutInterface, tally, onExit, onSpreadRequested)`
+  — spawns into the lumen at the upstream end, at a random distance from
+  the wall.
+- `InitializeInTissueDirect(..., slot, pClass, currentTime)` — **renamed
+  from Sprint 2's `InitializeAdheredDirect`**, because "adhered" now means
+  the gut wall rather than tissue. Places directly into tissue, bypassing
+  lumen and wall; used by viral spread and by harness fixtures.
+- `SimulationTick(deltaTime, currentTime)` — explicit-time, harness-callable.
+  Lumen: step, then one adhesion roll. Tissue: step, then `TickCombat`.
+  `AtInterface`: deliberately does nothing — a colonising pathogen waits for
+  `GutInterface` to roll its position, it does not decide its own breach.
+- `static AdhesionChanceAt(lumenDepthFromInterface)` —
+  `AdhesionChanceAtWall * exp(-depth / falloff)`; side-effect-free so it can
+  be asserted directly.
+- `AdhereToInterface(position)` — leaves the flow and **moves to the wall**.
+  Public for deterministic harness setup.
+- `EnterTissueAt(slot, currentTime)` — the wall→tissue transition.
+- `CurrentCoarse`, `InterfacePosition` (−1 when not on the wall).
+
+Advance in tissue consults only the axis frame; reaching a `Base`-band cell
+despawns the pathogen and increments `InvasionTally.ReachedBase`.
+
+## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
+
+`MapVerification.RunAll` — 71 assertions over band layout, axis-frame
+round-tripping, lumen flow and excretion, proximity-gated adhesion, the
+breach burst, base-directed advance, and the reached-base event. Drives real
+production classes; builds its own boards via `ConfigureForTest` and
+**never loads the scene**, which is why it could not catch the stale
+serialized `columns` bug.
+
 ## Open questions for whoever builds on this next
 
 1. **~~Coarse `Row` vs. the four-compartment depth-5 model~~ — RESOLVED by
@@ -769,3 +892,23 @@ public fields on a reference type:
    macrophage `KillLimit` of 20 is Director-confirmed. All are fields on
    `UnitProfile`/`UnitLifecycleTuning`, never consts, so tuning them
    requires no code restructuring.
+11. **(New, Sprint 4) Cytokine sensing's range no longer matches the board.**
+    `CytokineField` is `strength / (1 + distance)` with no cutoff. That was
+    a steep gradient across a 30×5 board and is nearly flat across Map 01's
+    ~47-cell average separation, so sensing went from converging to zero
+    within a minute to merely trending downward over 2.5 minutes. Measured
+    numbers in `ENGINE_STATUS.md`. Not a code regression and deliberately
+    not tuned (mechanics first), but Sprint 1 built the whole upgrade ladder
+    on sensing feeling transformative, so this needs an answer before that
+    ladder is monetised.
+12. **(New, Sprint 4) Band sizes clamp inward, concentrating any shortfall
+    on the tissue band.** If the axis is too short to hold base + lumen, the
+    tissue band silently becomes zero cells and the game is unplayable while
+    appearing fine. Guarded at runtime now, but the clamping behavior itself
+    is unchanged — consider whether bands should be proportions rather than
+    absolute cell counts when a second map exists.
+13. **(New, Sprint 4) Nothing renders host-cell state, because there isn't
+    any.** Sprint 5 adds healthy/infected/dead and two-layer occupancy
+    (`GAME_DESIGN.md` §1c), which is a `TissueGrid` rewrite — it still holds
+    exactly one pathogen per coarse slot. Do not build on the current
+    occupancy model expecting it to survive.
