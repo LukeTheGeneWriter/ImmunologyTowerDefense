@@ -378,24 +378,34 @@ depleted at all.
 being longer-lived and less prone to this kind of terminal burst,
 macrophages get a higher kill-count threshold before retiring, and
 retirement is a clean removal (no collateral damage) rather than a
-degranulation event. This is this document's working default, not yet
-independently confirmed by the Director the way the neutrophil behavior
-was — flagged in case it should change.
+degranulation event. **Confirmed by the Director 2026-08-21** — the
+behavior as written, at a threshold of **20 kills** (four times the
+neutrophil's; an earlier drafted 15 read as too low).
 
-**Upgrades are the future payoff, not built yet.** The Director's
+**Upgrades are the future payoff, not built yet — but the numbers are
+parameterized for them now (Director, 2026-08-21).** The Director's
 explicit intent: neutrophil upgrades should eventually let a player
 **reduce degranulation's collateral damage**, or **trigger self-destruction
 deliberately at a chosen moment** (e.g. before an infection spreads,
 rather than waiting for the kill counter) instead of only ever being
-forced into it passively. Neither is in scope until an actual upgrade
-system exists — for now, degranulation always happens at the kill-count
-limit, always deals its baseline collateral damage, with no player control
-over timing.
+forced into it passively. Added to that list: **upgrading a progenitor to
+raise its cells' kill counts**, i.e. buying longer-lived output from one
+specific tower.
+
+No upgrade system exists yet, so none of these are purchasable. What the
+Director *did* rule is that the implementation must not foreclose them:
+every lifecycle number (max active children, both kill limits,
+degranulation burst) is **per-tower mutable state seeded from a per-unit-kind
+default**, never a hardcoded constant. An upgrade, when it lands, should
+be a write to one tower's field and nothing more. This is the concrete
+reason the cap is per-progenitor rather than systemic (see the top of this
+section) — a global cap would have nothing for such an upgrade to attach
+to.
 
 Numbers (max active children, neutrophil kill-count limit, macrophage
-kill-count limit, degranulation collateral damage) are tuning values, not
-derived — see `docs/SPRINT_PLAN.md` for the Sprint 3 starting figures and
-`BACKLOG.md` for what's still open.
+kill-count limit, degranulation collateral damage, contact radius) are
+tuning values, not derived — see `docs/SPRINT_PLAN.md` for the Sprint 3
+starting figures and `BACKLOG.md` for what's still open.
 
 ## 7. Spatial representation — LOCKED
 

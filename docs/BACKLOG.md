@@ -76,12 +76,24 @@ formal sprint plan (`docs/GAME_DESIGN.md` §6d has the full design):
   retirement** (higher threshold, no damage) — both free their tower's
   population slot.
 - Upgrade hooks (reduced degranulation damage, player-triggered timed
-  self-destruct) are named as the eventual payoff but explicitly deferred
-  until an upgrade system exists — not Sprint 3 scope.
+  self-destruct, and — added by the Director 2026-08-21 — raising a
+  specific progenitor's kill counts) are named as the eventual payoff but
+  explicitly deferred until an upgrade system exists. Not Sprint 3 scope,
+  **except** that Sprint 3 must keep every lifecycle number as per-tower
+  mutable state rather than a hardcoded const, so an upgrade is later just
+  a write to one tower's field.
 - Starting numbers (max active children = 10, neutrophil kill limit = 5,
-  macrophage kill limit = 15, degranulation burst = 3x contact damage) are
-  this document's working defaults, not all independently confirmed by the
-  Director — see `docs/SPRINT_PLAN.md` for which ones are flagged as such.
+  macrophage kill limit = **20** — raised from a drafted 15 by the
+  Director 2026-08-21, degranulation burst = 3x contact damage, contact
+  radius = 2 fine tiles) are working defaults, not balance-tested. The
+  macrophage limit is now Director-confirmed; the rest are not.
+- Two Sprint 2 gaps folded into Sprint 3 (2026-08-21) rather than
+  deferred: **kill attribution** (`PathogenAgent.ReceiveDamage` takes no
+  source, so nothing knows which unit landed a killing blow — required
+  infrastructure for kill-count depletion) and **coarse-slot contact
+  detection** (`INTERFACE.md` open question 3 — every unit in a 7×7 slot
+  damages the pathogen every tick; becoming a fine-tile proximity test
+  with a tunable radius).
 
 ## Deferred out of Sprint 2
 
