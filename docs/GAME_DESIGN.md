@@ -600,6 +600,77 @@ Whether per-kill income makes a passive "let them through" strategy
 non-viable — or whether it should — is a balance question for when the
 economy is real.
 
+## 5c. Antigen specificity — the 8-bit barcode — LOCKED (Director, 2026-08-21)
+
+§5a says knowledge is earned when a DC and a helper T cell meet. This
+section says **what decides whether a given meeting teaches anything**, and
+the answer is antigen specificity, modelled as a binary barcode.
+
+### The abstraction, and what it stands in for
+
+Real T cell receptor:MHC recognition is based on a **9mer of amino acids
+with 20 possibilities per position** — 20⁹, around half a trillion
+combinations. That is far too large to be a game mechanic. The Director's
+simplification: **an 8-bit binary barcode** (e.g. `01011100`), 256
+possible values.
+
+That is small enough to actually match by chance in a game, and large
+enough that a match *feels* like specificity rather than a formality. It
+keeps the essential fiction — a T cell recognises **one** antigen, not
+antigens in general — which is the thing the game needs the player to
+understand.
+
+### The loop
+
+1. **A helper T cell progenitor** (fictional — real helper T cells mature
+   in the thymus, not from a marrow progenitor; this is a deliberate
+   simplification for playability) emits a helper T cell. **Each one is
+   born with a random 8-bit barcode.**
+2. **A DC picking up debris auto-generates a barcode** from that debris —
+   the antigen it is now carrying.
+3. **The DC migrates to the lymph node**, where helper T cells are.
+4. **Both DCs and helper T cells home in on a shared, unique cytokine
+   signal** — a *different* cytokine from the one infected tissue secretes.
+   This is what makes them co-localise instead of relying on two random
+   walks happening to intersect in an open space.
+5. **When an antigen-loaded DC touches a helper T cell they pair for a few
+   turns and stop moving.** The pairing is visible and costs both of them
+   time.
+6. **If their barcodes match, pathogen knowledge increments.** If not, the
+   pairing simply ends and both move on.
+
+### Why the details matter
+
+- **The second cytokine is load-bearing, not decoration.** Two random
+  walkers finding each other in an open compartment is a much worse search
+  problem than a unit finding a stationary infection, and it would make
+  learning feel arbitrary. A shared chemotactic signal turns the lymph node
+  from "wait and hope" into a place where meetings reliably happen — and it
+  reuses the cytokine machinery the game already has.
+- **Pairing that freezes both units for a few turns is the cost model.**
+  Without it, a DC could brush past every T cell in the node in seconds and
+  specificity would be free. The pause is what makes a mismatched pairing
+  an actual loss.
+- **Helper T cells get a lifespan, and the progenitor keeps emitting new
+  ones.** This is what creates **barcode turnover**: the population of
+  barcodes in the node keeps changing, so a player who currently has no T
+  cell matching the pathogen they are facing is not permanently stuck —
+  wait, and the repertoire refreshes. It also means a long-lived infection
+  is eventually matched, which is the right outcome.
+
+### Numbers not yet chosen
+
+Barcode length is fixed at 8 by the Director. Still open: how many bits
+must match (exact match, or a threshold like ≥6 of 8?), pairing duration,
+knowledge increment per successful match, helper T cell lifespan, how many
+T cells populate the node, and the second cytokine's range and decay.
+
+**An exact-match rule on 8 bits means a 1-in-256 chance per pairing**,
+which combined with pairing time could make learning glacial. A Hamming
+threshold is the obvious dial if that proves too slow — flagged here so
+whoever tunes it knows the lever exists rather than reaching for barcode
+length.
+
 ## 6. Tissue recovery and fibrosis — LOCKED in principle
 
 Host cells refill damaged coordinates between rounds. Damage is inevitable

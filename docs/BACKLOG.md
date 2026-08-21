@@ -256,3 +256,27 @@ Sprint 1.
   becomes a real variable — a sparse node learns slowly however much
   antigen arrives. Worth watching for whether that is interesting or just
   another thing to wait on.
+
+## Opened by the barcode design (2026-08-21)
+
+`GAME_DESIGN.md` §5c fixes barcode length at 8 bits. Still unchosen, all
+Sprint 7 or later:
+
+- **Match rule.** Exact 8-bit match is **1 in 256 per pairing**, which
+  combined with pairing downtime could make learning glacial. A Hamming
+  threshold (≥6 of 8, say) is the dial to reach for before changing barcode
+  length. Needs a decision informed by how many T cells are in the node and
+  how fast DCs cycle.
+- **Pairing duration** ("a few turns") — the cost of a mismatch.
+- **Knowledge increment** per successful match, and how it maps onto §5's
+  threshold ladder.
+- **Helper T cell lifespan**, which sets the barcode turnover rate. This is
+  the safety valve that stops a player being permanently unable to match a
+  pathogen, so it needs to be short enough to matter.
+- **T cell population in the node**, and whether the helper T progenitor
+  shares the bone marrow's slot budget or has its own.
+- **The second cytokine's range and decay.** It is a different signal from
+  the infected-tissue cytokine and needs its own field; note the existing
+  field is `strength / (1 + distance)` with no cutoff, which was measured
+  as too flat at large scale (see the Sprint 4 entry above).
+- **Whether a spent DC dies or returns empty** (carried over from §5a).
