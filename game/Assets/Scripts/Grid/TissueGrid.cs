@@ -263,7 +263,7 @@ namespace ImmunologyTD.Grid
         /// collateral all funnel here, so "killing an infected cell leaves
         /// debris" cannot be true on one path and false on another.
         /// </summary>
-        public bool KillHostCell(CoarseCoord c, float currentTime)
+        public bool KillHostCell(CoarseCoord c)
         {
             if (!IsHostGround(c)) return false;
             var previous = host[c.Column, c.Row];
@@ -272,6 +272,13 @@ namespace ImmunologyTD.Grid
             if (previous == HostState.Healthy) HealthyCount--;
             else if (previous == HostState.Infected) InfectedCount--;
 
+            // Whatever was living inside dies with the cell -- GAME_DESIGN.md
+            // section 4a's whole point about innate clearing of intracellular
+            // infections being destructive. Detach BEFORE notifying, so the
+            // pathogen's own clear path (which calls back in here) finds an
+            // already-dead cell and stops.
+            var resident = intracellular[c.Column, c.Row];
+
             host[c.Column, c.Row] = HostState.Dead;
             intracellular[c.Column, c.Row] = null;
             infectionStartTime[c.Column, c.Row] = -1f;
@@ -279,6 +286,8 @@ namespace ImmunologyTD.Grid
             debrisAmount[c.Column, c.Row] = FullDebris;
             emptySince[c.Column, c.Row] = -1f;
             DeadCount++;
+
+            if (resident != null) resident.OnHostCellDestroyed();
             return true;
         }
 
@@ -288,7 +297,7 @@ namespace ImmunologyTD.Grid
         /// Reaching zero kills the cell and leaves debris.
         /// </summary>
         /// <returns>True if this damage killed the cell.</returns>
-        public bool DamageHostCell(CoarseCoord c, float amount, float currentTime)
+        public bool DamageHostCell(CoarseCoord c, float amount)
         {
             if (!IsHostGround(c) || amount <= 0f) return false;
             var state = host[c.Column, c.Row];
@@ -296,7 +305,7 @@ namespace ImmunologyTD.Grid
 
             hostHealth[c.Column, c.Row] -= amount;
             if (hostHealth[c.Column, c.Row] > 0f) return false;
-            return KillHostCell(c, currentTime);
+            return KillHostCell(c);
         }
 
         /// <summary>
@@ -350,7 +359,7 @@ namespace ImmunologyTD.Grid
             switch (state)
             {
                 case HostState.Dead:
-                    KillHostCell(c, currentTime);
+                    KillHostCell(c);
                     break;
                 case HostState.Empty:
                     BecomeEmpty(c, currentTime);

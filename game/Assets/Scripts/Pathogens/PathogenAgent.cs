@@ -119,6 +119,20 @@ namespace ImmunologyTD.Pathogens
         public float Health { get; private set; }
         public float MaxHealth { get; private set; }
 
+        /// <summary>
+        /// True when this pathogen is INSIDE a host cell -- on TissueGrid's
+        /// host layer (the cell is `Infected` and holds a reference to this
+        /// agent), not on its occupant layer, and not rendered as itself
+        /// (GAME_DESIGN.md section 4a).
+        ///
+        /// This is the state that makes the two layers worth having: an
+        /// intracellular bacterium flips between here and the occupant layer
+        /// repeatedly over its life, and while it is in here the position it
+        /// sits at is simultaneously "an infected host cell" and "a free
+        /// occupant slot something else can walk through."
+        /// </summary>
+        public bool IsIntracellular { get; private set; }
+
         private Vector3 moveStartWorld;
         private Vector3 moveEndWorld;
         private float moveElapsed;
@@ -166,6 +180,33 @@ namespace ImmunologyTD.Pathogens
         /// not restart on every step. See TissueGrid.TryAdhere's comment.</summary>
         private float infectionStartTime;
         private float lastSpreadAttemptTime = float.NegativeInfinity;
+
+        /// <summary>When this virus last became a FREE particle (occupant
+        /// layer, no host). InvasionTuning.VirusFreeSurvivalSeconds after
+        /// this, it dies. Half of the firebreak.</summary>
+        private float freeSinceTime;
+
+        /// <summary>When an intracellular bacterium entered its current host
+        /// cell. It lyses out after
+        /// InvasionTuning.IntracellularResidenceSeconds, killing the
+        /// cell.</summary>
+        private float hostEntryTime;
+
+        /// <summary>Shuffle buffer for the five cell-to-cell spread
+        /// candidates (own cell + four von Neumann neighbours), reused so a
+        /// virus's per-step host search allocates nothing
+        /// (GAME_DESIGN.md section 8).</summary>
+        private readonly int[] hostSearchOrder = { 0, 1, 2, 3, 4 };
+
+        /// <summary>The five candidates above as (deltaAxis, deltaCross)
+        /// pairs in the AXIS FRAME. Index 0 is "stay here." The four steps
+        /// are symmetric and equally weighted, which is what "spreads in all
+        /// directions with no base bias" means -- there is deliberately no
+        /// toward-base term anywhere in the viral path.</summary>
+        private static readonly (int axis, int cross)[] SpreadOffsets =
+        {
+            (0, 0), (-1, 0), (1, 0), (0, -1), (0, 1),
+        };
 
         // ------------------------------------------------------------------
         // Initialization
@@ -238,13 +279,41 @@ namespace ImmunologyTD.Pathogens
             lastSpreadAttemptTime = float.NegativeInfinity;
 
             infectionStartTime = currentTime;
-            tissueGrid.TryClaimOccupant(slot, this, infectionStartTime);
             CurrentCoarse = slot;
             Current = board.CoarseCenterFine(slot);
             State = PathogenState.InTissue;
-            ApplyRestColorForCurrentClass();
+            SettleIntoTissue(slot, currentTime);
             SnapTo(board.CoarseToWorldCenter(slot));
             stepTimer = Random.Range(0f, InvasionTuning.TissueStepIntervalSeconds);
+        }
+
+        /// <summary>
+        /// Decides which of the two layers this pathogen lands on when it
+        /// arrives in tissue -- the first place Sprint 5's class split shows
+        /// up (GAME_DESIGN.md section 1b step 4).
+        ///
+        ///  - A **virus** takes the host cell if it is `Healthy`, becoming
+        ///    intracellular immediately. If there is no healthy cell here it
+        ///    lands as a free particle on the occupant layer and starts
+        ///    dying.
+        ///  - **Both bacteria** land on the occupant layer, visible and
+        ///    walking. An intracellular bacterium may go inside a cell later,
+        ///    on one of its own steps.
+        /// </summary>
+        private void SettleIntoTissue(CoarseCoord slot, float currentTime)
+        {
+            if (Class == PathogenClass.IntracellularVirus && tissueGrid.TryInfect(slot, this, currentTime))
+            {
+                IsIntracellular = true;
+                hostEntryTime = currentTime;
+            }
+            else
+            {
+                IsIntracellular = false;
+                freeSinceTime = currentTime;
+                tissueGrid.TryClaimOccupant(slot, this, infectionStartTime);
+            }
+            ApplyRestColorForCurrentClass();
         }
 
         private void BindContext(
@@ -627,8 +696,49 @@ namespace ImmunologyTD.Pathogens
 
         private void ClearFromCombat()
         {
+            // State goes first, deliberately: KillHostCell notifies its
+            // resident via OnHostCellDestroyed, and that method's
+            // already-Cleared guard is what stops this from exiting twice
+            // and double-releasing into the pool.
             State = PathogenState.Cleared;
-            tissueGrid.ReleaseOccupant(CurrentCoarse);
+
+            if (IsIntracellular)
+            {
+                // Innate clearing of an intracellular infection is
+                // destructive -- the only way to reach the pathogen is
+                // through the cell, so the cell dies and leaves debris
+                // (GAME_DESIGN.md sections 1c and 4a). The non-destructive
+                // path (ReleaseIntracellular, cell survives) belongs to
+                // adaptive immunity's precise MHC-I killing and is not built.
+                IsIntracellular = false;
+                tissueGrid.KillHostCell(CurrentCoarse);
+            }
+            else
+            {
+                tissueGrid.ReleaseOccupant(CurrentCoarse);
+            }
+
+            onExit?.Invoke(this);
+        }
+
+        /// <summary>
+        /// The host cell this pathogen was living inside has just been
+        /// destroyed, so this pathogen dies with it -- an intracellular
+        /// infection cannot outlive its host (GAME_DESIGN.md section 4a:
+        /// clearing an intracellular infection is destructive by nature,
+        /// because the only way to reach it is through the cell).
+        ///
+        /// Called by TissueGrid.KillHostCell, which has ALREADY detached
+        /// this agent from the host layer before calling -- deliberately, so
+        /// that nothing here calls back into the grid and finds a
+        /// half-updated cell. That is why this does not release anything: it
+        /// only tears down its own state and returns to the pool.
+        /// </summary>
+        public void OnHostCellDestroyed()
+        {
+            if (State == PathogenState.Cleared) return;
+            State = PathogenState.Cleared;
+            IsIntracellular = false;
             onExit?.Invoke(this);
         }
 

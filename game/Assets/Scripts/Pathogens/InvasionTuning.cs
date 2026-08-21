@@ -117,6 +117,67 @@ namespace ImmunologyTD.Pathogens
         /// rather than as a random walk.</summary>
         public static float AdvanceAwayWeight = 0.04f;
 
+        // -- Class-specific advance (SPRINT_PLAN.md Sprint 5 item 5) --
+        // GAME_DESIGN.md section 1b step 4 was deferred out of Sprint 4
+        // because it needs host states. These are the numbers it needs.
+
+        /// <summary>How long a FREE virus particle -- one on the occupant
+        /// layer, between hosts -- survives without finding a healthy cell
+        /// before it dies. This is half of the firebreak: a virus can only
+        /// move into a `Healthy` neighbour (the other half), so a virus
+        /// surrounded by dead ground cannot move at all and this timer is
+        /// what finishes it off.
+        ///
+        /// 6s is a judgment call: at the 1s tissue step it gives a virus
+        /// about six chances to find a host, which is enough that a breach
+        /// landing next to intact tissue reliably takes hold, and short
+        /// enough that a viral front stalling against a dead band visibly
+        /// dies out inside a playtest rather than sitting there.
+        ///
+        /// **Do not implement the firebreak as a check.** It is emergent
+        /// from this value plus TissueGrid.IsHealthyHost, exactly as
+        /// GAME_DESIGN.md section 1b step 4 requires.</summary>
+        public static float VirusFreeSurvivalSeconds = 6f;
+
+        /// <summary>Per-step chance that an intracellular bacterium standing
+        /// on a healthy host cell goes inside it (GAME_DESIGN.md section 1b
+        /// step 4: "biased when out, hidden when in"). 0.5 means it
+        /// typically walks one or two cells between hiding places, so both
+        /// halves of its behaviour are visible in a short watch -- at 1.0 it
+        /// would vanish the instant it entered tissue and the player would
+        /// never see it move.</summary>
+        public static float IntracellularEntryChance = 0.5f;
+
+        /// <summary>How long an intracellular bacterium stays inside a host
+        /// cell before lysing out of it. On exit the host cell DIES and
+        /// leaves debris, and the bacterium reappears on the occupant layer
+        /// and resumes walking.
+        ///
+        /// The exit is a judgment call: GAME_DESIGN.md describes going in
+        /// and being hidden but never says how a bacterium comes back out,
+        /// and without an exit it would enter the first cell it met and
+        /// never be seen again -- which would make "visible when out" dead
+        /// code. Lysis is the biologically obvious answer and it is also the
+        /// sprint's main source of debris in tissue that no immune cell has
+        /// reached yet.</summary>
+        public static float IntracellularResidenceSeconds = 12f;
+
+        /// <summary>Damage a LARGE bacterium does to the host cell it is
+        /// standing on, per tissue step, as it grazes its way toward the
+        /// base. Against TissueTuning.HostCellMaxHealth of 10 that is four
+        /// steps on one cell to kill it.
+        ///
+        /// GAME_DESIGN.md section 4a says a large bacterium "kills and
+        /// directly occupies one coarse slot"; section 1c's two-layer model
+        /// says it passes over ground that still holds living cells. This
+        /// number is how those are reconciled -- it kills, but not
+        /// instantly, so a bacterium that keeps moving leaves damaged tissue
+        /// rather than a scorched trail, while one that gets held up at a
+        /// contested line kills what it is standing on. Set it to 0 to
+        /// restore Sprint 4's exact behaviour (a bacterium that never
+        /// touches the host layer at all).</summary>
+        public static float LargeBacteriumHostDamagePerStep = 2.5f;
+
         /// <summary>Restores every value above. Called by harnesses that
         /// override a value for one group of assertions so they cannot leak
         /// into the next group.</summary>
@@ -133,6 +194,10 @@ namespace ImmunologyTD.Pathogens
             AdvanceBaseWeight = 0.70f;
             AdvanceLateralWeight = 0.13f;
             AdvanceAwayWeight = 0.04f;
+            VirusFreeSurvivalSeconds = 6f;
+            IntracellularEntryChance = 0.5f;
+            IntracellularResidenceSeconds = 12f;
+            LargeBacteriumHostDamagePerStep = 2.5f;
         }
     }
 }
