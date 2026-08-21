@@ -177,3 +177,26 @@ Sprint 1.
   but no rate. Needed before §6 tissue recovery is buildable.
 - **Debris dissipation rate.** "Slowly" needs a number — slow enough that
   macrophage clearance is clearly the better answer.
+
+## Flagged for later, opened 2026-08-21 (Director)
+
+- **"Don't eat me" signals as the clearance/sampling tuning lever.**
+  Apoptotic cells display signals that suppress phagocytic clearance.
+  Mechanically this is the natural knob on the macrophage-clearance vs.
+  DC-sampling ratio (`GAME_DESIGN.md` §1c): debris that resists being eaten
+  persists longer, biasing its eventual fate toward sampling rather than
+  silent disposal. Two obvious future uses — a player-side upgrade, and a
+  pathogen trait (a pathogen inducing strong "don't eat me" signalling
+  would clog tissue with debris nobody can clear). **Explicitly flagged for
+  later by the Director; not scoped, not costed.**
+- **Macrophage presentation efficiency vs. DC.** Macrophages can sample and
+  present debris but inefficiently, so the player manages a *ratio* rather
+  than choosing between unit types. The actual efficiency gap is a number
+  nobody has picked, and it decides whether a macrophage-only defence
+  learns slowly or effectively not at all.
+- **Passive lymphatic drainage rate.** Debris drains to the lymph node on
+  its own and is silently deleted there by resident macrophages — no
+  knowledge gained. The drainage rate therefore sets how much antigen is
+  *lost* to inaction, which is the pressure that makes deliberate shuttling
+  worth paying for. Needs a number, and needs to be visible enough that a
+  player understands why their knowledge is not accruing.

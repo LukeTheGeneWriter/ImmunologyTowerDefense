@@ -304,6 +304,53 @@ being instant while clearance takes time) is a **balance question for
 whenever this is built** — not resolved here, and not in Sprint 4 or 5.
 
 
+### Antigen presentation is a spectrum, not a DC monopoly (Director, 2026-08-21)
+
+Refinement of the above. Dendritic cells are not the only cell that can
+sample and present debris — they are the *efficient* one.
+
+- **Macrophages can also sample and present debris, but very
+  inefficiently.** So the player is not choosing between "clearing" and
+  "learning" as separate unit types; they are choosing a **ratio**. A
+  macrophage-heavy defence still learns, just slowly. A DC-heavy one learns
+  fast but does less clearing. Neither extreme is a dead end, which is a
+  better shape than a hard either/or.
+- **Debris also drains passively into the lymph node** — sweeping there on
+  its own rather than being deliberately shuttled by a professional antigen
+  presenting cell. **Macrophages in the lymph node silently delete that
+  debris**: it is disposed of without anything being learned from it.
+
+That second rule is the important one, because it makes passive drainage a
+**knowledge sink rather than a free trickle of learning**. Debris that
+nobody deliberately carries is not merely slower to teach you something —
+it teaches you nothing at all, and then it is gone. Learning requires
+*active* shuttling. Without this, adaptive immunity would eventually come
+online on its own no matter how the player played, and the whole antigen
+economy would be decorative.
+
+Net effect: three ways debris can end, only one of which produces
+knowledge.
+
+| Fate of debris | Tissue recovered | Knowledge gained |
+|---|---|---|
+| Cleared by a macrophage in tissue | yes | a little (inefficient presentation) |
+| Shuttled to the lymph node by a DC | yes | yes, efficiently |
+| Drains passively, deleted by lymph node macrophages | yes | **none** |
+| Left alone (slow self-dissipation) | eventually | none |
+
+### "Don't eat me" signals — flagged for later, not scoped
+
+Apoptotic cells display **"don't eat me" signals** that suppress
+phagocytic clearance. Mechanically this is a lever on the
+macrophage-clearance vs. DC-sampling ratio above: debris that resists
+being eaten persists longer, which biases its eventual fate toward
+sampling rather than silent disposal.
+
+Recorded now because it is the natural tuning knob for that ratio — and a
+plausible upgrade or pathogen trait later (a pathogen that induces strong
+"don't eat me" signalling would clog tissue with unclearable debris).
+**Not scoped, not costed, not in Sprint 4 or 5.** See `BACKLOG.md`.
+
 ## 2. Tower / unit lifespan model — LOCKED
 
 Adopts the Bloons division between a persistent tower and a transient thing
