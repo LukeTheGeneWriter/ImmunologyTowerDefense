@@ -1,211 +1,154 @@
-# Sprint Plan — Sprint 4
+# Sprint Plan — Sprint 5
 
-## Sprint 3 — closed 2026-08-21
+## Sprint 4 — closed 2026-08-21
 
-Delivered: per-progenitor population cap, kill-count depletion (neutrophil
-degranulation / macrophage retirement), kill attribution, and fine-tile
-proximity contact. Verified 79/79 headless, both prior harnesses clean,
-Windows build good. The Director playtested and reported: population is
-under control, immune cells overwhelmingly win, and **balance tuning is
-explicitly deferred** — mechanics first. Full history in
-`docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
+Delivered Map 01's geometry and the invasion loop: three lateral bands,
+lumen flow, proximity-gated adhesion, wall accumulation, the per-position
+breach burst, and base-directed advance. Verified 71/71 new assertions plus
+both prior harnesses. **The Director playtested and confirmed the rupture
+mechanic reads** — the sprint's whole question, answered yes.
 
-Same-day follow-up, already shipped: progenitor upgrades now apply
-instantly to a tower's living children as well as its future ones
-(`GAME_DESIGN.md` §6d).
+Same-day follow-up, already shipped: the board shrank from 100×40 to
+**25×10** (bands 6 | 13 | 6, keeping the proportions), which made units
+properly readable and got pathogens actually reaching the base within a
+short session.
 
-## Direction for Sprint 4 (Director, 2026-08-21)
+## Direction for Sprint 5 (Director, 2026-08-21)
 
-**Build Map 01's real geometry.** The Director specified the map, which
-resolved the axis ambiguity that had been open since Sprint 1 — read
-`GAME_DESIGN.md` **§1a, §1b, and §1c** before anything else; they are the
-authority for this sprint and this document is the implementation brief for
-them.
+The Director named three things for the next stretch — **debris, the
+progenitor buying tab, and lymphatic migration** — and approved splitting
+them across three sprints, because they form a hard dependency chain:
 
-The short version: a 100×40 grid of host cells in three lateral bands —
-**base** (leftmost 25 columns: bone marrow, lymph node, immune cell entry,
-and the lose condition), **tissue** (middle 50), **lumen** (rightmost 25).
-Pathogens flow top-to-bottom down the lumen for free, adhere to the gut
-interface with a proximity-gated chance, accumulate there, and **burst into
-the tissue when a boundary position's breach roll trips**. In tissue they
-make a strongly biased random walk **toward the base**.
+- **Sprint 5 (this one): host-cell states and debris.** Debris *is* a dead
+  host cell, and `TissueGrid` currently has no concept of a host cell at
+  all, so §1c's state model has to land first.
+- **Sprint 6: ATP economy + the progenitor buying tab**, and very likely
+  the round loop, since `GAME_DESIGN.md` §5b's "ATP from starting a round"
+  has nothing to attach to without one.
+- **Sprint 7: lymphatic migration** — the DC shuttle of §5a. Blocked until
+  debris exists, because debris is what a DC picks up.
 
-## Scope split — why this is Sprint 4 and not one giant sprint
-
-The Director's 2026-08-21 design covers more than one sprint's worth of
-work. It is split so something is playable at the end of each:
-
-- **Sprint 4 (this one): the map and the invasion loop.** Geometry, bands,
-  lumen flow, proximity adhesion, boundary accumulation, per-position
-  breach, base-directed advance. All three pathogen classes move the same
-  way for now.
-- **Sprint 5 (next): the tissue state model.** Host cells as
-  healthy/infected/dead with two-layer lattice occupancy (`GAME_DESIGN.md`
-  §1c), which then enables the class-specific advance behaviors of §1b step
-  4 — viral diffusion that dies without a host, intracellular bacteria
-  entering and leaving cells — plus debris and the real life pool.
-
-**Do not pull Sprint 5's work forward.** §1c's two-layer occupancy is a
-`TissueGrid` rewrite (it currently holds exactly one pathogen per coarse
-slot and has no host-cell concept whatsoever), and doing it at the same
-time as the geometry change would make both unreviewable.
+Read `GAME_DESIGN.md` **§1c** before anything else. It is the authority for
+this sprint; this document is the implementation brief for it.
 
 ## Scope
 
-**1. Board geometry: 100×40 with three bands.** `BoardConfig` currently
-hardcodes `Rows = 5` as a const and clamps columns to 24–40. Both go. The
-board becomes 100 coarse columns × 40 coarse rows, still 7×7 fine
-subdivision, with a **band concept**: which columns are base, tissue, and
-lumen. Bands must be data, not magic numbers scattered through the code — a
-later map will use different proportions.
+**1. Two-layer lattice occupancy — the structural change.** Per §1c, each
+coarse position holds **two independent slots**:
 
-Scale is confirmed by the Director: **100×40 counts host cells, not
-sub-lattice tiles.** So the tissue band is 50×40 = 2,000 host cells, and the
-full field is 4,000 — roughly 10× Sprint 3's board. See `GAME_DESIGN.md`
-§1a's scale note: at the existing 0.12s tick this puts a neutrophil at ~14s
-to cross the tissue laterally and a macrophage at ~42s, which is the
-intended spread. **Do not change `TickIntervalSeconds`, `FineSubdivision`,
-or unit speeds to "fix" that** — it is the design.
+- **Host layer:** `Healthy` | `Infected` | `Dead` (debris) | `Empty`.
+- **Occupant layer:** extracellular things — a large bacterium, an
+  intracellular bacterium currently *outside* a cell, a free virus
+  particle between hosts.
 
-**2. Camera and rendering at the new scale.** The field is 2.5:1; it fits
-16:9 at roughly 28px per coarse cell. **This is the sprint's main
-performance risk** — 4,000 coarse cells rendered, plus a cytokine field over
-all of them, against a hard project requirement that everything is pooled
-from first implementation (`GAME_DESIGN.md` §8, restated in `CLAUDE.md`).
-Sprint 1–3's `BoardRenderer` was written for 150 cells. Measure the frame
-cost and report it as a number; if per-cell `SpriteRenderer`s do not hold
-up, say so with measurements rather than silently redesigning.
+`TissueGrid` today holds exactly one `PathogenAgent` per coarse slot and
+nothing else. That single-occupant model is what this sprint replaces.
 
-**3. "Direction of the base" as a map property.** The Director was explicit
-that pathogen advance is specified as *toward the base*, **not** as
-*leftward*, so later maps can put the base anywhere without touching
-pathogen code. **No movement code may hardcode a leftward or negative-X
-assumption.** Expose the base direction (or the base region) from the map /
-board config and have movement consult it. This is an architectural
-requirement, not a style preference — call it out in `INTERFACE.md`.
+**Why two layers and not one enum** (§1c has the full argument, but it is
+the thing most likely to get "simplified" away): the states genuinely
+co-occur. A bacterium crawling toward the base passes **over ground that
+still holds living host cells** — tissue is packed with cells and bacteria
+squeeze between them. "Occupied by bacteria" and "occupied by a healthy
+cell" are simultaneously true, and one enum cannot say that.
 
-**4. Lumen flow.** Pathogens enter at the top of the lumen band and are
-carried **downward**. A pathogen that reaches the bottom is excreted —
-despawned, no penalty, per `handoff-map01-intestine.md` §1's
-deliberately-kept "transit is not a fail state." While in the lumen a
-pathogen cannot be attacked and does not interact with tissue.
+Immune cells are tracked on the fine lattice and are **not** part of either
+layer. Do not fold them in.
 
-**5. Proximity-gated adhesion.** Per `GAME_DESIGN.md` §1b step 1: a
-pathogen's chance to adhere depends on **its distance from the gut
-interface** — near the boundary it likely adheres, far out in the channel it
-likely does not. On adhering it **moves to the boundary** and stays there,
-colonising the interface. Curve shape is yours to choose; state what you
-chose and why, and make it tunable.
+**2. Host cells exist and can die.** The tissue band starts full of
+`Healthy` host cells. An infected cell that is cleared, or a cell damaged
+past its limit, becomes `Dead` and leaves debris. Sprint 2's existing
+"infected slot" concept (which is currently just "a slot with an
+intracellular pathogen in it") should become a real `Infected` host state
+that the pathogen occupies rather than replaces.
 
-**6. Per-position breach that releases everything at once.** Per §1b step 2:
-**each boundary position has its own breach chance**, rolled per tick or
-every X ticks. When it trips, **every pathogen adhered at that position is
-released into the first tissue column at once.**
+Keep the existing cytokine behaviour working: infected cells secrete, the
+heatmap reads off that, and `Chemotaxis` biases toward it. That mechanism
+predates this sprint and must survive it.
 
-The burst is the point, not an implementation detail — pressure must
-*visibly build* at a position and then break. Do not "simplify" this into
-per-pathogen independent invasion rolls; that produces a trickle and
-destroys the mechanic. Rolling less often with a correspondingly larger
-chance is fine (and cheaper across 40 boundary positions) — rolling
-per-pathogen is not.
+**3. Debris behaves as terrain, per §1c's locked rules.**
+- **Blocks host-cell regeneration.** A position holding debris cannot
+  regrow a host cell until the debris is gone.
+- **Macrophages clear it** — efferocytosis, the macrophage's real second
+  job. This deliberately puts the same units doing the killing in
+  competition with themselves; that tension is the point, not a problem to
+  design around.
+- **It also dissipates on its own, slowly** — slow enough that macrophage
+  clearance is clearly the better answer, but present so a player who never
+  invests in clearance is not permanently locked out of their own tissue.
+- Make debris **visually distinct** from healthy tissue, infected tissue,
+  and bare ground. Four host states now share one cell; if the Director
+  cannot tell them apart at a glance the model is invisible.
 
-Make an accumulating boundary position visibly distinct from an empty one,
-so the player can see danger forming.
+**4. Host-cell regeneration.** Bare `Empty` ground regrows a `Healthy`
+cell over time. Rate is a tuning value nobody has chosen — pick one, state
+why, make it a field. Debris blocks it (item 3).
 
-**7. Base-directed advance in tissue.** Per §1b step 3: a pathogen in tissue
-performs a **strongly biased random walk toward the base**. All three
-classes move this way this sprint — the class-specific behaviors (§1b step
-4) need Sprint 5's host-cell states and are explicitly deferred. Bias
-strength is tunable, not a const.
+**5. Class-specific advance, now that it is possible.** §1b step 4 was
+deferred out of Sprint 4 precisely because it needs host states:
+- **Viruses spread cell-to-cell in all directions with no base bias**, and
+  **die if they do not find a host quickly.** A virus can only spread into
+  a `Healthy` neighbour, so a viral front advances through intact tissue
+  and **cannot cross ground it has already killed** — dead tissue is a
+  firebreak. That behaviour is emergent from the two rules; do not script
+  it.
+- **Intracellular bacteria** use the base-biased walk while *outside* a
+  cell, and are hidden (occupying an `Infected` host) while inside.
+- **Large bacteria** keep the Sprint 4 base-biased walk, visible
+  throughout.
 
-**8. Compartments move into the base band.** Bone marrow and the lymph node
-placeholder currently render below and to the right of the board as
-free-floating strips. They belong in the base band now. Immune cells enter
-tissue at the **base-side edge of the tissue band**, not at the old
-"blood-adjacent deepest fine row." Keep placement working exactly as it does
-today — click an empty slot, pick a kind — this is a relocation, not a
-redesign.
+**6. Fix the base-band layout.** The 25×10 resize left the bone marrow
+strip, its tower boxes, and the lymph node backdrop sized for the old
+proportions — they overlap each other and spill across the board. This is
+small, visible, and in the Director's way every time he plays.
 
-**9. Reaching the base is a real event, minimally.** A pathogen that reaches
-the base band despawns and increments a visible counter in the HUD. **The
-100-life pool and the actual lose condition are Sprint 5** — this sprint
-only needs the endzone to exist and register, so the loop is observable end
-to end.
+**7. Explicitly not in scope.** ATP, economy, prices, the buying tab, the
+round loop (all Sprint 6). Dendritic cells, lymphatic migration, T/B cells,
+knowledge accrual (all Sprint 7). "Don't eat me" signals. Fibrosis as a
+distinct system beyond debris. Parasites. Balance tuning — **the
+Director's standing instruction is still mechanics first.**
 
-**10. Explicitly not in scope.** Host cell states / two-layer occupancy
-(§1c). Debris. Class-specific advance (§1b step 4). The life pool and lose
-condition. Balance tuning of any kind — **the Director's standing
-instruction is mechanics first, and immune cells currently winning easily is
-known and accepted** (`BACKLOG.md`). Any upgrade system, ATP, economy.
-Parasites. Adaptive immunity.
-
-Everything Sprints 1–3 built must keep working: per-tower population caps,
-kill-count depletion and degranulation, kill attribution, proximity contact,
-cytokine sensing + heatmap, pooling, the `C` toggle.
+Everything Sprints 1–4 built must keep working: the three bands, lumen flow
+and excretion, proximity adhesion, the breach burst, base-directed advance,
+per-tower population caps, kill-count depletion and degranulation, kill
+attribution, proximity contact, cytokine sensing + heatmap, pooling.
 
 ## Stopping point (definition of done)
 
-- [x] The board is 100×40 host cells in three visually distinct bands, and
-      the whole field is legible on screen at once.
-- [x] Pathogens flow down the lumen and are excreted at the bottom with no
-      penalty.
-- [x] Adhesion probability visibly depends on distance from the interface —
-      pathogens hugging the boundary adhere far more often than ones out in
-      the channel.
-- [ ] Adhered pathogens accumulate at boundary positions, and an
-      accumulating position looks different from an empty one.
-- [x] A breach releases **every** pathogen at that position simultaneously,
-      as a visible burst, not a trickle.
-- [x] Pathogens in tissue advance toward the base by a biased random walk,
-      and **nothing in the movement code hardcodes "left"** — moving the
-      base in config moves the advance direction with it.
-- [x] Bone marrow and lymph node sit in the base band; placement still
-      works; emitted cells enter at the tissue's base-side edge.
-- [ ] A pathogen reaching the base despawns and increments a visible
-      counter.
-- [x] Frame cost at 4,000 cells is measured and reported as a number.
-- [x] Everything from Sprints 1–3 still works.
-- [x] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
-      `docs/TEAM_RETRO.md` has a new note. **Write these as you go, not at
-      the end** — Sprint 3's agent hit its usage limit before writing any
-      docs and the head session had to reconstruct all four.
+- [ ] A coarse position can hold a host cell **and** an extracellular
+      pathogen at the same time, and the code says so in two slots rather
+      than one enum.
+- [ ] Host cells are visible, and `Healthy` / `Infected` / `Dead (debris)`
+      / `Empty` are distinguishable at a glance.
+- [ ] Killing an infected cell leaves debris behind.
+- [ ] Debris blocks regeneration; clearing it lets a host cell regrow.
+- [ ] A macrophage clears debris, and it is visible that it did.
+- [ ] Debris left alone eventually disappears on its own, noticeably slower
+      than a macrophage would have done it.
+- [ ] A viral infection spreads through healthy tissue and **visibly fails
+      to cross a patch of dead ground** — the firebreak.
+- [ ] An intracellular bacterium is hidden inside a host cell and visible
+      when out of one.
+- [ ] The base band's compartments no longer overlap each other or the
+      board.
+- [ ] Everything from Sprints 1–4 still works.
+- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
+      `docs/TEAM_RETRO.md` has a new note.
 
-The question this sprint answers for the Director: **does the invasion loop
-read?** Can he watch pressure build at a spot on the gut wall, see it burst,
-and then see the immune response converge on the breach — and does that feel
-like defending a front rather than watching pathogens teleport?
+The question this sprint answers for the Director: **does tissue feel like
+terrain now?** Does losing ground read as losing something — and does the
+firebreak (a viral front stalling against tissue it already killed) show up
+on its own, without being staged?
 
-## Verification result — head session, 2026-08-21
+## A process note for whoever is dispatched
 
-**Sprint 4 is code-complete and verified except for two items that need the
-Director's eyes.** All verification was run by the head session; the
-dispatched agent hit its usage limit having committed nothing. Full numbers
-in `docs/ENGINE_STATUS.md`.
+**Commit after each scope item, even if it is incomplete or ugly.** Sprint
+3's agent hit its usage limit having written no docs; Sprint 4's agent hit
+its limit having committed **nothing at all** — ~1,600 lines of
+uncompilable working tree, no harness, no docs, all of which the head
+session had to repair and reconstruct. Sprint 4's brief already said "write
+docs as you go" and that was not enough, because the commit got batched to
+the end too.
 
-Passed: `MapVerification` 71/71 (new), `LifecycleVerification` 79/79,
-`CombatVerification` 36/36, Windows build clean at 93,310,960 bytes with
-zero runtime exceptions, 4,000 cells at 8.35 ms/frame.
-
-Two boxes left unticked, both the same shape as Sprint 3's — the mechanism
-is proven, the *sight* of it is not:
-
-- **"Adhered pathogens accumulate, and an accumulating position looks
-  different from an empty one."** Accumulation is real and asserted (18 on
-  the wall in a live build, `PeakAdhered` tracking the worst position), and
-  `GutInterfaceRenderer` exists to tint by pressure — but nobody has
-  watched a position darken as it fills.
-- **"A pathogen reaching the base despawns and increments a visible
-  counter."** Asserted headlessly and wired to the HUD, but in a 60s
-  unattended run nothing crossed 50 cells of tissue to get there. Expected
-  at a 1s step interval, unproven live.
-
-**Reported rather than fixed**, per the mechanics-first instruction:
-cytokine sensing is much weaker at map scale (measured; see
-`ENGINE_STATUS.md` and `BACKLOG.md`), and the 8.35 ms frame cost is
-vsync-capped so it is an upper bound rather than a measurement.
-
-**One bug found in verification that the harness could not have caught:**
-the scene still carried Sprint 1's `columns: 30`, and because the outer
-bands clamp to fit, the tissue band silently became **zero cells wide** — a
-game that ran, rendered, and logged nothing while being unplayable. Fixed,
-plus a runtime guard.
+An incomplete committed tree is recoverable. An uncommitted one is not.
+Same for `docs/INTERFACE.md` and `docs/TEAM_RETRO.md`: update them as each
+signature changes and as each judgment call is made, not in a final sweep.
