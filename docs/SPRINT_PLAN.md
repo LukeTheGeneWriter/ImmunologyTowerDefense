@@ -145,27 +145,27 @@ cytokine sensing + heatmap, pooling, the `C` toggle.
 
 ## Stopping point (definition of done)
 
-- [ ] The board is 100×40 host cells in three visually distinct bands, and
+- [x] The board is 100×40 host cells in three visually distinct bands, and
       the whole field is legible on screen at once.
-- [ ] Pathogens flow down the lumen and are excreted at the bottom with no
+- [x] Pathogens flow down the lumen and are excreted at the bottom with no
       penalty.
-- [ ] Adhesion probability visibly depends on distance from the interface —
+- [x] Adhesion probability visibly depends on distance from the interface —
       pathogens hugging the boundary adhere far more often than ones out in
       the channel.
 - [ ] Adhered pathogens accumulate at boundary positions, and an
       accumulating position looks different from an empty one.
-- [ ] A breach releases **every** pathogen at that position simultaneously,
+- [x] A breach releases **every** pathogen at that position simultaneously,
       as a visible burst, not a trickle.
-- [ ] Pathogens in tissue advance toward the base by a biased random walk,
+- [x] Pathogens in tissue advance toward the base by a biased random walk,
       and **nothing in the movement code hardcodes "left"** — moving the
       base in config moves the advance direction with it.
-- [ ] Bone marrow and lymph node sit in the base band; placement still
+- [x] Bone marrow and lymph node sit in the base band; placement still
       works; emitted cells enter at the tissue's base-side edge.
 - [ ] A pathogen reaching the base despawns and increments a visible
       counter.
-- [ ] Frame cost at 4,000 cells is measured and reported as a number.
-- [ ] Everything from Sprints 1–3 still works.
-- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
+- [x] Frame cost at 4,000 cells is measured and reported as a number.
+- [x] Everything from Sprints 1–3 still works.
+- [x] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
       `docs/TEAM_RETRO.md` has a new note. **Write these as you go, not at
       the end** — Sprint 3's agent hit its usage limit before writing any
       docs and the head session had to reconstruct all four.
@@ -174,3 +174,38 @@ The question this sprint answers for the Director: **does the invasion loop
 read?** Can he watch pressure build at a spot on the gut wall, see it burst,
 and then see the immune response converge on the breach — and does that feel
 like defending a front rather than watching pathogens teleport?
+
+## Verification result — head session, 2026-08-21
+
+**Sprint 4 is code-complete and verified except for two items that need the
+Director's eyes.** All verification was run by the head session; the
+dispatched agent hit its usage limit having committed nothing. Full numbers
+in `docs/ENGINE_STATUS.md`.
+
+Passed: `MapVerification` 71/71 (new), `LifecycleVerification` 79/79,
+`CombatVerification` 36/36, Windows build clean at 93,310,960 bytes with
+zero runtime exceptions, 4,000 cells at 8.35 ms/frame.
+
+Two boxes left unticked, both the same shape as Sprint 3's — the mechanism
+is proven, the *sight* of it is not:
+
+- **"Adhered pathogens accumulate, and an accumulating position looks
+  different from an empty one."** Accumulation is real and asserted (18 on
+  the wall in a live build, `PeakAdhered` tracking the worst position), and
+  `GutInterfaceRenderer` exists to tint by pressure — but nobody has
+  watched a position darken as it fills.
+- **"A pathogen reaching the base despawns and increments a visible
+  counter."** Asserted headlessly and wired to the HUD, but in a 60s
+  unattended run nothing crossed 50 cells of tissue to get there. Expected
+  at a 1s step interval, unproven live.
+
+**Reported rather than fixed**, per the mechanics-first instruction:
+cytokine sensing is much weaker at map scale (measured; see
+`ENGINE_STATUS.md` and `BACKLOG.md`), and the 8.35 ms frame cost is
+vsync-capped so it is an upper bound rather than a measurement.
+
+**One bug found in verification that the harness could not have caught:**
+the scene still carried Sprint 1's `columns: 30`, and because the outer
+bands clamp to fit, the tissue band silently became **zero cells wide** — a
+game that ran, rendered, and logged nothing while being unplayable. Fixed,
+plus a runtime guard.

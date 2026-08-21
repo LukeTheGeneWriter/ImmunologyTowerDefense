@@ -12,6 +12,56 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 4 -- 2026-08-21
+The map is real. Instead of one undifferentiated board where pathogens
+appeared at random spots, Map 01 is now 100x40 host cells in three lateral
+bands: your **base** on the left (bone marrow, lymph node, and the place
+pathogens must not reach), 50 cells of **tissue** in the middle, and the
+**lumen** on the right. Threat comes from the right and pushes left, Plants
+vs. Zombies style.
+
+Pathogens ride the lumen flow downward for free -- reach the bottom and
+they are excreted with no penalty, which is deliberate. But the closer one
+drifts to the gut wall, the likelier it is to stick to it, and stuck
+pathogens **pile up at that spot on the wall**. Each spot's odds of
+rupturing rise with the size of its pile, and when it goes, **every
+pathogen there floods into the tissue at once.** That build-then-burst is
+the sprint's centrepiece: you should be able to watch a dangerous spot
+forming before it breaks. Once inside, pathogens make a strongly biased
+random walk toward your base.
+
+Advance is specified as "toward the base," never as "leftward" -- the base
+is a map property, so a future map can put it anywhere and pathogen
+movement follows without a code change. There is a test that runs the same
+movement code on a mirrored board and confirms the pathogens walk the other
+way.
+
+The HUD now shows where every pathogen is (lumen / wall / tissue), running
+counts of adhesions, breaches, excretions and anything that REACHED BASE,
+and a live frame-cost readout.
+
+**Two things worth knowing.** First, **cytokine sensing got much weaker on
+the bigger map** -- on the old 30x5 board it pulled units onto infections
+within a minute; on 100x40 it only trends toward them. Nothing broke; the
+gradient is simply flat at 47 cells where it was steep at 3. It is measured
+and recorded, not tuned, per the standing "mechanics first" instruction.
+Second, the map spent one build genuinely broken in a way nothing caught:
+the scene file still carried the old 30-column width, and because the outer
+bands clamp to fit, **the tissue band silently became zero cells wide**. It
+ran, drew a board, and reported no errors. Fixed, and the game now shouts
+if the playfield ever collapses again.
+
+Verified: 71 new map/invasion assertions, plus Sprint 3's 79 and Sprint 2's
+36 all still passing; 4,000 cells at 8.35 ms/frame (vsync-capped, so that
+is an upper bound); clean build, zero exceptions; the invasion loop visibly
+running unattended. **Not** verified: nobody has watched a breach burst
+happen -- the counters prove it does, but the sight of it is the Director's
+to judge, and it is the question this sprint exists to answer.
+
+Implemented by a dispatched Code agent that hit its usage limit having
+committed nothing at all; the head session repaired the tree, wrote the
+verification harness, found the zero-tissue bug, and wrote the docs.
+
 ## Sprint 3 -- 2026-08-21
 Population is bounded. Sprint 2's progenitor towers emitted forever and no
 unit ever despawned, so active cell count only ever grew -- the problem

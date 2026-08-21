@@ -1,71 +1,78 @@
-# Session Handoff — 2026-08-21 (Sprint 3 built and verified, awaiting playtest)
+# Session Handoff — 2026-08-21 (Sprint 4 built and verified, awaiting playtest)
 
 A checkpoint written by the head session. **This is a living file —
 overwrite it at the next checkpoint rather than accumulating dated copies.**
-It is not one of `WORKFLOW.md` §3's canonical docs; if it contradicts
+Not one of `WORKFLOW.md` §3's canonical docs; if it contradicts
 `SPRINT_PLAN.md`, `ENGINE_STATUS.md`, or `INTERFACE.md`, those win.
 
-## Status: Sprint 3 is code-complete, verified, and documented
+## Status: Sprint 4 is code-complete, verified, and documented
 
-Everything in `SPRINT_PLAN.md`'s scope is built. All verification was run
-by the head session directly (see `ENGINE_STATUS.md` → "Build status
-(Sprint 3)" for the actual numbers). **The one thing left is the Director's
-playtest.**
+Map 01's geometry and the invasion loop are built. All verification was run
+by the head session — see `ENGINE_STATUS.md` → "Build status (Sprint 4)".
+**The remaining step is the Director's playtest.**
 
-Commits on `main`, all pushed:
+## Both dispatched agents so far have hit their usage limits mid-sprint
 
-| Commit | What |
-|---|---|
-| `830e1e5` | "Sprint 3 plans" — previously staged planning docs, committed unchanged |
-| `74a2fb6` | Director's 2026-08-21 revisions (macrophage 20, parameterization, items 6–7 folded in) |
-| `8eaca14` | Code agent's implementation |
-| *(this)* | Head session's verification pass + all four doc updates |
+Sprint 3's agent committed working code but no docs. **Sprint 4's agent
+committed nothing at all** — ~1,600 lines of uncommitted, non-compiling
+working tree, no verification harness, no docs. The head session repaired
+it, wrote `MapVerification.cs` (71 assertions), found a serious bug, and
+wrote every doc.
 
-## What happened to the Code agent
+**The standing instruction for the next brief** (recorded in
+`TEAM_RETRO.md`): tell the agent to **commit after each scope item**, even
+if incomplete. "Write docs as you go" was already in Sprint 4's brief and
+still produced nothing, because the agent batched the commit too.
 
-It hit its usage limit mid-sprint, after committing working code and a
-successful build but **before writing any documentation**. The head session
-re-ran every verification from scratch and wrote `ENGINE_STATUS.md`,
-`INTERFACE.md`, `TEAM_RETRO.md`, and `CHANGELOG.md` from the commit
-message, code comments, and fresh harness output. Nothing was lost. The
-process lesson is recorded in `TEAM_RETRO.md`: **brief agents to write docs
-incrementally, not as a final step.**
+## The two things the Director should look at
 
-## The two things the Director needs to look at
+1. **Does the invasion loop read?** Watch one spot on the gut wall: pathogens
+   should visibly pile up there, then all burst into the tissue at once.
+   That build-then-burst is the sprint's whole question and **nobody has
+   actually watched it happen** — the counters and the harness prove it
+   occurs, but the sight of it is unverified.
+2. **Does anything reach the base?** In a 60s unattended run nothing crossed
+   the 50-cell tissue band. Expected at a 1s step interval, but it means the
+   endzone is unproven live and the pacing is worth a look.
 
-1. **Does population visibly stay bounded, and do the two deaths read as
-   different?** That's `SPRINT_PLAN.md`'s own question. Place towers, watch
-   the HUD's active-unit count climb and stop. A neutrophil hitting 5 kills
-   should flash and burst; a macrophage hitting 20 should just go.
-2. **Clearing is ~50% slower per unit than Sprint 2** — measured, intended,
-   and flagged rather than compensated for. Proximity contact and the
-   population cap landed in the same sprint, so if the board starts losing
-   ground, that interaction is why. The knob is `ContactRadiusFineTiles`
-   (per-tower, default 2). **Do not** revert to coarse-slot detection.
+## Findings recorded rather than fixed (mechanics-first instruction)
 
-## Still-open question the Director has not answered
+- **Cytokine sensing is much weaker at map scale.** 30×5: OFF ~3, ON
+  converges to 0 within a minute. 100×40: OFF flat at ~47, ON only trends
+  45.29 → 37.38 over 2.5 minutes. Not a regression — the 1/r field is steep
+  at 3 cells and flat at 47 — but Sprint 1 built the entire upgrade ladder
+  on this mechanic feeling transformative, so it needs an answer eventually.
+- **The 8.35 ms frame cost at 4,000 cells is vsync-capped**, so it is an
+  upper bound, not a measurement. Re-measure with vsync off before Sprint 5
+  adds host-cell state rendering.
+- **The base band is visually crowded** — marrow slots, lymph node, and HUD
+  overprint. Plausibly the first real job for a dispatched Design agent,
+  which this project has never used.
 
-**Do progenitor upgrades apply retroactively to living cells?** Currently
-no — a unit holds a value snapshot of its tower's tuning from emission
-time, so upgrading a tower improves only its future children. Head
-session's judgment call, flagged but unruled. A one-line change today; not
-one once an upgrade UI exists.
+## The bug worth knowing about
 
-## Known gap in verification
+The scene asset still carried Sprint 1's serialized `columns: 30`, which
+overrode Map 01's `columns = 100` default. Because the outer bands clamp
+against axis length, the shortfall landed entirely on the middle: **25 base
++ 5 lumen + 0 tissue.** The build ran, rendered, and logged nothing while
+being completely unplayable. Fixed, plus `GameBootstrap.WarnOnDegenerateBands`.
 
-**Placement was never exercised through the running build's UI this
-session.** Scripted clicks couldn't take foreground focus
-(`SetForegroundWindow` refused — the Director was using another window at the
-time; an unfocused build doesn't tick, so two
-captures 75s apart came back pixel-identical — that's the tell, not a
-hang). The click/picker path is unchanged code that Sprint 2 verified, and
-the real `PlaceTower`/emission path is driven headlessly by
-`LifecycleVerification`, so the mechanism is covered. But the first real
-click belongs to the Director.
+**`MapVerification` could not have caught it** — it builds boards via
+`ConfigureForTest` and never loads the scene. Worth remembering when the
+next "the harness is green so it works" moment arrives.
 
-## Next sprint's likely scope (not yet proposed to the Director)
+## Next up: Sprint 5
 
-Depends entirely on how the playtest goes. If population and pacing feel
-right, `BACKLOG.md`'s open design questions are the queue — the ATP/economy
-layer is the biggest unblocked one, and most of Sprint 2–3's numbers are
-explicitly waiting on it before they can be balanced rather than guessed.
+Already scoped in `SPRINT_PLAN.md`'s split: the tissue state model —
+host cells as healthy/infected/dead with two-layer lattice occupancy
+(`GAME_DESIGN.md` §1c), which then unlocks §1b step 4's class-specific
+advance (viral diffusion that dies without a host, intracellular bacteria
+entering and leaving cells), plus debris and the real 100-life pool.
+`TissueGrid` still holds exactly one pathogen per coarse slot with no
+host-cell concept — that is the rewrite.
+
+Also now designed and waiting: debris rules and the antigen-presentation
+spectrum (`GAME_DESIGN.md` §1c) — macrophages clear debris and present it
+inefficiently, dendritic cells shuttle it efficiently, passive drainage
+into the lymph node is a knowledge sink, and "don't eat me" signals are
+flagged in `BACKLOG.md` as the eventual tuning lever.
