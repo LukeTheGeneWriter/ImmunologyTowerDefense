@@ -1,129 +1,97 @@
-# Sprint Plan — Sprint 2
+# Sprint Plan — Sprint 3
 
-## Sprint 1 — closed 2026-08-19
+## Sprint 2 — closed 2026-08-19
 
-Delivered: the tissue lattice, random-walk search, and a cytokine-sensing
-toggle that (after a same-day legibility fix — see `docs/CHANGELOG.md`)
-the Director confirmed reads clearly in his own playtest. Full history in
-`docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
+Delivered: bone marrow placement, a lymph node placeholder, and
+pathogen-class combat with viral spread. Director playtested it directly
+and confirmed it works — and surfaced the next real problem: progenitors
+have no population cap, so active cell count grows unbounded over time.
+Full history in `docs/CHANGELOG.md` and `docs/ENGINE_STATUS.md`.
 
-## Direction for Sprint 2 (Director, 2026-08-19)
+## Direction for Sprint 3 (Director, 2026-08-19)
 
-Two things, in his words: (1) layout changes so there's a place to place
-purchased cells — bone marrow for progenitors, a lymph node for adaptive
-immunity — and (2) some way for immune cells to actually interact with
-pathogens/infected cells, "so we can see some functionality."
+Fix the unbounded growth with a population cap **tied to each individual
+progenitor**, not a systemic/global signal — a deliberate break from real
+hematopoiesis, made because it keeps individual towers (and eventually
+their upgrades) meaningful. Full design writeup is in `docs/GAME_DESIGN.md`
+§6d — read that first, this is the implementation brief for it.
 
 ## Scope
 
-Both pieces close the loop Sprint 1 left open on purpose: units currently
-debug-spawn at random positions and "contact" is just a visual flash with
-no consequence. This sprint replaces both placeholders with the real
-mechanics, still without the economy layer.
+**1. Max active children per tower (new).** Each bone marrow slot/tower
+tracks how many of its own emitted units are currently alive. Once at the
+cap, the tower stops emitting — even if its emission timer has elapsed —
+until one of its children dies and frees a slot. Requires each emitted
+unit to know which tower it came from and to notify that tower on death
+(depletion or otherwise), so `BoneMarrowManager` can decrement the count.
+Starting default: **10** per tower — the Director's own example number,
+treat as tunable.
 
-**1. Bone marrow — real placement, replacing debug spawn.**
-- A visually distinct area separate from the tissue board (per
-  `GAME_DESIGN.md` §1/§2a — bone marrow is its own compartment).
-- A small number of open slots. Clicking an open slot places a progenitor
-  tower — Macrophage or Neutrophil (the two Sprint 1 already has). Which
-  one is a player choice, however that's simplest to expose (e.g. a
-  two-button picker) — doesn't need to be polished.
-- A placed tower periodically emits a unit that enters tissue from the
-  blood-side edge, replacing `GameBootstrap`'s current random debug spawn.
-  Rung-1 entry only (uniform, per `GAME_DESIGN.md` §2a's entry table) —
-  cytokine-biased entry location is a later rung, not this sprint.
-- **No ATP cost yet.** Placement is free. This sprint is about proving the
-  placement → emission → tissue pipeline works, not the economy — that's
-  a deliberate, separate piece of scope (see `BACKLOG.md`'s round 1
-  economy question, still open).
+**2. Emission-rate cap (already exists, keep it).**
+`BoneMarrowManager.EmissionIntervalSeconds` (Sprint 2, currently 4s)
+already throttles how fast a tower can produce a *new* cell. Per
+`GAME_DESIGN.md` §6d this is deliberately kept as a *second*, independent
+cap — it's what stops a tower whose whole population just died at once
+from instantly bursting back to full. No change needed here beyond making
+sure it still applies once the max-children cap exists (a tower at zero
+children but still mid-cooldown should not emit early).
 
-**2. Combat — pathogen classes, not one undifferentiated type.**
-Per `GAME_DESIGN.md` §4a (new — Director direction, 2026-08-19). Two of
-the four classes there are in scope this sprint; the third (large
-bacteria) is a light add-on; the fourth (parasites) is deferred.
+**3. Neutrophil kill-count depletion → degranulation.** Track kills per
+neutrophil (increment when a `ReceiveDamage` call from that unit is the
+one that actually clears a pathogen — needs a way for `PathogenAgent` to
+report back which unit landed the killing hit, not just that it died).
+At the kill-count limit, the neutrophil **degranulates**: destroys itself
+and deals a burst of collateral damage to whatever's in its current
+coarse slot, then notifies its tower (frees a max-children slot). Starting
+default: **5 kills**, collateral burst **3x** `ContactDamagePerHit`. Since
+there's no host-cell-health/fibrosis system yet (`GAME_DESIGN.md` §6 is
+still unbuilt), "collateral damage" this sprint means: if an infected/
+occupied slot is present at the degranulation site, deal the burst damage
+to it same as combat damage; if the slot is bare host tissue, there's
+nothing to damage yet — that's fine, the mechanism is what matters this
+sprint, fibrosis accounting comes later. Make the degranulation event
+visibly distinct (a brief flash/effect) so the Director can actually see
+it happen, not just watch a unit quietly disappear.
 
-- **Intracellular pathogens (virus + bacterium, e.g. *Salmonella*).**
-  Replace Sprint 1's generic "adhered pathogen" with an infected-cell
-  model: the host cell isn't replaced, it's infected and keeps rendering
-  as host tissue (already effectively true — `TissueGrid`'s slot doesn't
-  currently distinguish, so this is mostly a rendering/identity change,
-  not new occupancy logic). No adaptive immunity yet, so units can't target
-  the pathogen precisely — contact instead deals damage to the **whole
-  infected cell**, and once destroyed the slot clears back to bare host
-  tissue (this doubles as tissue damage, worth tracking even if fibrosis
-  itself isn't built yet — see `GAME_DESIGN.md` §6/§6a).
-  - **Viral spread**: give virus-class infections an incubation timer;
-    if not cleared before it elapses, the infection spreads to one
-    adjacent uninfected coarse slot. This is the sprint's most important
-    piece for validating the whole game's thesis — it's what makes search
-    speed (rung 1 vs. rung 2, Sprint 1's whole point) have a visible,
-    escalating cost. Bacterial intracellular infections do not spread this
-    sprint (virus-specific per the design doc).
-- **Large bacteria.** Simpler, and close to what Sprint 1 already built:
-  kill-and-occupy a slot outright, visible as itself (no host-cell
-  disguise), cleared by direct damage to the pathogen rather than the
-  collateral-damage mechanic above. Include if it doesn't meaningfully
-  slow down the two items above — this is the smallest addition of the
-  three classes in scope.
-- **Not this sprint: parasites** (multi-coarse-slot footprint). Real
-  structural work to `TissueGrid`'s one-pathogen-per-slot model — tracked
-  in `BACKLOG.md` for a later sprint rather than folded in here.
-- Keep damage numbers simple (flat rates are fine). Differentiating
-  macrophage vs. neutrophil combat behavior (`GAME_DESIGN.md` §4's role
-  split) is a reasonable stretch goal, not required for this sprint's
-  stopping point.
+**4. Macrophage kill-count depletion → quiet retirement.** Same
+kill-tracking mechanism, higher limit, no collateral damage — the
+macrophage just despawns cleanly and frees its tower's slot. Starting
+default: **15 kills** (three times the neutrophil's, reflecting "longer
+lived, less prone to a terminal burst" per `GAME_DESIGN.md` §6d). This
+number is this document's working default, not independently confirmed
+by the Director — flag if it should change.
 
-**3. Lymph node — placeholder only, not functional.**
-- Full adaptive immunity (`GAME_DESIGN.md` §5 — knowledge percentage,
-  dendritic cells, T/B cells, the threshold ladder) is a large system on
-  its own and deliberately **not** in this sprint's scope.
-- What this sprint does add: a visually reserved space for it in the
-  layout (labeled, present, empty) so the compartment model is visible on
-  screen and the next sprint has somewhere to build into — not a
-  functional lymph node.
-- **Flagging this explicitly since it's a scope-narrowing call, not a
-  literal reading of "a lymph node for adaptive immunity to take place":**
-  if the intent was for something adaptive-immunity-related to actually
-  function this sprint, say so and this scope should change before work
-  starts.
-
-## Explicitly not in scope
-
-ATP/economy, knowledge percentage/adaptive immunity mechanics (including
-precise MHC-I-restricted killing — everything is collateral-damage clearing
-this sprint), fibrosis as a real system (tracking tissue-damage numbers is
-fine, decay/gameplay consequences are not in scope), breach cost/lives,
-multi-depth pathogen descent/burrowing, dendritic cell/lymph node travel
-delay, parasites (multi-slot footprint — see `BACKLOG.md`), differentiated
-per-unit-type combat (stretch goal only, see above). Everything Sprint 1
-already built (configurable board width, per-unit-type step speed, object
-pooling, the cytokine toggle and its heatmap cue) must keep working — this
-sprint extends it, doesn't replace it.
+**5. Explicitly not in scope.** Any upgrade system (reducing degranulation
+damage, player-triggered timed self-destruct — both named in
+`GAME_DESIGN.md` §6d as the eventual payoff, neither buildable without an
+upgrade system that doesn't exist yet). ATP/economy. Real fibrosis
+accounting. Parasites. Adaptive immunity. Everything Sprint 1/2 already
+built (lattice, search, cytokine sensing + heatmap, placement, pathogen
+classes, viral spread) must keep working unchanged.
 
 ## Stopping point (definition of done)
 
-- [ ] Bone marrow is a visually distinct area with clickable open slots.
-- [ ] Placing a slot lets the player choose Macrophage or Neutrophil.
-- [ ] A placed tower periodically emits that unit type, entering tissue
-      from the blood-side edge — no more random debug spawn.
-- [ ] Lymph node has a visible, labeled, reserved space in the layout.
-- [ ] Intracellular pathogens (virus + bacterium) infect a cell without
-      replacing it visually; a unit in contact deals damage to the whole
-      infected cell over time; a sufficiently damaged one clears back to
-      healthy tissue.
-- [ ] An uncleared virus spreads to an adjacent cell after its incubation
-      period — visibly, so the Director can watch it happen.
-- [ ] (If time allows) large bacteria kill-and-occupy a slot visibly and
-      clear via direct damage to the pathogen instead of the host cell.
-- [ ] Board width, per-unit-type step speed, object pooling, and the
-      cytokine-sensing toggle (with heatmap cue) all still work.
+- [ ] A tower placed and left alone stops emitting once it hits its
+      max-active-children cap, and resumes once a child dies.
+- [ ] A tower whose entire population dies at once still only refills at
+      its emission-rate cap, not instantly.
+- [ ] A neutrophil that reaches its kill limit visibly degranulates
+      (self-destructs with a visible effect) and deals collateral damage
+      if something occupies its slot.
+- [ ] A macrophage that reaches its (higher) kill limit quietly retires,
+      no collateral damage.
+- [ ] Both depletion paths correctly free their tower's population slot.
+- [ ] Total active unit count visibly stays bounded over an extended play
+      session instead of growing indefinitely — the actual problem this
+      sprint exists to fix.
+- [ ] Everything from Sprint 1/2 still works: board width, per-unit step
+      speed, pooling, cytokine toggle + heatmap, placement, pathogen
+      classes, viral spread.
 - [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect the new
       systems.
 - [ ] `docs/TEAM_RETRO.md` has at least one new note.
 
-The question this sprint answers for the Director: **does placement feel
-like a real decision, does combat give the search loop a satisfying
-payoff, and does viral spread make search speed feel like it actually
-matters?** Once these land, decide what's next — likely the economy layer
-(ATP, costs) that both placement and combat were deliberately built
-without, and/or parasites' multi-slot footprint.
+The question this sprint answers for the Director: **does population
+finally stay under control, and do the two depletion behaviors (neutrophil
+burst vs. macrophage quiet exit) read as intentionally different from each
+other, not just as a bug where units randomly vanish?**

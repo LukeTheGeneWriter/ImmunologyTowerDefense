@@ -328,6 +328,75 @@ Net effect: a breach costs a life, scars the board, and stalls the
 economy — every consequence has a mechanism behind it. Needs numbers — see
 `BACKLOG.md`.
 
+## 6d. Unit lifecycle and population homeostasis — LOCKED in principle (Director, 2026-08-19)
+
+Sprint 2 gave each bone marrow progenitor an unbounded emission timer —
+placed once, it emits forever, so active cell count only ever grows. This
+section is the fix: a progenitor's output is capped two ways at once,
+deliberately, and each cap has a different job.
+
+**The cap is per-progenitor, not systemic — an explicit break from
+biology.** Real hematopoiesis is regulated by a systemic signal (G-CSF
+sensing a body-wide deficiency), not tower-by-tower. This game
+deliberately does it per-tower anyway: it's simpler to build, and it's
+what makes upgrading a specific tower legible and worth doing — a systemic
+cap would make individual towers interchangeable. Noted here so a future
+session doesn't "fix" this back toward biological accuracy without
+realizing it was a deliberate simplification, not an oversight.
+
+**Two caps, doing different jobs:**
+- **Emission rate** (already exists — `BoneMarrowManager.EmissionIntervalSeconds`,
+  Sprint 2). A tower can only produce one new cell every *X* ticks,
+  regardless of how many of its previous children are still alive or how
+  recently one died. This is what actually gives a tower a **DPS cap**:
+  even a tower whose entire population just depleted in one moment can
+  only refill at this fixed rate, not burst back to full strength
+  instantly.
+- **Max active children** (new). A tower also has a hard ceiling on how
+  many of its own children can be alive at once (e.g. "10"). Once at that
+  ceiling, it stops emitting even if the timer has elapsed, until one of
+  its children dies and frees a slot. This is the piece that stops
+  unbounded growth outright — without it, a tower left alone long enough
+  still accumulates population no matter how slow the emission rate is.
+- Together: a tower's sustained output is bounded by the emission rate,
+  and its standing population is bounded by the max-children cap. Neither
+  alone is sufficient — rate-only still grows without bound given enough
+  time; cap-only still allows an instant refill burst the moment several
+  children die at once.
+
+**Neutrophils deplete via kill count, then degranulate.** A neutrophil
+that reaches its kill-count limit doesn't just vanish — it **degranulates**:
+self-destructs and deals a burst of collateral damage at its own location
+(to whatever host cell or infected cell is there). This isn't a new
+mechanic bolted on; it's the same "high collateral tissue damage" trait
+§4 already gives neutrophils, now with a concrete trigger and consequence
+instead of being pure flavor text. A degranulated neutrophil frees its
+slot in its tower's max-active-children count, same as one that never
+depleted at all.
+
+**Macrophages retire quietly instead.** Consistent with real macrophages
+being longer-lived and less prone to this kind of terminal burst,
+macrophages get a higher kill-count threshold before retiring, and
+retirement is a clean removal (no collateral damage) rather than a
+degranulation event. This is this document's working default, not yet
+independently confirmed by the Director the way the neutrophil behavior
+was — flagged in case it should change.
+
+**Upgrades are the future payoff, not built yet.** The Director's
+explicit intent: neutrophil upgrades should eventually let a player
+**reduce degranulation's collateral damage**, or **trigger self-destruction
+deliberately at a chosen moment** (e.g. before an infection spreads,
+rather than waiting for the kill counter) instead of only ever being
+forced into it passively. Neither is in scope until an actual upgrade
+system exists — for now, degranulation always happens at the kill-count
+limit, always deals its baseline collateral damage, with no player control
+over timing.
+
+Numbers (max active children, neutrophil kill-count limit, macrophage
+kill-count limit, degranulation collateral damage) are tuning values, not
+derived — see `docs/SPRINT_PLAN.md` for the Sprint 3 starting figures and
+`BACKLOG.md` for what's still open.
+
 ## 7. Spatial representation — LOCKED
 
 **Discrete lattice, two resolutions.** Authoritative state lives on a

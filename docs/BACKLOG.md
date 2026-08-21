@@ -56,26 +56,32 @@ scoped to the search problem only, no economy/compartments beyond tissue).
   mutation (a discrete step-change discount) and additive to it if ever
   built.
 
-## Scheduled into Sprint 2 (see `docs/SPRINT_PLAN.md`)
+## Delivered in Sprint 2 (closed 2026-08-19)
 
-Director's direction from the Sprint 1 playtest, now written up as a
-formal sprint plan:
+Bone marrow/lymph node placement and pathogen-class combat, both
+originally scheduled here from the Sprint 1 playtest — see
+`docs/CHANGELOG.md` for what shipped.
 
-- **Bone marrow and lymph node as real, placeable spaces.** Per
-  `GAME_DESIGN.md` §1/§2a, progenitor towers are bought and placed in the
-  bone marrow, not in tissue — Sprint 1 has no such place, units just
-  debug-spawn. Needs actual layout/compartment work: a UI space for the
-  player to place purchased cells, and a lymph node area for adaptive
-  immunity coordination (dendritic cells, naive/activated T and B cells).
-  This is the first real placement decision the player gets.
-- **Immune cell / pathogen interaction ("combat").** Sprint 1's "contact"
-  is a visual flash only — nothing dies, nothing is damaged. Director
-  wants some functional interaction so there's something to actually see
-  happen, not just search-and-flash.
-- Scope, sequencing, and exact mechanics (does combat mean an instant
-  kill? A damage-over-time tick? Does it differ by unit type already, per
-  `GAME_DESIGN.md` §4's neutrophil/macrophage role split?) still need to
-  be worked out before writing the Sprint 2 brief.
+## Scheduled into Sprint 3 (see `docs/SPRINT_PLAN.md`)
+
+Director's direction from the Sprint 2 playtest: progenitors have no
+population cap, so active cell count grows unbounded. Now written up as a
+formal sprint plan (`docs/GAME_DESIGN.md` §6d has the full design):
+
+- **Per-progenitor population cap** — deliberately not systemic/global,
+  see §6d for why. Two independent caps: max active children per tower,
+  and the existing emission-rate timer.
+- **Neutrophil kill-count depletion → degranulation** (self-destruct +
+  collateral damage burst) and **macrophage kill-count depletion → quiet
+  retirement** (higher threshold, no damage) — both free their tower's
+  population slot.
+- Upgrade hooks (reduced degranulation damage, player-triggered timed
+  self-destruct) are named as the eventual payoff but explicitly deferred
+  until an upgrade system exists — not Sprint 3 scope.
+- Starting numbers (max active children = 10, neutrophil kill limit = 5,
+  macrophage kill limit = 15, degranulation burst = 3x contact damage) are
+  this document's working defaults, not all independently confirmed by the
+  Director — see `docs/SPRINT_PLAN.md` for which ones are flagged as such.
 
 ## Deferred out of Sprint 2
 
