@@ -300,6 +300,14 @@ namespace ImmunologyTD.Pathogens
         ///    walking. An intracellular bacterium may go inside a cell later,
         ///    on one of its own steps.
         /// </summary>
+        /// <summary>Only a virus can enter a host cell on arrival, and only
+        /// if there is a healthy one here. Used by
+        /// <see cref="EnterTissueAt"/> to decide whether a pathogen whose
+        /// target position already has an extracellular occupant can still
+        /// come off the wall.</summary>
+        private bool CanTakeHostAt(CoarseCoord slot) =>
+            Class == PathogenClass.IntracellularVirus && tissueGrid.IsHealthyHost(slot);
+
         private void SettleIntoTissue(CoarseCoord slot, float currentTime)
         {
             if (Class == PathogenClass.IntracellularVirus && tissueGrid.TryInfect(slot, this, currentTime))
@@ -388,7 +396,7 @@ namespace ImmunologyTD.Pathogens
                 while (stepTimer >= interval && State == PathogenState.InTissue)
                 {
                     stepTimer -= interval;
-                    StepTissue();
+                    StepInTissue(currentTime);
                 }
                 TickCombat(currentTime);
             }
@@ -502,16 +510,21 @@ namespace ImmunologyTD.Pathogens
             if (board == null || State == PathogenState.Cleared) return false;
             if (board.BandOf(slot) != BoardBand.Tissue) return false;
 
-            infectionStartTime = currentTime;
-            if (!tissueGrid.TryClaimOccupant(slot, this, infectionStartTime)) return false;
+            // A virus can take the host cell here even when the occupant
+            // layer is busy, so the free-slot test is no longer the whole
+            // admission check -- SettleIntoTissue decides which layer this
+            // pathogen lands on, and only a pathogen that gets NEITHER stays
+            // on the wall.
+            if (!tissueGrid.IsOccupantFree(slot) && !CanTakeHostAt(slot)) return false;
 
+            infectionStartTime = currentTime;
             State = PathogenState.InTissue;
             InterfacePosition = -1;
             CurrentCoarse = slot;
             Current = board.CoarseCenterFine(slot);
             hasSpread = false;
             lastSpreadAttemptTime = float.NegativeInfinity;
-            ApplyRestColorForCurrentClass();
+            SettleIntoTissue(slot, currentTime);
             MoveTo(board.CoarseToWorldCenter(slot), InvasionTuning.TissueStepIntervalSeconds * 0.5f);
             stepTimer = Random.Range(0f, InvasionTuning.TissueStepIntervalSeconds);
             return true;
@@ -535,6 +548,180 @@ namespace ImmunologyTD.Pathogens
         /// the BASE band is not a move at all, it is the endzone
         /// (<see cref="ReachBase"/>).
         /// </summary>
+        // ------------------------------------------------------------------
+        // Class-specific advance (GAME_DESIGN.md section 1b step 4)
+        //
+        // Deferred out of Sprint 4 because it needs host states; Sprint 5's
+        // two-layer TissueGrid is what made it buildable. All three classes
+        // moved identically before this.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// One tissue step, dispatched by class. The three genuinely
+        /// different means of reaching the base are what should make a front
+        /// look different depending on what is attacking it.
+        /// </summary>
+        private void StepInTissue(float currentTime)
+        {
+            switch (Class)
+            {
+                case PathogenClass.IntracellularVirus:
+                    StepVirus(currentTime);
+                    break;
+                case PathogenClass.IntracellularBacterium:
+                    StepIntracellularBacterium(currentTime);
+                    break;
+                default:
+                    StepMotile(currentTime);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// **Viruses: diffusive, self-limiting, no base bias whatsoever.**
+        ///
+        /// An intracellular virus does not move at all -- it is inside a
+        /// cell, and its only way forward is <see cref="TickCombat"/>'s
+        /// cell-to-cell spread. A FREE virus (occupant layer, between hosts)
+        /// looks for a `Healthy` host in its own cell and its four
+        /// neighbours, in shuffled order, and dies if it has been homeless
+        /// for InvasionTuning.VirusFreeSurvivalSeconds.
+        ///
+        /// **The firebreak is emergent and there is no firebreak check.**
+        /// A free virus may only ever move ONTO a healthy host cell -- it
+        /// cannot traverse dead, empty, or already-infected ground even for
+        /// one step -- so a viral front that has killed the tissue behind it
+        /// physically cannot cross that ground, and the survival timer
+        /// finishes off whatever is stranded against it. Both halves are
+        /// plain local rules; the firebreak is what they add up to.
+        /// </summary>
+        private void StepVirus(float currentTime)
+        {
+            if (IsIntracellular) return; // hidden inside a cell; spread is TickCombat's job
+
+            if (TryFindAndEnterHost(currentTime)) return;
+
+            if (currentTime - freeSinceTime >= InvasionTuning.VirusFreeSurvivalSeconds)
+            {
+                // Died without finding a host. Not a kill -- nobody is
+                // credited, and it leaves no debris because no host cell
+                // died with it.
+                State = PathogenState.Cleared;
+                tissueGrid.ReleaseOccupant(CurrentCoarse);
+                onExit?.Invoke(this);
+            }
+        }
+
+        /// <summary>
+        /// **Intracellular bacteria: biased when out, hidden when in.**
+        ///
+        /// Outside a cell it is an ordinary base-biased walker, visible as
+        /// itself, and each step it may slip inside a healthy host cell it is
+        /// standing on (InvasionTuning.IntracellularEntryChance). Inside, it
+        /// is invisible and stationary until it lyses out
+        /// (InvasionTuning.IntracellularResidenceSeconds), which KILLS the
+        /// host cell and leaves debris.
+        ///
+        /// The lysis exit is this sprint's judgment call -- see
+        /// InvasionTuning.IntracellularResidenceSeconds for why an exit had
+        /// to exist at all.
+        /// </summary>
+        private void StepIntracellularBacterium(float currentTime)
+        {
+            if (IsIntracellular)
+            {
+                if (currentTime - hostEntryTime < InvasionTuning.IntracellularResidenceSeconds) return;
+                // Only lyse out if there is somewhere to stand. If something
+                // else is occupying this position, wait -- better a longer
+                // residence than a pathogen owned by neither layer.
+                if (!tissueGrid.IsOccupantFree(CurrentCoarse)) return;
+
+                tissueGrid.KillHostCell(CurrentCoarse);
+                IsIntracellular = false;
+                freeSinceTime = currentTime;
+                tissueGrid.TryClaimOccupant(CurrentCoarse, this, infectionStartTime);
+                ApplyRestColorForCurrentClass();
+                return;
+            }
+
+            if (tissueGrid.IsHealthyHost(CurrentCoarse) &&
+                Random.value < InvasionTuning.IntracellularEntryChance &&
+                tissueGrid.TryInfect(CurrentCoarse, this, currentTime))
+            {
+                tissueGrid.ReleaseOccupant(CurrentCoarse);
+                IsIntracellular = true;
+                hostEntryTime = currentTime;
+                infectionStartTime = currentTime;
+                ApplyRestColorForCurrentClass();
+                return;
+            }
+
+            StepMotile(currentTime);
+        }
+
+        /// <summary>
+        /// Looks for a `Healthy` host cell at this virus's own position and
+        /// its four neighbours, in shuffled order, and moves into the first
+        /// one found. Returns false if there is no healthy cell in reach --
+        /// which, on ground the infection has already killed, is every time.
+        ///
+        /// Neighbour offsets are expressed in the AXIS FRAME like everything
+        /// else in this class, but symmetrically: there is no toward-base
+        /// weighting, per section 1b step 4's "in all directions with no
+        /// base bias."
+        /// </summary>
+        private bool TryFindAndEnterHost(float currentTime)
+        {
+            for (int i = SpreadOffsets.Length - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                int tmp = hostSearchOrder[i];
+                hostSearchOrder[i] = hostSearchOrder[j];
+                hostSearchOrder[j] = tmp;
+            }
+
+            for (int i = 0; i < hostSearchOrder.Length; i++)
+            {
+                var (dAxis, dCross) = SpreadOffsets[hostSearchOrder[i]];
+                int axisIndex = board.AxisIndex(CurrentCoarse) + dAxis;
+                int crossIndex = board.CrossIndex(CurrentCoarse) + dCross;
+                if (!board.InAxisBounds(axisIndex) || !board.InCrossBounds(crossIndex)) continue;
+                if (board.BandAtAxisIndex(axisIndex) != BoardBand.Tissue) continue;
+
+                var candidate = board.CoarseFromAxis(axisIndex, crossIndex);
+                if (!tissueGrid.IsHealthyHost(candidate)) continue;
+                if (!tissueGrid.TryInfect(candidate, this, currentTime)) continue;
+
+                tissueGrid.ReleaseOccupant(CurrentCoarse);
+                IsIntracellular = true;
+                hostEntryTime = currentTime;
+                infectionStartTime = currentTime;
+                hasSpread = false;
+                lastSpreadAttemptTime = float.NegativeInfinity;
+                CurrentCoarse = candidate;
+                Current = board.CoarseCenterFine(candidate);
+                ApplyRestColorForCurrentClass();
+                MoveTo(board.CoarseToWorldCenter(candidate), InvasionTuning.TissueStepIntervalSeconds);
+                return true;
+            }
+            return false;
+        }
+
+        private void StepMotile(float currentTime)
+        {
+            // A large bacterium grazes the ground it stands on
+            // (GAME_DESIGN.md section 4a: it "kills and directly occupies").
+            // Reconciled with section 1c's two-layer model as damage over
+            // time rather than instant replacement -- see
+            // InvasionTuning.LargeBacteriumHostDamagePerStep.
+            if (Class == PathogenClass.LargeBacterium)
+            {
+                tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.LargeBacteriumHostDamagePerStep);
+            }
+
+            StepTissue();
+        }
+
         private void StepTissue()
         {
             int count = 0;
@@ -634,14 +821,22 @@ namespace ImmunologyTD.Pathogens
         /// IN TISSUE -- in the lumen and on the wall there is no host cell to
         /// hide inside, so every class is drawn as itself there. See
         /// docs/ENGINE_STATUS.md for why intracellular classes disable the
-        /// sprite outright rather than tinting it to HostColor.</summary>
+        /// sprite outright rather than tinting it to HostColor.
+        ///
+        /// **Sprint 5 made this a question about the LAYER, not the class.**
+        /// Sprint 2-4 hid both intracellular classes permanently, because
+        /// there was no such thing as being outside a cell. There is now: an
+        /// intracellular bacterium walking between hosts and a free virus
+        /// particle are both extracellular, both on the occupant layer, and
+        /// both visible as themselves -- which is exactly what section 1b
+        /// step 4's "biased when out, hidden when in" asks for. Hiding is
+        /// now driven by <see cref="IsIntracellular"/>.</summary>
         private void ApplyRestColorForCurrentClass()
         {
-            bool isLargeBacterium = Class == PathogenClass.LargeBacterium;
-            restColor = isLargeBacterium ? BoardRenderer.PathogenColor : BoardRenderer.HostColor;
+            restColor = IsIntracellular ? BoardRenderer.InfectedHostColor : BoardRenderer.PathogenColor;
             if (sr == null) return;
             sr.color = restColor;
-            sr.enabled = isLargeBacterium;
+            sr.enabled = !IsIntracellular;
         }
 
         /// <summary>
