@@ -119,33 +119,42 @@ required here. ATP economy, prices, round loop — the sprint after. DC
 shuttle, T/B cells, knowledge accrual — after that. Parasites. Balance
 tuning — mechanics first, still.
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-28
 
-The Director can watch, in a build:
+Mechanics all landed and harness-covered (`TissueVerification` 53 → 73);
+the "watch it happen" halves are the Director's playtest. `[x]` = done,
+`[~]` = code done + harness-verified, visual unconfirmed.
 
-- [ ] An **intracellular bacterium visibly enter a host cell** — the cell
-      changes in a way distinct from a viral infection — be **untouchable
-      by a macrophage** sitting on it, drain the cell, and **burst a brood**
-      of bacteria out when the cell dies.
-- [ ] A **macrophage occasionally "notice" an infected cell** on contact
-      and kill it in a visibly loud way, **with no pathogen released**.
-- [ ] A **budding-virus infection expand as a rough disk** of infected
-      cells, next to a **chain-virus infection that snakes** — the two read
-      as different.
-- [ ] **Some infections die on their own**, spilling debris and virions,
-      with nothing attacking them.
-- [ ] An extracellular intracellular-bacterium still **takes ordinary
-      macrophage/neutrophil damage** and dies to it.
-- [ ] A budding front still **fails to cross dead ground** (firebreak
-      intact) — harness-asserted.
-- [ ] Everything from Sprints 1–5 still works.
-- [ ] `TissueVerification` grows to cover: contact stress-sense (loud kill,
-      no burst), extracellular-vulnerable / intracellular-protected,
-      bacterial replication + burst + caught-early-no-burst, budding vs
-      chain, spontaneous burn-out.
-- [ ] `docs/ENGINE_STATUS.md`, `docs/INTERFACE.md`, `docs/CHANGELOG.md`,
-      `docs/BACKLOG.md` reflect reality, and `docs/TEAM_RETRO.md` has a new
-      note.
+- [~] An **intracellular bacterium** enters a host cell (cell turns a
+      distinct yellow-green, `InfectedColorFor`), is **untouchable by a
+      macrophage** while inside, drains the cell, and **bursts a brood** on
+      drain-death. Harness: `RunClassAdvance` bacterium block. Watching it
+      is the playtest.
+- [~] A **macrophage recognises an infected cell on contact** and kills it
+      **loudly** (1.5× magenta flash), **nothing released**. Harness:
+      `RunStressSense`. Whether the 0.03/tick rate *feels* right is the
+      playtest.
+- [~] A **budding infection grows as a disk**, a **chain one snakes** —
+      harness confirms established infections on both sides of a budding
+      seed. The two side by side is the playtest.
+- [~] **Infections burn out on their own**, spilling the virus + debris.
+      Harness: burn-out block.
+- [x] An **exposed** intracellular-bacterium still takes ordinary
+      macrophage/neutrophil damage. Harness: `RunClassAdvance` (`mac.CheckContact`
+      lands before it hides).
+- [x] A **budding front cannot cross dead ground** — harness-asserted end
+      to end (180s of budding, 0 established infections base-ward of a
+      3-cell band).
+- [x] Everything from Sprints 1–5 still works — Combat 36 / Lifecycle 79 /
+      Map 71 all re-run green.
+- [x] `TissueVerification` grown to cover stress-sense, exposed/hidden,
+      replication + brood + caught-early-no-brood, budding vs chain,
+      burn-out — **73 passed, 0 failed**.
+- [x] `docs/GAME_DESIGN.md` §4b, `SPRINT_PLAN.md`, `ENGINE_STATUS.md`,
+      `INTERFACE.md`, `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` all
+      updated.
+
+**Handed to the Director for playtest.**
 
 The question this sprint answers for the Director: **does an established
 intracellular infection feel like something innate immunity struggles

@@ -12,6 +12,47 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 6 -- 2026-08-28
+An established intracellular infection is now the thing innate immunity is
+bad at, on purpose (`GAME_DESIGN.md` §4b -- the Director's rework after the
+Sprint 5 playtest).
+
+**You can't just shoot an infected cell any more.** A macrophage or
+neutrophil grinding on a cell with a virus or a bacterium inside does
+nothing directly. What it can do, each tick it's in contact, is **roll to
+recognise the infection** -- a low chance for innate cells -- and if it
+succeeds it kills the cell **loudly** (a big magenta burst), taking
+everything inside with it and releasing nothing. That low roll is the
+whole point: it's why you'll eventually want the stress-sensing cells (γδ
+T and friends) that get a *high* roll. Those aren't built yet -- this
+sprint is you feeling the problem.
+
+**Intracellular bacteria** now behave the way you asked: out of a cell
+they roam freely with no death timer and take normal damage -- that's your
+window. Inside a cell they're untouchable, and they **replicate, draining
+the host's health**, until it dies and a **brood of bacteria bursts out**.
+Catch the cell with a stress-sense kill before then and the brood never
+happens. A bacterium-infected cell now renders a sickly yellow-green, so
+you can tell it from a violet virus infection and watch one duck in and
+burst back out.
+
+**Viruses** split into two species. Contact-chain ones still snake --
+infect one neighbour, done. **Budding** ones emit free virions on a timer
+that float around (momentum-biased walk, per-tick chance to enter a
+healthy cell), so a budding infection grows as a **disk**. Free virions
+can only ever step onto healthy cells, so a budding front still can't
+cross dead ground -- the firebreak survives. And a chunk of viral
+infections now just **burn out on their own** -- the cell exhausts, dies
+loud, spills its virus, no immune action needed.
+
+Verified: `TissueVerification` grew from 53 to 73 assertions (stress-sense
+loud-kill / no-burst, exposed-vs-hidden bacterium, drain + brood + caught-
+early-no-brood, budding disk, burn-out), plus Combat 36 / Lifecycle 79 /
+Map 71 all still green -- **259 total, 0 failed**. **Not** verified: nobody
+has watched a macrophage catch an infection, a brood burst, a budding disk
+grow, or an infection burn out -- all the Director's playtest. Every
+number is an unvalidated mechanics-first default.
+
 ## Sprint 5 -- 2026-08-28
 Tissue is terrain now. Every cell in the tissue band is a host cell with
 its own state -- **Healthy**, **Infected**, **Dead**, or bare **Empty**

@@ -6,9 +6,13 @@ spread. Sprint 4 rewrote spatial geometry (Map 01 bands, the axis frame,
 `GutInterface`) — see the "Map 01 geometry" / "Gut interface" sections.
 **Sprint 5 (2026-08-28)** rewrote `TissueGrid` into two layers (host +
 occupant) with `HostState`, debris, efferocytosis, and class-specific
-advance — see "Occupancy state" and "Sprint 5 changes". Everything below
-reflects code that actually exists in `game/Assets/Scripts/` as of this
-sprint — it is not aspirational. There is no UI session/agent yet to
+advance — see "Occupancy state" and "Sprint 5 changes". **Sprint 6
+(2026-08-28)** made an established intracellular infection unreachable by
+ordinary innate damage and added the contact stress-sense roll, the real
+intracellular-bacterium model (replicate → brood burst), and virus budding
++ burn-out — see "Sprint 6 changes". Everything below reflects code that
+actually exists in `game/Assets/Scripts/` as of this sprint — it is not
+aspirational. There is no UI session/agent yet to
 consume this contract, so treat this as the engine side declaring its
 shapes ahead of need. Update this file whenever any of the below changes;
 per `WORKFLOW.md` that's a cross-team event even though "cross-team" is
@@ -936,15 +940,109 @@ non-overlapping vertical budgets (4% margin | marrow 62% | 4% gap | lymph
 30%), and slot size is capped against the band width too. The 25×10 resize
 had left them sized for 100×40, spilling across the board.
 
-### `Assets/Editor/TissueVerification.cs` (new)
+### `Assets/Editor/TissueVerification.cs` (new Sprint 5, grown Sprint 6)
 
-`TissueVerification.RunAll` — 53 assertions: two-layer occupancy,
-death→debris, debris-as-terrain (blocks regrowth / `ClearDebris` /
-self-dissipation), efferocytosis through the real `SearchUnit` path, the
-viral firebreak (rule-level: spreads into Healthy / fails-and-retries when
-walled / 60 cycles never cross a dead band / homeless free virus dies), and
-class-specific advance. Same drive-the-real-classes, no-Play-Mode
-philosophy as the four before it.
+`TissueVerification.RunAll` — **73 assertions** (was 53): two-layer
+occupancy, death→debris, debris-as-terrain, efferocytosis, the viral
+firebreak, class-specific advance, and Sprint 6's §4b coverage (contact
+stress-sense, exposed-vs-hidden bacterium, replication + brood burst +
+caught-early-no-brood, budding disk, spontaneous burn-out). Same
+drive-the-real-classes, no-Play-Mode philosophy as the four before it.
+
+## Sprint 6 changes — the intracellular-infection rework (`GAME_DESIGN.md` §4b)
+
+An established intracellular infection is no longer reachable by ordinary
+innate damage. Full design in §4b; the contract deltas:
+
+### `TissueGrid`
+
+- **`GetAttackableAt(CoarseCoord)` returns the extracellular occupant
+  ONLY.** The intracellular resident is never returned — Sprints 2–5
+  returned it and let a macrophage grind it down through the cell; that
+  path is gone.
+
+### `PathogenAgent`
+
+- **`ReceiveDamage(amount, source)` is a no-op while `IsIntracellular`.**
+  Ordinary damage cannot touch a hidden pathogen. `ClearFromCombat` now
+  only handles the extracellular case; the intracellular case leaves via
+  `OnHostCellDestroyed` when its host cell is killed (stress-sense roll,
+  drain-death, or collateral).
+- **`onSpreadRequested` → `onSpawnNear`**, type
+  `Func<CoarseCoord, PathogenClass, bool, float, bool>` — `(source,
+  class, asFreeParticle, currentTime) → spawned?`. One delegate for viral
+  spread and the bacterial brood.
+- **`TickCombat`** now drives an ESTABLISHED viral infection only
+  (`if (!IsIntracellular) return`): a one-time spontaneous burn-out roll
+  (`VirusBurnoutChance`, fires `VirusBurnoutMin..MaxSeconds` later →
+  `BurnOut`), then spread — **budding** (`virusBuds`: emit a free virion
+  every `VirusBuddingIntervalSeconds`, `asFreeParticle:true`, forever) or
+  **contact-chain** (one `asFreeParticle:false` hop, `hasSpread`).
+- **`StepVirus`** is now the FREE-virion tick: roll `VirusEntryChancePerTick`
+  to get inside a `Healthy` current cell, else `TryStepFreeVirion` — a
+  momentum-biased walk (3× weight to continue `lastHeading`) that may step
+  **only onto `Healthy`, occupant-free cells** (this is the firebreak),
+  else die on the `VirusFreeSurvivalSeconds` clock. `TryFindAndEnterHost`
+  and `hostSearchOrder` are removed.
+- **`StepIntracellularBacterium`** — extracellular: no death clock, roams
+  (`IntracellularEntryChance` 0.5 → 0.12), takes ordinary damage. Enters a
+  `Healthy` cell (per-tick roll). Intracellular: immune to damage;
+  replicates every `IntracellularReplicationIntervalSeconds`, draining
+  `IntracellularDrainPerReplication`, `broodCount++`. Drain-death →
+  `BurstBrood` (detach, `KillHostCell`, this bacterium survives as the
+  first of the brood, up to `IntracellularMaxBrood` total via
+  `onSpawnNear`). Killed any other way first → `OnHostCellDestroyed`, no
+  brood.
+- **`EstablishInfection(currentTime)`** — shared "now an intracellular
+  infection" setup (sets `IsIntracellular`, resets bud/burn-out state),
+  called by `StepVirus` establishing and `SettleIntoTissue`.
+- Removed: `hostEntryTime`, `IntracellularResidenceSeconds` (the Sprint 5
+  residence-timer / lyse model).
+
+### `PathogenSpawner`
+
+- **`RequestSpread` → `RequestSpawnNear(source, pClass, asFreeParticle,
+  currentTime)`.** Contact-chain virus (`asFreeParticle:false`): needs a
+  `Healthy`, occupant-free NEIGHBOUR (the firebreak). Budded virion / burn-
+  out spill (`asFreeParticle:true`): a free virion dropped on `source`
+  itself or any occupant-free tissue cell — no `Healthy` requirement, but
+  it can still only ESTABLISH in a `Healthy` cell. Brood: occupant-free
+  tissue cell, no `Healthy` requirement.
+
+### `SearchUnit`
+
+- **`bool CheckStressSense(float currentTime)`** (new, public, harness-
+  callable) — while in contact (same range test as `CheckContact`) with an
+  `Infected` cell, roll `tuning.StressSenseChancePerTick` once per tick; on
+  success `KillHostCell` (a loud necrotic kill of cell + all contents,
+  nothing released), credit self a kill, play a 1.5× magenta
+  `DegranulationFlash` (`StressKillColor`). Called from `SimulationTick`.
+- **`Degranulate`** now also `DamageHostCell`s its slot at the burst
+  multiplier (§6d "whatever host cell or infected cell is there"), since
+  `GetAttackableAt` no longer exposes the intracellular resident.
+- **`float StressSenseChancePerTick`** — read-through to the tuning.
+
+### `UnitProfile` / `UnitLifecycleTuning`
+
+New per-tower mutable field **`float StressSenseChancePerTick`** (§6d
+pattern; the future γδ T / CTL / NK sensors carry a high value here).
+`GameBootstrap`: macrophage `0.03`, neutrophil `0.02`. Wired through
+`FromProfile` / `CopyFromProfile` / `CopyFrom`.
+
+### `BoardRenderer`
+
+- **`static Color InfectedColorFor(PathogenAgent resident)`** — viral
+  violet vs. bacterial `InfectedByBacteriumColor` (sickly yellow-green).
+  `Refresh` uses it for `Infected` cells so the Director can tell the two
+  apart and watch a bacterium duck in / burst out.
+
+### `InvasionTuning` — new statics (all unvalidated defaults, `ResetToDefaults()`)
+
+`VirusEntryChancePerTick` 0.20, `VirusBuddingSpeciesChance` 0.5,
+`VirusBuddingIntervalSeconds` 2.5, `VirusBurnoutChance` 0.30,
+`VirusBurnoutMinSeconds` 8 / `VirusBurnoutMaxSeconds` 25,
+`IntracellularReplicationIntervalSeconds` 3, `IntracellularDrainPerReplication`
+2.5, `IntracellularMaxBrood` 6; `IntracellularEntryChance` 0.5 → 0.12.
 
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
@@ -1093,10 +1191,31 @@ serialized `columns` bug.
     tests the firebreak with a 3-cell band.
 16. **(New, Sprint 5) Every Sprint 5 number is an unvalidated default.**
     `TissueTuning` (`HostCellMaxHealth` 10, `HostRegenerationSeconds` 20,
-    `DebrisSelfDissipationSeconds` 60), `InvasionTuning`'s four new
-    class-advance knobs, and `UnitProfile.EfferocytosisDebrisPerTick` 0.05
-    for the macrophage. All mutable, all grouped for a tuning pass;
-    mechanics-first per the Director's standing instruction. The lysis
-    exit for an intracellular bacterium (`IntracellularResidenceSeconds`)
-    is also a judgment call — §1b step 4 doesn't say *how* one leaves a
-    cell, only that it does.
+    `DebrisSelfDissipationSeconds` 60), `InvasionTuning`'s class-advance
+    knobs, and `UnitProfile.EfferocytosisDebrisPerTick` 0.05 for the
+    macrophage. All mutable, all grouped for a tuning pass; mechanics-first
+    per the Director's standing instruction.
+17. **(New, Sprint 6) The innate stress-sense chance and every §4b number
+    are unvalidated.** `StressSenseChancePerTick` (macrophage 0.03,
+    neutrophil 0.02), the eight new `InvasionTuning` virus/bacterium knobs.
+    The stress-sense chance in particular is the dial the whole
+    innate↔adaptive bridge turns on — too high and a macrophage-wall
+    trivialises intracellular infection before the stress sensors exist;
+    too low and it reads as "nothing works." Needs the Director's
+    playtest.
+18. **(New, Sprint 6) Budding vs. contact-chain is a per-spawn coin flip,
+    not a species roster.** `VirusBuddingSpeciesChance` 0.5 is rolled per
+    agent, so a budding infection's established virions independently
+    re-roll (some of its children snake). Fine as "no roster yet"; when a
+    pathogen-species system lands this becomes a species trait. Any harness
+    test that watches a virus over time must force this (and
+    `VirusBurnoutChance`) to 0 or 1 for determinism.
+19. **(New, Sprint 6) `GetAttackableAt` occupant-only changed the
+    degranulation and kill-attribution contracts.** A neutrophil's
+    degranulation now reaches an infected cell via `DamageHostCell` rather
+    than `ReceiveDamage` on the resident; kill attribution for an
+    intracellular infection goes through `SearchUnit.CheckStressSense` →
+    `KillHostCell` → `OnHostCellDestroyed` (which credits nobody unless the
+    stress-sense path called `RegisterKill` on the sensing unit — it does).
+    Any future code that assumed "hit the pathogen, get the kill" for an
+    intracellular target needs the stress-sense path instead.

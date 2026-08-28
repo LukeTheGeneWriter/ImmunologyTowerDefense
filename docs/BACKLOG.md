@@ -357,3 +357,38 @@ Partly addressed by Sprint 6:
   *budding* as a second per-species spread mode (a growing disk), alongside
   the chain. The chain stays for non-budding species. Spontaneous burn-out
   also added.
+
+## Opened / updated by Sprint 6 (2026-08-28) — the §4b rework shipped
+
+- **The innate stress-sense chance is the dial the game turns on.**
+  `StressSenseChancePerTick` (macrophage 0.03, neutrophil 0.02) decides
+  whether an established intracellular infection is "a problem you chip at"
+  or "a wall you can't get past." Too high and a macrophage line
+  trivialises intracellular infection before the stress sensors exist; too
+  low and it reads as "my units do nothing." First real target for a
+  tuning pass, and it wants the Director's playtest specifically.
+- **`VirusBuddingSpeciesChance` is a placeholder for a species roster.**
+  Budding vs. contact-chain is currently a per-spawn coin flip, so a
+  budding infection's established children independently re-roll (some
+  snake). When a pathogen-species system lands (needed anyway for a real
+  enemy roster, `GAME_DESIGN.md` TBD list) this becomes a fixed per-species
+  trait, and so does "buds / burns out / drains at rate X".
+- **~~Viral spread is a one-shot chain, not a front~~ — partly addressed.**
+  §4b's *budding* species is a growing disk (repeated emission, no
+  `hasSpread`); the *chain* species still snakes. Both are now real. The
+  open part: whether the chain species should exist at all, or whether all
+  viruses should bud, is a species-design question for later.
+- **Dedicated stress-sensor units (γδ T / CTL / NK) + their patrol
+  pattern** — still deferred (see the Sprint 6 planning notes above). §4b
+  ships only the low innate roll; these are the high roll, and the bridge
+  to adaptive. The `StressSenseChancePerTick` field is already on
+  `UnitProfile` so they slot in without a data-model change.
+- **Macrophage homing on debris (efferocytosis chemotaxis)** — still
+  flagged, still not scoped. Sprint 6 didn't touch it. Note it now also
+  interacts with the loud/quiet death axis: a necrotic (stress-sense or
+  burn-out) death should pull harder than a quiet one.
+- **"Loud" is only a flash right now.** §4b says a loud necrotic kill
+  broadcasts a strong DAMP that recruits more innate cells and feeds
+  fibrosis (§6). Neither recruitment nor fibrosis exists, so a stress-sense
+  kill and a burn-out are "loud" only in the visual. The hooks are
+  commented in `SearchUnit.TryStressSenseAt` / `PathogenAgent.BurnOut`.

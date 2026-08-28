@@ -525,3 +525,49 @@ Sprint 4 `columns` bug (a field present in stale YAML overriding a new
 default): here the fields are simply not serialized, so the initializer
 wins. New lifecycle fields added to `UnitProfile` are safe as long as
 `GameBootstrap`'s initializer sets them; don't rely on the scene.
+
+### Sprint 6 — head session (2026-08-28, the intracellular-infection rework)
+
+Done inline by the head session (no dispatched agent) across one sitting,
+straight after Sprint 5's playtest and design conversation. Three code
+items, each committed green before the next.
+
+**The contract change rippled exactly as far as expected and no further.**
+Making `GetAttackableAt` return occupant-only + `ReceiveDamage` a no-op
+while `IsIntracellular` broke three harness assertions, all testing the
+now-retired "innate grinds an intracellular infection down through the
+cell" path (CombatVerification's clear-before-incubation, LifecycleVerification's
+kill-attribution-on-a-virus, TissueVerification's clear-via-ReceiveDamage).
+Fixes were mechanical: use `KillHostCell` for "caught early", use
+`LargeBacterium` (extracellular) where the test is class-agnostic. Worth
+knowing for the next combat-contract change: grep the harnesses for the
+old verb, don't just compile.
+
+**A one-shot chain vs. a repeating bud is the whole difference between a
+snake and a disk** — no separate "grow radially" code needed. The budding
+virus just doesn't set `hasSpread`; it emits every interval. The momentum
+walk on the free virion is polish on top (radial vs. blobby), and the
+"only step onto Healthy cells" rule is what keeps the firebreak intact
+through the rework — same emergent-not-checked principle as Sprint 5.
+
+**Budding-disk test: advance time in 1s steps, not one big jump.** A free
+virion dies after `VirusFreeSurvivalSeconds` (6s). A test loop that jumps
+`t` by an incubation window per cycle but only calls `SimulationTick(1, t)`
+gives the virion one step of movement and then 15+ seconds of "you've been
+homeless too long" — it never establishes. Drive the clock at the
+granularity the mechanic actually runs at.
+
+**Non-determinism from a per-spawn coin flip.** `VirusBuddingSpeciesChance`
+0.5 and `VirusBurnoutChance` 0.30 are rolled per agent off unseeded
+`Random`, so any test that seeds a virus and watches it over time is flaky
+unless it forces those to 0 (or 1) for the scenario it's actually about.
+Every viral-spread test now sets them explicitly and `ResetToDefaults()`
+after. Pattern to keep: a stochastic trait needs a harness override, not a
+hope.
+
+**`onSpreadRequested` -> `onSpawnNear` -> 4-arg `onSpawnNear`.** Two
+signature widenings in two commits (add `PathogenClass`, then add
+`asFreeParticle`). ~14 harness lambda callsites each time, all
+`(c, ...) => false`. `perl -pi` across `game/Assets/Editor/*.cs` is the
+fast path; the only hand-edits are the real callers. If a third parameter
+ever shows up here, consider a small struct instead.
