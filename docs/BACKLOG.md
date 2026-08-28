@@ -322,3 +322,38 @@ Sprint 7 or later:
   Sprint 7. When it lands, the "clearing removes what a DC would have
   sampled" tension (already flagged under "New, opened 2026-08-21") gets
   its real numbers: `EfferocytosisDebrisPerTick` vs. DC sample rate.
+
+## Sprint 6 planning notes (Director, 2026-08-28)
+
+The virus + intracellular-bacterium rework (`GAME_DESIGN.md` §4b) is
+**Sprint 6** — it jumped ahead of the ATP economy and the DC shuttle after
+the Sprint 5 playtest. Remaining queue, order not finally fixed: ATP
+economy + round loop, and the DC shuttle (§5a — the Director's most-wanted).
+
+Deferred out of Sprint 6, needed eventually:
+
+- **Dedicated stress-sensor units — γδ T cell, CTL, NK-like.** §4b's
+  contact stress-sense roll is *low* for innate cells (all Sprint 6 ships).
+  These units get a *high* roll — reliable recognition of an intracellular
+  infection — and are the concrete bridge from innate to adaptive. The γδ T
+  cell is already sketched in §4 (tissue-resident, no classical priming).
+  Not costed, not scheduled. Sprint 6 leaves the per-unit-kind stress-sense
+  field on `UnitProfile` so these slot in without a data-model change.
+- **A patrol movement pattern for stress-sensor cells** (Director's note).
+  Distinct from the §7/§9 search-ladder chemotaxis — a stress sensor is not
+  chasing a gradient, it is walking a beat and checking cells by contact.
+  Ships with the units above.
+- **Macrophage homing on debris (efferocytosis chemotaxis).** Sprint 5's
+  efferocytosis is opportunistic — a macrophage clears debris it happens to
+  stand on. The Director wants macrophages to *sense and move toward*
+  debris ("find-me" signalling). Good fit for a later combat-feel pass;
+  explicitly **not** required by Sprint 6. Note it interacts with the
+  loud/quiet death axis: a necrotic (loud) death should pull harder than a
+  quiet one.
+
+Partly addressed by Sprint 6:
+
+- **~~Viral spread is a one-shot chain, not a front~~** — §4b adds
+  *budding* as a second per-species spread mode (a growing disk), alongside
+  the chain. The chain stays for non-budding species. Spontaneous burn-out
+  also added.

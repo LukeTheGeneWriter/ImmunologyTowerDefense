@@ -1,164 +1,165 @@
-# Sprint Plan — Sprint 5
+# Sprint Plan — Sprint 6
 
-## Sprint 4 — closed 2026-08-21
+## Sprint 5 — closed 2026-08-28
 
-Delivered Map 01's geometry and the invasion loop: three lateral bands,
-lumen flow, proximity-gated adhesion, wall accumulation, the per-position
-breach burst, and base-directed advance. Verified 71/71 new assertions plus
-both prior harnesses. **The Director playtested and confirmed the rupture
-mechanic reads** — the sprint's whole question, answered yes.
+Delivered `GAME_DESIGN.md` §1c: the two-layer `TissueGrid` (host +
+occupant), four host-cell states with four distinct colours, debris as
+terrain (blocks regrowth; macrophage efferocytosis; ~60s self-dissipation;
+~20s regrowth), and a first pass at class-specific advance. **The Director
+playtested it:** the cell colours read, the viral firebreak reads, and a
+macrophage clearing a debris pile reads. Verified by a new
+`TissueVerification` harness (53 assertions) plus all three prior harnesses
+— 239 total, 0 failed.
 
-Same-day follow-up, already shipped: the board shrank from 100×40 to
-**25×10** (bands 6 | 13 | 6, keeping the proportions), which made units
-properly readable and got pathogens actually reaching the base within a
-short session.
+Playtest feedback that shaped Sprint 6:
 
-## Direction for Sprint 5 (Director, 2026-08-21)
+- The **intracellular bacterium** did not read — it rendered identically to
+  a viral infection and mostly just looked like a pathogen walking through
+  walls. More to the point, the Director replaced the model (see below).
+- The **macrophage** cleared debris but did not *home in* on it —
+  efferocytosis is currently opportunistic only.
+- Intracellular bacteria should be **vulnerable when out, protected when
+  in**, replicating at the host cell's expense, and only reliably killed by
+  a stress-sensing cell.
 
-The Director named three things for the next stretch — **debris, the
-progenitor buying tab, and lymphatic migration** — and approved splitting
-them across three sprints, because they form a hard dependency chain:
+Those decisions are now written into **`GAME_DESIGN.md` §4b** (Director,
+2026-08-28). This sprint builds §4b.
 
-- **Sprint 5 (this one): host-cell states and debris.** Debris *is* a dead
-  host cell, and `TissueGrid` currently has no concept of a host cell at
-  all, so §1c's state model has to land first.
-- **Sprint 6: ATP economy + the progenitor buying tab**, and very likely
-  the round loop, since `GAME_DESIGN.md` §5b's "ATP from starting a round"
-  has nothing to attach to without one.
-- **Sprint 7: lymphatic migration** — the DC shuttle of §5a. Blocked until
-  debris exists, because debris is what a DC picks up.
+## Direction for Sprint 6 (Director, 2026-08-28)
 
-Read `GAME_DESIGN.md` **§1c** before anything else. It is the authority for
-this sprint; this document is the implementation brief for it.
+Do the **virus and bacteria reworks** now — they are the natural
+continuation of Sprint 5's tissue/infection work and they are what the
+playtest asked for. The ATP economy + round loop, and the DC shuttle
+(`§5a`), stay queued after this; the Director has flagged the DC shuttle as
+the one he is most keen on, exact order to be set at Sprint 7 planning.
+
+**Read `GAME_DESIGN.md` §4b before anything else.** It is the authority for
+this sprint; this document is the implementation brief for it. §1c (host
+states / debris) and §1b (invasion loop) are the substrate it builds on.
 
 ## Scope
 
-**1. Two-layer lattice occupancy — the structural change.** Per §1c, each
-coarse position holds **two independent slots**:
+### 1. The stress signal + the contact stress-sense roll
 
-- **Host layer:** `Healthy` | `Infected` | `Dead` (debris) | `Empty`.
-- **Occupant layer:** extracellular things — a large bacterium, an
-  intracellular bacterium currently *outside* a cell, a free virus
-  particle between hosts.
+Per §4b. Every `Infected` host cell (viral or bacterial) carries a **stress
+signal**. It is **read on contact only** — it is *not* the recruitment
+cytokine field and must not be folded into it.
 
-`TissueGrid` today holds exactly one `PathogenAgent` per coarse slot and
-nothing else. That single-occupant model is what this sprint replaces.
+- An immune cell **in contact with an `Infected` cell** rolls **each tick**
+  to recognise the infection. Contact = the same fine-tile proximity test
+  `SearchUnit.CheckContact` already uses.
+- On success: a **loud kill** — the host cell dies necrotically (`Dead` +
+  debris, a loud death per §1c), and **every pathogen inside dies with it.
+  Nothing is released.**
+- The per-tick probability is a per-unit-kind field (`UnitProfile` /
+  `UnitLifecycleTuning`, never a const — §6d pattern). **Macrophage and
+  neutrophil get a LOW value this sprint.** Dedicated stress sensors (γδ T
+  etc.) are **out of scope** — leave the field on the profile so they slot
+  in later, but do not build the units or a patrol pattern.
+- A loud kill should be **visibly louder** than a quiet death — reuse /
+  extend `DegranulationFlash` (a distinct colour, bigger) so the Director
+  can see "a macrophage just caught one."
 
-**Why two layers and not one enum** (§1c has the full argument, but it is
-the thing most likely to get "simplified" away): the states genuinely
-co-occur. A bacterium crawling toward the base passes **over ground that
-still holds living host cells** — tissue is packed with cells and bacteria
-squeeze between them. "Occupied by bacteria" and "occupied by a healthy
-cell" are simultaneously true, and one enum cannot say that.
+### 2. Intracellular bacterium — the real model
 
-Immune cells are tracked on the fine lattice and are **not** part of either
-layer. Do not fold them in.
+Replaces Sprint 5's enter → 12s timer → lyse placeholder.
 
-**2. Host cells exist and can die.** The tissue band starts full of
-`Healthy` host cells. An infected cell that is cleared, or a cell damaged
-past its limit, becomes `Dead` and leaves debris. Sprint 2's existing
-"infected slot" concept (which is currently just "a slot with an
-intracellular pathogen in it") should become a real `Infected` host state
-that the pathogen occupies rather than replaces.
+- **Extracellular:** no death clock (unlike a virus — it survives out
+  there). Base-biased walk, *more* inclined to wander than the current
+  version. **Fully vulnerable to ordinary innate contact damage.**
+- **Enters** a `Healthy` host cell it is standing on — a per-tick roll
+  (`InvasionTuning`).
+- **Intracellular:** **immune to ordinary innate contact damage.** A
+  macrophage/neutrophil touching the cell does nothing except roll the
+  stress-sense (item 1). While inside, the bacterium **replicates on a
+  timer, draining `hostHealth`**. No voluntary exit.
+- **Host cell drained to death:** loud death, debris, and a **burst of N
+  extracellular bacteria** — `N` scales with incubation time (replication
+  count). Released onto the dead cell and its free neighbours.
+- **Caught by a stress-sense kill first: no burst.**
+- **Rendering:** an intracellular-bacterium cell must be tellable at a
+  glance from a virus-infected cell, from healthy, and from dead. The "went
+  in / came out" beat must read. Consider a marker on the cell, or a
+  distinct infected-cell tint per infecting class.
 
-Keep the existing cytokine behaviour working: infected cells secrete, the
-heatmap reads off that, and `Chemotaxis` biases toward it. That mechanism
-predates this sprint and must survive it.
+### 3. Virus — budding + burn-out
 
-**3. Debris behaves as terrain, per §1c's locked rules.**
-- **Blocks host-cell regeneration.** A position holding debris cannot
-  regrow a host cell until the debris is gone.
-- **Macrophages clear it** — efferocytosis, the macrophage's real second
-  job. This deliberately puts the same units doing the killing in
-  competition with themselves; that tension is the point, not a problem to
-  design around.
-- **It also dissipates on its own, slowly** — slow enough that macrophage
-  clearance is clearly the better answer, but present so a player who never
-  invests in clearance is not permanently locked out of their own tissue.
-- Make debris **visually distinct** from healthy tissue, infected tissue,
-  and bare ground. Four host states now share one cell; if the Director
-  cannot tell them apart at a glance the model is invisible.
+Keep the Sprint 5 contact-chain spread as one **per-species** mode. Add:
 
-**4. Host-cell regeneration.** Bare `Empty` ground regrows a `Healthy`
-cell over time. Rate is a tuning value nobody has chosen — pick one, state
-why, make it a field. Debris blocks it (item 3).
+- **Budding (some species):** the infected cell **periodically emits a free
+  virion** that does a **momentum-biased random walk** (slight bias toward
+  its last heading → roughly radial expansion) and **rolls a per-tick entry
+  chance** against the `Healthy` cell it is on. Each budded virion has its
+  **own survival clock** (`VirusFreeSurvivalSeconds`). A budding infection
+  should read as a growing **disk**, visibly unlike a chain virus's line.
+- **Spontaneous burn-out:** a **fraction of viral infections** deplete and
+  die on their own — loud death, debris, and their virions spilled into the
+  tissue — with no immune action. Self-limiting even if ignored.
+- Budding virions still only establish in **`Healthy`** cells, so the
+  firebreak survives — a `TissueVerification` assertion must prove a budding
+  front still cannot cross dead ground.
+- "Which species buds" is a `PathogenClass`-adjacent trait; a simple
+  per-spawn flag is fine this sprint (no species roster yet).
 
-**5. Class-specific advance, now that it is possible.** §1b step 4 was
-deferred out of Sprint 4 precisely because it needs host states:
-- **Viruses spread cell-to-cell in all directions with no base bias**, and
-  **die if they do not find a host quickly.** A virus can only spread into
-  a `Healthy` neighbour, so a viral front advances through intact tissue
-  and **cannot cross ground it has already killed** — dead tissue is a
-  firebreak. That behaviour is emergent from the two rules; do not script
-  it.
-- **Intracellular bacteria** use the base-biased walk while *outside* a
-  cell, and are hidden (occupying an `Infected` host) while inside.
-- **Large bacteria** keep the Sprint 4 base-biased walk, visible
-  throughout.
+### 4. Keep everything from Sprints 1–5 working
 
-**6. Fix the base-band layout.** The 25×10 resize left the bone marrow
-strip, its tower boxes, and the lymph node backdrop sized for the old
-proportions — they overlap each other and spill across the board. This is
-small, visible, and in the Director's way every time he plays.
+The firebreak, host states, debris/efferocytosis, the breach burst,
+base-directed advance, population caps, kill-count depletion, cytokine
+sensing + heatmap, pooling. In particular the innate contact-damage path
+for **extracellular** pathogens (large bacterium, extracellular
+intracellular-bacterium, exposed virion) is unchanged — only the
+*intracellular* case gains protection.
 
-**7. Explicitly not in scope.** ATP, economy, prices, the buying tab, the
-round loop (all Sprint 6). Dendritic cells, lymphatic migration, T/B cells,
-knowledge accrual (all Sprint 7). "Don't eat me" signals. Fibrosis as a
-distinct system beyond debris. Parasites. Balance tuning — **the
-Director's standing instruction is still mechanics first.**
+### 5. Explicitly not in scope
 
-Everything Sprints 1–4 built must keep working: the three bands, lumen flow
-and excretion, proximity adhesion, the breach burst, base-directed advance,
-per-tower population caps, kill-count depletion and degranulation, kill
-attribution, proximity contact, cytokine sensing + heatmap, pooling.
+Dedicated stress-sensor units (γδ T / CTL / NK) and their patrol pattern —
+`BACKLOG.md`. Macrophage *homing* on debris (efferocytosis chemotaxis) —
+the Director raised it; it is a good fit for a later pass and is **not**
+required here. ATP economy, prices, round loop — the sprint after. DC
+shuttle, T/B cells, knowledge accrual — after that. Parasites. Balance
+tuning — mechanics first, still.
 
-## Stopping point (definition of done) — status 2026-08-28
+## Stopping point (definition of done)
 
-Mechanics all landed and covered by the new `TissueVerification` harness
-(53 assertions); the visual/"at a glance" halves are the Director's
-playtest. `[x]` = done, `[~]` = code done + harness-verified, visual
-unconfirmed.
+The Director can watch, in a build:
 
-- [x] A coarse position can hold a host cell **and** an extracellular
-      pathogen at the same time, in two slots not one enum.
-      (`TissueGrid` host + occupant layers; `TissueVerification` group A.)
-- [~] `Healthy` / `Infected` / `Dead (debris)` / `Empty` are four distinct
-      colours (`BoardRenderer.HostStateColor`, asserted distinct). "At a
-      glance" is the playtest.
-- [x] Killing an infected cell leaves debris. (Every death path →
-      `KillHostCell` → `Dead` + full debris; group B.)
-- [x] Debris blocks regeneration; clearing it lets a cell regrow. (Group C.)
-- [~] A macrophage clears debris (efferocytosis, `CheckEfferocytosis`,
-      group D) with a blue-green flash. The flash is unwatched.
-- [x] Debris self-dissipates, ~20× slower than a macrophage. (Group C.)
-- [~] A viral infection **cannot cross dead ground** — verified as an
-      emergent rule (60 cycles, full-lane dead band never crossed; group
-      E). The *sight* of it is the sprint's headline playtest question.
-- [~] An intracellular bacterium is hidden inside a cell and visible out of
-      one (`IsIntracellular` drives rendering; group F). Visual unwatched.
-- [x] The base band's compartments no longer overlap or spill — confirmed
-      from the build's bootstrap diagnostic (marrow strip and lymph
-      backdrop both inside the base band, clean gap between them).
-- [x] Everything from Sprints 1–4 still works. (Map 71 / Lifecycle 79 /
-      Combat 36 all re-run green.)
-- [x] `docs/ENGINE_STATUS.md`, `docs/INTERFACE.md`, `docs/TEAM_RETRO.md`,
-      `docs/CHANGELOG.md`, `docs/BACKLOG.md` updated.
+- [ ] An **intracellular bacterium visibly enter a host cell** — the cell
+      changes in a way distinct from a viral infection — be **untouchable
+      by a macrophage** sitting on it, drain the cell, and **burst a brood**
+      of bacteria out when the cell dies.
+- [ ] A **macrophage occasionally "notice" an infected cell** on contact
+      and kill it in a visibly loud way, **with no pathogen released**.
+- [ ] A **budding-virus infection expand as a rough disk** of infected
+      cells, next to a **chain-virus infection that snakes** — the two read
+      as different.
+- [ ] **Some infections die on their own**, spilling debris and virions,
+      with nothing attacking them.
+- [ ] An extracellular intracellular-bacterium still **takes ordinary
+      macrophage/neutrophil damage** and dies to it.
+- [ ] A budding front still **fails to cross dead ground** (firebreak
+      intact) — harness-asserted.
+- [ ] Everything from Sprints 1–5 still works.
+- [ ] `TissueVerification` grows to cover: contact stress-sense (loud kill,
+      no burst), extracellular-vulnerable / intracellular-protected,
+      bacterial replication + burst + caught-early-no-burst, budding vs
+      chain, spontaneous burn-out.
+- [ ] `docs/ENGINE_STATUS.md`, `docs/INTERFACE.md`, `docs/CHANGELOG.md`,
+      `docs/BACKLOG.md` reflect reality, and `docs/TEAM_RETRO.md` has a new
+      note.
 
-**Handed to the Director for playtest.** The question it answers: **does
-tissue feel like terrain now?** Does losing ground read as losing
-something — and does the firebreak (a viral front stalling against tissue
-it already killed) show up on its own, without being staged?
+The question this sprint answers for the Director: **does an established
+intracellular infection feel like something innate immunity struggles
+with** — something you can only catch by luck or by burning the tissue
+down — so that the eventual stress-sensor and adaptive units have an
+obvious job?
 
 ## A process note for whoever is dispatched
 
-**Commit after each scope item, even if it is incomplete or ugly.** Sprint
-3's agent hit its usage limit having written no docs; Sprint 4's agent hit
-its limit having committed **nothing at all** — ~1,600 lines of
-uncompilable working tree, no harness, no docs, all of which the head
-session had to repair and reconstruct. Sprint 4's brief already said "write
-docs as you go" and that was not enough, because the commit got batched to
-the end too.
-
-An incomplete committed tree is recoverable. An uncommitted one is not.
-Same for `docs/INTERFACE.md` and `docs/TEAM_RETRO.md`: update them as each
-signature changes and as each judgment call is made, not in a final sweep.
+Sprints 3, 4 and 5 were all implemented by dispatched Code agents that were
+interrupted mid-task. Sprint 5's hand-off was the first clean one, because
+the brief said **commit after each scope item, even if incomplete or
+ugly** — and the agent did. Keep doing that. Update `docs/INTERFACE.md` as
+each signature changes and append to `docs/TEAM_RETRO.md` as each judgment
+call is made, not in a final sweep. A verbose, reasoning-heavy commit
+message is the recovery artifact when the author disappears mid-sprint —
+it has been, four times now.

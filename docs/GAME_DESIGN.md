@@ -8,6 +8,11 @@ marked **LOCKED** are settled; sections marked **TBD** or **open** need a
 Director decision before they can be built — see `docs/BACKLOG.md` for the
 tracked list.
 
+Later Director decisions with their own dated markers: §1a–§1c, §5a–§5c,
+§6b–§6d (2026-08-21); **§4b — intracellular infection / the innate↔adaptive
+bridge (2026-08-28), which supersedes §1b step 4 and the intracellular rows
+of §4a in detail.**
+
 ## Locked decisions — platform & genre
 
 - **Engine:** Unity (decided 2026-08-18 — see rationale in `ENGINE_STATUS.md`).
@@ -193,6 +198,20 @@ walking.
 
 **Large bacteria — straightforwardly motile.** Base-biased random walk,
 visible as themselves the whole time.
+
+> **Refined by the Director, 2026-08-28** — after the Sprint 5 playtest.
+> The virus / intracellular-bacterium behaviour above is superseded in
+> detail by **§4b (Intracellular infection — the innate↔adaptive
+> bridge)**. Headlines: intracellular bacteria roam *freely* when
+> extracellular (no death clock — they have the chassis to survive, unlike
+> a virus) and **replicate while inside**, draining the host cell, then
+> **burst out as a brood** when it dies; some virus species **bud** free
+> virions rather than only chain cell-to-cell; a fraction of viral
+> infections **burn out on their own**; and both classes, while
+> intracellular, are only cleared by a **contact stress-sense roll** (low
+> for innate, high for the not-yet-built stress sensors) or by running
+> their course. Sprint 5 shipped a placeholder (enter → 12s timer → lyse);
+> Sprint 6 replaces it with §4b.
 
 ### Step 5 — Reaching the base costs a life
 
@@ -443,8 +462,8 @@ new ones.
 
 | Class | Example | Occupies | Visible as | Cleared by |
 |---|---|---|---|---|
-| **Intracellular — virus** | generic virus | Hides inside a host cell; the cell is not replaced | The host cell, not itself (until sensed — see below) | Collateral damage to the whole infected cell (innate) or precise MHC-I killing (adaptive, ~10% knowledge, §5) |
-| **Intracellular — bacterium** | *Salmonella* (or *Listeria*/*Shigella* — genuinely gut-invasive, unlike *C. diff*, which is extracellular and toxin-mediated, not intracellular) | Same as virus | Same as virus | Same as virus |
+| **Intracellular — virus** | generic virus | Hides inside a host cell; the cell is not replaced | The host cell, not itself (until sensed) | **§4b:** contact stress-sense roll (innate low / stress sensors high) → loud kill of the cell; or the infection burns out on its own; precise MHC-I killing (adaptive, ~10% knowledge, §5) is the quiet version |
+| **Intracellular — bacterium** | *Salmonella* (or *Listeria*/*Shigella* — genuinely gut-invasive, unlike *C. diff*, which is extracellular and toxin-mediated, not intracellular) | Roams freely when extracellular; hides inside a host cell (cell not replaced), replicating | Itself when extracellular; the host cell when inside | **§4b:** ordinary combat damage *only while extracellular*; while inside, the same contact stress-sense roll as the virus, else it runs its course (drains the cell to death, bursts out a brood) |
 | **Large bacterium (extracellular)** | generic gut bacterium | Kills and directly occupies one coarse slot | Itself — no disguise | Direct combat damage to the pathogen |
 | **Parasite** | generic multicellular/large parasite | Multiple coarse slots at once | Itself, spanning its footprint | Direct combat damage, more of it (bigger target) |
 
@@ -474,7 +493,9 @@ search (cytokine sensing and beyond, §7/§9) catches infections before they
 spread. It's a direct, legible payoff for exactly the search-ladder
 progression the game is built around — not a separate difficulty knob
 bolted on. (Intracellular bacteria are not stated to spread this way — this
-is a virus-specific mechanic unless/until said otherwise.)
+is a virus-specific mechanic unless/until said otherwise.) **§4b adds a
+second, per-species spread mode — *budding* — and a spontaneous
+burn-out fraction.**
 
 **Parasites' multi-slot footprint is a real structural change**, not just a
 bigger number — `TissueGrid`'s occupancy model (§7, and
@@ -483,6 +504,119 @@ slot. Building this properly (footprint claiming multiple slots, partial
 clearing, etc.) is more engineering than the other three classes combined.
 See `docs/SPRINT_PLAN.md` for which of these four classes land in which
 sprint — not all four need to ship at once.
+
+## 4b. Intracellular infection — the innate↔adaptive bridge — LOCKED (Director, 2026-08-28)
+
+Sprint 5 shipped a placeholder for the two intracellular classes (walk in,
+sit on a 12-second timer, lyse back out). The Director playtested it and
+replaced the model. This section is the replacement; Sprint 6 builds it.
+The point of the rework: **an established intracellular infection is the
+thing innate immunity is *bad at*, on purpose** — it is what the adaptive
+half of the game exists to answer, and the mechanics here are the seam
+between the two.
+
+### The stress signal, and why sensing needs contact
+
+Every infected cell — viral or bacterial — emits a **stress signal**. It is
+**not** the recruitment cytokine of §7/§9: that one says "something is
+wrong over here, come look," and drives chemotaxis from a distance. The
+stress signal is different — it is read **on contact**, and it answers
+"*this* cell, the one I am touching, is infected and needs to die."
+
+The Director's reasoning for making recognition contact-gated: a cell
+stressed enough to be screaming chemokine has *already* tried to kill
+itself (apoptosis). Whether an immune cell then finishes the job is a
+close-range decision — a handshake, not a broadcast.
+
+### The contact stress-sense roll
+
+An immune cell **in contact with an infected cell** rolls, **each tick**,
+to recognise the infection. On success it performs a **loud kill**:
+
+- The host cell dies **necrotically** — `Dead` + debris, and a **strong
+  DAMP** (a loud death per §1c) that recruits more innate cells and feeds
+  fibrosis (§6) later.
+- **Everything inside dies with it. No pathogen is released** — not a
+  virion, not a bacterium. Catching an infection early is how you deny the
+  brood (see bacterial replication below).
+
+The roll probability is **pathogen-class-specific** and, more importantly,
+**cell-type-specific**:
+
+| Sensing cell | Per-tick recognition | Built? |
+|---|---|---|
+| Innate (macrophage, neutrophil) | **Low** — they lack antigen-specific recognition; this is generic stress/damage sensing | Sprint 6 |
+| Dedicated stress sensors (γδ T cell, CTL, NK-like) | **High** — they know what they are looking for; this is the payoff for investing past innate | Later — see below |
+
+This is the bridge: innate can clear an intracellular infection, but only
+by luck and only loudly. The stress sensors clear it reliably. Adaptive
+MHC-I killing (§5, ~10% knowledge) is the *quiet* precise version of the
+same recognition — no necrotic DAMP, minimal collateral.
+
+**Dedicated stress-sensor units are deferred** (Director, 2026-08-28 —
+"we can wait to build gamma deltas… for a moment"). Sprint 6 ships only the
+innate (low) roll, so the Director feels the problem — "my macrophages
+can't touch this" — before the answer is purchasable. When those units
+land they will also want a **patrol movement pattern** distinct from the
+search-ladder chemotaxis (Director's note); that is deferred with them, in
+`BACKLOG.md`.
+
+### Virus — revised
+
+- **A free virion dies after `VirusFreeSurvivalSeconds` outside a host.**
+  Unchanged — the "needs a new host *now*" pressure, and half of the
+  firebreak (§1c).
+- **Spread has two per-species modes:**
+  - *Contact-chain* (Sprint 5, kept): an infected cell infects **one**
+    adjacent healthy cell after an incubation period. Produces a snaking
+    path.
+  - *Budding* (new, some species only): the infected cell **periodically
+    emits a free virion** that (a) does a **momentum-biased random walk** —
+    a slight bias toward its last heading, so a cloud of budded virions
+    expands roughly **radially** from the source rather than diffusing
+    formlessly — and (b) **rolls a per-tick "entry" chance** against
+    whatever healthy cell it is currently on. Each budded virion carries
+    **its own survival clock**. A budding infection reads as a growing
+    *disk* of infected cells, visibly different from a chain virus's line.
+- **Spontaneous burn-out:** a **fraction of viral infections deplete and
+  die on their own** — the cell exhausts, dies loud, and spills its
+  virions + debris with no immune action. Makes a viral infection
+  self-limiting even if wholly ignored, and seeds fresh free virions into
+  the tissue as it goes.
+- Infected cells still spread only into **`Healthy`** neighbours, so a
+  budding front still cannot cross dead ground — the firebreak survives the
+  rework.
+
+### Intracellular bacterium — revised
+
+- **Extracellular: no death clock.** Unlike a virus, it has the chassis to
+  survive in the interstitium indefinitely. It roams on the base-biased
+  walk and is **fully vulnerable to ordinary innate contact damage** — this
+  is the window to kill it cheaply. Give it *more* inclination to wander
+  than a virus (the Director's words: "more of a chance to move around
+  outside the cells").
+- **Enters a healthy host cell it is standing on** — a per-tick roll.
+- **Intracellular: immune to ordinary innate contact.** A macrophage or
+  neutrophil touching the cell does nothing *except* roll the contact
+  stress-sense (low). While inside, the bacterium **replicates on a timer,
+  draining the host cell's health**. No voluntary exit.
+- **When the drain kills the cell:** loud death, debris, and a **burst of N
+  bacteria** released as extracellular — `N` scales with how long the
+  infection incubated (replication count). Option A from the design
+  conversation.
+- **If a stress-sense roll kills the cell first: no burst.** The brood dies
+  with the host. This is what makes the low innate roll still worth
+  something — every tick a macrophage sits on an infected cell is a chance
+  to abort the whole thing.
+
+### Numbers — all TBD, mechanics-first
+
+Innate stress-sense per-tick probability, bacterial replication interval
+and host-drain rate, brood size `N` as a function of incubation, budding
+interval, per-tick virion entry chance, momentum-bias weight, spontaneous
+burn-out fraction and its timing. None chosen; all belong in
+`InvasionTuning`/`TissueTuning` as mutable fields. The Director's standing
+instruction is still mechanics first.
 
 ## 5. Pathogen knowledge — LOCKED
 
