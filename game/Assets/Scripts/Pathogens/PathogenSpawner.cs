@@ -120,34 +120,38 @@ namespace ImmunologyTD.Pathogens
 
         /// <summary>
         /// Spawns one pathogen of <paramref name="pClass"/> at or beside
-        /// <paramref name="source"/>. Two production callers, both through
+        /// <paramref name="source"/>. Three production callers, all through
         /// PathogenAgent's `onSpawnNear` delegate:
         ///
-        ///  - **Viral spread** (`IntracellularVirus`) -- from an infected
-        ///    cell after incubation. The target must be an in-bounds,
+        ///  - **Viral CONTACT-CHAIN spread** (`IntracellularVirus`,
+        ///    `asFreeParticle` false) -- the target must be an in-bounds,
         ///    TISSUE-BAND, **`Healthy`**, occupant-free NEIGHBOUR. The
         ///    Healthy check (Sprint 5) is half of what makes the firebreak
         ///    emerge -- a virus ringed by dead/infected ground gets `false`
         ///    here and retries rather than burning its one-shot spread. The
-        ///    band check (Sprint 4) keeps it out of the lumen.
-        ///  - **Bacterial brood burst** (`IntracellularBacterium`, Sprint 6)
-        ///    -- from a cell just drained to death. The bacterium is
-        ///    extracellular, so the target only needs to be an in-bounds,
-        ///    TISSUE-BAND, occupant-free cell; `source` itself is tried first
-        ///    (the dead cell the brood is bursting from), then its
-        ///    neighbours. **No `Healthy` requirement.**
+        ///    virion establishes instantly (SettleIntoTissue infects it).
+        ///  - **Viral BUDDING / burn-out spill** (`IntracellularVirus`,
+        ///    `asFreeParticle` true) -- drops a **free virion** on `source`
+        ///    itself (the infected cell, so SettleIntoTissue can't infect it
+        ///    and it lands on the occupant layer) or, if that is taken, an
+        ///    occupant-free tissue neighbour of any host state. It then
+        ///    floats via `PathogenAgent.StepVirus`. **No `Healthy`
+        ///    requirement**, but the virion can still only ever ESTABLISH in
+        ///    a Healthy cell, so the firebreak holds.
+        ///  - **Bacterial brood burst** (`IntracellularBacterium`) -- from a
+        ///    cell just drained to death; occupant-free tissue cell, `source`
+        ///    first then neighbours, no `Healthy` requirement.
         ///
-        /// Neighbour order is shuffled each call so neither favours a
-        /// direction.
+        /// Neighbour order is shuffled each call so none favours a direction.
         /// </summary>
-        public bool RequestSpawnNear(CoarseCoord source, PathogenClass pClass, float currentTime)
+        public bool RequestSpawnNear(CoarseCoord source, PathogenClass pClass, bool asFreeParticle, float currentTime)
         {
             if (live.Count >= maxLivePathogens) return false;
 
-            bool needsHealthyHost = pClass == PathogenClass.IntracellularVirus;
+            bool needsHealthyHost = pClass == PathogenClass.IntracellularVirus && !asFreeParticle;
 
-            // A brood may land on the source cell itself (a virus never can --
-            // that cell is already infected).
+            // A brood or a budded free virion may land on the source cell
+            // itself; a contact-chain virus never can (that cell is infected).
             if (!needsHealthyHost && TrySpawnAt(source, pClass, needsHealthyHost, currentTime)) return true;
 
             var order = new[] { 0, 1, 2, 3 };

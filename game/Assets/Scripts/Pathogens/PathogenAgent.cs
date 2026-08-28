@@ -96,7 +96,7 @@ namespace ImmunologyTD.Pathogens
         private GutInterface gutInterface;
         private InvasionTally tally;
         private System.Action<PathogenAgent> onExit;
-        private System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear;
+        private System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear;
 
         public PathogenState State { get; private set; }
 
@@ -198,17 +198,37 @@ namespace ImmunologyTD.Pathogens
         /// cell entry.</summary>
         private int broodCount;
 
-        /// <summary>Shuffle buffer for the five cell-to-cell spread
-        /// candidates (own cell + four von Neumann neighbours), reused so a
-        /// virus's per-step host search allocates nothing
-        /// (GAME_DESIGN.md section 8).</summary>
-        private readonly int[] hostSearchOrder = { 0, 1, 2, 3, 4 };
+        // -- Virus species traits (GAME_DESIGN.md §4b), assigned once when
+        //    Class becomes IntracellularVirus. --
 
-        /// <summary>The five candidates above as (deltaAxis, deltaCross)
-        /// pairs in the AXIS FRAME. Index 0 is "stay here." The four steps
-        /// are symmetric and equally weighted, which is what "spreads in all
-        /// directions with no base bias" means -- there is deliberately no
-        /// toward-base term anywhere in the viral path.</summary>
+        /// <summary>True for a BUDDING virus species: an established
+        /// infection emits a free virion every
+        /// InvasionTuning.VirusBuddingIntervalSeconds and never stops (a
+        /// growing disk). False for a contact-chain species (one hop, then
+        /// done -- a snake).</summary>
+        private bool virusBuds;
+        private float lastBudTime;
+
+        /// <summary>Rolled once when an infection establishes: a fraction
+        /// (InvasionTuning.VirusBurnoutChance) of viral infections
+        /// spontaneously exhaust and die loud, spilling the virus back out
+        /// as a free virion. <see cref="burnoutTime"/> is when.</summary>
+        private bool burnoutRolled;
+        private bool willBurnOut;
+        private float burnoutTime;
+
+        /// <summary>A free virion's last step direction, in the axis frame.
+        /// Its walk is biased toward this so a cloud of budded virions
+        /// expands roughly radially instead of diffusing formlessly
+        /// (GAME_DESIGN.md §4b).</summary>
+        private int lastHeadingAxis;
+        private int lastHeadingCross;
+
+        /// <summary>Von Neumann offsets in the AXIS FRAME. Index 0 is "stay
+        /// here"; 1..4 are the four cardinals, symmetric and (base-)unbiased,
+        /// per §1b step 4's "in all directions with no base bias." Used by
+        /// the free virion's momentum walk and the burst-brood direction
+        /// pick.</summary>
         private static readonly (int axis, int cross)[] SpreadOffsets =
         {
             (0, 0), (-1, 0), (1, 0), (0, -1), (0, 1),
@@ -232,13 +252,14 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear)
         {
             BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
             EnsureSprite();
 
             Class = PickRandomClass();
             SetHealthForClass();
+            AssignVirusTraits();
 
             int axisIndex = Random.Range(board.LumenNearWallAxisIndex, board.AxisLength);
             CurrentCoarse = board.CoarseFromAxis(axisIndex, board.LumenEntryCrossIndex);
@@ -271,7 +292,7 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void InitializeInTissueDirect(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear,
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
             CoarseCoord slot, PathogenClass pClass, float currentTime)
         {
             BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
@@ -279,6 +300,7 @@ namespace ImmunologyTD.Pathogens
 
             Class = pClass;
             SetHealthForClass();
+            AssignVirusTraits();
             InterfacePosition = -1;
             hasSpread = false;
             contactFlashTimer = 0f;
@@ -318,20 +340,20 @@ namespace ImmunologyTD.Pathogens
         {
             if (Class == PathogenClass.IntracellularVirus && tissueGrid.TryInfect(slot, this, currentTime))
             {
-                IsIntracellular = true;
+                EstablishInfection(currentTime); // sets IsIntracellular, resets bud/burnout state, applies colour
             }
             else
             {
                 IsIntracellular = false;
                 freeSinceTime = currentTime;
                 tissueGrid.TryClaimOccupant(slot, this, infectionStartTime);
+                ApplyRestColorForCurrentClass();
             }
-            ApplyRestColorForCurrentClass();
         }
 
         private void BindContext(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
@@ -583,38 +605,114 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>
-        /// **Viruses: diffusive, self-limiting, no base bias whatsoever.**
+        /// One tick of a FREE virion (occupant layer, between hosts).
+        /// GAME_DESIGN.md §4b:
         ///
-        /// An intracellular virus does not move at all -- it is inside a
-        /// cell, and its only way forward is <see cref="TickCombat"/>'s
-        /// cell-to-cell spread. A FREE virus (occupant layer, between hosts)
-        /// looks for a `Healthy` host in its own cell and its four
-        /// neighbours, in shuffled order, and dies if it has been homeless
-        /// for InvasionTuning.VirusFreeSurvivalSeconds.
+        ///  1. If it is on a `Healthy` cell, roll
+        ///     InvasionTuning.VirusEntryChancePerTick to get inside it.
+        ///  2. Otherwise wander one step -- a **momentum-biased** walk that
+        ///     may only ever step onto a `Healthy`, occupant-free tissue
+        ///     cell. That restriction IS the firebreak: a virion physically
+        ///     cannot traverse dead or infected ground, so a viral front
+        ///     cannot cross a band it has already killed. No firebreak check
+        ///     anywhere.
+        ///  3. If it can neither enter nor move, it is stranded and dies on
+        ///     the InvasionTuning.VirusFreeSurvivalSeconds clock -- no kill,
+        ///     no debris (no host cell died with it).
         ///
-        /// **The firebreak is emergent and there is no firebreak check.**
-        /// A free virus may only ever move ONTO a healthy host cell -- it
-        /// cannot traverse dead, empty, or already-infected ground even for
-        /// one step -- so a viral front that has killed the tissue behind it
-        /// physically cannot cross that ground, and the survival timer
-        /// finishes off whatever is stranded against it. Both halves are
-        /// plain local rules; the firebreak is what they add up to.
+        /// An intracellular virus does not come through here at all -- its
+        /// spread is <see cref="TickCombat"/>'s job (bud or chain).
         /// </summary>
         private void StepVirus(float currentTime)
         {
-            if (IsIntracellular) return; // hidden inside a cell; spread is TickCombat's job
+            if (IsIntracellular) return;
 
-            if (TryFindAndEnterHost(currentTime)) return;
+            if (tissueGrid.IsHealthyHost(CurrentCoarse)
+                && Random.value < InvasionTuning.VirusEntryChancePerTick
+                && tissueGrid.TryInfect(CurrentCoarse, this, currentTime))
+            {
+                tissueGrid.ReleaseOccupant(CurrentCoarse);
+                EstablishInfection(currentTime);
+                return;
+            }
+
+            if (TryStepFreeVirion(currentTime)) return;
 
             if (currentTime - freeSinceTime >= InvasionTuning.VirusFreeSurvivalSeconds)
             {
-                // Died without finding a host. Not a kill -- nobody is
-                // credited, and it leaves no debris because no host cell
-                // died with it.
                 State = PathogenState.Cleared;
                 tissueGrid.ReleaseOccupant(CurrentCoarse);
                 onExit?.Invoke(this);
             }
+        }
+
+        /// <summary>Shared "I am now an intracellular infection" setup, used
+        /// by a free virion establishing (<see cref="StepVirus"/>) and by a
+        /// contact-chain spawn (<see cref="SettleIntoTissue"/>).</summary>
+        private void EstablishInfection(float currentTime)
+        {
+            IsIntracellular = true;
+            infectionStartTime = currentTime;
+            hasSpread = false;
+            burnoutRolled = false;
+            willBurnOut = false;
+            lastSpreadAttemptTime = float.NegativeInfinity;
+            lastBudTime = float.NegativeInfinity;
+            ApplyRestColorForCurrentClass();
+        }
+
+        /// <summary>
+        /// One step of a free virion's momentum-biased walk. Eligible
+        /// destinations are the von Neumann tissue neighbours that are
+        /// `Healthy` AND occupant-free -- nothing else, which is the
+        /// firebreak. Among those, the one continuing this virion's last
+        /// heading is weighted heavier so a cloud of budded virions expands
+        /// roughly radially rather than diffusing in place.
+        /// </summary>
+        private bool TryStepFreeVirion(float currentTime)
+        {
+            int count = 0;
+            float total = 0f;
+            int baseAxis = board.AxisIndex(CurrentCoarse);
+            int baseCross = board.CrossIndex(CurrentCoarse);
+
+            for (int k = 1; k <= 4; k++) // SpreadOffsets 1..4 are the four cardinals
+            {
+                var (dAxis, dCross) = SpreadOffsets[k];
+                int ai = baseAxis + dAxis;
+                int ci = baseCross + dCross;
+                if (!board.InAxisBounds(ai) || !board.InCrossBounds(ci)) continue;
+                if (board.BandAtAxisIndex(ai) != BoardBand.Tissue) continue;
+                var cand = board.CoarseFromAxis(ai, ci);
+                if (!tissueGrid.IsHealthyHost(cand) || !tissueGrid.IsOccupantFree(cand)) continue;
+
+                advanceCandidates[count] = cand;
+                advanceWeights[count] = (dAxis == lastHeadingAxis && dCross == lastHeadingCross) ? 3f : 1f;
+                total += advanceWeights[count];
+                count++;
+            }
+
+            if (count == 0) return false;
+
+            float pick = Random.value * total;
+            int chosen = count - 1;
+            float running = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                running += advanceWeights[i];
+                if (pick <= running) { chosen = i; break; }
+            }
+
+            var dest = advanceCandidates[chosen];
+            if (!tissueGrid.TryClaimOccupant(dest, this, currentTime)) return false;
+            tissueGrid.ReleaseOccupant(CurrentCoarse);
+
+            lastHeadingAxis = board.AxisIndex(dest) - baseAxis;
+            lastHeadingCross = board.CrossIndex(dest) - baseCross;
+            CurrentCoarse = dest;
+            Current = board.CoarseCenterFine(dest);
+            MoveTo(board.CoarseToWorldCenter(dest), InvasionTuning.TissueStepIntervalSeconds);
+            return true;
         }
 
         /// <summary>
@@ -703,56 +801,9 @@ namespace ImmunologyTD.Pathogens
             int total = Mathf.Clamp(broodCount, 1, Mathf.Max(1, InvasionTuning.IntracellularMaxBrood));
             for (int i = 0; i < total - 1; i++)
             {
-                if (onSpawnNear == null || !onSpawnNear(at, PathogenClass.IntracellularBacterium, currentTime)) break;
+                if (onSpawnNear == null || !onSpawnNear(at, PathogenClass.IntracellularBacterium, false, currentTime)) break;
             }
             broodCount = 0;
-        }
-
-        /// <summary>
-        /// Looks for a `Healthy` host cell at this virus's own position and
-        /// its four neighbours, in shuffled order, and moves into the first
-        /// one found. Returns false if there is no healthy cell in reach --
-        /// which, on ground the infection has already killed, is every time.
-        ///
-        /// Neighbour offsets are expressed in the AXIS FRAME like everything
-        /// else in this class, but symmetrically: there is no toward-base
-        /// weighting, per section 1b step 4's "in all directions with no
-        /// base bias."
-        /// </summary>
-        private bool TryFindAndEnterHost(float currentTime)
-        {
-            for (int i = SpreadOffsets.Length - 1; i > 0; i--)
-            {
-                int j = Random.Range(0, i + 1);
-                int tmp = hostSearchOrder[i];
-                hostSearchOrder[i] = hostSearchOrder[j];
-                hostSearchOrder[j] = tmp;
-            }
-
-            for (int i = 0; i < hostSearchOrder.Length; i++)
-            {
-                var (dAxis, dCross) = SpreadOffsets[hostSearchOrder[i]];
-                int axisIndex = board.AxisIndex(CurrentCoarse) + dAxis;
-                int crossIndex = board.CrossIndex(CurrentCoarse) + dCross;
-                if (!board.InAxisBounds(axisIndex) || !board.InCrossBounds(crossIndex)) continue;
-                if (board.BandAtAxisIndex(axisIndex) != BoardBand.Tissue) continue;
-
-                var candidate = board.CoarseFromAxis(axisIndex, crossIndex);
-                if (!tissueGrid.IsHealthyHost(candidate)) continue;
-                if (!tissueGrid.TryInfect(candidate, this, currentTime)) continue;
-
-                tissueGrid.ReleaseOccupant(CurrentCoarse);
-                IsIntracellular = true;
-                infectionStartTime = currentTime;
-                hasSpread = false;
-                lastSpreadAttemptTime = float.NegativeInfinity;
-                CurrentCoarse = candidate;
-                Current = board.CoarseCenterFine(candidate);
-                ApplyRestColorForCurrentClass();
-                MoveTo(board.CoarseToWorldCenter(candidate), InvasionTuning.TissueStepIntervalSeconds);
-                return true;
-            }
-            return false;
         }
 
         private void StepMotile(float currentTime)
@@ -863,6 +914,24 @@ namespace ImmunologyTD.Pathogens
             Health = MaxHealth;
         }
 
+        /// <summary>Rolls this agent's virus species traits (GAME_DESIGN.md
+        /// §4b) once, when Class is set. A non-virus clears them. Budding vs
+        /// contact-chain is a per-spawn coin flip -- there is no species
+        /// roster yet, so a budding infection's established virions
+        /// independently re-roll; noted as a simplification.</summary>
+        private void AssignVirusTraits()
+        {
+            virusBuds = Class == PathogenClass.IntracellularVirus
+                        && Random.value < InvasionTuning.VirusBuddingSpeciesChance;
+            lastBudTime = float.NegativeInfinity;
+            burnoutRolled = false;
+            willBurnOut = false;
+            burnoutTime = 0f;
+            var h = SpreadOffsets[1 + Random.Range(0, 4)]; // a random cardinal to seed the momentum walk
+            lastHeadingAxis = h.axis;
+            lastHeadingCross = h.cross;
+        }
+
         /// <summary>GAME_DESIGN.md section 4a: intracellular pathogens are
         /// "visible as the host cell, not itself"; large bacteria are
         /// "visible as itself, no disguise." Applies only once a pathogen is
@@ -888,24 +957,79 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>
-        /// The viral spread check (GAME_DESIGN.md section 4a). No-ops unless
-        /// this is an uncleared virus infection sitting in tissue past its
-        /// incubation. Called from SimulationTick, and callable directly
-        /// with simulated time by a harness.
+        /// What an ESTABLISHED viral infection does each tick (GAME_DESIGN.md
+        /// §4a / §4b): maybe spontaneously burn out, otherwise spread -- by
+        /// budding a free virion every interval (a growing disk) or, for a
+        /// contact-chain species, infecting one neighbour once (a snake). A
+        /// FREE virion's behaviour is <see cref="StepVirus"/>'s job, not
+        /// this. Called from SimulationTick and directly by a harness.
         /// </summary>
         public void TickCombat(float currentTime)
         {
             if (State != PathogenState.InTissue) return;
             if (Class != PathogenClass.IntracellularVirus) return;
-            if (hasSpread) return;
-            if (currentTime - infectionStartTime < IncubationSeconds) return;
-            if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
+            if (!IsIntracellular) return;
 
+            // Spontaneous burn-out (§4b): a fraction of infections exhaust
+            // and die loud on their own. Rolled once, on the first tick past
+            // establishment.
+            if (!burnoutRolled)
+            {
+                burnoutRolled = true;
+                if (Random.value < InvasionTuning.VirusBurnoutChance)
+                {
+                    willBurnOut = true;
+                    burnoutTime = currentTime + Random.Range(
+                        InvasionTuning.VirusBurnoutMinSeconds, InvasionTuning.VirusBurnoutMaxSeconds);
+                }
+            }
+            if (willBurnOut && currentTime >= burnoutTime)
+            {
+                BurnOut(currentTime);
+                return;
+            }
+
+            if (currentTime - infectionStartTime < IncubationSeconds) return;
+
+            if (virusBuds)
+            {
+                if (currentTime - lastBudTime < InvasionTuning.VirusBuddingIntervalSeconds) return;
+                lastBudTime = currentTime;
+                // asFreeParticle: true -- the virion is dropped ON this
+                // infected cell and floats off (StepVirus), it does not
+                // instantly infect a neighbour.
+                onSpawnNear?.Invoke(CurrentCoarse, PathogenClass.IntracellularVirus, true, currentTime);
+                return;
+            }
+
+            // Contact-chain: one hop, then done.
+            if (hasSpread) return;
+            if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
             lastSpreadAttemptTime = currentTime;
-            if (onSpawnNear != null && onSpawnNear(CurrentCoarse, PathogenClass.IntracellularVirus, currentTime))
+            if (onSpawnNear != null && onSpawnNear(CurrentCoarse, PathogenClass.IntracellularVirus, false, currentTime))
             {
                 hasSpread = true;
             }
+        }
+
+        /// <summary>
+        /// A viral infection that has run its course kills its own host cell
+        /// loudly (§4b: "the cell exhausts, dies loud, and spills its
+        /// virions + debris") and this virus spills back out as a free
+        /// virion. Detach-before-kill, same as everywhere.
+        /// </summary>
+        private void BurnOut(float currentTime)
+        {
+            var at = CurrentCoarse;
+            tissueGrid.ReleaseIntracellular(at);
+            tissueGrid.KillHostCell(at);
+            IsIntracellular = false;
+            freeSinceTime = currentTime;
+            hasSpread = false;
+            tissueGrid.TryClaimOccupant(at, this, currentTime);
+            ApplyRestColorForCurrentClass();
+            // Spill one more free virion alongside this one.
+            onSpawnNear?.Invoke(at, PathogenClass.IntracellularVirus, true, currentTime);
         }
 
         /// <summary>
@@ -1043,6 +1167,11 @@ namespace ImmunologyTD.Pathogens
             lastSpreadAttemptTime = float.NegativeInfinity;
             lastReplicationTime = 0f;
             broodCount = 0;
+            virusBuds = false;
+            lastBudTime = float.NegativeInfinity;
+            burnoutRolled = false;
+            willBurnOut = false;
+            burnoutTime = 0f;
             IsIntracellular = false;
             stepTimer = 0f;
             moveElapsed = moveDuration = 0f;

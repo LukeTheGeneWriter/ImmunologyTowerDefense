@@ -112,13 +112,13 @@ public static class TissueVerification
     /// (spawner.RequestSpawnNear) for the firebreak group.</summary>
     private static PathogenAgent PlaceInTissue(
         Rig rig, string name, CoarseCoord slot, PathogenClass pClass, float now,
-        System.Func<CoarseCoord, PathogenClass, float, bool> onSpread = null,
+        System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpread = null,
         System.Action<PathogenAgent> onExit = null)
     {
         var agent = NewAgent(rig, name);
         agent.InitializeInTissueDirect(
             rig.Board, rig.Grid, rig.Gut, rig.Tally,
-            onExit ?? (a => { }), onSpread ?? ((c, cls, t) => false),
+            onExit ?? (a => { }), onSpread ?? ((c, cls, free, t) => false),
             slot, pClass, now);
         return agent;
     }
@@ -457,6 +457,110 @@ public static class TissueVerification
                 rig.Grid.DeadCount == deadBefore);
             rig.Dispose();
         }
+
+        // --- Budding (GAME_DESIGN §4b): a budding infection grows as a
+        //     DISK, and a dead band still walls it. ---
+        {
+            Random.InitState(20260828);
+            InvasionTuning.VirusBuddingSpeciesChance = 1f; // every virus buds
+            InvasionTuning.VirusBurnoutChance = 0f;
+            InvasionTuning.VirusEntryChancePerTick = 1f;   // a virion establishes the first Healthy cell it lands on
+
+            var rig = BuildRig("Budding");
+            var spawnerGo = new GameObject("TissueVerification_BudSpawner");
+            rig.Junk.Add(spawnerGo);
+            var spawner = spawnerGo.AddComponent<PathogenSpawner>();
+            var template = new GameObject("TissueVerification_BudTemplate");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<PathogenAgent>();
+            template.SetActive(false);
+            rig.Junk.Add(template);
+            spawner.Initialize(rig.Board, rig.Grid, rig.Field, rig.Gut, rig.Tally, template);
+
+            // Dead band at axes 9-11, seed at axis 13 -- as Rule 3.
+            for (int d = 0; d < 3; d++)
+                for (int lane = 0; lane < rig.Board.CrossLength; lane++)
+                    rig.Grid.KillHostCell(rig.Board.CoarseFromAxis(11 - d, lane));
+
+            var seedCell = TissueCell(rig, 13, 5);
+            var origin = PlaceInTissue(rig, "Bud_Origin", seedCell, PathogenClass.IntracellularVirus, 0f,
+                onSpread: spawner.RequestSpawnNear);
+
+            // Advance in 1s steps so free virions get to walk and establish
+            // (they die in VirusFreeSurvivalSeconds; a coarse time jump would
+            // kill them before they moved).
+            float t = 0f;
+            for (int step = 0; step < 180; step++)
+            {
+                t += 1f;
+                origin.TickCombat(t);
+                foreach (var a in new List<PathogenAgent>(spawner.Live))
+                {
+                    a.SimulationTick(1f, t);
+                    a.TickCombat(t);
+                }
+            }
+
+            // A disk: established infections on BOTH sides of the seed axis
+            // (lumen-ward at axis > 13, base-ward at axis 12), not a line;
+            // and NOTHING established base-ward of the dead band (axis <= 8).
+            int lumenWard = 0, baseWardOfSeed = 0, baseWardOfBand = 0;
+            for (int axis = 0; axis < rig.Board.AxisLength; axis++)
+            {
+                if (rig.Board.BandAtAxisIndex(axis) != BoardBand.Tissue) continue;
+                for (int lane = 0; lane < rig.Board.CrossLength; lane++)
+                {
+                    if (rig.Grid.GetHostState(rig.Board.CoarseFromAxis(axis, lane)) != HostState.Infected) continue;
+                    if (axis > 13) lumenWard++;
+                    if (axis == 12) baseWardOfSeed++;
+                    if (axis <= 8) baseWardOfBand++;
+                }
+            }
+            Check($"Budding grows a disk -- established infections both sides of the seed ({baseWardOfSeed} at axis 12, {lumenWard} lumen-ward)",
+                baseWardOfSeed > 0 && lumenWard > 0);
+            Check($"Budding cannot cross the dead band -- 0 established infections base-ward of it ({baseWardOfBand})",
+                baseWardOfBand == 0);
+            rig.Dispose();
+        }
+
+        // --- Spontaneous burn-out (GAME_DESIGN §4b): a fraction of
+        //     infections die loud on their own, spilling the virus. ---
+        {
+            Random.InitState(20260828);
+            InvasionTuning.VirusBuddingSpeciesChance = 0f;
+            InvasionTuning.VirusBurnoutChance = 1f;         // this one always burns out
+            InvasionTuning.VirusBurnoutMinSeconds = 2f;
+            InvasionTuning.VirusBurnoutMaxSeconds = 3f;
+
+            var rig = BuildRig("Burnout");
+            var spawnerGo = new GameObject("TissueVerification_BurnoutSpawner");
+            rig.Junk.Add(spawnerGo);
+            var spawner = spawnerGo.AddComponent<PathogenSpawner>();
+            var template = new GameObject("TissueVerification_BurnoutTemplate");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<PathogenAgent>();
+            template.SetActive(false);
+            rig.Junk.Add(template);
+            spawner.Initialize(rig.Board, rig.Grid, rig.Field, rig.Gut, rig.Tally, template);
+
+            var cell = TissueCell(rig, 13, 5);
+            var virus = PlaceInTissue(rig, "Burnout", cell, PathogenClass.IntracellularVirus, 0f,
+                onSpread: spawner.RequestSpawnNear);
+            Check("Burn-out fixture: the infection established", virus.IsIntracellular);
+            int deadBefore = rig.Grid.DeadCount;
+
+            float t = 0f;
+            for (int i = 0; i < 20 && virus.IsIntracellular; i++) { t += 0.5f; virus.TickCombat(t); }
+            Check("A burning-out infection kills its own host cell (loud, no immune action)",
+                rig.Grid.GetHostState(cell) == HostState.Dead && rig.Grid.DeadCount == deadBefore + 1);
+            Check("...and the virus spills back out as a free virion (not gone)",
+                virus.State == PathogenState.InTissue && !virus.IsIntracellular && !rig.Grid.IsOccupantFree(virus.CurrentCoarse));
+
+            InvasionTuning.ResetToDefaults();
+            rig.Dispose();
+        }
+
+        InvasionTuning.ResetToDefaults();
     }
 
     /// <summary>Builds a firebreak rig: a 25x10 board, a real PathogenSpawner
@@ -467,6 +571,11 @@ public static class TissueVerification
     private static (Rig rig, PathogenSpawner spawner, PathogenAgent origin) FirebreakRig(int deadStripAxis, int seedAxis)
     {
         Random.InitState(20260828); // deterministic
+        // The firebreak-rule scenarios test the Healthy-only ESTABLISHMENT
+        // rule. Force a pure contact-chain virus with no burn-out so budding
+        // and self-termination don't add noise -- they get their own blocks.
+        InvasionTuning.VirusBuddingSpeciesChance = 0f;
+        InvasionTuning.VirusBurnoutChance = 0f;
         var rig = BuildRig(deadStripAxis < 0 ? "FB_Control" : "FB_Walled");
 
         var spawnerGo = new GameObject("TissueVerification_Spawner");

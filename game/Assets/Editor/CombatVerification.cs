@@ -114,7 +114,7 @@ public static class CombatVerification
         var go = new GameObject($"CombatVerification_{pClass}");
         var agent = go.AddComponent<PathogenAgent>();
         bool exited = false;
-        agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, cls, t) => false, slot, pClass, 0f);
+        agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, cls, free, t) => false, slot, pClass, 0f);
 
         Check($"{pClass} occupies {slot} after adhering", !tissueGrid.IsOccupantFree(slot) && tissueGrid.GetAttackableAt(slot) == agent);
 
@@ -148,17 +148,17 @@ public static class CombatVerification
 
         var virusGo = new GameObject("Virus");
         var virus = virusGo.AddComponent<PathogenAgent>();
-        virus.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
+        virus.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, free, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
         Check("Intracellular virus does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(virus));
 
         var bacGo = new GameObject("Bacterium");
         var bac = bacGo.AddComponent<PathogenAgent>();
-        bac.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
+        bac.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, free, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
         Check("Intracellular bacterium does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(bac));
 
         var largeGo = new GameObject("LargeBacterium");
         var large = largeGo.AddComponent<PathogenAgent>();
-        large.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
+        large.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, free, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
         Check("Large bacterium DOES show as itself", BoardRenderer.ShowsAsPathogenItself(large));
 
         Check("BoardRenderer.ShowsAsPathogenItself(null) is false (bare host tissue)", !BoardRenderer.ShowsAsPathogenItself(null));
@@ -192,10 +192,19 @@ public static class CombatVerification
         // incubation window -- should never spread (virus-specific per
         // GAME_DESIGN.md section 4a).
         RunBacteriumDoesNotSpread();
+
+        InvasionTuning.ResetToDefaults(); // undo the chain/no-burnout overrides
     }
 
     private static void RunSpreadScenario(string label, bool clearOriginEarly)
     {
+        // Sprint 6: this scenario is about CONTACT-CHAIN spread timing.
+        // Force a pure chain virus with no spontaneous burn-out so budding
+        // and self-termination (GAME_DESIGN §4b, covered by TissueVerification)
+        // don't perturb the counts.
+        InvasionTuning.VirusBuddingSpeciesChance = 0f;
+        InvasionTuning.VirusBurnoutChance = 0f;
+
         var boardGo = new GameObject("CombatVerification_SpreadBoard_" + (clearOriginEarly ? "cleared" : "uncleared"));
         var board = boardGo.AddComponent<BoardConfig>();
         var tissueGrid = new TissueGrid(board);
