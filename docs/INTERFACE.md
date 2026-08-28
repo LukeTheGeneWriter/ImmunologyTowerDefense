@@ -10,9 +10,12 @@ advance — see "Occupancy state" and "Sprint 5 changes". **Sprint 6
 (2026-08-28)** made an established intracellular infection unreachable by
 ordinary innate damage and added the contact stress-sense roll, the real
 intracellular-bacterium model (replicate → brood burst), and virus budding
-+ burn-out — see "Sprint 6 changes". Everything below reflects code that
-actually exists in `game/Assets/Scripts/` as of this sprint — it is not
-aspirational. There is no UI session/agent yet to
++ burn-out — see "Sprint 6 changes". **Sprint 7 (2026-08-28)** added the
+ATP economy (`AtpWallet`, prices, per-kill and lump-sum income) and the
+round loop (`RoundController`: wave batch + buy phase, the 100-life pool,
+the lose condition) — see "Sprint 7 changes". Everything below reflects
+code that actually exists in `game/Assets/Scripts/` as of this sprint — it
+is not aspirational. There is no UI session/agent yet to
 consume this contract, so treat this as the engine side declaring its
 shapes ahead of need. Update this file whenever any of the below changes;
 per `WORKFLOW.md` that's a cross-team event even though "cross-team" is
@@ -1044,6 +1047,105 @@ pattern; the future γδ T / CTL / NK sensors carry a high value here).
 `IntracellularReplicationIntervalSeconds` 3, `IntracellularDrainPerReplication`
 2.5, `IntracellularMaxBrood` 6; `IntracellularEntryChance` 0.5 → 0.12.
 
+## Sprint 7 changes — the ATP economy and round loop (`GAME_DESIGN.md` §5b/§5d/§6c)
+
+### `ImmunologyTD.Economy`
+
+- **`EconomyTuning`** — mutable statics, `ResetToDefaults()`, all
+  placeholder: `StartingAtp` 100, `RoundStartLumpSum` 80, `AtpPerKill` 3,
+  `MacrophagePrice` 40, `NeutrophilPrice` 15, `StartingLives` 100,
+  `LifeRegenRounds` 2 / `LifeRegenAmount` 1, `BatchSizeBase` 8 /
+  `BatchSizeGrowthPerRound` 3. `int BatchSizeForRound(int)`.
+- **`AtpWallet`** — plain reference type. `int Balance`, `bool CanAfford(int)`,
+  `bool TrySpend(int)` (false if unaffordable, non-positive cost is a free
+  success), `void Grant(int)` (ignores non-positive), `void Reset(int)`,
+  `int LifetimeEarned` (diagnostics). Constructed by `GameBootstrap`,
+  passed by reference — same shape as `InvasionTally`.
+- **`EconomyHooks`** — `static System.Action PayForKill` + `ReportKill()`.
+  A one-line bridge from `SearchUnit.RegisterKill` to the wallet without
+  threading a wallet ref through the unit tree. `GameBootstrap` sets it in
+  Awake; a harness leaves it null (kills pay nothing) or points it at a
+  test wallet. Same pattern as `DegranulationFlash.Configure` /
+  `CytokineToggle`.
+
+### `ImmunologyTD.Rounds.RoundController` (MonoBehaviour)
+
+The round state machine (§5d) and the §6c life pool. Explicit-time
+`Tick(float deltaTime)`; `Update()` forwards `Time.deltaTime` and reads
+`StartRoundKey` (`KeyCode.Space`).
+
+- `void Initialize(AtpWallet, PathogenSpawner, InvasionTally, BoneMarrowManager)`
+  — the last two may be null for a harness.
+- `RoundPhase Phase` — `{ Building, Active, Defeat }`; opens in `Building`.
+- `int RoundNumber` (0 in the opening buy phase; first `StartRound` → 1),
+  `int RoundsCleared`, `int Lives`, `int MaxLives`.
+- `void StartRound()` — no-op unless in `Building`. `RoundNumber++`, sizes
+  the batch (`EconomyTuning.BatchSizeForRound`), `spawner.BeginBatch(n)`,
+  → `Active`. **Pays nothing** — the lump sum is granted on a round CLEAR.
+- `Tick` while `Active`: charges new `InvasionTally.ReachedBase` against
+  `Lives` (0 → `Defeat`, `spawner.EndBatch()`); and when
+  `spawner.BatchComplete`, clears the round — `wallet.Grant(RoundStartLumpSum)`,
+  regen a life every `LifeRegenRounds` cleared rounds (capped at `MaxLives`),
+  `marrow.ClearFieldedUnits()` (§2), `spawner.EndBatch()`, → `Building`.
+
+### `PathogenSpawner`
+
+**No longer free-runs.** The spawn gate now also checks a batch:
+
+- `void BeginBatch(int count)` — arm to emit exactly `count`, reset the
+  spawn clock.
+- `void EndBatch()` — disarm (round over / defeat); live pathogens
+  untouched.
+- `bool BatchComplete` — emitted the target **and** zero pathogens in the
+  lumen or tissue. Pathogens on the GUT WALL are deliberately **not**
+  counted (§6b: a barrier pile persists round to round).
+- `int LiveCount` / `int BatchTarget` / `int BatchEmitted`.
+
+Gut-interface and cytokine ticking are unchanged (they no-op with nothing
+live).
+
+### `SearchUnit`
+
+`RegisterKill()` now also calls `EconomyHooks.ReportKill()` — the single
+"a unit got a kill" chokepoint. Contact kills (via
+`PathogenAgent.ReceiveDamage`) and §4b stress-sense kills (via
+`TryStressSenseAt`) pay; brood-burst / burn-out / drain-death do not.
+
+### `BoneMarrowManager`
+
+- `Initialize` gains a trailing **`AtpWallet wallet = null`**. Null keeps
+  placement free (the harness path).
+- `PlaceTower` calls `wallet.TrySpend(PriceFor(kind))` first and no-ops on
+  failure. `static int PriceFor(UnitKind)` reads `EconomyTuning`.
+- `void ClearFieldedUnits()` — despawns every fielded child of every
+  placed tower and resets emission timers; the towers stay `Placed`.
+  Called by `RoundController` on a round clear (§2).
+- The IMGUI picker shows `"{Kind}   {price} ATP"` and greys out
+  (`GUI.enabled`) what the wallet can't afford.
+
+### `HudOverlay`
+
+`Bind` gains **`AtpWallet wallet, RoundController rounds`**. A top-right
+bar draws ATP, `Lives N / MaxLives`, round number + phase, batch progress
+during a round, the "+N ATP · Start Round" prompt + button during
+`Building`, and a GAME OVER line on `Defeat`.
+
+### `GameBootstrap`
+
+Awake wires `EconomyTuning.ResetToDefaults()`, `wallet = new AtpWallet(...)`,
+`EconomyHooks.PayForKill = () => wallet.Grant(...)`, a `RoundController`
+(`BuildRoundController`), and passes the wallet to bone marrow. The game
+now opens in a buy phase with the spawner un-armed.
+
+### `Assets/Editor/EconomyVerification.cs` (new)
+
+`EconomyVerification.RunAll` — **47 assertions**: the wallet, batch
+gating, the round loop (Building → StartRound → Active → drive-to-clear →
+Building, lump on clear, batch growth), the life pool (breach → life, 0 →
+Defeat, inert after Defeat, regen), placement cost, per-kill income
+through the real `SearchUnit.RegisterKill`, and round-boundary unit
+clearing. Same no-Play-Mode philosophy as the five before it.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame
@@ -1219,3 +1321,27 @@ serialized `columns` bug.
     stress-sense path called `RegisterKill` on the sensing unit — it does).
     Any future code that assumed "hit the pathogen, get the kill" for an
     intracellular target needs the stress-sense path instead.
+20. **(New, Sprint 7) Every economy/round number is a placeholder.**
+    `EconomyTuning` — prices, lump sum, per-kill, starting ATP, life pool,
+    regen cadence, batch size curve. The Director asked for the framework,
+    not the balance. First real tuning pass follows his playtest of the
+    loop.
+21. **(New, Sprint 7) Round-complete deliberately ignores the gut wall.**
+    `PathogenSpawner.BatchComplete` is true when the batch is emitted and
+    nothing is in the lumen or tissue — a wall pile is allowed to persist
+    (§6b). Without this, one stuck adherer (~1%/roll breach chance) holds a
+    round open for a minute+. If a later change makes the wall attackable
+    or clearable, revisit whether a round should wait on it.
+22. **(New, Sprint 7) The kill payout is a static hook.**
+    `EconomyHooks.PayForKill` is process-global. Fine for a single-scene
+    game (`GameBootstrap` sets it every Awake) and null-safe for harnesses,
+    but a second concurrent board or a scene with two wallets would need it
+    made an instance path.
+23. **(New, Sprint 7) `RoundController.Tick` runs only while `Active`.**
+    Nothing advances the round state during `Building` or `Defeat` — which
+    is intended (spawning is paused; the game is over), but it means a
+    future "buy timer" or a defeat animation has to be driven elsewhere.
+    The life-pool baseline (`breachesCharged`) is snapshotted in
+    `Initialize` from `tally.ReachedBase`, so a run restart must build a
+    fresh `RoundController` (or the tally must be `Reset()`), not just flip
+    the phase.

@@ -1,20 +1,20 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 6** (the intracellular-infection rework:
-contact stress-sense, protected-while-inside bacteria that replicate into a
-brood, virus budding + burn-out). Sprint 0's engine/platform decision
-section is preserved below since it is still accurate. Earlier sprints'
-histories are in `docs/CHANGELOG.md`; this file only carries forward what is
-still true.
+reflects the state after **Sprint 7** (the ATP economy framework and the
+round loop). Sprint 0's engine/platform decision section is preserved below
+since it is still accurate. Earlier sprints' histories are in
+`docs/CHANGELOG.md`; this file only carries forward what is still true.
 
-**Sprints 3–5 were all implemented by dispatched Code agents interrupted
-mid-task** (usage limit / usage limit / dropped network); the head session
-finished each. **Sprint 6 was done entirely by the head session**, inline,
-straight after the Sprint 5 playtest and design conversation — three code
-items, each committed green before the next. Anything below that says
+**Sprints 3–5 were implemented by dispatched Code agents interrupted
+mid-task**; the head session finished each. **Sprints 6 and 7 were done
+entirely by the head session**, inline. Anything below that says
 "verified" was verified from actual command output — see "Build status
-(Sprint 6)" and `docs/TEAM_RETRO.md`.
+(Sprint 7)" and `docs/TEAM_RETRO.md`.
+
+**Sprint 7 is a framework pass — every economy/round number is a
+deliberate placeholder** (Director's instruction). The state machine is
+right; the balance is not attempted.
 
 ## Engine & platform decision
 
@@ -432,6 +432,44 @@ free virion + one more.
 asFreeParticle, currentTime)`. One path for viral spread and the bacterial
 brood.
 
+### Sprint 7 additions — the ATP economy and the round loop
+
+Design: `GAME_DESIGN.md` §5b (ATP income), §5d (round loop, new), §6c
+(life pool), §2 (towers persist, emitted cells die at round end).
+Signature-level detail in `docs/INTERFACE.md` ("Sprint 7 changes").
+
+**1. `ImmunologyTD.Economy`.** `EconomyTuning` (every number, mutable
+statics, `ResetToDefaults()`), `AtpWallet` (plain reference type —
+`Balance` / `TrySpend` / `Grant` / `CanAfford`), and `EconomyHooks`
+(`static PayForKill`, a one-line bridge from `SearchUnit.RegisterKill` to
+the wallet so a kill can add ATP without threading a wallet ref through
+the unit tree).
+
+**2. `ImmunologyTD.Rounds.RoundController`** — a MonoBehaviour with an
+explicit-time `Tick(dt)`. `RoundPhase { Building, Active, Defeat }`. Opens
+in `Building` at round 0. `StartRound()` (Space / a HUD button) sizes the
+batch, arms the spawner, → `Active`. Each `Active` tick charges new
+`InvasionTally.ReachedBase` against the 100-life pool (0 → `Defeat`), and
+on `spawner.BatchComplete` clears the round — grants the lump sum, regen a
+life every `LifeRegenRounds`, `marrow.ClearFieldedUnits()`, → `Building`.
+
+**3. `PathogenSpawner` stops free-running.** `BeginBatch(n)` / `EndBatch()`;
+`BatchComplete` = the batch emitted **and** nothing in the lumen or tissue
+(a gut-WALL pile is allowed to persist per §6b — without that exception a
+single stuck adherer holds a round open for a minute). `LiveCount` /
+`BatchTarget` / `BatchEmitted` exposed.
+
+**4. Placement costs ATP.** `BoneMarrowManager.Initialize` gains a nullable
+`wallet`; `PlaceTower` spends `PriceFor(kind)` first (null wallet → free,
+the harness path); the IMGUI picker shows prices and greys out the
+unaffordable. New `ClearFieldedUnits()` for the round boundary — despawns
+every fielded child, the towers stay.
+
+**5. HUD + bootstrap.** `HudOverlay` draws a top-right economy bar (ATP,
+lives, round + phase, batch progress, buy-phase prompt + Start button,
+GAME OVER). `GameBootstrap` wires the wallet, the kill hook, the
+`RoundController`; the game opens in a buy phase with the spawner un-armed.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -463,7 +501,7 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 6)
+## Build status (Sprint 7)
 
 All run by the **head session**. Numbers copied from actual output.
 
@@ -471,13 +509,26 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
-| `TissueVerification.RunAll` (Sprint 5, **grown** Sprint 6) | **73 passed, 0 failed** |
+| `EconomyVerification.RunAll` (**new**, Sprint 7) | **47 passed, 0 failed** |
+| `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**259 assertions, 0 failed**, on a clean working tree after every Sprint 6
+**306 assertions, 0 failed**, on a clean working tree after every Sprint 7
 commit.
+
+`EconomyVerification` drives the real `AtpWallet` (arithmetic, overspend,
+non-positive edge cases), `PathogenSpawner` batch gating (un-armed emits
+nothing; emits exactly the target; completes only when lumen+tissue are
+clear; a wall pile is allowed to persist), the `RoundController` state
+machine (Building → StartRound → Active → drive-to-clear → Building; lump
+sum on clear; batch grows; `StartRound` a no-op outside Building), the
+§6c life pool (breach → life; 0 → Defeat clamped; ticks after Defeat
+inert; regen every N cleared rounds capped at Max), placement cost
+(deduct / refuse when broke / null wallet = free), per-kill income through
+the real `SearchUnit.RegisterKill`, and the round boundary despawning
+fielded units while towers stay placed and re-emit.
 
 `TissueVerification` now also covers §4b: the contact stress-sense roll
 (`GetAttackableAt` returns null for a hidden resident; `ReceiveDamage`
@@ -550,34 +601,32 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 6)
+### Windows build (Sprint 7)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,320,000 bytes, 0 errors.**
-Launched headlessly for ~25s: **0 exceptions / 0 errors** in `Player.log`
-— the invasion loop runs through all the new §4b code paths (stress-sense
-rolls, replication, budding, burn-out) without a crash. Bootstrap
-diagnostic unchanged from Sprint 5 (25×10 board, base-band layout still
-fits). Frame cost not re-measured (still vsync-capped, unchanged renderer
-path).
+`BuildScript.BuildWindows()` — **Succeeded, 93,325,632 bytes, 0 errors.**
+Launched headlessly for ~22s: **0 exceptions / 0 errors** in `Player.log`.
+The game opens in the buy phase with the spawner un-armed, so a passive
+launch sits idle by design — the round-loop code paths (StartRound, batch,
+clear, defeat) are covered by `EconomyVerification`, not this launch.
+Bootstrap diagnostic unchanged (25×10, layout fits).
 
 ### What was NOT verified
 
-- **Nobody has watched the §4b mechanics play out** — a macrophage
-  catching an infection with a loud kill, a bacterial brood bursting out
-  of a drained cell, a budding infection growing as a disk next to a
-  chain infection's snake, an infection burning out on its own. The
-  73-assertion harness proves the mechanics headlessly; the *sight* of
-  them — and whether the innate stress-sense chance *feels* right (rare
-  enough to hurt, common enough not to read as broken) — is the
-  Director's playtest and the question this sprint exists to answer.
-- **The infected-cell colours have not been eyeballed in a build** —
-  `InfectedColorFor` returns violet vs. yellow-green (asserted distinct),
-  but "can the Director see a bacterium duck in and burst out" is a
-  playtest question.
-- **The firebreak still holds visually** is assumed from the harness
-  (budding-disk test, 0 crossings over 180s); not re-watched.
-- **Placement / clicking** not exercised through the running build's UI,
-  same as every sprint since 3.
+- **Nobody has played the loop.** Buy → start → survive → get paid → buy
+  more is the whole question of the sprint, and it needs a human at the
+  keyboard: the buy decision, the Start keypress, watching a batch resolve
+  and land back in a buy phase, seeing ATP tick up per kill and lives tick
+  down per breach, and — the point of a *framework* pass — whether any of
+  the placeholder numbers are even in the right order of magnitude.
+- **The §6 combat/infection mechanics under the round loop.** The
+  harnesses drive economy and combat separately; nobody has watched a
+  round's worth of pathogens meet a bought defence with a real wallet
+  constraining it.
+- **Placement / clicking** through the running build's UI (the picker now
+  also has price buttons and grey-out), same as every sprint since 3.
+- Sprint 6's §4b visuals (loud kill, brood burst, budding disk, burn-out)
+  and Sprint 5's infected-cell colours — still unwatched, carried forward.
+- **WebGL** not re-verified (unchanged since Sprint 1).
 - **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
@@ -623,6 +672,26 @@ path).
   by the infection running its course, or (not built) by the stress-sensor
   / adaptive units. Do not restore the "damage the resident directly"
   path.
+- **(New, Sprint 7) Every economy/round number is a placeholder.**
+  `EconomyTuning` — prices, lump sum, per-kill, starting ATP, life pool,
+  regen cadence, batch curve. Framework, not balance, on the Director's
+  instruction. All mutable, all grouped.
+- **(New, Sprint 7) Round-complete ignores the gut wall on purpose.**
+  `PathogenSpawner.BatchComplete` doesn't wait on wall-pile pathogens
+  (§6b — a pile persists round to round; otherwise one stuck adherer
+  holds a round open for a minute). Revisit if the wall ever becomes
+  attackable.
+- **(New, Sprint 7) The kill payout is a process-global static hook**
+  (`EconomyHooks.PayForKill`). Fine for one scene / one wallet; a second
+  board would need an instance path.
+- **(New, Sprint 7) `RoundController` only ticks state while `Active`, and
+  snapshots its breach baseline in `Initialize`.** A run restart needs a
+  fresh controller (or `InvasionTally.Reset()`), not a phase flip. A
+  buy-phase timer or defeat animation has to be driven elsewhere.
+- **(New, Sprint 7) The acute breach consequence (emergency
+  granulopoiesis, §6c) is not built.** A breach is currently "just the
+  counter", which §6c itself warns reads as a cushion. Flagged for the
+  playtest.
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell

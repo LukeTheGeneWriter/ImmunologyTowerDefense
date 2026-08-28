@@ -12,6 +12,39 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 7 -- 2026-08-28
+There is a game loop now. The framework, not the balance -- **every number
+is a placeholder**.
+
+The game opens in a **buy phase**: you have 100 ATP, the bone-marrow
+picker shows prices (Macrophage 40, Neutrophil 15) and greys out what you
+can't afford, and nothing spawns until you press **Space** (or the Start
+button). A round then spawns a **finite batch** of pathogens -- round 1 is
+8, each round is 3 bigger -- and ends when that batch is resolved
+(everything cleared, excreted, or reached the base). Pathogens still
+sitting on the gut wall are allowed to carry over into the next round, so
+a smouldering wall doesn't hold the round open.
+
+**ATP comes in two ways** (GAME_DESIGN 5b): +3 per pathogen a unit kills,
+during a round; and a +80 lump sum when a round clears, shown between
+rounds as your budget for the next one. When a round clears it also
+**despawns every unit your towers put in the field** -- the towers stay,
+and re-emit from scratch next round.
+
+**You have 100 lives.** A breach (pathogen reaches the base) costs one;
+one regenerates every two cleared rounds; at 0 it's **GAME OVER**. The
+acute "emergency granulopoiesis" punishment from the design is still
+deferred, so for now a breach is just the counter.
+
+Verified: a new `EconomyVerification` harness, **47 assertions** across the
+wallet, the round state machine, batch completion, the lump sum, per-kill
+income, life loss -> defeat, life regen, placement cost, and the
+round-boundary unit clearing -- plus Map 71 / Combat 36 / Lifecycle 79 /
+Tissue 73 all still green (**306 total, 0 failed**). Clean Windows build.
+**Not** verified: nobody has played the loop -- buy, start, survive, get
+paid, buy more -- which is the whole question, and the Director's
+playtest.
+
 ## Sprint 6 -- 2026-08-28
 An established intracellular infection is now the thing innate immunity is
 bad at, on purpose (`GAME_DESIGN.md` §4b -- the Director's rework after the

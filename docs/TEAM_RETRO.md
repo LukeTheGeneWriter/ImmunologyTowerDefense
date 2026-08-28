@@ -571,3 +571,46 @@ signature widenings in two commits (add `PathogenClass`, then add
 `(c, ...) => false`. `perl -pi` across `game/Assets/Editor/*.cs` is the
 fast path; the only hand-edits are the real callers. If a third parameter
 ever shows up here, consider a small struct instead.
+
+### Sprint 7 — head session (2026-08-28, ATP economy + round loop framework)
+
+Head session, inline, straight after Sprint 6. Framework pass — every
+number a deliberate placeholder — so the emphasis was on the state machine
+being right and legible, not on feel.
+
+**Three up-front decisions, asked before writing a line.** Round model
+(wave batch + buy phase vs. timed vs. endless), does placement cost ATP
+this pass, wire the life pool now or later. All three genuinely changed
+what got built, and each was cheap to ask; guessing the round model wrong
+would have thrown away the `RoundController` state machine. `AskUserQuestion`
+with a recommended option first and a one-line ASCII preview per choice
+was the right tool for this — it's the "blocked on a decision that's the
+Director's" case exactly.
+
+**The lump sum is paid on round CLEAR, not on StartRound.** §5b's literal
+words are "starting a round pays a lump sum", but paying it the instant
+the previous round resolves — framed in the HUD as "the budget for
+starting the next round" — feels much better (you see the reward for
+surviving, then spend it) and still satisfies the text. Recorded in §5b so
+it isn't "corrected" back later.
+
+**Round-complete ignores the gut wall on purpose.** A round ends when its
+batch is emitted and nothing is in the lumen or tissue — but pathogens
+colonising the wall are allowed to persist (§6b), or a single stuck
+adherer with a ~1%/roll breach chance would hold a round open for a
+minute+. This is `PathogenSpawner.BatchComplete`, and it's the one place
+the round loop leans on a design rule that isn't obvious from the code.
+
+**A static hook for the kill payout.** Threading an `AtpWallet` reference
+through `BoneMarrowManager → SearchUnit →` every emitted unit, purely so
+`RegisterKill` can add 3 ATP, is a lot of plumbing for a one-liner.
+`EconomyHooks.PayForKill` (static `Action`, set by `GameBootstrap`, null
+in a harness) matches what the project already does for shared services
+(`DegranulationFlash.Configure`, `CytokineToggle`, `RuntimeSprites`). The
+harness that tests it just points the hook at a test wallet.
+
+**Nullable wallet = free placement kept the lifecycle harness untouched.**
+`BoneMarrowManager.Initialize` grew an optional `wallet` param (default
+null); `PlaceTower` only charges when it's non-null. `LifecycleVerification`'s
+9-arg call still compiles and still gets free placement, no edit. Optional
+params are a clean way to add an economy gate without a harness sweep.

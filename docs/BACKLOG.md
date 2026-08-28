@@ -392,3 +392,39 @@ Partly addressed by Sprint 6:
   fibrosis (§6). Neither recruitment nor fibrosis exists, so a stress-sense
   kill and a burn-out are "loud" only in the visual. The hooks are
   commented in `SearchUnit.TryStressSenseAt` / `PathogenAgent.BurnOut`.
+
+## Opened / updated by Sprint 7 (2026-08-28) — the economy + round framework shipped
+
+The framework is in; the balance is not attempted. What a real economy /
+difficulty pass needs, none scoped:
+
+- **All of `EconomyTuning`.** Tower prices, the round-start lump, per-kill
+  ATP, starting ATP, the life pool size, regen cadence, and the batch-size
+  curve (`BatchSizeBase` + linear growth). The Director's playtest of the
+  loop is the input.
+- **Round batch composition.** Right now round N is just "N pathogens,
+  linearly bigger" with the normal class weights. A real curve wants
+  per-round class mixes, harder pathogens introduced over time, and
+  probably milestone / boss rounds. Depends on a pathogen-species roster
+  (also needed for §4b's budding-vs-chain trait — see the Sprint 6 note).
+- **`GAME_DESIGN.md` §2a's "round 1 is buy-then-observe" risk.** The buy
+  phase is now real, but round 1 still has no in-round player action once
+  you press Start. §2a's suggested fix (a manually placed cytokine signal
+  or similar) is unbuilt.
+- **Emergency granulopoiesis (§6c).** The acute breach punishment — a
+  forced surge of immature neutrophils, bone-marrow capacity consumed for
+  several rounds, an ATP income penalty. Deferred with its numbers; the
+  life pool is wired without it, so a breach is currently just the
+  counter.
+- **Bone-marrow slot expansion (§2a).** Slots are fixed at 5 and free.
+  §2a wants a starting count + an ATP cost curve for buying more — the
+  game's primary economic constraint, per that section.
+- **Tower upgrades with ATP.** The §6d/§5c upgrade hooks (bump a tower's
+  kill count, reduce degranulation damage, the helper-T barcode line) have
+  no purchase path — there is no upgrade system, only the framework a
+  future one would spend from.
+- **A run restart.** `RoundController` has no reset — `Defeat` is
+  terminal, and its breach baseline is snapshotted in `Initialize`. A
+  "play again" needs a fresh controller (and `InvasionTally.Reset()`).
+- **`EconomyHooks.PayForKill` as an instance path** if the game ever runs
+  two boards / two wallets at once (currently a process-global static).

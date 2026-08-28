@@ -111,29 +111,36 @@ Everything from Sprints 1–6 keeps working: the invasion loop, the
 firebreak, host states / debris / efferocytosis, the §4b stress-sense and
 intracellular models, population caps, pooling.
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-28
 
-The Director can, in a build:
+All mechanics landed and harness-covered (`EconomyVerification`, 47);
+whether the loop *plays* is the Director's playtest. `[~]` = code done +
+harness-verified, feel unconfirmed.
 
-- [ ] Open into a **buy phase** with `StartingAtp`, place towers (each
-      deducting its price; can't place when broke), and start round 1 with
-      a keypress / button.
-- [ ] Watch a round spawn a **finite batch**, run, and **clear** when the
-      batch is resolved — then land back in a buy phase with the
-      **lump sum** added and last round's units gone.
-- [ ] See **ATP rise per kill** during a round.
-- [ ] See **Lives drop on a breach**, regenerate slowly between rounds,
-      and the run end at **0 → GAME OVER**.
-- [ ] See the **round number climb** and the batch get bigger.
-- [ ] Wall-pile pathogens **persist** across the buy phase into the next
-      round (§6b).
-- [ ] Everything from Sprints 1–6 still works.
-- [ ] A new `EconomyVerification` harness covers the wallet, the round
-      state machine, batch completion, the lump sum, per-kill income,
-      life loss → defeat, life regen, placement cost, and round-boundary
-      unit clearing. Combat / Lifecycle / Map / Tissue all still green.
-- [ ] `GAME_DESIGN.md` §5b/§5d/§6c, `ENGINE_STATUS.md`, `INTERFACE.md`,
-      `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` reflect reality.
+- [~] Open into a **buy phase** with `StartingAtp` 100, place towers (each
+      deducting its price; refused when broke; picker greys out the
+      unaffordable), start round 1 with **Space** or the button.
+      (`RunPlacementCost`, `RunRoundLoop`.)
+- [~] A round spawns a **finite batch**, runs, and **clears** when
+      resolved → back to a buy phase with the **+80 lump** and last
+      round's units gone. (`RunBatchGating`, `RunRoundLoop`,
+      `RunRoundBoundaryClearsUnits`.)
+- [~] **ATP rises per kill** during a round — through the real
+      `SearchUnit.RegisterKill`. (`RunPerKillIncome`.)
+- [~] **Lives drop on a breach**, regen every 2 cleared rounds, run ends
+      at **0 → GAME OVER**. (`RunLifePool`.)
+- [~] **Round number climbs**, batch grows (8, 11, 14 …). (`RunRoundLoop`.)
+- [~] Wall-pile pathogens **persist** across the buy phase (§6b) —
+      `BatchComplete` ignores the wall. (`RunBatchGating`.)
+- [x] Everything from Sprints 1–6 still works — Combat 36 / Lifecycle 79 /
+      Map 71 / Tissue 73 all re-run green.
+- [x] `EconomyVerification` — **47 passed, 0 failed**. 306 total across
+      all six harnesses.
+- [x] `GAME_DESIGN.md` §5b/§5d/§6c, `SPRINT_PLAN.md`, `ENGINE_STATUS.md`,
+      `INTERFACE.md`, `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md`
+      updated. Clean Windows build, 0 exceptions on launch.
+
+**Handed to the Director for playtest.**
 
 The question this sprint answers: **is the loop — buy, start, survive,
 get paid, buy more — there and legible**, even with every number wrong?
