@@ -39,9 +39,10 @@ namespace ImmunologyTD.Units
     ///     section 6d): before it, nothing ever despawned a unit and the
     ///     active population grew without bound.
     ///
-    /// SimulationTick() is public and takes no UnityEngine.Time reads, per
-    /// this project's convention that anything worth verifying is callable
-    /// by a headless harness (see BoneMarrowManager.Tick,
+    /// SimulationTick(currentTime) is public and reads no UnityEngine.Time
+    /// itself -- Update() passes Time.time in, a harness passes a simulated
+    /// clock -- per this project's convention that anything worth verifying
+    /// is callable by a headless harness (see BoneMarrowManager.Tick,
     /// PathogenAgent.TickCombat, Chemotaxis.ChooseNextStep). Update() only
     /// handles the visual tween and the tick clock.
     /// </summary>
@@ -90,6 +91,7 @@ namespace ImmunologyTD.Units
         public int KillLimit => tuning.KillLimit;
         public bool DegranulatesOnDepletion => tuning.DegranulatesOnDepletion;
         public int ContactRadiusFineTiles => tuning.ContactRadiusFineTiles;
+        public float EfferocytosisDebrisPerTick => tuning.EfferocytosisDebrisPerTick;
 
         /// <summary>True once this unit has started (or finished) its
         /// depletion sequence. Guards re-entrancy: a degranulation burst can
@@ -172,7 +174,7 @@ namespace ImmunologyTD.Units
             if (tickTimer >= BoardConfig.TickIntervalSeconds)
             {
                 tickTimer -= BoardConfig.TickIntervalSeconds;
-                SimulationTick();
+                SimulationTick(Time.time);
             }
         }
 
@@ -188,8 +190,13 @@ namespace ImmunologyTD.Units
         /// PathogenAgent.ReceiveDamage, which is itself called from
         /// CheckContact -- despawning there would tear down the object
         /// mid-call.
+        ///
+        /// <paramref name="currentTime"/> is threaded through only for
+        /// <see cref="CheckEfferocytosis"/> (a cleared debris pile stamps a
+        /// regrowth clock). Update() passes Time.time; a harness passes a
+        /// simulated clock, same convention as the rest of the project.
         /// </summary>
-        public void SimulationTick()
+        public void SimulationTick(float currentTime)
         {
             if (board == null) return;
 
@@ -201,7 +208,40 @@ namespace ImmunologyTD.Units
             tickEndWorld = board.FineToWorld(Current);
 
             CheckContact();
+            CheckEfferocytosis(currentTime);
             ResolveDepletionIfDue();
+        }
+
+        /// <summary>
+        /// Efferocytosis: a macrophage standing on a dead cell eats its
+        /// debris, one <see cref="EfferocytosisDebrisPerTick"/> bite per
+        /// logical tick (GAME_DESIGN.md section 1c, SPRINT_PLAN.md item 3).
+        ///
+        /// Opportunistic, not directed -- the unit clears whatever debris it
+        /// happens to walk over while hunting, nothing more. That is enough
+        /// for this sprint: the design's "competing demand" between clearing
+        /// and killing is about how the PLAYER allocates macrophages, not
+        /// per-unit AI. A macrophage that seeks debris is a later concern.
+        ///
+        /// Kinds with EfferocytosisDebrisPerTick == 0 (neutrophils) fall out
+        /// here with no kind check. Public and explicit-time so a headless
+        /// harness drives the real path, exactly like CheckContact.
+        /// </summary>
+        /// <returns>True if this call finished a debris pile off.</returns>
+        public bool CheckEfferocytosis(float currentTime)
+        {
+            if (tissueGrid == null || tuning.EfferocytosisDebrisPerTick <= 0f) return false;
+
+            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
+            if (!tissueGrid.ClearDebris(coarse, tuning.EfferocytosisDebrisPerTick, currentTime)) return false;
+
+            // Pile finished -- the ground is bare and its regrowth clock has
+            // started. Show it, so recovering ground reads as an event.
+            DegranulationFlash.Play(
+                board.CoarseToWorldCenter(coarse),
+                BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision,
+                DegranulationFlash.EfferocytosisColor);
+            return true;
         }
 
         private void StepOnce()

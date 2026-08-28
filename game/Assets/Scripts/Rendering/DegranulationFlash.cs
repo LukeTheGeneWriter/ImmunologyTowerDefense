@@ -57,6 +57,12 @@ namespace ImmunologyTD.Rendering
         /// player winning and the other is the player losing ground.</summary>
         public static readonly Color BreachBurstColor = new Color(1f, 0.35f, 0.22f);
 
+        /// <summary>Sprint 5: a macrophage finishing off a debris pile
+        /// (efferocytosis). A calm blue-green -- the player RECOVERING
+        /// ground, so it must read as unlike both the granule burst and the
+        /// breach. Deliberately gentler than either.</summary>
+        public static readonly Color EfferocytosisColor = new Color(0.45f, 0.80f, 0.68f);
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;

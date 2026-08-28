@@ -52,5 +52,17 @@ namespace ImmunologyTD.Units
         /// <summary>Contact range in fine tiles (Chebyshev). SPRINT_PLAN.md
         /// item 7's starting default is 2.</summary>
         [Min(0)] public int ContactRadiusFineTiles = 2;
+
+        /// <summary>Debris cleared per logical tick while a unit of this kind
+        /// stands on a dead cell -- efferocytosis, the macrophage's real
+        /// second job (GAME_DESIGN.md section 1c, SPRINT_PLAN.md item 3).
+        /// **Default 0 = this kind does not clear debris at all**, which is
+        /// how "only macrophages clear it" falls out without a kind check in
+        /// SearchUnit. The macrophage default (set in GameBootstrap) clears a
+        /// full pile in ~2.5s of standing on it -- far faster than the ~60s
+        /// self-dissipation, so macrophage clearance is clearly the better
+        /// answer, per the design's own wording. A per-tower field, never a
+        /// const, so a future macrophage upgrade can raise it.</summary>
+        [Min(0f)] public float EfferocytosisDebrisPerTick = 0f;
     }
 }

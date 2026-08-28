@@ -39,7 +39,12 @@ namespace ImmunologyTD.Bootstrap
             KillLimit = 20,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
-            ContactRadiusFineTiles = 2
+            ContactRadiusFineTiles = 2,
+            // ~2.5s to eat a full debris pile it stands on -- roughly 20x
+            // faster than the 60s self-dissipation, so efferocytosis is the
+            // better answer without self-dissipation being a dead option.
+            // Judgment call, mechanics-first (see docs/TEAM_RETRO.md).
+            EfferocytosisDebrisPerTick = 0.05f
         };
 
         [SerializeField]
@@ -54,7 +59,8 @@ namespace ImmunologyTD.Bootstrap
             KillLimit = 5,
             DegranulatesOnDepletion = true,
             DegranulationBurstMultiplier = 3f,
-            ContactRadiusFineTiles = 2
+            ContactRadiusFineTiles = 2,
+            EfferocytosisDebrisPerTick = 0f // neutrophils do not clear debris -- macrophage's job (section 1c)
         };
 
         /// <summary>Bone marrow slot count -- unchanged from Sprint 2, a
@@ -163,33 +169,46 @@ namespace ImmunologyTD.Bootstrap
         /// </summary>
         private Layout BuildLayout()
         {
-            float cell = board.CoarseCellWorldSize;
             var baseRect = board.BandWorldRect(BoardBand.Base);
 
-            float marrowSlotSize = cell * 2.2f;
-            float marrowSlotGap = cell * 0.9f;
-            float marrowStripHeight = BoneMarrowSlotCount * marrowSlotSize + (BoneMarrowSlotCount - 1) * marrowSlotGap;
+            // SPRINT_PLAN.md item 6: the 25x10 resize left this sized for the
+            // old 100x40 proportions -- the marrow strip alone was taller
+            // than the whole base band, so it spilled into the tissue band
+            // and overlapped the lymph node. Everything below is derived as a
+            // FRACTION of baseRect with explicit non-overlapping vertical
+            // budgets, so a later map resize cannot reproduce the spill:
+            //   4% top margin | marrow (62%) | 4% gap | lymph (30%) | (nothing)
+            float innerTop = baseRect.yMax - baseRect.height * 0.04f;
+            float marrowRegionH = baseRect.height * 0.62f;
+            float lymphRegionH = baseRect.height * 0.30f;
 
-            // Marrow occupies the upper-middle of the base band; the lymph
-            // node sits below it with room to breathe.
-            float marrowCenterY = baseRect.center.y + baseRect.height * 0.18f;
             float marrowCenterX = baseRect.center.x;
-            float topSlotY = marrowCenterY + marrowStripHeight * 0.5f - marrowSlotSize * 0.5f;
+            float pitch = marrowRegionH / BoneMarrowSlotCount;
+            // Square slots: cap the size against the band's WIDTH too, so a
+            // narrow base band shrinks the slots rather than overflowing
+            // sideways. Whatever the pitch does not spend on the slot is the
+            // gap between slots.
+            float marrowSlotSize = Mathf.Min(pitch * 0.80f, baseRect.width * 0.62f);
 
+            float topSlotY = innerTop - marrowSlotSize * 0.5f;
             var slotPositions = new Vector3[BoneMarrowSlotCount];
             for (int i = 0; i < BoneMarrowSlotCount; i++)
             {
-                float y = topSlotY - i * (marrowSlotSize + marrowSlotGap);
-                slotPositions[i] = new Vector3(marrowCenterX, y, 0f);
+                slotPositions[i] = new Vector3(marrowCenterX, topSlotY - i * pitch, 0f);
             }
 
-            var marrowBackdropSize = new Vector2(marrowSlotSize + marrowSlotGap, marrowStripHeight + marrowSlotGap);
+            float marrowStripHeight = (BoneMarrowSlotCount - 1) * pitch + marrowSlotSize;
+            float marrowCenterY = topSlotY - (BoneMarrowSlotCount - 1) * pitch * 0.5f;
+
+            var marrowBackdropSize = new Vector2(
+                Mathf.Min(marrowSlotSize * 1.35f, baseRect.width * 0.92f),
+                marrowStripHeight + pitch * 0.35f);
             var marrowBackdropCenter = new Vector3(marrowCenterX, marrowCenterY, 0f);
 
-            var lymphSize = new Vector2(cell * 6f, cell * 4f);
+            var lymphSize = new Vector2(baseRect.width * 0.82f, lymphRegionH);
             var lymphCenter = new Vector3(
                 marrowCenterX,
-                baseRect.center.y - baseRect.height * 0.30f,
+                baseRect.yMin + baseRect.height * 0.04f + lymphRegionH * 0.5f,
                 0f);
 
             // Every compartment is inside the board now, so the camera fits

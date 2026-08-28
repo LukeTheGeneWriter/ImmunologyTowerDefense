@@ -56,6 +56,13 @@ namespace ImmunologyTD.Units
         /// would essentially never connect.</summary>
         public int ContactRadiusFineTiles;
 
+        /// <summary>Debris cleared per logical tick while this unit stands on
+        /// a dead cell -- efferocytosis (GAME_DESIGN.md section 1c). 0 for a
+        /// kind that does not clear debris (neutrophil); the macrophage's
+        /// default is set in GameBootstrap. Per-tower and mutable so a future
+        /// upgrade can raise one tower's clearance rate.</summary>
+        public float EfferocytosisDebrisPerTick;
+
         public static UnitLifecycleTuning FromProfile(UnitProfile profile) => new UnitLifecycleTuning
         {
             MaxActiveChildren = profile.MaxActiveChildren,
@@ -63,6 +70,7 @@ namespace ImmunologyTD.Units
             DegranulatesOnDepletion = profile.DegranulatesOnDepletion,
             DegranulationBurstMultiplier = profile.DegranulationBurstMultiplier,
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles,
+            EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick,
         };
 
         /// <summary>Allocation-free equivalent of FromProfile, for filling an
@@ -75,6 +83,7 @@ namespace ImmunologyTD.Units
             DegranulatesOnDepletion = profile.DegranulatesOnDepletion;
             DegranulationBurstMultiplier = profile.DegranulationBurstMultiplier;
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles;
+            EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick;
         }
 
         /// <summary>Value copy, used to snapshot a tower's current numbers
@@ -86,6 +95,7 @@ namespace ImmunologyTD.Units
             DegranulatesOnDepletion = other.DegranulatesOnDepletion;
             DegranulationBurstMultiplier = other.DegranulationBurstMultiplier;
             ContactRadiusFineTiles = other.ContactRadiusFineTiles;
+            EfferocytosisDebrisPerTick = other.EfferocytosisDebrisPerTick;
         }
     }
 }
