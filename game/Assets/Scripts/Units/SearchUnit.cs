@@ -387,6 +387,12 @@ namespace ImmunologyTD.Units
         public void RegisterKill()
         {
             Kills++;
+            // GAME_DESIGN.md §5b: per-kill ATP income. The single chokepoint
+            // for "a unit got a kill" -- reached from PathogenAgent.ReceiveDamage
+            // on the fatal hit and from TryStressSenseAt's loud kill. Brood
+            // burst / burn-out / drain-death do not come through here, so
+            // they correctly pay nothing.
+            ImmunologyTD.Economy.EconomyHooks.ReportKill();
         }
 
         /// <summary>True once this unit has earned enough kills to deplete

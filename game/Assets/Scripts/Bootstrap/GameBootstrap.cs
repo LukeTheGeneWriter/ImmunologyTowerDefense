@@ -4,6 +4,8 @@ using ImmunologyTD.Units;
 using ImmunologyTD.Pathogens;
 using ImmunologyTD.Pooling;
 using ImmunologyTD.Rendering;
+using ImmunologyTD.Economy;
+using ImmunologyTD.Rounds;
 
 namespace ImmunologyTD.Bootstrap
 {
@@ -124,6 +126,8 @@ namespace ImmunologyTD.Bootstrap
             }
         }
 
+        private AtpWallet wallet;
+
         private void Awake()
         {
             board = GetComponent<BoardConfig>();
@@ -132,6 +136,11 @@ namespace ImmunologyTD.Bootstrap
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
             gutInterface = new GutInterface(board, tissueGrid, tally);
+
+            // Sprint 7: the ATP economy + round loop (GAME_DESIGN.md §5b/§5d/§6c).
+            EconomyTuning.ResetToDefaults();
+            wallet = new AtpWallet(EconomyTuning.StartingAtp);
+            EconomyHooks.PayForKill = () => wallet.Grant(EconomyTuning.AtpPerKill);
 
             // Sprint 5: the host layer heals on its own clock, independent
             // of whether anything is invading (GAME_DESIGN.md section 1c).
@@ -152,8 +161,10 @@ namespace ImmunologyTD.Bootstrap
             var neutrophilPool = BuildUnitPool(neutrophilProfile);
             var boneMarrow = BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool);
 
+            var rounds = BuildRoundController(boneMarrow);
+
             BuildDegranulationFlashPool();
-            BuildHud(boneMarrow);
+            BuildHud(boneMarrow, rounds);
 
             Debug.Log(
                 $"[GameBootstrap] Map 01 -- {board.Columns}x{board.Rows} coarse cells; " +
@@ -393,8 +404,17 @@ namespace ImmunologyTD.Bootstrap
                 board, tissueGrid, cytokineField,
                 macrophageProfile, macrophagePool,
                 neutrophilProfile, neutrophilPool,
-                layout.MarrowSlotPositions, layout.MarrowSlotSize);
+                layout.MarrowSlotPositions, layout.MarrowSlotSize,
+                wallet);
             return manager;
+        }
+
+        private RoundController BuildRoundController(BoneMarrowManager boneMarrow)
+        {
+            var go = new GameObject("RoundController");
+            var rounds = go.AddComponent<RoundController>();
+            rounds.Initialize(wallet, pathogenSpawner, tally, boneMarrow);
+            return rounds;
         }
 
         private void BuildDegranulationFlashPool()
@@ -410,13 +430,13 @@ namespace ImmunologyTD.Bootstrap
             DegranulationFlash.Configure(pool);
         }
 
-        private void BuildHud(BoneMarrowManager boneMarrow)
+        private void BuildHud(BoneMarrowManager boneMarrow, RoundController rounds)
         {
             var hudGo = new GameObject("HUD");
             hudGo.AddComponent<CytokineToggle>();
             var overlay = hudGo.AddComponent<HudOverlay>();
             overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick,
-                boneMarrow, gutInterface, tally, pathogenSpawner);
+                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds);
         }
     }
 }

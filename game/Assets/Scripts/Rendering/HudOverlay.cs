@@ -2,6 +2,8 @@ using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Pathogens;
 using ImmunologyTD.Units;
+using ImmunologyTD.Economy;
+using ImmunologyTD.Rounds;
 
 namespace ImmunologyTD.Rendering
 {
@@ -29,26 +31,32 @@ namespace ImmunologyTD.Rendering
         private GutInterface gutInterface;
         private InvasionTally tally;
         private PathogenSpawner spawner;
+        private AtpWallet wallet;
+        private RoundController rounds;
         private string infoLine;
         private GUIStyle style;
+        private GUIStyle bigStyle;
         private float smoothedFrameMs;
 
         public void Bind(
             BoardConfig board, int macrophageSpeed, int neutrophilSpeed, BoneMarrowManager boneMarrow,
-            GutInterface gutInterface, InvasionTally tally, PathogenSpawner spawner)
+            GutInterface gutInterface, InvasionTally tally, PathogenSpawner spawner,
+            AtpWallet wallet, RoundController rounds)
         {
             this.board = board;
             this.boneMarrow = boneMarrow;
             this.gutInterface = gutInterface;
             this.tally = tally;
             this.spawner = spawner;
+            this.wallet = wallet;
+            this.rounds = rounds;
             infoLine =
-                "Immunology TD -- Sprint 4 map & invasion prototype\n" +
+                "Immunology TD -- Sprint 7 economy & round framework\n" +
                 $"Board: {board.Columns} x {board.Rows} coarse cells " +
                 $"(base {board.BaseBandCells} | tissue {board.TissueBandCells} | lumen {board.LumenBandCells}), " +
                 $"{BoardConfig.FineSubdivision}x{BoardConfig.FineSubdivision} fine per cell\n" +
                 $"Macrophage speed: {macrophageSpeed} fine-tiles/tick   Neutrophil speed: {neutrophilSpeed} fine-tiles/tick\n" +
-                "Place bone marrow towers (in the base band) to bring units into tissue -- nothing spawns until you do.";
+                "Buy towers in the base band, then press SPACE (or the button) to start the round. Every number is a placeholder.";
         }
 
         private void OnGUI()
@@ -62,7 +70,10 @@ namespace ImmunologyTD.Rendering
                     fontSize = 18,
                     normal = { textColor = Color.white }
                 };
+                bigStyle = new GUIStyle(style) { fontSize = 24, fontStyle = FontStyle.Bold };
             }
+
+            DrawRoundBar();
 
             // Map 01's base band now sits underneath this text, so the HUD
             // needs to stop being transparent white-on-whatever. A dimming
@@ -87,6 +98,54 @@ namespace ImmunologyTD.Rendering
             GUI.Label(new Rect(16, 206, 1100, 30), BuildPathogenLine(), style);
             GUI.Label(new Rect(16, 234, 1100, 30), BuildInvasionLine(), style);
             GUI.Label(new Rect(16, 262, 1100, 30), BuildPerformanceLine(), style);
+        }
+
+        /// <summary>The Sprint 7 economy / round readout -- top-right, clear
+        /// of the debug panel. ATP, lives, round number and phase, plus the
+        /// buy-phase prompt / Start button and the GAME OVER banner.</summary>
+        private void DrawRoundBar()
+        {
+            if (rounds == null || wallet == null) return;
+
+            float w = 360f;
+            var box = new Rect(Screen.width - w - 12f, 12f, w, 118f);
+            var prev = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.78f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = prev;
+
+            float x = box.x + 14f;
+            GUI.Label(new Rect(x, box.y + 8f, w - 28f, 30f),
+                $"ATP {wallet.Balance}      Lives {rounds.Lives} / {rounds.MaxLives}", bigStyle);
+
+            string phase =
+                rounds.Phase == RoundPhase.Active ? "ROUND IN PROGRESS" :
+                rounds.Phase == RoundPhase.Defeat ? "GAME OVER" : "BUY PHASE";
+            string batch = spawner == null ? "" :
+                $"   batch {spawner.BatchEmitted}/{spawner.BatchTarget}, {spawner.LiveCount} in play";
+            GUI.Label(new Rect(x, box.y + 42f, w - 28f, 26f),
+                $"Round {Mathf.Max(1, rounds.Phase == RoundPhase.Building ? rounds.RoundNumber + 1 : rounds.RoundNumber)} -- {phase}{(rounds.Phase == RoundPhase.Active ? batch : "")}",
+                style);
+
+            if (rounds.Phase == RoundPhase.Building)
+            {
+                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 24f),
+                    $"+{ImmunologyTD.Economy.EconomyTuning.RoundStartLumpSum} ATP added.  Buy, then:", style);
+                if (GUI.Button(new Rect(x, box.y + 90f, w - 28f, 24f), $"Start Round {rounds.RoundNumber + 1}   (Space)"))
+                {
+                    rounds.StartRound();
+                }
+            }
+            else if (rounds.Phase == RoundPhase.Defeat)
+            {
+                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 44f),
+                    $"Reached the base {tally?.ReachedBase ?? 0} times over {rounds.RoundsCleared} cleared round(s).", style);
+            }
+            else
+            {
+                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 44f),
+                    "Round clears when the batch is resolved\n(wall-pile pathogens carry over).", style);
+            }
         }
 
         /// <summary>Frame cost, on screen. SPRINT_PLAN.md item 2 asks for a

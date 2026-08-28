@@ -55,11 +55,56 @@ namespace ImmunologyTD.Pathogens
         private float spawnTimer;
         private float fieldRecomputeTimer;
 
+        // -- Round batching (Sprint 7, GAME_DESIGN.md §5d) --
+        //
+        // The spawner no longer free-runs. RoundController.BeginBatch(n)
+        // arms it to spawn exactly n pathogens on the existing interval;
+        // it then idles until the next BeginBatch. Gut-interface and
+        // cytokine ticking keep running throughout (they no-op with
+        // nothing live).
+        private bool inBatch;
+        private int batchTarget;
+        private int batchEmitted;
+
         /// <summary>Read-only view of currently live pathogens -- exposed so
         /// a headless harness can advance every agent with an explicit
         /// simulated clock (Unity's Update() does not run in Editor
         /// batchmode outside play mode).</summary>
         public IReadOnlyList<PathogenAgent> Live => live;
+
+        public int LiveCount => live.Count;
+        public int BatchTarget => batchTarget;
+        public int BatchEmitted => batchEmitted;
+
+        /// <summary>Arms the spawner to emit <paramref name="count"/>
+        /// pathogens, then stop. Resets the spawn clock so the first one
+        /// arrives a full interval into the round.</summary>
+        public void BeginBatch(int count)
+        {
+            inBatch = true;
+            batchTarget = count < 0 ? 0 : count;
+            batchEmitted = 0;
+            spawnTimer = 0f;
+        }
+
+        /// <summary>Disarms the spawner (round over / defeat). Live
+        /// pathogens are untouched.</summary>
+        public void EndBatch() => inBatch = false;
+
+        /// <summary>The round's batch is done: every pathogen in it has been
+        /// emitted, and none remain in the lumen or the tissue. Pathogens
+        /// still colonising the GUT WALL are deliberately NOT counted --
+        /// §6b says a barrier pile persists round to round, so a smouldering
+        /// wall does not hold the round open.</summary>
+        public bool BatchComplete
+        {
+            get
+            {
+                if (!inBatch || batchEmitted < batchTarget) return false;
+                CountByState(out int inLumen, out _, out int inTissue);
+                return inLumen == 0 && inTissue == 0;
+            }
+        }
 
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField,
@@ -94,10 +139,12 @@ namespace ImmunologyTD.Pathogens
         public void Tick(float deltaTime, float currentTime)
         {
             spawnTimer += deltaTime;
-            if (spawnTimer >= spawnIntervalSeconds && live.Count < maxLivePathogens)
+            if (inBatch && batchEmitted < batchTarget
+                && spawnTimer >= spawnIntervalSeconds && live.Count < maxLivePathogens)
             {
                 spawnTimer = 0f;
                 SpawnOne();
+                batchEmitted++;
             }
 
             if (gutInterface != null) gutInterface.Tick(deltaTime, currentTime);

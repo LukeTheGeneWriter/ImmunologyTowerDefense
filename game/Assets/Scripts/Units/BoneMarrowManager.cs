@@ -104,6 +104,12 @@ namespace ImmunologyTD.Units
         private UnitProfile neutrophilProfile;
         private PrefabPool neutrophilPool;
 
+        /// <summary>The player's ATP -- placement spends from it (Sprint 7,
+        /// GAME_DESIGN.md §5b/§2a). **Nullable:** a headless harness passes
+        /// null and placement stays free, exactly as it was before the
+        /// economy existed.</summary>
+        private ImmunologyTD.Economy.AtpWallet wallet;
+
         private readonly List<Slot> slots = new List<Slot>();
         private int? pendingChoiceIndex;
         private GUIStyle labelStyle;
@@ -138,7 +144,8 @@ namespace ImmunologyTD.Units
             BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField,
             UnitProfile macrophageProfile, PrefabPool macrophagePool,
             UnitProfile neutrophilProfile, PrefabPool neutrophilPool,
-            Vector3[] slotWorldPositions, float slotWorldSize)
+            Vector3[] slotWorldPositions, float slotWorldSize,
+            ImmunologyTD.Economy.AtpWallet wallet = null)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
@@ -147,6 +154,7 @@ namespace ImmunologyTD.Units
             this.macrophagePool = macrophagePool;
             this.neutrophilProfile = neutrophilProfile;
             this.neutrophilPool = neutrophilPool;
+            this.wallet = wallet;
 
             for (int i = 0; i < slotWorldPositions.Length; i++)
             {
@@ -195,6 +203,12 @@ namespace ImmunologyTD.Units
             if (index < 0 || index >= slots.Count) return;
             var slot = slots[index];
             if (slot.State != BoneMarrowSlotState.Empty) return;
+
+            // Sprint 7: placement costs ATP (GAME_DESIGN.md §2a/§5b). A
+            // null wallet (harness) keeps placement free. If the player
+            // can't afford it, nothing happens -- the picker button is also
+            // greyed out, this is belt-and-braces.
+            if (wallet != null && !wallet.TrySpend(PriceFor(kind))) return;
 
             slot.State = BoneMarrowSlotState.Placed;
             slot.Kind = kind;
@@ -256,6 +270,36 @@ namespace ImmunologyTD.Units
 
                 slot.EmissionTimer -= EmissionIntervalSeconds;
                 Emit(i, slot);
+            }
+        }
+
+        /// <summary>ATP price for a tower of this kind (GAME_DESIGN.md §5b).
+        /// Public so the HUD / picker can show it and grey out what the
+        /// player can't afford.</summary>
+        public static int PriceFor(UnitKind kind) =>
+            kind == UnitKind.Macrophage
+                ? ImmunologyTD.Economy.EconomyTuning.MacrophagePrice
+                : ImmunologyTD.Economy.EconomyTuning.NeutrophilPrice;
+
+        /// <summary>Despawns every fielded immune cell of every tower --
+        /// the round boundary (GAME_DESIGN.md §2: "the cells they emit ...
+        /// die at the end of the round"). The towers stay placed; their
+        /// emission timers reset so each re-emits from scratch next round.
+        /// Called by RoundController when a round clears.</summary>
+        public void ClearFieldedUnits()
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i];
+                if (slot.State != BoneMarrowSlotState.Placed) continue;
+
+                // Iterate a copy -- OnChildDespawned mutates slot.Children.
+                var children = slot.Children.ToArray();
+                for (int c = 0; c < children.Length; c++)
+                {
+                    OnChildDespawned(i, children[c]);
+                }
+                slot.EmissionTimer = 0f;
             }
         }
 
@@ -352,18 +396,26 @@ namespace ImmunologyTD.Units
             if (pendingChoiceIndex.HasValue)
             {
                 var screen = WorldToGui(slots[pendingChoiceIndex.Value].WorldPosition);
-                float panelW = 190, panelH = 92;
+                float panelW = 200, panelH = 92;
                 var panelRect = new Rect(screen.x - panelW / 2f, screen.y + 15, panelW, panelH);
                 GUI.Box(panelRect, "Place progenitor tower");
 
-                var macRect = new Rect(panelRect.x + 10, panelRect.y + 28, panelW - 20, 26);
-                if (GUI.Button(macRect, "Macrophage", buttonStyle))
-                    PlaceTower(pendingChoiceIndex.Value, UnitKind.Macrophage);
-
-                var neuRect = new Rect(panelRect.x + 10, panelRect.y + 58, panelW - 20, 26);
-                if (GUI.Button(neuRect, "Neutrophil", buttonStyle))
-                    PlaceTower(pendingChoiceIndex.Value, UnitKind.Neutrophil);
+                DrawBuyButton(new Rect(panelRect.x + 10, panelRect.y + 28, panelW - 20, 26), UnitKind.Macrophage, "Macrophage");
+                DrawBuyButton(new Rect(panelRect.x + 10, panelRect.y + 58, panelW - 20, 26), UnitKind.Neutrophil, "Neutrophil");
             }
+        }
+
+        private void DrawBuyButton(Rect rect, UnitKind kind, string label)
+        {
+            int price = PriceFor(kind);
+            bool affordable = wallet == null || wallet.CanAfford(price);
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = affordable;
+            if (GUI.Button(rect, $"{label}   {price} ATP", buttonStyle) && affordable)
+            {
+                PlaceTower(pendingChoiceIndex.Value, kind);
+            }
+            GUI.enabled = wasEnabled;
         }
 
         private Vector2 WorldToGui(Vector3 worldPos)
