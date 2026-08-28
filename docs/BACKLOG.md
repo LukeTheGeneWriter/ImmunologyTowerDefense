@@ -280,3 +280,45 @@ Sprint 7 or later:
   field is `strength / (1 + distance)` with no cutoff, which was measured
   as too flat at large scale (see the Sprint 4 entry above).
 - **Whether a spent DC dies or returns empty** (carried over from §5a).
+
+## Opened by Sprint 5 (2026-08-28)
+
+- **Viral spread is a one-shot chain, not a front.** `PathogenAgent.hasSpread`
+  means each infected cell infects exactly one neighbour, ever, so an
+  infection random-walks through tissue as a snake rather than spreading
+  outward as a blob. The firebreak still emerges and `CombatVerification`
+  already called this "chains across generations," so it may be intended —
+  but whoever tunes viral behaviour should consciously decide whether a
+  real front is wanted (options: allow multiple simultaneous spreads per
+  cell, or drop `hasSpread` and rate-limit differently). Not a bug, not
+  scoped.
+- **A 1-cell-thick dead gap is hoppable.** The firebreak is emergent: a
+  spread event can drop a transient free virus particle *on* a single dead
+  cell, and it can then step to the healthy cell on the far side before
+  its `VirusFreeSurvivalSeconds` (6s) timer kills it. Two or more dead
+  cells, or a full-lane band, is a hard wall. Consistent with
+  `GAME_DESIGN.md` §1a's "slipping past one or two cells is allowed and
+  occasional," so probably fine — recorded so it isn't mistaken for a bug
+  later.
+- **Every Sprint 5 number is an unvalidated default.** `TissueTuning`
+  (`HostCellMaxHealth` 10, `HostRegenerationSeconds` 20,
+  `DebrisSelfDissipationSeconds` 60), the four new `InvasionTuning`
+  class-advance knobs (`VirusFreeSurvivalSeconds` 6,
+  `IntracellularEntryChance` 0.5, `IntracellularResidenceSeconds` 12,
+  `LargeBacteriumHostDamagePerStep` 2.5), and the macrophage's
+  `EfferocytosisDebrisPerTick` 0.05. All mutable statics/fields grouped
+  for a tuning pass. Mechanics-first per the Director's standing
+  instruction — flagged, not touched.
+- **The intracellular-bacterium lysis exit is invented.** `GAME_DESIGN.md`
+  §1b step 4 says an intracellular bacterium is "hidden when in" but does
+  not say *how* it leaves a cell. Sprint 5 gave it a residence timer
+  (`IntracellularResidenceSeconds`) after which it lyses out, killing the
+  cell. If the Director wants a different exit condition (e.g. only on
+  being attacked, or never — it just stays until the cell is cleared),
+  this is the knob.
+- **Efferocytosis vs. antigen-sampling competition is now half-real.**
+  Macrophages clear debris (this sprint). The other half — a dendritic
+  cell sampling that same debris for knowledge (`GAME_DESIGN.md` §1c) — is
+  Sprint 7. When it lands, the "clearing removes what a DC would have
+  sampled" tension (already flagged under "New, opened 2026-08-21") gets
+  its real numbers: `EfferocytosisDebrisPerTick` vs. DC sample rate.

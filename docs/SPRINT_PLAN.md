@@ -112,32 +112,42 @@ and excretion, proximity adhesion, the breach burst, base-directed advance,
 per-tower population caps, kill-count depletion and degranulation, kill
 attribution, proximity contact, cytokine sensing + heatmap, pooling.
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-28
 
-- [ ] A coarse position can hold a host cell **and** an extracellular
-      pathogen at the same time, and the code says so in two slots rather
-      than one enum.
-- [ ] Host cells are visible, and `Healthy` / `Infected` / `Dead (debris)`
-      / `Empty` are distinguishable at a glance.
-- [ ] Killing an infected cell leaves debris behind.
-- [ ] Debris blocks regeneration; clearing it lets a host cell regrow.
-- [ ] A macrophage clears debris, and it is visible that it did.
-- [ ] Debris left alone eventually disappears on its own, noticeably slower
-      than a macrophage would have done it.
-- [ ] A viral infection spreads through healthy tissue and **visibly fails
-      to cross a patch of dead ground** — the firebreak.
-- [ ] An intracellular bacterium is hidden inside a host cell and visible
-      when out of one.
-- [ ] The base band's compartments no longer overlap each other or the
-      board.
-- [ ] Everything from Sprints 1–4 still works.
-- [ ] `docs/ENGINE_STATUS.md` and `docs/INTERFACE.md` reflect reality, and
-      `docs/TEAM_RETRO.md` has a new note.
+Mechanics all landed and covered by the new `TissueVerification` harness
+(53 assertions); the visual/"at a glance" halves are the Director's
+playtest. `[x]` = done, `[~]` = code done + harness-verified, visual
+unconfirmed.
 
-The question this sprint answers for the Director: **does tissue feel like
-terrain now?** Does losing ground read as losing something — and does the
-firebreak (a viral front stalling against tissue it already killed) show up
-on its own, without being staged?
+- [x] A coarse position can hold a host cell **and** an extracellular
+      pathogen at the same time, in two slots not one enum.
+      (`TissueGrid` host + occupant layers; `TissueVerification` group A.)
+- [~] `Healthy` / `Infected` / `Dead (debris)` / `Empty` are four distinct
+      colours (`BoardRenderer.HostStateColor`, asserted distinct). "At a
+      glance" is the playtest.
+- [x] Killing an infected cell leaves debris. (Every death path →
+      `KillHostCell` → `Dead` + full debris; group B.)
+- [x] Debris blocks regeneration; clearing it lets a cell regrow. (Group C.)
+- [~] A macrophage clears debris (efferocytosis, `CheckEfferocytosis`,
+      group D) with a blue-green flash. The flash is unwatched.
+- [x] Debris self-dissipates, ~20× slower than a macrophage. (Group C.)
+- [~] A viral infection **cannot cross dead ground** — verified as an
+      emergent rule (60 cycles, full-lane dead band never crossed; group
+      E). The *sight* of it is the sprint's headline playtest question.
+- [~] An intracellular bacterium is hidden inside a cell and visible out of
+      one (`IsIntracellular` drives rendering; group F). Visual unwatched.
+- [x] The base band's compartments no longer overlap or spill — confirmed
+      from the build's bootstrap diagnostic (marrow strip and lymph
+      backdrop both inside the base band, clean gap between them).
+- [x] Everything from Sprints 1–4 still works. (Map 71 / Lifecycle 79 /
+      Combat 36 all re-run green.)
+- [x] `docs/ENGINE_STATUS.md`, `docs/INTERFACE.md`, `docs/TEAM_RETRO.md`,
+      `docs/CHANGELOG.md`, `docs/BACKLOG.md` updated.
+
+**Handed to the Director for playtest.** The question it answers: **does
+tissue feel like terrain now?** Does losing ground read as losing
+something — and does the firebreak (a viral front stalling against tissue
+it already killed) show up on its own, without being staged?
 
 ## A process note for whoever is dispatched
 

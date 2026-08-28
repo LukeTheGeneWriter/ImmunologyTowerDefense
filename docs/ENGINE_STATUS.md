@@ -1,20 +1,23 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 4** (Map 01's three-band geometry and the
-invasion loop). Sprint 0's engine/platform decision section is preserved
-below since it is still accurate. Earlier sprints' histories are in
-`docs/CHANGELOG.md`; this file only carries forward what is still true.
+reflects the state after **Sprint 5** (host-cell states, debris as terrain,
+efferocytosis, and class-specific pathogen advance). Sprint 0's
+engine/platform decision section is preserved below since it is still
+accurate. Earlier sprints' histories are in `docs/CHANGELOG.md`; this file
+only carries forward what is still true.
 
-**Sprints 3 and 4 were both implemented by dispatched Code agents that hit
-their usage limits mid-task.** Sprint 3's agent committed working code but
-no docs. Sprint 4's agent committed **nothing** — it left ~1,600 lines of
-uncommitted, non-compiling working tree with no verification harness. In
-both cases the head session repaired, verified, and documented the work
-itself. Anything below that says "verified" was verified by the head
-session directly, from actual command output — see "Build status (Sprint 4)"
-for exactly what that did and did not cover, and `docs/TEAM_RETRO.md` for
-the process lesson.
+**Sprints 3, 4 and 5 were all implemented by dispatched Code agents that
+were interrupted mid-task** (usage limit, usage limit, dropped network).
+Sprint 3's agent committed working code but no docs; Sprint 4's committed
+nothing (~1,600 lines of non-compiling tree); Sprint 5's committed items
+1–2 and a design doc with good messages, plus most of item 5 sitting
+uncommitted **but compiling and passing all prior harnesses** — the first
+clean interrupted hand-off, because this sprint's brief said "commit after
+each scope item." In every case the head session finished, verified, and
+documented the work. Anything below that says "verified" was verified by
+the head session directly, from actual command output — see "Build status
+(Sprint 5)" and `docs/TEAM_RETRO.md`.
 
 ## Engine & platform decision
 
@@ -327,6 +330,60 @@ against `GAME_DESIGN.md` §8. Both buffers are owned and cleared in place.
 tally including `REACHED BASE`, and a live frame-cost readout. A dimming
 panel sits behind it because the base band is now underneath the text.
 
+### Sprint 5 additions — host-cell states, debris, class-specific advance
+
+Implements `GAME_DESIGN.md` §1c and §1b step 4. Full signature-level detail
+is in `docs/INTERFACE.md` ("Occupancy state" and "Sprint 5 changes").
+
+**1. `TissueGrid` is two independent layers per coarse position.** A host
+layer (`enum HostState { Empty, Healthy, Infected, Dead }`, plus per-cell
+health, debris amount, intracellular pathogen ref, infection start time)
+and an occupant layer for extracellular pathogens. Sprints 1–4's
+one-`PathogenAgent`-per-slot model is gone. The tissue band seeds full of
+`Healthy`; base/lumen are permanently `Empty`. Cytokine secretion sources
+are now `Infected` hosts **or** occupied occupant slots (earliest start
+wins) — dropping the occupant sources would have deleted every
+`LargeBacterium` from the field in a sprint told to keep the mechanism
+working.
+
+**2. Debris is terrain.** `KillHostCell` (the single chokepoint every death
+funnels through) → `Dead` + `FullDebris` (`1f`). Debris blocks regrowth
+(only `Empty` ground regrows). `TissueGrid.Tick(dt, now)` — driven by a new
+three-line `TissueDriver` MonoBehaviour, **not** the pathogen spawner —
+owns debris self-dissipation (`DebrisSelfDissipationSeconds` 60) and
+regrowth (`HostRegenerationSeconds` 20). `TissueTuning` holds the numbers
+(mutable statics, `ResetToDefaults()`).
+
+**3. Efferocytosis.** `SearchUnit.CheckEfferocytosis(currentTime)` — a unit
+with `EfferocytosisDebrisPerTick > 0` (a per-tower field on
+`UnitProfile`/`UnitLifecycleTuning`, macrophage default `0.05` ≈ 2.5s per
+full pile, neutrophil `0`) standing on a `Dead` cell eats one bite of
+debris via `TissueGrid.ClearDebris`. Opportunistic — own coarse slot only.
+A finished pile plays a calm blue-green `DegranulationFlash`
+(`EfferocytosisColor`). `SearchUnit.SimulationTick()` grew a `currentTime`
+parameter (only caller is `Update()`).
+
+**4. Class-specific advance** (`PathogenAgent.StepInTissue` dispatches by
+class):
+- **Virus** — free particles step only onto `Healthy` hosts and die after
+  `VirusFreeSurvivalSeconds` (6s) if homeless; intracellular ones are
+  stationary (spread is `TickCombat`'s job). The **firebreak is emergent**
+  from those two rules plus `PathogenSpawner.RequestSpread` now requiring
+  `IsHealthyHost` — no firebreak check exists in the code.
+- **Intracellular bacterium** — base-biased walk when exposed, enters a
+  `Healthy` cell it stands on (`IntracellularEntryChance` 0.5), hides
+  `IntracellularResidenceSeconds` (12s), lyses out killing the cell and
+  keeps walking.
+- **Large bacterium** — unchanged walk, grazes its host cell for
+  `LargeBacteriumHostDamagePerStep` (2.5) each step.
+- Rendering is now driven by `PathogenAgent.IsIntracellular`, not `Class`,
+  so an intracellular bacterium out of a cell and a free virus particle
+  are both drawn as themselves.
+
+**5. Base-band layout** (`GameBootstrap.BuildLayout`) rebuilt as fractions
+of the base band's world rect — the marrow strip and lymph backdrop were
+still sized for 100×40 and spilled across the 25×10 board.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -358,18 +415,54 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 4)
+## Build status (Sprint 5)
 
-All run by the **head session**, after the dispatched agent hit its usage
-limit having committed nothing. Numbers are copied from actual output.
+All run by the **head session**, resuming after the dispatched agent's
+network dropped mid-item-5. Numbers copied from actual output.
 
 ### Headless verification
 
 | Harness | Result |
 |---|---|
-| `MapVerification.RunAll` (**new**, Sprint 4) | **71 passed, 0 failed** |
+| `TissueVerification.RunAll` (**new**, Sprint 5) | **53 passed, 0 failed** |
+| `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
+
+**239 assertions, 0 failed**, on a clean working tree after every Sprint 5
+commit.
+
+`TissueVerification` covers two-layer occupancy (a `Healthy` host and an
+extracellular occupant at one coord at once), death→debris on every kill
+path, debris-as-terrain (blocks regrowth / `ClearDebris` unblocks /
+self-dissipation ~20× slower than a macrophage), efferocytosis through the
+real `SearchUnit` path, the viral firebreak, and class-specific advance.
+Two groups carry most of the weight:
+
+- **The firebreak.** Tested at the level of the *rule*, not by measuring
+  how far a random walk penetrates (viral spread is a one-shot chain, so
+  it snakes rather than saturates): (a) a virus with a `Healthy` neighbour
+  spreads into it; (b) a virus ringed by dead/infected ground never
+  spreads across 10 post-incubation attempts and does **not** burn its
+  one-shot `hasSpread`; (c) over 60 incubation cycles against a 3-cell
+  full-lane dead band, no infection ever appears on the base side; (d) a
+  homeless free virus dies after `VirusFreeSurvivalSeconds` leaving no new
+  debris. No code path checks for a firebreak — it emerges from those
+  local rules.
+- **Intracellular bacterium in/out.** Enters a `Healthy` cell it stands on,
+  hides (sprite off, `Infected`), lyses out after the residence window
+  killing the cell + leaving debris, and is back on the occupant layer
+  **alive and walking** — the assertion that caught the self-kill bug
+  (`KillHostCell` was notifying the very pathogen that called it).
+
+Two bugs `TissueVerification` caught while being written, both in the
+resumed item-5 code: the intracellular-bacterium self-kill on lysis (fixed
+with `ReleaseIntracellular` before `KillHostCell`), and
+`PathogenSpawner.RequestSpread` spreading onto non-`Healthy` ground (fixed
+with an `IsHealthyHost` check — latent since Sprint 2). Details in
+`docs/TEAM_RETRO.md`.
+
+### Sprint 4 verification (unchanged, re-run green)
 
 `MapVerification` covers band layout and boundaries, axis-frame
 round-tripping, lumen flow and excretion, proximity-gated adhesion, the
@@ -412,42 +505,34 @@ the old board's ~3-cell separations, nearly flat across Map 01's ~47-cell
 average. Sprint 1 called this mechanic "should feel transformative"; at map
 scale, right now, it isn't. **Deliberately not tuned** — the Director's
 standing instruction is mechanics first. Logged in `BACKLOG.md`.
+**Sprint 5 note:** not re-measured — no cytokine code changed — and the
+table above still stands.
 
-### Performance at 4,000 cells
+### Windows build (Sprint 5)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,310,960 bytes, 0 errors.**
-Launched clean: **0 exceptions** in `Player.log`.
-
-**8.35 ms/frame (120 fps) with 4,000 coarse cells rendered**, each still its
-own `SpriteRenderer`, plus the cytokine field over all of them. So per-cell
-`SpriteRenderer`s **do** hold up at Map 01's scale and no renderer redesign
-was needed.
-
-**Honest caveat:** 8.35 ms is *exactly* the 120 Hz refresh interval, so this
-is vsync-capped. True cost is **at most** 8.35 ms; actual headroom is
-unknown. Re-measure with vsync off before adding Sprint 5's host-cell state
-rendering.
-
-### The invasion loop, running in a real build
-
-From the HUD after ~60s unattended, no towers placed: 11 pathogens in the
-lumen, **18 piled on the gut wall**, 12 loose in tissue, **6 breaches having
-released 11**, 32 excreted harmlessly, 0 reached base. All three bands
-render distinctly and the whole 100×40 field is on screen at once.
+`BuildScript.BuildWindows()` — **Succeeded, 93,317,440 bytes, 0 errors.**
+Launched headlessly for ~18s: **0 exceptions / 0 errors** in `Player.log`.
+Bootstrap diagnostic confirms the 25×10 board (base axis 0–5, tissue 6–18,
+lumen 19–24) and the **fixed base-band layout**: `BoneMarrowSlot[0]` at
+world y 4.60 (top of the base band, inside it), `LymphNode` at y −3.47,
+with a clean gap between the marrow strip's bottom edge and the lymph
+backdrop's top — no overlap, nothing spilling into the tissue band.
+Frame cost not re-measured (still vsync-capped, unchanged renderer path).
 
 ### What was NOT verified
 
-- **Nobody has watched a breach happen.** The counters prove bursts occur
-  and the harness proves they release everything at once, but the *visual*
-  build-then-burst — the sprint's whole question — has not been seen by a
-  human. It needs a sustained watch of one wall position, which is the
-  Director's playtest.
-- **Placement was not exercised through the running build's UI**, same as
-  Sprint 3: scripted clicks cannot take foreground focus while the machine
-  is in use. Unchanged code path, covered headlessly.
-- **Nothing reached the base in a 60s observation.** Expected — tissue
-  crossing takes ~70s+ at a 1s step and 0.7 toward-base weight — but it
-  means the endzone counter is unproven in a live build.
+- **Nobody has watched the firebreak happen**, or a macrophage clear a
+  debris pile, or an intracellular bacterium duck in and lyse back out.
+  The 53-assertion harness proves the mechanics; the *sight* of a viral
+  front stalling against dead ground, with no one staging it, is the
+  question this sprint exists to answer and it is the Director's playtest.
+- **The four host-state colours have not been eyeballed in a build** —
+  `BoardRenderer.HostStateColor` returns four distinct values (asserted),
+  but "can the Director tell them apart at a glance" (SPRINT_PLAN item 3)
+  is a screenshot/playtest question.
+- **Placement / clicking was not exercised through the running build's
+  UI**, same as Sprints 3–4: scripted clicks can't take foreground focus
+  while the machine is in use. Unchanged code path.
 - **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
@@ -464,26 +549,36 @@ render distinctly and the whole 100×40 field is on screen at once.
   Build status. Measured, not tuned, per the mechanics-first instruction.
 - **(New, Sprint 4) Frame cost is vsync-capped and therefore unmeasured.**
   8.35 ms is the refresh interval, not necessarily the cost.
-- **(New, Sprint 4) The base band is visually crowded.** Bone marrow slots,
-  the lymph node placeholder, and the HUD share a corner and overprint. A
-  dimming panel makes the HUD readable; the marrow labels still collide
-  with it. Wants a real layout pass — plausibly the first genuine job for a
-  dispatched Design agent, which this project has never used.
+- **(Sprint 4, partly addressed) The base band's marrow strip / lymph
+  backdrop no longer overlap or spill** (Sprint 5 item 6 — `BuildLayout`
+  rebuilt as fractions of the base band rect). The HUD dimming panel and
+  its overprint against the marrow labels is **not** touched — still wants
+  a real layout / Design-agent pass.
 - **(New, Sprint 4) All invasion numbers are unvalidated defaults** —
   `InvasionTuning`'s adhesion chance/falloff, breach cadence and
   per-pathogen chance, release spread limits, and advance weights. Grouped
   in one file with `ResetToDefaults()` precisely so a tuning pass is cheap.
-- Scene is still named `Sprint1.unity` — cosmetic only, unchanged through
-  Sprint 4 for the same reason as before. Note it now also carries real
-  serialized state that matters (see the first item).
+- **(New, Sprint 5) All Sprint 5 numbers are unvalidated defaults too** —
+  `TissueTuning` (host health 10, regrowth 20s, self-dissipation 60s),
+  `InvasionTuning`'s four class-advance knobs (`VirusFreeSurvivalSeconds`
+  6, `IntracellularEntryChance` 0.5, `IntracellularResidenceSeconds` 12,
+  `LargeBacteriumHostDamagePerStep` 2.5), and the macrophage's
+  `EfferocytosisDebrisPerTick` 0.05. All mutable, all grouped.
+- **(New, Sprint 5) Viral spread is a one-shot chain, not a front.**
+  `hasSpread` per cell → an infection snakes rather than saturates. The
+  firebreak still emerges and the design ("chains across generations")
+  arguably intends this, but flagged for whoever tunes viral behaviour.
+  Logged in `BACKLOG.md`.
+- **(New, Sprint 5) A 1-cell dead gap is hoppable** by a transient free
+  virus particle; ≥2 cells / a full lane is a hard wall. Consistent with
+  §1a's "slipping past one or two cells." `TissueVerification` uses a
+  3-cell band.
+- Scene is still named `Sprint1.unity` — cosmetic only. It carries real
+  serialized state that matters (`columns: 25`, the 5 partially-serialized
+  `UnitProfile` fields — see `docs/TEAM_RETRO.md`).
 - `Application.runInBackground` is unchecked (Unity default) — the game
   pauses when its window loses focus. Not a bug, but it means scripted
   input/screenshot verification needs the machine otherwise idle.
-- No host cell health/fibrosis, no debris, no host-cell states — all
-  Sprint 5 (`GAME_DESIGN.md` §1c).
-- Class-specific pathogen advance (viral diffusion, intracellular bacteria
-  entering/leaving cells) is **not** built — all three classes advance
-  identically. Deferred with Sprint 5's state model, which it depends on.
 - `UnityEngine.UI` is still not installed — HUD, marrow picker and
   compartment labels are IMGUI.
 - WebGL not re-verified (unchanged since Sprint 1).

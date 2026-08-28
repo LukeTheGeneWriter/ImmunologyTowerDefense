@@ -1,12 +1,14 @@
 # Interface Contract (Engine ↔ UI)
 
-Status: written during Sprint 1 alongside the search prototype; updated
-during Sprint 1's closing task (2026-08-19 playtest fix) to reflect the
-infected-cell / continuous-secretion rework of the cytokine system; updated
-again during Sprint 2 (2026-08-19) to add bone marrow placement, the lymph
-node placeholder, and pathogen classes/combat/viral spread. Everything
-below reflects code that actually exists in `game/Assets/Scripts/` as of
-this sprint — it is not aspirational. There is no UI session/agent yet to
+Status: written Sprint 1; grown each sprint since. Sprint 2 added bone
+marrow placement, the lymph-node placeholder, pathogen classes/combat/viral
+spread. Sprint 4 rewrote spatial geometry (Map 01 bands, the axis frame,
+`GutInterface`) — see the "Map 01 geometry" / "Gut interface" sections.
+**Sprint 5 (2026-08-28)** rewrote `TissueGrid` into two layers (host +
+occupant) with `HostState`, debris, efferocytosis, and class-specific
+advance — see "Occupancy state" and "Sprint 5 changes". Everything below
+reflects code that actually exists in `game/Assets/Scripts/` as of this
+sprint — it is not aspirational. There is no UI session/agent yet to
 consume this contract, so treat this as the engine side declaring its
 shapes ahead of need. Update this file whenever any of the below changes;
 per `WORKFLOW.md` that's a cross-team event even though "cross-team" is
@@ -43,34 +45,80 @@ Plain C# class (not a MonoBehaviour), constructed by `GameBootstrap` and
 passed by reference to everything that needs it (units, pathogens, the
 spawner, the board renderer).
 
-- `bool IsSlotFree(CoarseCoord)`
-- `bool TryAdhere(CoarseCoord, PathogenAgent, float currentTime)` — claims
-  a slot atomically; false if already occupied. `currentTime` starts that
-  slot's infection timer (see below) — real gameplay callers pass
-  `Time.time`. Changed this sprint's closing task from a 2-arg to a 3-arg
-  signature; the caller (`PathogenAgent.TryAdhereHere`) was updated.
-- `void ReleaseSlot(CoarseCoord)` — clears occupancy and the slot's
-  infection timer. Unused through Sprint 1; as of Sprint 2, called by
-  `PathogenAgent.ClearFromCombat` whenever `ReceiveDamage` brings a
-  pathogen's `Health` to zero, for all three pathogen classes (see
-  Pathogens section below) — this is the "clears back to bare host tissue"
-  half of `GAME_DESIGN.md` section 4a.
-- `PathogenAgent GetPathogenAt(CoarseCoord)` — null if the slot is bare
-  host tissue.
-- `IEnumerable<CoarseCoord> AdheredCoords()` — bare occupancy, no
-  secretion data. No longer used internally (see `InfectedSources` below)
-  but kept public for callers that only care about occupancy.
-- `int AdheredCount` — cheap O(1) counter.
+**Sprint 5 rewrote this into two independent layers per coarse position**
+(`GAME_DESIGN.md` §1c). Sprints 1–4 held exactly one `PathogenAgent` per
+slot and treated "bare tissue" as "no pathogen"; that could not express a
+bacterium standing on a slot that still holds a living host cell, which is
+the co-occurrence §1c argues is the whole reason for two layers rather than
+one enum.
 
-There is currently no separate "host cell" object/state — a coarse slot is
-implicitly host tissue whenever `GetPathogenAt` returns null. Host cell
-health, damage, and fibrosis are out of scope this sprint (see
-`SPRINT_PLAN.md`'s exclusion list) and are **not** represented anywhere in
-this data model yet. When they land, expect `TissueGrid` to grow a real
-per-slot occupant enum/struct rather than the current
-null-means-host-tissue shortcut.
+### Layer 1 — the host cell
 
-### Infected-cell / continuous secretion (added in the Sprint 1 closing task)
+`enum HostState { Empty, Healthy, Infected, Dead }`. The tissue band seeds
+full of `Healthy`; every non-tissue cell is permanently `Empty` and every
+host mutator no-ops there (`IsHostGround(CoarseCoord)` gates them).
+
+Reads:
+- `HostState GetHostState(CoarseCoord)`
+- `float GetHostHealth(CoarseCoord)` — 0..`TissueTuning.HostCellMaxHealth`
+- `float GetDebrisAmount(CoarseCoord)` — 0..`FullDebris` (`const 1f`); non-zero exactly when `Dead`
+- `PathogenAgent GetIntracellularAt(CoarseCoord)` — the pathogen inside an `Infected` cell, else null
+- `bool IsHealthyHost(CoarseCoord)` — `GetHostState == Healthy`. §1c's whole viral rule as one predicate: a virus may only spread into a `Healthy` neighbour.
+- `bool CanRegrow(CoarseCoord)` — `IsHostGround && GetHostState == Empty`. Debris blocks regrowth because a `Dead` cell is not `Empty`.
+- `int HealthyCount` / `int InfectedCount` / `int DeadCount` — O(1) counters, kept coherent across every transition.
+
+Writes (every host-cell death funnels through `KillHostCell`, so "killing a
+cell leaves debris" cannot be true on one path and false on another):
+- `bool TryInfect(CoarseCoord, PathogenAgent, float startTime)` — `Healthy → Infected`, records the pathogen as living *inside* the cell (not replacing it). Fails on anything not an uninfected healthy host. `startTime` is what the cytokine ramp measures from.
+- `bool KillHostCell(CoarseCoord)` — any state → `Dead`, full debris, intracellular ref dropped. **Notifies the cell's intracellular resident via `PathogenAgent.OnHostCellDestroyed` after detaching it** (so the resident's own clear path finds an already-dead cell and stops). Idempotent on an already-`Dead` cell.
+- `bool DamageHostCell(CoarseCoord, float amount)` — direct damage to the cell (a large bacterium grazing, a neutrophil degranulation burst). Reaching zero calls `KillHostCell`. Returns true if this call killed it.
+- `bool ReleaseIntracellular(CoarseCoord)` — `Infected → Healthy`, drops the resident link, **does not kill the cell**. Two callers: (a) `PathogenAgent.StepIntracellularBacterium` calls it immediately before `KillHostCell` when a bacterium lyses out, so `KillHostCell` has no resident to notify and the bacterium survives; (b) reserved for adaptive immunity's precise MHC-I killing (§4a, ~10% knowledge), not yet wired.
+- `bool ClearDebris(CoarseCoord, float amount, float currentTime)` — efferocytosis. Subtracts `amount`; when the pile hits zero the position becomes `Empty` and its regrowth clock starts. Returns true if this call finished the pile.
+- `void SeedHostState(CoarseCoord, HostState, float currentTime)` — test/bootstrap hook (lay out a firebreak fixture without killing cells through combat). Not called by production.
+
+### Layer 2 — the extracellular occupant
+
+Independent of the host layer. Holds a large bacterium, an intracellular
+bacterium currently *outside* a cell, or a free virus particle between
+hosts. Immune cells are tracked on the fine lattice and are **not** here.
+
+- `bool IsOccupantFree(CoarseCoord)`
+- `bool TryClaimOccupant(CoarseCoord, PathogenAgent, float secretionStartTime)` — false if already occupied
+- `void ReleaseOccupant(CoarseCoord)`
+- `PathogenAgent GetOccupantAt(CoarseCoord)` — null if free
+- `PathogenAgent GetAttackableAt(CoarseCoord)` — what a `SearchUnit` hits at this slot: the occupant, or the intracellular resident if the host is `Infected` (innate clearing of an infection is destructive, §4a). Replaces Sprints 1–4's `GetPathogenAt`.
+- `int OccupantCount`
+- `int TissuePathogenCount => OccupantCount + InfectedCount` — HUD copy / cheap sanity read.
+
+### Host-layer simulation — `void Tick(float deltaTime, float currentTime)`
+
+Debris self-dissipation and host-cell regrowth, the two host-layer
+processes that run on their own clock — **not** driven by the pathogen
+spawner (the host layer keeps healing whether or not anything is invading).
+Wired in `GameBootstrap` via a three-line `TissueDriver` MonoBehaviour that
+forwards `Time.deltaTime`/`Time.time`; every harness forwards a simulated
+clock. Decay is integrated over the accumulated delta, so
+`TissueTuning.SweepIntervalSeconds` is purely a cost knob — a harness may
+advance in coarse slices without the numbers drifting.
+
+- Debris on a `Dead` cell loses `elapsed / DebrisSelfDissipationSeconds` per sweep; at zero the cell becomes `Empty`.
+- An `Empty` host-ground cell regrows to `Healthy` `HostRegenerationSeconds` after it became empty.
+
+### `TissueTuning` (`ImmunologyTD.Grid`, new Sprint 5)
+
+Mutable statics with `ResetToDefaults()`, same pattern as `InvasionTuning`.
+All unvalidated defaults (mechanics-first):
+`HostCellMaxHealth` 10, `HostRegenerationSeconds` 20,
+`DebrisSelfDissipationSeconds` 60, `SweepIntervalSeconds` 0.25.
+
+### Legacy names removed
+
+`IsSlotFree`, `TryAdhere`, `ReleaseSlot`, `GetPathogenAt`, `AdheredCoords`,
+`AdheredCount` are **gone** (Sprint 4 already retired the adhesion model
+they belonged to; Sprint 5 removed the shims). `AdheredCount`'s role is now
+split across `HealthyCount`/`InfectedCount`/`DeadCount`/`OccupantCount`.
+
+### Infected-cell / continuous secretion (added in the Sprint 1 closing task, still current)
 
 The first playtest found the cytokine-sensing toggle produced no
 perceptible difference — root cause: the field's sources were just "wherever
@@ -781,6 +829,123 @@ call `ResetToDefaults()` afterwards.
 Advance in tissue consults only the axis frame; reaching a `Base`-band cell
 despawns the pathogen and increments `InvasionTally.ReachedBase`.
 
+## Sprint 5 changes — host states, debris, class-specific advance
+
+Design: `GAME_DESIGN.md` §1c and §1b step 4. The `TissueGrid` two-layer
+rewrite is documented under **Occupancy state** above; the deltas to the
+other classes:
+
+### `PathogenAgent`
+
+- **`bool IsIntracellular { get; private set; }`** — true when this pathogen
+  is inside a host cell (on `TissueGrid`'s host layer, cell `Infected`), not
+  on the occupant layer. **Rendering is now driven by this, not by
+  `Class`**: `ApplyRestColorForCurrentClass` hides the sprite iff
+  `IsIntracellular`, so an intracellular bacterium walking *between* hosts
+  and a free virus particle are both drawn as themselves. Sprints 2–4 hid
+  both intracellular classes permanently because "outside a cell" did not
+  exist.
+- **`SettleIntoTissue(slot, currentTime)`** (private) — decides which layer
+  a pathogen lands on when it arrives in tissue. A virus takes the host cell
+  if `Healthy` (→ intracellular immediately); everything else, and a virus
+  with no healthy cell here, lands on the occupant layer. Called from
+  `InitializeInTissueDirect` and `EnterTissueAt`.
+- **`EnterTissueAt`** — a virus may now come off the wall onto a `Healthy`
+  host even when the occupant layer at that position is busy
+  (`CanTakeHostAt`); only a pathogen that gets *neither* layer stays on the
+  wall.
+- **Class-specific advance** — `SimulationTick`'s tissue branch now calls
+  `StepInTissue(currentTime)`, which dispatches by class:
+  - **Virus** — an intracellular virus does not move (spread is
+    `TickCombat`'s job). A *free* virus (`StepVirus`) steps only onto a
+    `Healthy` host in its own cell or a von Neumann neighbour
+    (`TryFindAndEnterHost`), and dies after
+    `InvasionTuning.VirusFreeSurvivalSeconds` if it finds none. No firebreak
+    check exists anywhere — it emerges from these two local rules.
+  - **Intracellular bacterium** (`StepIntracellularBacterium`) — base-biased
+    walk while extracellular; each step may enter a `Healthy` cell it stands
+    on (`InvasionTuning.IntracellularEntryChance`); hidden and stationary
+    inside until it lyses out after
+    `InvasionTuning.IntracellularResidenceSeconds`, which **calls
+    `ReleaseIntracellular` then `KillHostCell`** (detach-before-kill, so the
+    bacterium survives and keeps walking) leaving debris.
+  - **Large bacterium** (`StepMotile`) — unchanged base-biased walk, but
+    grazes the host cell under it for
+    `InvasionTuning.LargeBacteriumHostDamagePerStep` each step
+    (`DamageHostCell`).
+- **`OnHostCellDestroyed()`** — called by `TissueGrid.KillHostCell` on the
+  cell's intracellular resident (already detached before the call). The
+  pathogen dies with its host: `State = Cleared`, `onExit`. Guards on
+  already-`Cleared` so the innate-clear path (which sets `Cleared` *before*
+  `KillHostCell`) doesn't double-exit.
+- **`ClearFromCombat`** splits by layer: an intracellular pathogen cleared
+  by innate immunity takes its host cell with it (`KillHostCell` → `Dead` +
+  debris, §4a); an extracellular one just `ReleaseOccupant`s.
+
+New `InvasionTuning` statics (mutable, `ResetToDefaults()`, all unvalidated
+mechanics-first defaults): `VirusFreeSurvivalSeconds` 6,
+`IntracellularEntryChance` 0.5, `IntracellularResidenceSeconds` 12,
+`LargeBacteriumHostDamagePerStep` 2.5.
+
+### `PathogenSpawner.RequestSpread`
+
+Now also requires `tissueGrid.IsHealthyHost(candidate)` — §1c ("a virus can
+only spread into a `Healthy` neighbour"). Previously checked only
+`IsOccupantFree`, which let a walled-in virus burn its one-shot `hasSpread`
+on a doomed free particle. This is the other half of the firebreak.
+
+### `SearchUnit`
+
+- **`SimulationTick()` → `SimulationTick(float currentTime)`.** Only caller
+  is `Update()` (passes `Time.time`); no harness calls it. Threaded through
+  for the regrowth-clock stamp.
+- **`bool CheckEfferocytosis(float currentTime)`** (new, public,
+  harness-callable like `CheckContact`) — a unit with
+  `tuning.EfferocytosisDebrisPerTick > 0` (macrophage only, by default)
+  standing on a `Dead` cell calls `TissueGrid.ClearDebris` for one bite.
+  Opportunistic — the unit's own coarse slot only, no seeking. Plays a
+  `DegranulationFlash` in `DegranulationFlash.EfferocytosisColor` when a
+  pile is finished.
+- **`float EfferocytosisDebrisPerTick`** — read-through to
+  `tuning.EfferocytosisDebrisPerTick`.
+
+### `UnitProfile` / `UnitLifecycleTuning`
+
+New per-tower mutable field **`float EfferocytosisDebrisPerTick`** (§6d
+pattern: never a const, so a future macrophage upgrade is a one-field
+write). Default 0 = "this kind does not clear debris" — how "only
+macrophages do it" falls out with no kind check. `GameBootstrap` sets the
+macrophage to `0.05` (~2.5s per full pile), neutrophil to `0`. Wired
+through `FromProfile` / `CopyFromProfile` / `CopyFrom`.
+
+### `BoardRenderer` (`ImmunologyTD.Rendering`)
+
+- **`static Color HostStateColor(HostState)`** — the four host states as
+  four distinguishable colours: `HostColor` (pink) / `InfectedHostColor`
+  (bruised violet, `0.54,0.36,0.60`) / `DebrisColor` (grey-brown,
+  `0.38,0.34,0.28`) / `EmptyGroundColor` (near-black, `0.13,0.11,0.12`).
+  Static and side-effect-free so a harness can assert the four are distinct.
+- `DebrisColor` / `EmptyGroundColor` are new `public static readonly`;
+  `InfectedHostColor` was added with item 1.
+
+### `GameBootstrap.BuildLayout`
+
+Rewritten (item 6). The bone-marrow strip and lymph-node backdrop are now
+sized as fractions of `BandWorldRect(BoardBand.Base)` with explicit
+non-overlapping vertical budgets (4% margin | marrow 62% | 4% gap | lymph
+30%), and slot size is capped against the band width too. The 25×10 resize
+had left them sized for 100×40, spilling across the board.
+
+### `Assets/Editor/TissueVerification.cs` (new)
+
+`TissueVerification.RunAll` — 53 assertions: two-layer occupancy,
+death→debris, debris-as-terrain (blocks regrowth / `ClearDebris` /
+self-dissipation), efferocytosis through the real `SearchUnit` path, the
+viral firebreak (rule-level: spreads into Healthy / fails-and-retries when
+walled / 60 cycles never cross a dead band / homeless free virus dies), and
+class-specific advance. Same drive-the-real-classes, no-Play-Mode
+philosophy as the four before it.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame
@@ -907,8 +1072,31 @@ serialized `columns` bug.
     appearing fine. Guarded at runtime now, but the clamping behavior itself
     is unchanged — consider whether bands should be proportions rather than
     absolute cell counts when a second map exists.
-13. **(New, Sprint 4) Nothing renders host-cell state, because there isn't
-    any.** Sprint 5 adds healthy/infected/dead and two-layer occupancy
-    (`GAME_DESIGN.md` §1c), which is a `TissueGrid` rewrite — it still holds
-    exactly one pathogen per coarse slot. Do not build on the current
-    occupancy model expecting it to survive.
+13. **~~Nothing renders host-cell state, because there isn't any.~~ —
+    RESOLVED in Sprint 5.** `TissueGrid` is now two layers (host +
+    occupant), `HostState` is `{Empty, Healthy, Infected, Dead}`, and
+    `BoardRenderer.HostStateColor` draws the four distinctly. See
+    **Occupancy state** and **Sprint 5 changes** above.
+14. **(New, Sprint 5) Viral spread is a one-shot chain, not a front.**
+    `PathogenAgent.hasSpread` means each infected cell infects exactly one
+    neighbour, ever, so an infection snakes through tissue rather than
+    saturating outward. It matches `CombatVerification`'s "chains across
+    generations" and the firebreak still emerges, but whoever tunes viral
+    behaviour should decide whether a real front (multiple simultaneous
+    spreads, or dropping `hasSpread`) is wanted. Logged in `BACKLOG.md`.
+15. **(New, Sprint 5) A 1-cell dead gap is hoppable; ≥2 cells / a full
+    lane is a hard wall.** The firebreak is emergent: a spread event can
+    land a transient free virus particle *on* a single dead cell, which
+    then steps to the healthy cell on the far side before its 6s survival
+    timer expires. Consistent with `GAME_DESIGN.md` §1a's "slipping past
+    one or two cells is allowed and occasional." `TissueVerification`
+    tests the firebreak with a 3-cell band.
+16. **(New, Sprint 5) Every Sprint 5 number is an unvalidated default.**
+    `TissueTuning` (`HostCellMaxHealth` 10, `HostRegenerationSeconds` 20,
+    `DebrisSelfDissipationSeconds` 60), `InvasionTuning`'s four new
+    class-advance knobs, and `UnitProfile.EfferocytosisDebrisPerTick` 0.05
+    for the macrophage. All mutable, all grouped for a tuning pass;
+    mechanics-first per the Director's standing instruction. The lysis
+    exit for an intracellular bacterium (`IntracellularResidenceSeconds`)
+    is also a judgment call — §1b step 4 doesn't say *how* one leaves a
+    cell, only that it does.
