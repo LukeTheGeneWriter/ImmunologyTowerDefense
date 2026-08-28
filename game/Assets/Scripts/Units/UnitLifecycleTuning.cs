@@ -63,6 +63,12 @@ namespace ImmunologyTD.Units
         /// upgrade can raise one tower's clearance rate.</summary>
         public float EfferocytosisDebrisPerTick;
 
+        /// <summary>Per-tick chance of recognising an `Infected` cell this
+        /// unit is in contact with and killing it loudly (GAME_DESIGN.md
+        /// §4b). Low for innate; the future stress sensors get a high value.
+        /// 0 = cannot sense intracellular infection.</summary>
+        public float StressSenseChancePerTick;
+
         public static UnitLifecycleTuning FromProfile(UnitProfile profile) => new UnitLifecycleTuning
         {
             MaxActiveChildren = profile.MaxActiveChildren,
@@ -71,6 +77,7 @@ namespace ImmunologyTD.Units
             DegranulationBurstMultiplier = profile.DegranulationBurstMultiplier,
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles,
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick,
+            StressSenseChancePerTick = profile.StressSenseChancePerTick,
         };
 
         /// <summary>Allocation-free equivalent of FromProfile, for filling an
@@ -84,6 +91,7 @@ namespace ImmunologyTD.Units
             DegranulationBurstMultiplier = profile.DegranulationBurstMultiplier;
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles;
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick;
+            StressSenseChancePerTick = profile.StressSenseChancePerTick;
         }
 
         /// <summary>Value copy, used to snapshot a tower's current numbers
@@ -96,6 +104,7 @@ namespace ImmunologyTD.Units
             DegranulationBurstMultiplier = other.DegranulationBurstMultiplier;
             ContactRadiusFineTiles = other.ContactRadiusFineTiles;
             EfferocytosisDebrisPerTick = other.EfferocytosisDebrisPerTick;
+            StressSenseChancePerTick = other.StressSenseChancePerTick;
         }
     }
 }

@@ -53,6 +53,18 @@ namespace ImmunologyTD.Units
         /// item 7's starting default is 2.</summary>
         [Min(0)] public int ContactRadiusFineTiles = 2;
 
+        /// <summary>Per-tick chance, while this unit is in contact with an
+        /// `Infected` host cell, of recognising the infection and killing
+        /// the cell **loudly** (necrotic, cell + all contents, nothing
+        /// released) -- the contact stress-sense roll of GAME_DESIGN.md §4b.
+        /// **Low for innate cells** (macrophage/neutrophil): they only do
+        /// generic stress/damage sensing. The not-yet-built stress sensors
+        /// (γδ T / CTL / NK) will carry a much higher value -- that gap is
+        /// the innate↔adaptive bridge. Default 0 = this kind cannot sense
+        /// intracellular infection at all. Per-tower mutable, never a const
+        /// (§6d), so an upgrade or a new unit kind is a one-field write.</summary>
+        [Min(0f)] public float StressSenseChancePerTick = 0f;
+
         /// <summary>Debris cleared per logical tick while a unit of this kind
         /// stands on a dead cell -- efferocytosis, the macrophage's real
         /// second job (GAME_DESIGN.md section 1c, SPRINT_PLAN.md item 3).

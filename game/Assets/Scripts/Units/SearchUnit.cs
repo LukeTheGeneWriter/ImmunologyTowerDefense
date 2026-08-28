@@ -208,8 +208,69 @@ namespace ImmunologyTD.Units
             tickEndWorld = board.FineToWorld(Current);
 
             CheckContact();
+            CheckStressSense(currentTime);
             CheckEfferocytosis(currentTime);
             ResolveDepletionIfDue();
+        }
+
+        /// <summary>
+        /// The contact stress-sense roll (GAME_DESIGN.md §4b). While this
+        /// unit is in contact with an `Infected` host cell it rolls, once per
+        /// tick, to recognise the infection. On success it kills the cell
+        /// **loudly** -- `KillHostCell` takes the cell to `Dead` + debris and
+        /// its intracellular resident dies with it, releasing nothing (the
+        /// bacterial brood only bursts on a drain-death, never here). This is
+        /// the ONLY way an innate cell reaches an intracellular infection
+        /// now; `GetAttackableAt` no longer returns the resident.
+        ///
+        /// `StressSenseChancePerTick` is low for macrophage/neutrophil --
+        /// generic damage sensing, no antigen specificity. The future stress
+        /// sensors (γδ T / CTL / NK) carry a high value; that gap is the
+        /// point. Kinds with a 0 chance fall out here with no kind check.
+        ///
+        /// Contact uses the same range test as <see cref="CheckContact"/>,
+        /// measured against the resident's stored fine tile (the coarse-cell
+        /// centre). Public and explicit-time for the harness.
+        /// </summary>
+        /// <returns>True if a loud kill fired this call.</returns>
+        public bool CheckStressSense(float currentTime)
+        {
+            if (tissueGrid == null || tuning.StressSenseChancePerTick <= 0f) return false;
+
+            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
+            if (TryStressSenseAt(coarse)) return true;
+
+            if (tuning.ContactRadiusFineTiles < BoardConfig.FineSubdivision / 2 + 1) return false;
+
+            for (int i = 0; i < FineCoord.VonNeumannOffsets.Length; i++)
+            {
+                var off = FineCoord.VonNeumannOffsets[i];
+                if (TryStressSenseAt(new CoarseCoord(coarse.Column + off.Column, coarse.Row + off.Row))) return true;
+            }
+            return false;
+        }
+
+        private bool TryStressSenseAt(CoarseCoord coarse)
+        {
+            if (tissueGrid.GetHostState(coarse) != HostState.Infected) return false;
+            var resident = tissueGrid.GetIntracellularAt(coarse);
+            if (resident == null || !WithinContactRange(resident.Current)) return false;
+            if (Random.value >= tuning.StressSenseChancePerTick) return false;
+
+            // Recognised. Loud necrotic kill: cell + everything inside, no
+            // pathogen released. KillHostCell notifies the resident via
+            // OnHostCellDestroyed. Credit this unit -- it did the work.
+            // (The DAMP that a loud death should broadcast -- extra innate
+            // recruitment, fibrosis feed -- is GAME_DESIGN.md §6, not built;
+            // for now "loud" is the flash.)
+            var worldCenter = board.CoarseToWorldCenter(coarse);
+            tissueGrid.KillHostCell(coarse);
+            RegisterKill();
+            DegranulationFlash.Play(
+                worldCenter,
+                BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * 1.5f,
+                DegranulationFlash.StressKillColor);
+            return true;
         }
 
         /// <summary>
@@ -361,19 +422,19 @@ namespace ImmunologyTD.Units
         /// vanish, it self-destructs and dumps its granule contents into
         /// wherever it happens to be standing. Mechanically: a burst equal
         /// to ContactDamagePerHit * DegranulationBurstMultiplier applied to
-        /// whatever occupies this unit's current coarse slot, as ordinary
-        /// combat damage.
-        ///
-        /// Scope note (SPRINT_PLAN.md item 3): there is no host-cell-health
-        /// or fibrosis system yet, so if the slot is bare host tissue there
-        /// is simply nothing to damage. That is the intended state this
-        /// sprint -- the mechanism is what matters; fibrosis accounting
-        /// comes later.
+        /// whatever is in this unit's current coarse slot -- both an
+        /// extracellular occupant (ordinary combat damage) **and the host
+        /// cell itself** (`DamageHostCell`). §6d's wording is "whatever host
+        /// cell or infected cell is there," and hitting the cell is how the
+        /// burst reaches an intracellular infection (which `GetAttackableAt`
+        /// no longer exposes, §4b) -- a loud, indiscriminate kill, exactly
+        /// the neutrophil's "high collateral tissue damage" trait. If the
+        /// burst kills a `Healthy`/`Infected` cell it leaves debris and
+        /// feeds fibrosis later (§6).
         ///
         /// The burst is attributed to this unit, so a kill it lands still
-        /// counts toward Kills (visible in the HUD/debug) -- the `depleting`
-        /// guard is what stops that from recursing back into a second
-        /// depletion.
+        /// counts toward Kills -- the `depleting` guard stops that from
+        /// recursing into a second depletion.
         /// </summary>
         private void Degranulate()
         {
@@ -381,9 +442,14 @@ namespace ImmunologyTD.Units
 
             if (tissueGrid == null) return;
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
+            float burst = PathogenAgent.ContactDamagePerHit * tuning.DegranulationBurstMultiplier;
+
             var occupant = tissueGrid.GetAttackableAt(coarse);
-            if (occupant == null) return;
-            occupant.ReceiveDamage(PathogenAgent.ContactDamagePerHit * tuning.DegranulationBurstMultiplier, this);
+            if (occupant != null) occupant.ReceiveDamage(burst, this);
+
+            // Collateral to the host cell -- kills an infected or damaged
+            // cell outright at the 3x burst, which is the point.
+            tissueGrid.DamageHostCell(coarse, burst);
         }
 
         /// <summary>

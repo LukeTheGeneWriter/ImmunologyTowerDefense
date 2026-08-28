@@ -882,6 +882,17 @@ namespace ImmunologyTD.Pathogens
         /// rewrite, and the mechanic this sprint is proving is the burst,
         /// not the siege.
         ///
+        /// **Sprint 6 (GAME_DESIGN.md §4b): ordinary damage cannot touch an
+        /// intracellular pathogen.** While `IsIntracellular` this is a
+        /// no-op -- a macrophage grinding on the cell does nothing, a
+        /// neutrophil's degranulation burst does nothing *to the pathogen*
+        /// directly (it still hits the host cell via `DamageHostCell`, and
+        /// if that kills the cell this pathogen dies through
+        /// `OnHostCellDestroyed`). The only thing that reaches an
+        /// intracellular infection on purpose is the stress-sense roll
+        /// (`SearchUnit.CheckStressSense` -> `KillHostCell`) or it running
+        /// its course.
+        ///
         /// Kill attribution is unchanged from Sprint 3: exactly one unit is
         /// ever credited, whoever's hit crosses zero, credited before
         /// clearing (which can pool this instance). A null source stays
@@ -890,6 +901,7 @@ namespace ImmunologyTD.Pathogens
         public void ReceiveDamage(float amount, SearchUnit source)
         {
             if (State != PathogenState.InTissue) return;
+            if (IsIntracellular) return; // hidden inside a host cell -- §4b
             contactFlashTimer = 0.25f;
             Health -= amount;
             if (Health > 0f) return;
@@ -898,30 +910,19 @@ namespace ImmunologyTD.Pathogens
             ClearFromCombat();
         }
 
+        /// <summary>
+        /// An **extracellular** pathogen (occupant layer) cleared by ordinary
+        /// combat damage. State goes first so a re-entrant path stops at the
+        /// guard. The intracellular case does not come through here any more
+        /// (§4b) -- an intracellular pathogen leaves via
+        /// <see cref="OnHostCellDestroyed"/> when its host cell is killed
+        /// (stress-sense roll, drain-death, or collateral), never through
+        /// `ReceiveDamage`.
+        /// </summary>
         private void ClearFromCombat()
         {
-            // State goes first, deliberately: KillHostCell notifies its
-            // resident via OnHostCellDestroyed, and that method's
-            // already-Cleared guard is what stops this from exiting twice
-            // and double-releasing into the pool.
             State = PathogenState.Cleared;
-
-            if (IsIntracellular)
-            {
-                // Innate clearing of an intracellular infection is
-                // destructive -- the only way to reach the pathogen is
-                // through the cell, so the cell dies and leaves debris
-                // (GAME_DESIGN.md sections 1c and 4a). The non-destructive
-                // path (ReleaseIntracellular, cell survives) belongs to
-                // adaptive immunity's precise MHC-I killing and is not built.
-                IsIntracellular = false;
-                tissueGrid.KillHostCell(CurrentCoarse);
-            }
-            else
-            {
-                tissueGrid.ReleaseOccupant(CurrentCoarse);
-            }
-
+            tissueGrid.ReleaseOccupant(CurrentCoarse);
             onExit?.Invoke(this);
         }
 

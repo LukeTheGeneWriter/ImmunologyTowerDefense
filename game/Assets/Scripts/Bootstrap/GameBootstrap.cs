@@ -44,7 +44,13 @@ namespace ImmunologyTD.Bootstrap
             // faster than the 60s self-dissipation, so efferocytosis is the
             // better answer without self-dissipation being a dead option.
             // Judgment call, mechanics-first (see docs/TEAM_RETRO.md).
-            EfferocytosisDebrisPerTick = 0.05f
+            EfferocytosisDebrisPerTick = 0.05f,
+            // GAME_DESIGN.md §4b: generic stress sensing, deliberately weak.
+            // At the 0.12s tick, 0.03/tick is ~1-in-4 per second -- a
+            // macrophage that parks on an infected cell catches it in a few
+            // seconds on average, but a patrol that only brushes past
+            // usually misses. Judgment call, mechanics-first.
+            StressSenseChancePerTick = 0.03f
         };
 
         [SerializeField]
@@ -60,7 +66,11 @@ namespace ImmunologyTD.Bootstrap
             DegranulatesOnDepletion = true,
             DegranulationBurstMultiplier = 3f,
             ContactRadiusFineTiles = 2,
-            EfferocytosisDebrisPerTick = 0f // neutrophils do not clear debris -- macrophage's job (section 1c)
+            EfferocytosisDebrisPerTick = 0f, // neutrophils do not clear debris -- macrophage's job (section 1c)
+            // Slightly weaker than the macrophage's -- a neutrophil is a
+            // blunter instrument -- but non-zero: it is still an innate cell
+            // that can stumble onto a stressed cell. Judgment call.
+            StressSenseChancePerTick = 0.02f
         };
 
         /// <summary>Bone marrow slot count -- unchanged from Sprint 2, a

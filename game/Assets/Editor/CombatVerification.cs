@@ -226,7 +226,12 @@ public static class CombatVerification
             simTime += dt;
             if (clearOriginEarly && !clearedEarly && simTime >= PathogenAgent.IncubationSeconds * 0.5f)
             {
-                origin.ReceiveDamage(origin.MaxHealth, null); // one hit for full health clears it outright
+                // Sprint 6 (GAME_DESIGN.md §4b): an intracellular virus is
+                // immune to ReceiveDamage. "Caught early" is now a loud kill
+                // of the host cell -- KillHostCell takes the cell and its
+                // resident, and nothing spreads. This is what a successful
+                // stress-sense roll does.
+                tissueGrid.KillHostCell(originCoord);
                 clearedEarly = true;
             }
             origin.TickCombat(simTime);

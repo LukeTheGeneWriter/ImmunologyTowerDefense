@@ -44,6 +44,7 @@ public static class TissueVerification
         RunDeathLeavesDebris();
         RunDebrisTerrain();
         RunEfferocytosis();
+        RunStressSense();
         RunViralFirebreak();
         RunClassAdvance();
 
@@ -126,17 +127,17 @@ public static class TissueVerification
 
     private static bool SameCell(CoarseCoord a, CoarseCoord b) => a.Column == b.Column && a.Row == b.Row;
 
-    private static SearchUnit NewUnit(Rig rig, UnitKind kind, CoarseCoord at)
+    private static SearchUnit NewUnit(Rig rig, UnitKind kind, CoarseCoord at, float stressSense = 0f)
     {
         var profile = kind == UnitKind.Macrophage
             ? new UnitProfile { Kind = UnitKind.Macrophage, DisplayName = "Mac", FineTilesPerTick = 1, FootprintFineTiles = 5,
                                 MaxActiveChildren = 10, KillLimit = 20, DegranulatesOnDepletion = false,
                                 DegranulationBurstMultiplier = 0f, ContactRadiusFineTiles = 2,
-                                EfferocytosisDebrisPerTick = 0.05f }
+                                EfferocytosisDebrisPerTick = 0.05f, StressSenseChancePerTick = stressSense }
             : new UnitProfile { Kind = UnitKind.Neutrophil, DisplayName = "Neu", FineTilesPerTick = 3, FootprintFineTiles = 3,
                                 MaxActiveChildren = 10, KillLimit = 5, DegranulatesOnDepletion = true,
                                 DegranulationBurstMultiplier = 3f, ContactRadiusFineTiles = 2,
-                                EfferocytosisDebrisPerTick = 0f };
+                                EfferocytosisDebrisPerTick = 0f, StressSenseChancePerTick = stressSense };
 
         var go = new GameObject($"TissueVerification_{profile.DisplayName}");
         go.AddComponent<SpriteRenderer>();
@@ -207,16 +208,23 @@ public static class TissueVerification
         Check("Damage past the health limit kills the cell", killedNow && rig.Grid.GetHostState(b) == HostState.Dead);
         Check("...and leaves full debris", Mathf.Approximately(rig.Grid.GetDebrisAmount(b), TissueGrid.FullDebris));
 
-        // 3. Innate clearing of an intracellular infection (GAME_DESIGN 1c/4a:
-        //    the only way to reach the pathogen is through the cell).
+        // 3. Killing an intracellular infection (GAME_DESIGN §4b). Ordinary
+        //    damage no longer reaches it -- only a loud kill of the host
+        //    cell (a stress-sense roll, or collateral). KillHostCell is that
+        //    path: cell dies, resident dies with it, nothing released.
         var d = TissueCell(rig, 11, 4);
         var virus = PlaceInTissue(rig, "ClearMe", d, PathogenClass.IntracellularVirus, 0f);
-        Check("Infected cell before clearing", rig.Grid.GetHostState(d) == HostState.Infected);
-        for (int i = 0; i < Mathf.CeilToInt(virus.MaxHealth / PathogenAgent.ContactDamagePerHit); i++)
-            virus.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null);
-        Check("Clearing an intracellular infection kills the host cell", rig.Grid.GetHostState(d) == HostState.Dead);
-        Check("...and leaves debris behind (this is what makes debris appear in play)",
+        Check("Infected cell before clearing", rig.Grid.GetHostState(d) == HostState.Infected && virus.IsIntracellular);
+
+        for (int i = 0; i < 30; i++) virus.ReceiveDamage(PathogenAgent.ContactDamagePerHit, null);
+        Check("Ordinary damage does NOT touch an intracellular pathogen (§4b) -- still Infected, still alive",
+            rig.Grid.GetHostState(d) == HostState.Infected && virus.State == PathogenState.InTissue);
+
+        rig.Grid.KillHostCell(d);
+        Check("A loud kill of the host cell takes the infection with it", rig.Grid.GetHostState(d) == HostState.Dead);
+        Check("...leaving debris (this is what makes debris appear in play)",
             Mathf.Approximately(rig.Grid.GetDebrisAmount(d), TissueGrid.FullDebris));
+        Check("...and the pathogen is gone (OnHostCellDestroyed)", virus.State == PathogenState.Cleared);
 
         // Counts stay coherent.
         Check("DeadCount tracks the three kills", rig.Grid.DeadCount == 3);
@@ -328,6 +336,47 @@ public static class TissueVerification
         for (int i = 0; i < 100; i++) neu.CheckEfferocytosis(i * BoardConfig.TickIntervalSeconds);
         Check("A neutrophil does not clear debris (efferocytosis is the macrophage's job)",
             Mathf.Approximately(rig.Grid.GetDebrisAmount(dead2), neuBefore) && rig.Grid.GetHostState(dead2) == HostState.Dead);
+
+        rig.Dispose();
+    }
+
+    // =================================================================
+    // D2. The contact stress-sense roll (GAME_DESIGN.md §4b, Sprint 6)
+    // =================================================================
+    private static void RunStressSense()
+    {
+        Debug.Log("[TissueVerification] --- Contact stress-sense ---");
+        var rig = BuildRig("Stress");
+
+        // An intracellular pathogen is not exposed to ordinary attack.
+        var hidden = TissueCell(rig, 10, 3);
+        var virus = PlaceInTissue(rig, "Hidden", hidden, PathogenClass.IntracellularVirus, 0f);
+        Check("An Infected cell's resident is NOT returned by GetAttackableAt (§4b)",
+            rig.Grid.GetAttackableAt(hidden) == null && virus.IsIntracellular);
+
+        // A macrophage sitting on an Infected cell, with a real (forced-high
+        // here) stress-sense chance, eventually recognises it and kills the
+        // cell loudly -- Dead + debris, resident gone, nothing released.
+        var mac = NewUnit(rig, UnitKind.Macrophage, hidden, stressSense: 0.5f);
+        bool killed = false;
+        for (int i = 0; i < 200 && !killed; i++)
+        {
+            killed = mac.CheckStressSense(i * BoardConfig.TickIntervalSeconds);
+        }
+        Check("A macrophage in contact with an Infected cell eventually loud-kills it", killed);
+        Check("...the cell is Dead with debris", rig.Grid.GetHostState(hidden) == HostState.Dead &&
+            Mathf.Approximately(rig.Grid.GetDebrisAmount(hidden), TissueGrid.FullDebris));
+        Check("...the intracellular pathogen died with it, nothing on the occupant layer",
+            virus.State == PathogenState.Cleared && rig.Grid.IsOccupantFree(hidden));
+        Check("...and the macrophage was credited the kill", mac.Kills == 1);
+
+        // Zero stress-sense chance -> an Infected cell is never touched.
+        var safe = TissueCell(rig, 12, 3);
+        var virus2 = PlaceInTissue(rig, "Safe", safe, PathogenClass.IntracellularVirus, 0f);
+        var blindMac = NewUnit(rig, UnitKind.Macrophage, safe, stressSense: 0f);
+        for (int i = 0; i < 300; i++) blindMac.CheckStressSense(i * BoardConfig.TickIntervalSeconds);
+        Check("A unit with StressSenseChancePerTick == 0 never recognises an infection",
+            rig.Grid.GetHostState(safe) == HostState.Infected && virus2.State == PathogenState.InTissue);
 
         rig.Dispose();
     }

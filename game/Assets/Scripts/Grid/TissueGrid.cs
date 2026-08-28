@@ -425,21 +425,24 @@ namespace ImmunologyTD.Grid
         public int TissuePathogenCount => OccupantCount + InfectedCount;
 
         /// <summary>
-        /// What an innate immune cell can actually attack at this position:
-        /// the extracellular occupant if there is one, otherwise the
-        /// pathogen hiding inside an infected host cell.
+        /// What an innate immune cell can hit with ordinary contact damage
+        /// here: the **extracellular occupant only**.
         ///
-        /// The occupant wins deliberately. A macrophage cannot tell an
-        /// infected cell from a healthy one without MHC-I recognition
-        /// (GAME_DESIGN.md section 4a, an adaptive capability that does not
-        /// exist yet), but it can certainly see a bacterium standing in
-        /// front of it.
+        /// **Sprint 6 (GAME_DESIGN.md §4b):** a pathogen *inside* a host
+        /// cell is no longer returned. An intracellular infection cannot be
+        /// touched by ordinary innate damage at all -- it is reached only by
+        /// the contact stress-sense roll (`SearchUnit.CheckStressSense` ->
+        /// `KillHostCell`, a loud necrotic kill that takes the cell and
+        /// everything in it), by the infection running its course, or by the
+        /// not-yet-built stress-sensor / adaptive units. Sprints 2-5
+        /// returned the intracellular resident here and let a macrophage
+        /// grind it down through the cell; that "innate clearing is
+        /// destructive" path is what §4b replaces.
         /// </summary>
         public PathogenAgent GetAttackableAt(CoarseCoord c)
         {
             if (!board.InCoarseBounds(c)) return null;
-            var extra = occupant[c.Column, c.Row];
-            return extra != null ? extra : intracellular[c.Column, c.Row];
+            return occupant[c.Column, c.Row];
         }
 
         // ==================================================================

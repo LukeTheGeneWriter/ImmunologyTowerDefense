@@ -63,6 +63,14 @@ namespace ImmunologyTD.Rendering
         /// breach. Deliberately gentler than either.</summary>
         public static readonly Color EfferocytosisColor = new Color(0.45f, 0.80f, 0.68f);
 
+        /// <summary>Sprint 6: an immune cell recognising an infected cell on
+        /// contact and killing it LOUDLY (GAME_DESIGN.md §4b's stress-sense
+        /// roll). A harsh magenta-pink, distinct from granule yellow, breach
+        /// red, and efferocytosis blue-green -- and this one is played
+        /// bigger, because a necrotic kill is meant to read as violent, not
+        /// tidy.</summary>
+        public static readonly Color StressKillColor = new Color(0.95f, 0.40f, 0.80f);
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;

@@ -454,8 +454,13 @@ public static class LifecycleVerification
         rig.Manager.PlaceTower(0, UnitKind.Neutrophil);
         rig.Manager.PlaceTower(1, UnitKind.Neutrophil);
 
+        // LargeBacterium: an EXTRACELLULAR pathogen, so ordinary contact
+        // damage reaches it. Sprint 6 (GAME_DESIGN.md §4b) made intracellular
+        // pathogens immune to ReceiveDamage, so an intracellular class would
+        // make this test un-runnable -- kill attribution itself is
+        // class-agnostic, it was only ever incidentally a virus here.
         var slot = new CoarseCoord(8, 2);
-        var pathogen = SeedPathogen(rig, slot, PathogenClass.IntracellularVirus);
+        var pathogen = SeedPathogen(rig, slot, PathogenClass.LargeBacterium);
         var center = CenterOf(slot);
 
         var unitA = EmitAt(rig, 0, center);
@@ -480,7 +485,7 @@ public static class LifecycleVerification
 
         // Null source stays legal (spread/environmental damage + harness use).
         var slot2 = new CoarseCoord(9, 2);
-        var pathogen2 = SeedPathogen(rig, slot2, PathogenClass.IntracellularVirus);
+        var pathogen2 = SeedPathogen(rig, slot2, PathogenClass.LargeBacterium);
         pathogen2.ReceiveDamage(pathogen2.MaxHealth, null);
         Check("ReceiveDamage with a null source still clears the pathogen (no exception, credited to nobody)", rig.Grid.IsOccupantFree(slot2));
 
