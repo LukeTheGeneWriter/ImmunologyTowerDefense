@@ -1,174 +1,145 @@
-# Sprint Plan — Sprint 6
+# Sprint Plan — Sprint 7
 
-## Sprint 5 — closed 2026-08-28
+## Sprint 6 — closed 2026-08-28
 
-Delivered `GAME_DESIGN.md` §1c: the two-layer `TissueGrid` (host +
-occupant), four host-cell states with four distinct colours, debris as
-terrain (blocks regrowth; macrophage efferocytosis; ~60s self-dissipation;
-~20s regrowth), and a first pass at class-specific advance. **The Director
-playtested it:** the cell colours read, the viral firebreak reads, and a
-macrophage clearing a debris pile reads. Verified by a new
-`TissueVerification` harness (53 assertions) plus all three prior harnesses
-— 239 total, 0 failed.
+Delivered `GAME_DESIGN.md` §4b: the contact stress-sense roll (an
+established intracellular infection is unreachable by ordinary innate
+damage; a low per-tick recognition roll → a loud necrotic kill), the real
+intracellular-bacterium model (roam/protected/replicate → brood burst;
+caught early = no brood), and virus budding + spontaneous burn-out. 259
+harness assertions, clean build. Handed to the Director; the "watch it
+happen" halves are his playtest.
 
-Playtest feedback that shaped Sprint 6:
+## Direction for Sprint 7 (Director, 2026-08-28)
 
-- The **intracellular bacterium** did not read — it rendered identically to
-  a viral infection and mostly just looked like a pathogen walking through
-  walls. More to the point, the Director replaced the model (see below).
-- The **macrophage** cleared debris but did not *home in* on it —
-  efferocytosis is currently opportunistic only.
-- Intracellular bacteria should be **vulnerable when out, protected when
-  in**, replicating at the host cell's expense, and only reliably killed by
-  a stress-sensing cell.
+Build the **ATP economy framework** and the **round structure** — a
+playable skeleton the Director can exercise, numbers deliberately
+placeholder. Three decisions taken up front:
 
-Those decisions are now written into **`GAME_DESIGN.md` §4b** (Director,
-2026-08-28). This sprint builds §4b.
+- **Round model: wave batch + buy phase.** Each round spawns a defined
+  batch of pathogens. The round ends when that batch is resolved —
+  everything either cleared, excreted, or reached the base — **except**
+  pathogens colonising the gut wall, which persist round to round per
+  §6b. Spawning then pauses; the player buys; a player action starts the
+  next round.
+- **Placement costs ATP.** A per-kind price, deducted on placement, no
+  placement you can't afford.
+- **The 100-life pool is wired** (§6c): a breach costs a life, lives
+  regenerate slowly, the run ends at 0. The *emergency granulopoiesis*
+  consequence (§6c's acute punishment) stays deferred.
 
-## Direction for Sprint 6 (Director, 2026-08-28)
-
-Do the **virus and bacteria reworks** now — they are the natural
-continuation of Sprint 5's tissue/infection work and they are what the
-playtest asked for. The ATP economy + round loop, and the DC shuttle
-(`§5a`), stay queued after this; the Director has flagged the DC shuttle as
-the one he is most keen on, exact order to be set at Sprint 7 planning.
-
-**Read `GAME_DESIGN.md` §4b before anything else.** It is the authority for
-this sprint; this document is the implementation brief for it. §1c (host
-states / debris) and §1b (invasion loop) are the substrate it builds on.
+Authority: `GAME_DESIGN.md` §5b (ATP income), the new §5d (round loop),
+§6c (breach cost), §2 (towers persist, emitted cells die at round end).
 
 ## Scope
 
-### 1. The stress signal + the contact stress-sense roll
+### 1. `AtpWallet` + income
 
-Per §4b. Every `Infected` host cell (viral or bacterial) carries a **stress
-signal**. It is **read on contact only** — it is *not* the recruitment
-cytokine field and must not be folded into it.
+A plain `AtpWallet` (balance, `TrySpend`, `Grant`, `CanAfford`). Two income
+sources, per §5b:
 
-- An immune cell **in contact with an `Infected` cell** rolls **each tick**
-  to recognise the infection. Contact = the same fine-tile proximity test
-  `SearchUnit.CheckContact` already uses.
-- On success: a **loud kill** — the host cell dies necrotically (`Dead` +
-  debris, a loud death per §1c), and **every pathogen inside dies with it.
-  Nothing is released.**
-- The per-tick probability is a per-unit-kind field (`UnitProfile` /
-  `UnitLifecycleTuning`, never a const — §6d pattern). **Macrophage and
-  neutrophil get a LOW value this sprint.** Dedicated stress sensors (γδ T
-  etc.) are **out of scope** — leave the field on the profile so they slot
-  in later, but do not build the units or a patrol pattern.
-- A loud kill should be **visibly louder** than a quiet death — reuse /
-  extend `DegranulationFlash` (a distinct colour, bigger) so the Director
-  can see "a macrophage just caught one."
+- **Round-start lump sum** — granted when a round clears (framed as the
+  budget for starting the next round; the between-rounds "+N ATP" the
+  Director sees). Game start seeds `StartingAtp` instead.
+- **Per kill** — a flat `AtpPerKill` on every pathogen a unit kills,
+  routed through the single `SearchUnit.RegisterKill` chokepoint (covers
+  contact kills and stress-sense kills; not brood-burst / burn-out /
+  drain-death).
 
-### 2. Intracellular bacterium — the real model
+### 2. `RoundController` — the state machine
 
-Replaces Sprint 5's enter → 12s timer → lyse placeholder.
+`RoundPhase { Building, Active, Defeat }`, explicit-time `Tick(dt)` per the
+project convention.
 
-- **Extracellular:** no death clock (unlike a virus — it survives out
-  there). Base-biased walk, *more* inclined to wander than the current
-  version. **Fully vulnerable to ordinary innate contact damage.**
-- **Enters** a `Healthy` host cell it is standing on — a per-tick roll
-  (`InvasionTuning`).
-- **Intracellular:** **immune to ordinary innate contact damage.** A
-  macrophage/neutrophil touching the cell does nothing except roll the
-  stress-sense (item 1). While inside, the bacterium **replicates on a
-  timer, draining `hostHealth`**. No voluntary exit.
-- **Host cell drained to death:** loud death, debris, and a **burst of N
-  extracellular bacteria** — `N` scales with incubation time (replication
-  count). Released onto the dead cell and its free neighbours.
-- **Caught by a stress-sense kill first: no burst.**
-- **Rendering:** an intracellular-bacterium cell must be tellable at a
-  glance from a virus-infected cell, from healthy, and from dead. The "went
-  in / came out" beat must read. Consider a marker on the cell, or a
-  distinct infected-cell tint per infecting class.
+- **Building** — spawner idle. A player action (`Space`, or a HUD button)
+  → `StartRound()`.
+- **`StartRound()`** — `RoundNumber++`, computes this round's batch size
+  (`BatchSizeBase + (RoundNumber-1) * BatchSizeGrowthPerRound`), tells the
+  spawner to emit exactly that many, → **Active**.
+- **Active** — watches two things each tick:
+  - `tally.ReachedBase` rising → subtract lives; at 0 → **Defeat**.
+  - the batch is resolved (batch fully emitted **and** nothing in the
+    lumen or tissue — wall pile is allowed to persist) → round clears:
+    grant the lump sum, regen a life every `LifeRegenRounds` rounds,
+    **despawn every fielded unit** (§2 — emitted cells die at round end;
+    the progenitor towers stay), → **Building**.
+- **Defeat** — everything frozen, HUD shows GAME OVER.
 
-### 3. Virus — budding + burn-out
+### 3. `PathogenSpawner` — batch gating
 
-Keep the Sprint 5 contact-chain spread as one **per-species** mode. Add:
+Stops free-running. `BeginBatch(count)` sets a target; `Tick` spawns on its
+existing interval only while `emitted < target` and under
+`maxLivePathogens`. `BatchComplete` = emitted the target **and** zero
+pathogens in lumen or tissue. `LiveCount` exposed. Gut-interface and
+cytokine ticking are unchanged (they no-op with nothing live).
 
-- **Budding (some species):** the infected cell **periodically emits a free
-  virion** that does a **momentum-biased random walk** (slight bias toward
-  its last heading → roughly radial expansion) and **rolls a per-tick entry
-  chance** against the `Healthy` cell it is on. Each budded virion has its
-  **own survival clock** (`VirusFreeSurvivalSeconds`). A budding infection
-  should read as a growing **disk**, visibly unlike a chain virus's line.
-- **Spontaneous burn-out:** a **fraction of viral infections** deplete and
-  die on their own — loud death, debris, and their virions spilled into the
-  tissue — with no immune action. Self-limiting even if ignored.
-- Budding virions still only establish in **`Healthy`** cells, so the
-  firebreak survives — a `TissueVerification` assertion must prove a budding
-  front still cannot cross dead ground.
-- "Which species buds" is a `PathogenClass`-adjacent trait; a simple
-  per-spawn flag is fine this sprint (no species roster yet).
+### 4. `BoneMarrowManager` — placement cost
 
-### 4. Keep everything from Sprints 1–5 working
+`Initialize` gains the wallet (nullable — a harness passes null and
+placement stays free). `PlaceTower` spends `MacrophagePrice` /
+`NeutrophilPrice` first, no-ops if unaffordable. The IMGUI picker shows
+prices and greys out what you can't afford. New `ClearFieldedUnits()` for
+the round boundary.
 
-The firebreak, host states, debris/efferocytosis, the breach burst,
-base-directed advance, population caps, kill-count depletion, cytokine
-sensing + heatmap, pooling. In particular the innate contact-damage path
-for **extracellular** pathogens (large bacterium, extracellular
-intracellular-bacterium, exposed virion) is unchanged — only the
-*intracellular* case gains protection.
+### 5. HUD
 
-### 5. Explicitly not in scope
+`HudOverlay` shows `ROUND N [phase] · ATP · Lives N/100`, batch progress
+during a round, the buy-phase prompt + Start button during Building, and
+GAME OVER on defeat. Marrow-slot picker shows prices.
 
-Dedicated stress-sensor units (γδ T / CTL / NK) and their patrol pattern —
-`BACKLOG.md`. Macrophage *homing* on debris (efferocytosis chemotaxis) —
-the Director raised it; it is a good fit for a later pass and is **not**
-required here. ATP economy, prices, round loop — the sprint after. DC
-shuttle, T/B cells, knowledge accrual — after that. Parasites. Balance
-tuning — mechanics first, still.
+### 6. `EconomyTuning` — every number in one place
 
-## Stopping point (definition of done) — status 2026-08-28
+Mutable statics, `ResetToDefaults()`, all placeholder mechanics-first:
+`StartingAtp` 100, `RoundStartLumpSum` 80, `AtpPerKill` 3,
+`MacrophagePrice` 40, `NeutrophilPrice` 15, `StartingLives` 100,
+`LifeRegenRounds` 2 / `LifeRegenAmount` 1, `BatchSizeBase` 8 /
+`BatchSizeGrowthPerRound` 3.
 
-Mechanics all landed and harness-covered (`TissueVerification` 53 → 73);
-the "watch it happen" halves are the Director's playtest. `[x]` = done,
-`[~]` = code done + harness-verified, visual unconfirmed.
+### 7. Not in scope
 
-- [~] An **intracellular bacterium** enters a host cell (cell turns a
-      distinct yellow-green, `InfectedColorFor`), is **untouchable by a
-      macrophage** while inside, drains the cell, and **bursts a brood** on
-      drain-death. Harness: `RunClassAdvance` bacterium block. Watching it
-      is the playtest.
-- [~] A **macrophage recognises an infected cell on contact** and kills it
-      **loudly** (1.5× magenta flash), **nothing released**. Harness:
-      `RunStressSense`. Whether the 0.03/tick rate *feels* right is the
-      playtest.
-- [~] A **budding infection grows as a disk**, a **chain one snakes** —
-      harness confirms established infections on both sides of a budding
-      seed. The two side by side is the playtest.
-- [~] **Infections burn out on their own**, spilling the virus + debris.
-      Harness: burn-out block.
-- [x] An **exposed** intracellular-bacterium still takes ordinary
-      macrophage/neutrophil damage. Harness: `RunClassAdvance` (`mac.CheckContact`
-      lands before it hides).
-- [x] A **budding front cannot cross dead ground** — harness-asserted end
-      to end (180s of budding, 0 established infections base-ward of a
-      3-cell band).
-- [x] Everything from Sprints 1–5 still works — Combat 36 / Lifecycle 79 /
-      Map 71 all re-run green.
-- [x] `TissueVerification` grown to cover stress-sense, exposed/hidden,
-      replication + brood + caught-early-no-brood, budding vs chain,
-      burn-out — **73 passed, 0 failed**.
-- [x] `docs/GAME_DESIGN.md` §4b, `SPRINT_PLAN.md`, `ENGINE_STATUS.md`,
-      `INTERFACE.md`, `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` all
-      updated.
+- **Emergency granulopoiesis** (§6c's acute breach punishment) — deferred.
+- **Bone marrow slot expansion / capacity purchase** (§2a open) — slots
+  stay at 5, count fixed.
+- **Round batch *composition*** — class weights per round, boss rounds,
+  a real difficulty curve. Placeholder linear size growth only.
+- **Tower upgrades** with ATP — no upgrade system yet.
+- **The DC shuttle / adaptive immunity** — the sprint after.
+- Anything that makes round 1 non-inert beyond the buy decision (§2a's
+  flagged risk) — noted, not addressed.
 
-**Handed to the Director for playtest.**
+Everything from Sprints 1–6 keeps working: the invasion loop, the
+firebreak, host states / debris / efferocytosis, the §4b stress-sense and
+intracellular models, population caps, pooling.
 
-The question this sprint answers for the Director: **does an established
-intracellular infection feel like something innate immunity struggles
-with** — something you can only catch by luck or by burning the tissue
-down — so that the eventual stress-sensor and adaptive units have an
-obvious job?
+## Stopping point (definition of done)
 
-## A process note for whoever is dispatched
+The Director can, in a build:
 
-Sprints 3, 4 and 5 were all implemented by dispatched Code agents that were
-interrupted mid-task. Sprint 5's hand-off was the first clean one, because
-the brief said **commit after each scope item, even if incomplete or
-ugly** — and the agent did. Keep doing that. Update `docs/INTERFACE.md` as
-each signature changes and append to `docs/TEAM_RETRO.md` as each judgment
-call is made, not in a final sweep. A verbose, reasoning-heavy commit
-message is the recovery artifact when the author disappears mid-sprint —
-it has been, four times now.
+- [ ] Open into a **buy phase** with `StartingAtp`, place towers (each
+      deducting its price; can't place when broke), and start round 1 with
+      a keypress / button.
+- [ ] Watch a round spawn a **finite batch**, run, and **clear** when the
+      batch is resolved — then land back in a buy phase with the
+      **lump sum** added and last round's units gone.
+- [ ] See **ATP rise per kill** during a round.
+- [ ] See **Lives drop on a breach**, regenerate slowly between rounds,
+      and the run end at **0 → GAME OVER**.
+- [ ] See the **round number climb** and the batch get bigger.
+- [ ] Wall-pile pathogens **persist** across the buy phase into the next
+      round (§6b).
+- [ ] Everything from Sprints 1–6 still works.
+- [ ] A new `EconomyVerification` harness covers the wallet, the round
+      state machine, batch completion, the lump sum, per-kill income,
+      life loss → defeat, life regen, placement cost, and round-boundary
+      unit clearing. Combat / Lifecycle / Map / Tissue all still green.
+- [ ] `GAME_DESIGN.md` §5b/§5d/§6c, `ENGINE_STATUS.md`, `INTERFACE.md`,
+      `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` reflect reality.
+
+The question this sprint answers: **is the loop — buy, start, survive,
+get paid, buy more — there and legible**, even with every number wrong?
+
+## A process note
+
+Same as Sprint 6: head session, inline, commit after each scope item with
+a reasoning-heavy message, update `INTERFACE.md` and `TEAM_RETRO.md` as
+signatures change and judgment calls are made — not in a final sweep.

@@ -720,19 +720,56 @@ Explicitly an interim answer — the Director's words were "for now" — chosen
 so the progenitor buying tab has something real to spend before the full
 economy exists.
 
-**This creates a dependency the project has been deferring: there is no
-round loop.** The game currently runs as one continuous, unbounded session
-— no waves, no round boundaries, no between-round interval. "Starting a
-round" has nothing to attach to yet. The Director has flagged a round loop
-as needed soon; until it exists, the round-start payment can only be a
-one-off grant at session start.
-
 Note the two sources pull in different directions, which is probably
 healthy: the round-start lump rewards surviving to the next round, while
 per-kill income rewards active clearing over letting pathogens transit.
 Whether per-kill income makes a passive "let them through" strategy
 non-viable — or whether it should — is a balance question for when the
 economy is real.
+
+**Round loop built — Sprint 7 (Director, 2026-08-28).** The "there is no
+round loop" caveat this section carried is resolved; see **§5d**. Two
+implementation choices worth recording here: the round-start lump is
+granted **when a round clears** (framed as the budget for the next round —
+what the player sees as the between-rounds "+N ATP"), with `StartingAtp`
+seeding the first buy phase instead; and per-kill income is a flat amount
+routed through the single `SearchUnit.RegisterKill` chokepoint, so it
+covers ordinary contact kills and §4b stress-sense kills but **not**
+brood-burst / burn-out / drain-death (those are not the player's kills).
+
+## 5d. Round loop — LOCKED (Director, 2026-08-28)
+
+The round model, decided at the top of Sprint 7. **Wave batch + buy
+phase**, close to Bloons TD's rhythm:
+
+- **A round is a defined batch of pathogens.** Round `N` spawns
+  `BatchSizeBase + (N−1)·BatchSizeGrowthPerRound` of them into the lumen on
+  the normal spawn cadence, then stops.
+- **The round ends when the batch is resolved** — every pathogen in it has
+  cleared, been excreted, or reached the base — **except** pathogens
+  colonising the gut wall, which are *allowed to persist* into the buy
+  phase and the next round, exactly as §6b's barrier colonisation
+  specifies. A smouldering wall pile does not hold the round open.
+- **On clear:** the round-start lump sum is granted, a life regenerates
+  every `LifeRegenRounds` rounds (§6c convalescence), and **every fielded
+  immune cell despawns** — §2's "the cells they emit die at the end of the
+  round." The progenitor **towers** stay placed; each re-emits from
+  scratch next round.
+- **The buy phase** pauses spawning. The player places / can eventually
+  upgrade towers, then a **player action** (a keypress or a button) starts
+  the next round. No timer on the buy phase.
+- **`RoundPhase { Building, Active, Defeat }`.** Defeat is entered when the
+  life pool hits 0 (§6c); everything freezes.
+
+Numbers (`EconomyTuning`, all placeholder mechanics-first): `StartingAtp`
+100, `RoundStartLumpSum` 80, `AtpPerKill` 3, `MacrophagePrice` 40,
+`NeutrophilPrice` 15, `BatchSizeBase` 8, `BatchSizeGrowthPerRound` 3.
+
+**Deliberately not in the framework:** round batch *composition* (class
+weights per round, boss rounds, a real difficulty curve — placeholder is
+linear size growth), bone-marrow slot expansion (§2a, slots fixed at 5),
+ATP tower upgrades (no upgrade system yet), and anything addressing §2a's
+"round 1 is buy-then-observe with no in-round action" risk.
 
 ## 5c. Antigen specificity — the 8-bit barcode — LOCKED (Director, 2026-08-21)
 
@@ -882,6 +919,16 @@ IgA (§5, ~70%) is the adaptive tool that later prevents adhesion outright.
 over subsequent rounds (convalescence). Losing a life must have an
 **acute** consequence beyond the counter, or a 100-life pool reads as a
 difficulty cushion rather than a threat.
+
+**Wired — Sprint 7 (Director, 2026-08-28).** The life pool, the per-breach
+decrement (off `InvasionTally.ReachedBase` rising), the per-round
+regeneration (`LifeRegenAmount` every `LifeRegenRounds` cleared rounds),
+and the `0 → Defeat` lose condition are built (`RoundController`). The
+**acute consequence below (emergency granulopoiesis) is *not* built** —
+still deferred with its numbers. So for now a breach is "just the counter,"
+which §6c itself warns reads as a cushion; the Director's playtest of the
+economy framework is expected to confirm that and the granulopoiesis work
+follows.
 
 ### Acute consequence: emergency granulopoiesis
 
