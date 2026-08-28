@@ -114,32 +114,41 @@ namespace ImmunologyTD.Pathogens
         {
             var go = pool.Get();
             var agent = go.GetComponent<PathogenAgent>();
-            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpread);
+            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear);
             live.Add(agent);
         }
 
         /// <summary>
-        /// Attempts to spread a virus infection from <paramref name="source"/>
-        /// into one in-bounds, TISSUE-BAND, **Healthy** coarse neighbour.
-        /// Neighbour order is shuffled each call so spread doesn't favour a
+        /// Spawns one pathogen of <paramref name="pClass"/> at or beside
+        /// <paramref name="source"/>. Two production callers, both through
+        /// PathogenAgent's `onSpawnNear` delegate:
+        ///
+        ///  - **Viral spread** (`IntracellularVirus`) -- from an infected
+        ///    cell after incubation. The target must be an in-bounds,
+        ///    TISSUE-BAND, **`Healthy`**, occupant-free NEIGHBOUR. The
+        ///    Healthy check (Sprint 5) is half of what makes the firebreak
+        ///    emerge -- a virus ringed by dead/infected ground gets `false`
+        ///    here and retries rather than burning its one-shot spread. The
+        ///    band check (Sprint 4) keeps it out of the lumen.
+        ///  - **Bacterial brood burst** (`IntracellularBacterium`, Sprint 6)
+        ///    -- from a cell just drained to death. The bacterium is
+        ///    extracellular, so the target only needs to be an in-bounds,
+        ///    TISSUE-BAND, occupant-free cell; `source` itself is tried first
+        ///    (the dead cell the brood is bursting from), then its
+        ///    neighbours. **No `Healthy` requirement.**
+        ///
+        /// Neighbour order is shuffled each call so neither favours a
         /// direction.
-        ///
-        /// Sprint 4 added the band check: without it a virus at the tissue's
-        /// lumen edge could spread a new infection into the channel, where
-        /// nothing would ever be able to reach it.
-        ///
-        /// Sprint 5 added the Healthy check. GAME_DESIGN.md section 1c is
-        /// explicit -- "a virus can only spread into a `Healthy` neighbour"
-        /// -- and it is half of what makes the firebreak emerge: a virus
-        /// ringed by dead or already-infected ground gets `false` here and
-        /// TickCombat retries next interval rather than burning its one
-        /// spread on a doomed free particle. The occupant-free test stays as
-        /// a belt-and-braces guard against dropping a second thing on an
-        /// occupied tile.
         /// </summary>
-        public bool RequestSpread(CoarseCoord source, float currentTime)
+        public bool RequestSpawnNear(CoarseCoord source, PathogenClass pClass, float currentTime)
         {
             if (live.Count >= maxLivePathogens) return false;
+
+            bool needsHealthyHost = pClass == PathogenClass.IntracellularVirus;
+
+            // A brood may land on the source cell itself (a virus never can --
+            // that cell is already infected).
+            if (!needsHealthyHost && TrySpawnAt(source, pClass, needsHealthyHost, currentTime)) return true;
 
             var order = new[] { 0, 1, 2, 3 };
             for (int i = 3; i > 0; i--)
@@ -154,21 +163,26 @@ namespace ImmunologyTD.Pathogens
             {
                 var (dc, dr) = CoarseNeighborOffsets[idx];
                 var candidate = new CoarseCoord(source.Column + dc, source.Row + dr);
-                if (!board.InCoarseBounds(candidate)) continue;
-                if (board.BandOf(candidate) != BoardBand.Tissue) continue;
-                if (!tissueGrid.IsHealthyHost(candidate)) continue;
-                if (!tissueGrid.IsOccupantFree(candidate)) continue;
-
-                var go = pool.Get();
-                var child = go.GetComponent<PathogenAgent>();
-                child.InitializeInTissueDirect(
-                    board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpread,
-                    candidate, PathogenClass.IntracellularVirus, currentTime);
-                live.Add(child);
-                return true;
+                if (TrySpawnAt(candidate, pClass, needsHealthyHost, currentTime)) return true;
             }
 
             return false;
+        }
+
+        private bool TrySpawnAt(CoarseCoord candidate, PathogenClass pClass, bool needsHealthyHost, float currentTime)
+        {
+            if (!board.InCoarseBounds(candidate)) return false;
+            if (board.BandOf(candidate) != BoardBand.Tissue) return false;
+            if (needsHealthyHost && !tissueGrid.IsHealthyHost(candidate)) return false;
+            if (!tissueGrid.IsOccupantFree(candidate)) return false;
+
+            var go = pool.Get();
+            var child = go.GetComponent<PathogenAgent>();
+            child.InitializeInTissueDirect(
+                board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear,
+                candidate, pClass, currentTime);
+            live.Add(child);
+            return true;
         }
 
         /// <summary>Single exit path for every way a pathogen leaves play --

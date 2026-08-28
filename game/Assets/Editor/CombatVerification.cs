@@ -114,7 +114,7 @@ public static class CombatVerification
         var go = new GameObject($"CombatVerification_{pClass}");
         var agent = go.AddComponent<PathogenAgent>();
         bool exited = false;
-        agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, t) => false, slot, pClass, 0f);
+        agent.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => exited = true, (c, cls, t) => false, slot, pClass, 0f);
 
         Check($"{pClass} occupies {slot} after adhering", !tissueGrid.IsOccupantFree(slot) && tissueGrid.GetAttackableAt(slot) == agent);
 
@@ -148,17 +148,17 @@ public static class CombatVerification
 
         var virusGo = new GameObject("Virus");
         var virus = virusGo.AddComponent<PathogenAgent>();
-        virus.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
+        virus.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(1, 1), PathogenClass.IntracellularVirus, 0f);
         Check("Intracellular virus does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(virus));
 
         var bacGo = new GameObject("Bacterium");
         var bac = bacGo.AddComponent<PathogenAgent>();
-        bac.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
+        bac.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(2, 1), PathogenClass.IntracellularBacterium, 0f);
         Check("Intracellular bacterium does NOT show as itself (reads as host tissue)", !BoardRenderer.ShowsAsPathogenItself(bac));
 
         var largeGo = new GameObject("LargeBacterium");
         var large = largeGo.AddComponent<PathogenAgent>();
-        large.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
+        large.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, null, (c, cls, t) => false, new CoarseCoord(3, 1), PathogenClass.LargeBacterium, 0f);
         Check("Large bacterium DOES show as itself", BoardRenderer.ShowsAsPathogenItself(large));
 
         Check("BoardRenderer.ShowsAsPathogenItself(null) is false (bare host tissue)", !BoardRenderer.ShowsAsPathogenItself(null));
@@ -213,7 +213,7 @@ public static class CombatVerification
         var originGo = new GameObject("OriginVirus");
         var origin = originGo.AddComponent<PathogenAgent>();
         float simTime = 0f;
-        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpread, originCoord, PathogenClass.IntracellularVirus, simTime);
+        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpawnNear, originCoord, PathogenClass.IntracellularVirus, simTime);
 
         Check($"[{label}] AdheredCount is 1 right after seeding the origin infection", tissueGrid.TissuePathogenCount == 1);
 
@@ -288,7 +288,7 @@ public static class CombatVerification
         var coord = new CoarseCoord(board.Columns / 2, 2);
         var go = new GameObject("OriginBacterium");
         var origin = go.AddComponent<PathogenAgent>();
-        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpread, coord, PathogenClass.IntracellularBacterium, 0f);
+        origin.InitializeInTissueDirect(board, tissueGrid, HarnessGut(board, tissueGrid), HarnessTally, a => { }, spawner.RequestSpawnNear, coord, PathogenClass.IntracellularBacterium, 0f);
 
         float simTime = 0f;
         const float dt = 0.5f;

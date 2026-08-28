@@ -244,7 +244,7 @@ public static class LifecycleVerification
         var go = new GameObject($"Pathogen_{slot}");
         rig.Junk.Add(go);
         var agent = go.AddComponent<PathogenAgent>();
-        agent.InitializeInTissueDirect(rig.Board, rig.Grid, HarnessGut(rig.Board, rig.Grid), HarnessTally, a => { }, (c, t) => false, slot, pClass, 0f);
+        agent.InitializeInTissueDirect(rig.Board, rig.Grid, HarnessGut(rig.Board, rig.Grid), HarnessTally, a => { }, (c, cls, t) => false, slot, pClass, 0f);
         return agent;
     }
 

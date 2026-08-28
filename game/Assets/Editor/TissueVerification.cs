@@ -4,6 +4,7 @@ using ImmunologyTD.Grid;
 using ImmunologyTD.Pathogens;
 using ImmunologyTD.Pooling;
 using ImmunologyTD.Units;
+using ImmunologyTD.Rendering;
 
 /// <summary>
 /// Sprint 5 verification: host-cell states, debris as terrain, efferocytosis,
@@ -108,16 +109,16 @@ public static class TissueVerification
 
     /// <summary>A pathogen placed directly into tissue at <paramref name="slot"/>.
     /// The spread callback defaults to "never spreads" -- pass a real one
-    /// (spawner.RequestSpread) for the firebreak group.</summary>
+    /// (spawner.RequestSpawnNear) for the firebreak group.</summary>
     private static PathogenAgent PlaceInTissue(
         Rig rig, string name, CoarseCoord slot, PathogenClass pClass, float now,
-        System.Func<CoarseCoord, float, bool> onSpread = null,
+        System.Func<CoarseCoord, PathogenClass, float, bool> onSpread = null,
         System.Action<PathogenAgent> onExit = null)
     {
         var agent = NewAgent(rig, name);
         agent.InitializeInTissueDirect(
             rig.Board, rig.Grid, rig.Gut, rig.Tally,
-            onExit ?? (a => { }), onSpread ?? ((c, t) => false),
+            onExit ?? (a => { }), onSpread ?? ((c, cls, t) => false),
             slot, pClass, now);
         return agent;
     }
@@ -484,7 +485,7 @@ public static class TissueVerification
                     rig.Grid.KillHostCell(rig.Board.CoarseFromAxis(deadStripAxis - d, lane));
 
         var origin = PlaceInTissue(rig, "FB_Origin", TissueCell(rig, seedAxis, 5),
-            PathogenClass.IntracellularVirus, 0f, onSpread: spawner.RequestSpread);
+            PathogenClass.IntracellularVirus, 0f, onSpread: spawner.RequestSpawnNear);
         return (rig, spawner, origin);
     }
 
@@ -541,15 +542,35 @@ public static class TissueVerification
     {
         Debug.Log("[TissueVerification] --- Class-specific advance ---");
 
-        // Intracellular bacterium: visible + walking while out, hidden +
-        // stationary while in, and it lyses back out killing the cell.
+        // Intracellular bacterium (GAME_DESIGN §4b): vulnerable + walking
+        // while out; protected + replicating while in; NO voluntary exit; on
+        // drain-death the brood bursts out.
         {
             var rig = BuildRig("IntraBac");
-            InvasionTuning.IntracellularEntryChance = 1f; // deterministic: enter the first Healthy cell it stands on
+            InvasionTuning.IntracellularEntryChance = 1f; // deterministic: enter the first Healthy cell
             var start = TissueCell(rig, 14, 5);
-            var bac = PlaceInTissue(rig, "IntraBac", start, PathogenClass.IntracellularBacterium, 0f);
-            Check("An intracellular bacterium starts extracellular (on the occupant layer)",
+
+            // Wire a real spawner so the burst can actually spawn its brood.
+            var spawnerGo = new GameObject("TissueVerification_IntraBacSpawner");
+            rig.Junk.Add(spawnerGo);
+            var spawner = spawnerGo.AddComponent<PathogenSpawner>();
+            var template = new GameObject("TissueVerification_IntraBacTemplate");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<PathogenAgent>();
+            template.SetActive(false);
+            rig.Junk.Add(template);
+            spawner.Initialize(rig.Board, rig.Grid, rig.Field, rig.Gut, rig.Tally, template);
+
+            var bac = PlaceInTissue(rig, "IntraBac", start, PathogenClass.IntracellularBacterium, 0f,
+                onSpread: spawner.RequestSpawnNear);
+            Check("An intracellular bacterium starts extracellular, visible, on the occupant layer",
                 !bac.IsIntracellular && !rig.Grid.IsOccupantFree(start));
+
+            // A macrophage can hit it while it is still exposed.
+            var exposedBefore = bac.Health;
+            var mac = NewUnit(rig, UnitKind.Macrophage, start);
+            mac.CheckContact();
+            Check("...and takes ordinary contact damage while exposed", bac.Health < exposedBefore);
 
             float t = 0f;
             for (int i = 0; i < 20 && !bac.IsIntracellular; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
@@ -558,17 +579,75 @@ public static class TissueVerification
             Check("...flipping that cell to Infected and clearing the occupant layer there",
                 rig.Grid.GetHostState(host) == HostState.Infected && rig.Grid.IsOccupantFree(host));
 
-            float enterTime = t;
-            for (int i = 0; i < 5; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
-            Check("...and holds still inside (still the same Infected cell) before its residence elapses",
-                bac.IsIntracellular && SameCell(bac.CurrentCoarse, host) && (t - enterTime) < InvasionTuning.IntracellularResidenceSeconds);
+            // While inside: immune to ordinary damage, and it drains the host.
+            bac.ReceiveDamage(999f, null);
+            Check("...it is immune to ordinary damage while inside (§4b)", bac.IsIntracellular && bac.State == PathogenState.InTissue);
+            float hpAtEntry = rig.Grid.GetHostHealth(host);
+            for (int i = 0; i < 4; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
+            Check("...and the host cell's health is being drained", rig.Grid.GetHostHealth(host) < hpAtEntry || rig.Grid.GetHostState(host) != HostState.Infected);
 
-            for (int i = 0; i < 200 && bac.IsIntracellular; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
-            Check("...then lyses back out after IntracellularResidenceSeconds", !bac.IsIntracellular);
-            Check("...killing its host cell and leaving debris",
+            int liveBefore = spawner.Live.Count;
+            for (int i = 0; i < 100 && bac.IsIntracellular; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
+            Check("...no voluntary exit -- it leaves only when the drain kills the cell", !bac.IsIntracellular);
+            Check("...the drained cell is Dead with debris",
                 rig.Grid.GetHostState(host) == HostState.Dead && Mathf.Approximately(rig.Grid.GetDebrisAmount(host), TissueGrid.FullDebris));
-            Check("...and it is back on the occupant layer, alive and advancing",
+            Check("...this bacterium survived, back on the occupant layer, still advancing",
                 bac.State == PathogenState.InTissue && !rig.Grid.IsOccupantFree(bac.CurrentCoarse));
+            Check("...and a brood of extra bacteria burst out with it",
+                spawner.Live.Count > liveBefore);
+
+            InvasionTuning.ResetToDefaults();
+            rig.Dispose();
+        }
+
+        // Caught early: a stress-sense / loud kill of the infected cell
+        // releases NOTHING -- the reward for sensing it fast.
+        {
+            var rig = BuildRig("NoBurst");
+            InvasionTuning.IntracellularEntryChance = 1f;
+            var start = TissueCell(rig, 14, 5);
+            var spawnerGo = new GameObject("TissueVerification_NoBurstSpawner");
+            rig.Junk.Add(spawnerGo);
+            var spawner = spawnerGo.AddComponent<PathogenSpawner>();
+            var template = new GameObject("TissueVerification_NoBurstTemplate");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<PathogenAgent>();
+            template.SetActive(false);
+            rig.Junk.Add(template);
+            spawner.Initialize(rig.Board, rig.Grid, rig.Field, rig.Gut, rig.Tally, template);
+
+            var bac = PlaceInTissue(rig, "NoBurst", start, PathogenClass.IntracellularBacterium, 0f,
+                onSpread: spawner.RequestSpawnNear);
+            float t = 0f;
+            for (int i = 0; i < 20 && !bac.IsIntracellular; i++) { t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
+            var host = bac.CurrentCoarse;
+            // one replication in, then a loud kill before the drain finishes
+            t += InvasionTuning.TissueStepIntervalSeconds; bac.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t);
+            rig.Grid.KillHostCell(host);
+            Check("A loud kill of a mid-replication infected cell leaves no brood", spawner.Live.Count == 0);
+            Check("...the bacterium died with the cell", bac.State == PathogenState.Cleared);
+            Check("...the cell is Dead with debris", rig.Grid.GetHostState(host) == HostState.Dead);
+
+            InvasionTuning.ResetToDefaults();
+            rig.Dispose();
+        }
+
+        // Rendering: an intracellular-bacterium cell is a different colour
+        // from a virus-infected one.
+        {
+            var rig = BuildRig("InfectColour");
+            InvasionTuning.IntracellularEntryChance = 1f;
+            var v = PlaceInTissue(rig, "V", TissueCell(rig, 12, 3), PathogenClass.IntracellularVirus, 0f);
+            var bstart = TissueCell(rig, 12, 6);
+            var b = PlaceInTissue(rig, "B", bstart, PathogenClass.IntracellularBacterium, 0f);
+            float t = 0f;
+            for (int i = 0; i < 10 && !b.IsIntracellular; i++) { t += InvasionTuning.TissueStepIntervalSeconds; b.SimulationTick(InvasionTuning.TissueStepIntervalSeconds, t); }
+            var bhost = b.CurrentCoarse;
+            var virusColour = BoardRenderer.InfectedColorFor(rig.Grid.GetIntracellularAt(v.CurrentCoarse));
+            var bacColour = BoardRenderer.InfectedColorFor(rig.Grid.GetIntracellularAt(bhost));
+            Check("A virus-infected cell and a bacterium-infected cell draw in different colours",
+                virusColour != bacColour && virusColour == BoardRenderer.InfectedHostColor &&
+                bacColour == BoardRenderer.InfectedByBacteriumColor);
 
             InvasionTuning.ResetToDefaults();
             rig.Dispose();

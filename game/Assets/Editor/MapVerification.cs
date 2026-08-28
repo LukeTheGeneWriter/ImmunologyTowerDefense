@@ -231,7 +231,7 @@ public static class MapVerification
 
         var agent = NewAgent(rig, "Flower");
         bool exited = false;
-        agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => exited = true, (c, t) => false);
+        agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => exited = true, (c, cls, t) => false);
 
         Check("A freshly spawned pathogen is in the Lumen", agent.State == PathogenState.Lumen);
         Check("...and is inside the lumen band", rig.Board.BandOf(agent.CurrentCoarse) == BoardBand.Lumen);
@@ -331,7 +331,7 @@ public static class MapVerification
         for (int i = 0; i < cohort; i++)
         {
             var agent = NewAgent(rig, $"{label}_{i}");
-            agent.Initialize(rig.Board, rig.Grid, gut, tally, a => { }, (c, t) => false);
+            agent.Initialize(rig.Board, rig.Grid, gut, tally, a => { }, (c, cls, t) => false);
             agents.Add(agent);
         }
 
@@ -366,7 +366,7 @@ public static class MapVerification
         for (int i = 0; i < pileSize; i++)
         {
             var agent = NewAgent(rig, $"PileA_{i}");
-            agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, t) => false);
+            agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, cls, t) => false);
             agent.AdhereToInterface(positionA);
             atA.Add(agent);
         }
@@ -375,7 +375,7 @@ public static class MapVerification
         for (int i = 0; i < 3; i++)
         {
             var agent = NewAgent(rig, $"PileB_{i}");
-            agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, t) => false);
+            agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, cls, t) => false);
             agent.AdhereToInterface(positionB);
             atB.Add(agent);
         }
@@ -449,7 +449,7 @@ public static class MapVerification
             var agent = NewAgent(rig, $"Advance_{i}");
             var slot = rig.Board.CoarseFromAxis(startAxis, i % rig.Board.CrossLength);
             agent.InitializeInTissueDirect(rig.Board, rig.Grid, rig.Gut, rig.Tally,
-                a => { }, (c, t) => false, slot, PathogenClass.LargeBacterium, 0f);
+                a => { }, (c, cls, t) => false, slot, PathogenClass.LargeBacterium, 0f);
             agents.Add(agent);
         }
 
@@ -504,7 +504,7 @@ public static class MapVerification
         bool exited = false;
         var agent = NewAgent(rig, "Breacher");
         agent.InitializeInTissueDirect(rig.Board, rig.Grid, rig.Gut, rig.Tally,
-            a => exited = true, (c, t) => false, slot, PathogenClass.LargeBacterium, 0f);
+            a => exited = true, (c, cls, t) => false, slot, PathogenClass.LargeBacterium, 0f);
 
         Check("Seeded at the tissue cell adjacent to the base",
             rig.Board.AxisIndex(agent.CurrentCoarse) == rig.Board.TissueBaseEdgeAxisIndex);
@@ -539,7 +539,7 @@ public static class MapVerification
 
         var agent = NewAgent(rig, "MirrorWalker");
         agent.InitializeInTissueDirect(rig.Board, rig.Grid, rig.Gut, rig.Tally,
-            a => { }, (c, t) => false, slot, PathogenClass.LargeBacterium, 0f);
+            a => { }, (c, cls, t) => false, slot, PathogenClass.LargeBacterium, 0f);
 
         float t = 0f;
         for (int step = 0; step < 5; step++)

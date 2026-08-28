@@ -96,7 +96,7 @@ namespace ImmunologyTD.Pathogens
         private GutInterface gutInterface;
         private InvasionTally tally;
         private System.Action<PathogenAgent> onExit;
-        private System.Func<CoarseCoord, float, bool> onSpreadRequested;
+        private System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear;
 
         public PathogenState State { get; private set; }
 
@@ -186,11 +186,17 @@ namespace ImmunologyTD.Pathogens
         /// this, it dies. Half of the firebreak.</summary>
         private float freeSinceTime;
 
-        /// <summary>When an intracellular bacterium entered its current host
-        /// cell. It lyses out after
-        /// InvasionTuning.IntracellularResidenceSeconds, killing the
-        /// cell.</summary>
-        private float hostEntryTime;
+        /// <summary>When an intracellular bacterium last replicated inside
+        /// its host cell (GAME_DESIGN.md §4b). Every
+        /// InvasionTuning.IntracellularReplicationIntervalSeconds it drains
+        /// the host cell and grows the brood; there is no voluntary exit.</summary>
+        private float lastReplicationTime;
+
+        /// <summary>How many times an intracellular bacterium has replicated
+        /// in its current host cell -- the size of the brood that bursts out
+        /// when the cell finally dies from the drain. Reset on each fresh
+        /// cell entry.</summary>
+        private int broodCount;
 
         /// <summary>Shuffle buffer for the five cell-to-cell spread
         /// candidates (own cell + four von Neumann neighbours), reused so a
@@ -226,9 +232,9 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear)
         {
-            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpreadRequested);
+            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
             EnsureSprite();
 
             Class = PickRandomClass();
@@ -265,10 +271,10 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void InitializeInTissueDirect(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested,
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear,
             CoarseCoord slot, PathogenClass pClass, float currentTime)
         {
-            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpreadRequested);
+            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
             EnsureSprite();
 
             Class = pClass;
@@ -313,7 +319,6 @@ namespace ImmunologyTD.Pathogens
             if (Class == PathogenClass.IntracellularVirus && tissueGrid.TryInfect(slot, this, currentTime))
             {
                 IsIntracellular = true;
-                hostEntryTime = currentTime;
             }
             else
             {
@@ -326,14 +331,14 @@ namespace ImmunologyTD.Pathogens
 
         private void BindContext(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, float, bool> onSpreadRequested)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, float, bool> onSpawnNear)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
             this.gutInterface = gutInterface;
             this.tally = tally;
             this.onExit = onExit;
-            this.onSpreadRequested = onSpreadRequested;
+            this.onSpawnNear = onSpawnNear;
         }
 
         private void EnsureSprite()
@@ -613,43 +618,42 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>
-        /// **Intracellular bacteria: biased when out, hidden when in.**
+        /// **Intracellular bacteria: vulnerable when out, protected when in**
+        /// (GAME_DESIGN.md §4b).
         ///
-        /// Outside a cell it is an ordinary base-biased walker, visible as
-        /// itself, and each step it may slip inside a healthy host cell it is
-        /// standing on (InvasionTuning.IntracellularEntryChance). Inside, it
-        /// is invisible and stationary until it lyses out
-        /// (InvasionTuning.IntracellularResidenceSeconds), which KILLS the
-        /// host cell and leaves debris.
+        /// *Extracellular* -- an ordinary base-biased walker, visible as
+        /// itself, fully exposed to innate contact damage, with **no death
+        /// clock** (unlike a virus). Each step, standing on a `Healthy` cell,
+        /// it has a low chance (InvasionTuning.IntracellularEntryChance, 0.12
+        /// -- deliberately low so it roams) of going inside.
         ///
-        /// The lysis exit is this sprint's judgment call -- see
-        /// InvasionTuning.IntracellularResidenceSeconds for why an exit had
-        /// to exist at all.
+        /// *Intracellular* -- hidden, stationary, immune to ordinary damage.
+        /// Every InvasionTuning.IntracellularReplicationIntervalSeconds it
+        /// **drains the host cell and grows its brood by one**. There is no
+        /// voluntary exit. When the drain finally kills the cell the brood
+        /// **bursts out** as up to InvasionTuning.IntracellularMaxBrood
+        /// extracellular bacteria (this one plus fresh spawns). If the cell
+        /// is killed some other way first (a stress-sense roll, neutrophil
+        /// collateral), <see cref="OnHostCellDestroyed"/> takes this
+        /// bacterium with it and **nothing bursts** -- that is the payoff for
+        /// catching an infection early.
         /// </summary>
         private void StepIntracellularBacterium(float currentTime)
         {
             if (IsIntracellular)
             {
-                if (currentTime - hostEntryTime < InvasionTuning.IntracellularResidenceSeconds) return;
-                // Only lyse out if there is somewhere to stand. If something
-                // else is occupying this position, wait -- better a longer
-                // residence than a pathogen owned by neither layer.
-                if (!tissueGrid.IsOccupantFree(CurrentCoarse)) return;
+                if (currentTime - lastReplicationTime < InvasionTuning.IntracellularReplicationIntervalSeconds) return;
+                lastReplicationTime = currentTime;
+                broodCount++;
 
-                // Detach from the host layer FIRST. KillHostCell notifies its
-                // resident via OnHostCellDestroyed -- and the resident here is
-                // this bacterium. Without the detach, lysing out would kill
-                // the bacterium along with the cell, when the whole point of
-                // lysis is that it survives and keeps walking (section 1b
-                // step 4). ReleaseIntracellular flips Infected -> Healthy and
-                // drops the resident link; KillHostCell then takes that
-                // Healthy cell to Dead + debris with no one to notify.
-                tissueGrid.ReleaseIntracellular(CurrentCoarse);
-                tissueGrid.KillHostCell(CurrentCoarse);
-                IsIntracellular = false;
-                freeSinceTime = currentTime;
-                tissueGrid.TryClaimOccupant(CurrentCoarse, this, infectionStartTime);
-                ApplyRestColorForCurrentClass();
+                float remaining = tissueGrid.GetHostHealth(CurrentCoarse) - InvasionTuning.IntracellularDrainPerReplication;
+                if (remaining > 0f)
+                {
+                    tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.IntracellularDrainPerReplication);
+                    return;
+                }
+
+                BurstBrood(currentTime);
                 return;
             }
 
@@ -659,13 +663,49 @@ namespace ImmunologyTD.Pathogens
             {
                 tissueGrid.ReleaseOccupant(CurrentCoarse);
                 IsIntracellular = true;
-                hostEntryTime = currentTime;
                 infectionStartTime = currentTime;
+                lastReplicationTime = currentTime;
+                broodCount = 0;
                 ApplyRestColorForCurrentClass();
                 return;
             }
 
             StepMotile(currentTime);
+        }
+
+        /// <summary>
+        /// The drained host cell dies and the brood spills out. This
+        /// bacterium survives as the first member; the rest are fresh spawns
+        /// through <see cref="onSpawnNear"/>, capped at
+        /// InvasionTuning.IntracellularMaxBrood total.
+        ///
+        /// Detach-before-kill, same reason as everywhere else: `KillHostCell`
+        /// notifies its resident, and the resident is this bacterium.
+        /// `ReleaseIntracellular` drops the link first so the kill has no one
+        /// to notify, then this method finishes putting the bacterium back on
+        /// the occupant layer itself.
+        /// </summary>
+        private void BurstBrood(float currentTime)
+        {
+            var at = CurrentCoarse;
+
+            tissueGrid.ReleaseIntracellular(at); // Infected -> Healthy, drop the resident link
+            tissueGrid.KillHostCell(at);         // Healthy -> Dead + debris, no one to notify
+            IsIntracellular = false;
+
+            // I am back on the occupant layer of the now-dead cell. A fresh
+            // Dead cell's occupant slot is free; if something raced in, fall
+            // back to StepMotile next tick rather than being owned by neither
+            // layer.
+            tissueGrid.TryClaimOccupant(at, this, currentTime);
+            ApplyRestColorForCurrentClass();
+
+            int total = Mathf.Clamp(broodCount, 1, Mathf.Max(1, InvasionTuning.IntracellularMaxBrood));
+            for (int i = 0; i < total - 1; i++)
+            {
+                if (onSpawnNear == null || !onSpawnNear(at, PathogenClass.IntracellularBacterium, currentTime)) break;
+            }
+            broodCount = 0;
         }
 
         /// <summary>
@@ -703,7 +743,6 @@ namespace ImmunologyTD.Pathogens
 
                 tissueGrid.ReleaseOccupant(CurrentCoarse);
                 IsIntracellular = true;
-                hostEntryTime = currentTime;
                 infectionStartTime = currentTime;
                 hasSpread = false;
                 lastSpreadAttemptTime = float.NegativeInfinity;
@@ -863,7 +902,7 @@ namespace ImmunologyTD.Pathogens
             if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
 
             lastSpreadAttemptTime = currentTime;
-            if (onSpreadRequested != null && onSpreadRequested(CurrentCoarse, currentTime))
+            if (onSpawnNear != null && onSpawnNear(CurrentCoarse, PathogenClass.IntracellularVirus, currentTime))
             {
                 hasSpread = true;
             }
@@ -996,12 +1035,15 @@ namespace ImmunologyTD.Pathogens
             tissueGrid = null;
             gutInterface = null;
             tally = null;
-            onSpreadRequested = null;
+            onSpawnNear = null;
             onExit = null;
             InterfacePosition = -1;
             contactFlashTimer = 0f;
             hasSpread = false;
             lastSpreadAttemptTime = float.NegativeInfinity;
+            lastReplicationTime = 0f;
+            broodCount = 0;
+            IsIntracellular = false;
             stepTimer = 0f;
             moveElapsed = moveDuration = 0f;
             Health = 0f;

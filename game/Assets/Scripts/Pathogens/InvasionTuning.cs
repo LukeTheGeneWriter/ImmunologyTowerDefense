@@ -139,28 +139,66 @@ namespace ImmunologyTD.Pathogens
         /// GAME_DESIGN.md section 1b step 4 requires.</summary>
         public static float VirusFreeSurvivalSeconds = 6f;
 
-        /// <summary>Per-step chance that an intracellular bacterium standing
-        /// on a healthy host cell goes inside it (GAME_DESIGN.md section 1b
-        /// step 4: "biased when out, hidden when in"). 0.5 means it
-        /// typically walks one or two cells between hiding places, so both
-        /// halves of its behaviour are visible in a short watch -- at 1.0 it
-        /// would vanish the instant it entered tissue and the player would
-        /// never see it move.</summary>
-        public static float IntracellularEntryChance = 0.5f;
+        /// <summary>Per-tick chance that a FREE virion sitting on a `Healthy`
+        /// host cell gets inside it (GAME_DESIGN.md §4b -- "a random virus
+        /// entry number each tick"). Below 1 so a virion visibly lingers and
+        /// walks a little before establishing, rather than snapping into the
+        /// first cell it touches. Judgment call.</summary>
+        public static float VirusEntryChancePerTick = 0.20f;
 
-        /// <summary>How long an intracellular bacterium stays inside a host
-        /// cell before lysing out of it. On exit the host cell DIES and
-        /// leaves debris, and the bacterium reappears on the occupant layer
-        /// and resumes walking.
-        ///
-        /// The exit is a judgment call: GAME_DESIGN.md describes going in
-        /// and being hidden but never says how a bacterium comes back out,
-        /// and without an exit it would enter the first cell it met and
-        /// never be seen again -- which would make "visible when out" dead
-        /// code. Lysis is the biologically obvious answer and it is also the
-        /// sprint's main source of debris in tissue that no immune cell has
-        /// reached yet.</summary>
-        public static float IntracellularResidenceSeconds = 12f;
+        /// <summary>Fraction of virus spawns that are a BUDDING species
+        /// rather than a contact-chain one (GAME_DESIGN.md §4b). A budding
+        /// infection emits free virions on a timer and grows as a disk; a
+        /// chain infection infects one neighbour once and snakes. Per-spawn
+        /// roll -- there is no species roster yet.</summary>
+        public static float VirusBuddingSpeciesChance = 0.5f;
+
+        /// <summary>Seconds between a budding infected cell emitting a free
+        /// virion. Each virion then walks (momentum-biased, Healthy cells
+        /// only) and rolls VirusEntryChancePerTick to establish.</summary>
+        public static float VirusBuddingIntervalSeconds = 2.5f;
+
+        /// <summary>Fraction of viral infections that spontaneously burn out
+        /// -- the cell exhausts and dies loud on its own, spilling the virus
+        /// back out as a free virion plus debris, with no immune action
+        /// (GAME_DESIGN.md §4b). Rolled once when the infection establishes.</summary>
+        public static float VirusBurnoutChance = 0.30f;
+
+        /// <summary>Range, in seconds after establishing, over which a
+        /// burn-out fires. Wide so burn-outs are scattered rather than
+        /// synchronised.</summary>
+        public static float VirusBurnoutMinSeconds = 8f;
+        public static float VirusBurnoutMaxSeconds = 25f;
+
+        /// <summary>Per-step chance that an intracellular bacterium standing
+        /// on a healthy host cell goes inside it (GAME_DESIGN.md §4b:
+        /// "vulnerable when out, protected when in"). **Sprint 6 lowered
+        /// this from 0.5 to 0.12** on the Director's note that these should
+        /// roam more -- they have the chassis to survive extracellularly,
+        /// unlike a virus -- so the exposed window where they can be killed
+        /// cheaply is longer and more visible.</summary>
+        public static float IntracellularEntryChance = 0.12f;
+
+        /// <summary>Seconds between an intracellular bacterium's replication
+        /// events while inside a host cell (GAME_DESIGN.md §4b). Each event
+        /// drains <see cref="IntracellularDrainPerReplication"/> from the
+        /// host cell and adds one to the brood that bursts out when the cell
+        /// dies. **No voluntary exit** -- Sprint 5's residence timer is
+        /// gone; the bacterium leaves only when the cell dies (from the
+        /// drain, or from a stress-sense / collateral kill, which releases
+        /// nothing).</summary>
+        public static float IntracellularReplicationIntervalSeconds = 3f;
+
+        /// <summary>Host-cell health drained per replication event. Against
+        /// TissueTuning.HostCellMaxHealth of 10 and a 3s interval, an
+        /// unmolested infection kills its host in ~12s and bursts a brood of
+        /// ~4. Judgment call, mechanics-first.</summary>
+        public static float IntracellularDrainPerReplication = 2.5f;
+
+        /// <summary>Hard cap on how many bacteria a single drained cell
+        /// releases, however long the infection ran. Keeps a long-lived
+        /// infection from dumping an unbounded brood.</summary>
+        public static int IntracellularMaxBrood = 6;
 
         /// <summary>Damage a LARGE bacterium does to the host cell it is
         /// standing on, per tissue step, as it grazes its way toward the
@@ -195,8 +233,16 @@ namespace ImmunologyTD.Pathogens
             AdvanceLateralWeight = 0.13f;
             AdvanceAwayWeight = 0.04f;
             VirusFreeSurvivalSeconds = 6f;
-            IntracellularEntryChance = 0.5f;
-            IntracellularResidenceSeconds = 12f;
+            VirusEntryChancePerTick = 0.20f;
+            VirusBuddingSpeciesChance = 0.5f;
+            VirusBuddingIntervalSeconds = 2.5f;
+            VirusBurnoutChance = 0.30f;
+            VirusBurnoutMinSeconds = 8f;
+            VirusBurnoutMaxSeconds = 25f;
+            IntracellularEntryChance = 0.12f;
+            IntracellularReplicationIntervalSeconds = 3f;
+            IntracellularDrainPerReplication = 2.5f;
+            IntracellularMaxBrood = 6;
             LargeBacteriumHostDamagePerStep = 2.5f;
         }
     }

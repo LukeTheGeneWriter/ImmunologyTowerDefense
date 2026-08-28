@@ -46,6 +46,14 @@ namespace ImmunologyTD.Rendering
         /// as violet shading toward orange as it ramps.</summary>
         public static readonly Color InfectedHostColor = new Color(0.54f, 0.36f, 0.60f);
 
+        /// <summary>An `Infected` host cell whose resident is an intracellular
+        /// BACTERIUM rather than a virus (GAME_DESIGN.md §4b). A sickly
+        /// yellow-green -- purulent, unmistakably not the viral violet and
+        /// not healthy pink -- so the Director can see which kind of
+        /// infection a cell is carrying, and see a bacterium duck in and
+        /// burst back out. The cytokine heat tint lands here too.</summary>
+        public static readonly Color InfectedByBacteriumColor = new Color(0.62f, 0.60f, 0.26f);
+
         /// <summary>DEBRIS: a dead host cell. Desaturated grey-brown, darker
         /// and colder than living tissue -- necrotic, not merely empty. It
         /// has to be told apart from bare ground at a glance, which is why
@@ -125,9 +133,14 @@ namespace ImmunologyTD.Rendering
                 for (int row = 0; row < rows; row++)
                 {
                     var coord = new CoarseCoord(col, row);
-                    Color baseColor = isHostGround[col, row]
-                        ? HostStateColor(tissueGrid.GetHostState(coord))
-                        : baseColors[col, row];
+                    var hostState = isHostGround[col, row] ? tissueGrid.GetHostState(coord) : HostState.Empty;
+                    Color baseColor;
+                    if (!isHostGround[col, row])
+                        baseColor = baseColors[col, row];
+                    else if (hostState == HostState.Infected)
+                        baseColor = InfectedColorFor(tissueGrid.GetIntracellularAt(coord)); // §4b: viral vs. bacterial tint
+                    else
+                        baseColor = HostStateColor(hostState);
 
                     var pathogen = tissueGrid.GetOccupantAt(coord);
                     if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
@@ -155,6 +168,15 @@ namespace ImmunologyTD.Rendering
                 default: return EmptyGroundColor;
             }
         }
+
+        /// <summary>The colour for an `Infected` cell, split by what is
+        /// hiding in it (GAME_DESIGN.md §4b): viral violet vs. bacterial
+        /// yellow-green. Falls back to the viral colour if the resident is
+        /// unknown. Side-effect-free for the harness.</summary>
+        public static Color InfectedColorFor(PathogenAgent resident) =>
+            resident != null && resident.Class == PathogenClass.IntracellularBacterium
+                ? InfectedByBacteriumColor
+                : InfectedHostColor;
 
         /// <summary>GAME_DESIGN.md section 4a's occupant/render split, as a
         /// static side-effect-free predicate so a headless harness can
