@@ -459,3 +459,69 @@ Three things to take from it:
   ~3-cell separations that gradient was steep, while at Map 01's ~47-cell
   average separation it is nearly flat. **Not tuned, per the Director's
   standing "mechanics first" instruction** — flagged in `BACKLOG.md`.
+
+### Sprint 5 — Code agent + head session (2026-08-28, host states, debris, class advance)
+
+**Third sprint running, third dispatched-agent interruption.** The agent
+this time lost its network connection mid-item-5. It had committed items 1
+and 2 and the barcode doc with genuinely explanatory messages, plus most of
+item 5's class-advance code sitting uncommitted but compiling. The head
+session picked it up from there. The verbose-commit-message discipline
+(WORKFLOW §2) paid off for the *fourth* time as a recovery artifact —
+worth treating as a hard rule now, not a nicety.
+
+**The uncommitted tree compiled and passed all three prior harnesses**
+(Map 71, Combat 36, Lifecycle 79), which is a first — the two previous
+interrupted sprints left non-compiling trees. Committing after each scope
+item (this sprint's brief said so explicitly) is visibly working.
+
+**Two real bugs the new harness caught, both in the resumed item-5 code:**
+
+- **An intracellular bacterium killed itself lysing out.** `StepIntracellularBacterium`
+  called `TissueGrid.KillHostCell` to leave debris on exit — but
+  `KillHostCell` notifies the cell's intracellular resident via
+  `OnHostCellDestroyed`, and that resident *is* the bacterium. So it
+  exited to the pool instead of surviving as a motile extracellular
+  pathogen (§1b step 4). Fix: `ReleaseIntracellular` (Infected→Healthy,
+  drop the resident link) *then* `KillHostCell` (Healthy→Dead+debris, no
+  one to notify). Tip: any code that calls `KillHostCell` on a cell whose
+  resident should outlive it must detach the resident first.
+
+- **`PathogenSpawner.RequestSpread` let a virus spread onto non-Healthy
+  ground.** It checked `IsOccupantFree` but not `IsHealthyHost`, so a
+  virus ringed by dead/infected tissue burned its one-shot `hasSpread` on
+  a doomed free particle instead of stalling and retrying. §1c is explicit
+  ("only into a `Healthy` neighbour") and it is half of what makes the
+  firebreak emerge. Added the `IsHealthyHost` check. This had been latent
+  since Sprint 2 — CombatVerification only asserts "AdheredCount grew,"
+  which a wasted spread still satisfies.
+
+**Viral spread is a one-shot CHAIN, not a spreading front.** `hasSpread`
+means each infected cell infects exactly one neighbour, ever, so an
+infection random-walks through tissue as a snake rather than saturating
+outward. This surprised the harness author mid-write (the first firebreak
+test assumed a saturating front and its control/wall contrast was
+meaningless because neither penetrated far). It matches CombatVerification's
+existing "chains across generations" language and is probably fine, but
+whoever tunes viral behaviour should know the mechanic is a path, not a
+blob, and decide whether a real front (multiple simultaneous spreads, or
+dropping `hasSpread`) is wanted. Recorded in BACKLOG.
+
+**A 1-cell-thick dead gap is hoppable; a full-lane band is not.** The
+firebreak is emergent, and a single dead cell between two healthy ones can
+be crossed by a spread event that lands a transient free particle on the
+dead cell, which then steps to the healthy cell on the far side before its
+6s survival timer expires. Two-plus cells of dead ground, or a full-lane
+band, is a hard wall. This is consistent with §1a's "slipping past one or
+two cells is allowed and occasional" but it means the harness tests the
+firebreak with a 3-cell band, not a 1-cell one.
+
+**Serialized `UnitProfile` in `Sprint1.unity` only carries 5 of its
+fields** (Kind, DisplayName, FineTilesPerTick, FootprintFineTiles, Color)
+— the Sprint 3 lifecycle fields and this sprint's `EfferocytosisDebrisPerTick`
+are absent from the YAML, so they take the value from `GameBootstrap`'s
+`new UnitProfile { ... }` initializer. This is the *opposite* of the
+Sprint 4 `columns` bug (a field present in stale YAML overriding a new
+default): here the fields are simply not serialized, so the initializer
+wins. New lifecycle fields added to `UnitProfile` are safe as long as
+`GameBootstrap`'s initializer sets them; don't rely on the scene.

@@ -636,6 +636,15 @@ namespace ImmunologyTD.Pathogens
                 // residence than a pathogen owned by neither layer.
                 if (!tissueGrid.IsOccupantFree(CurrentCoarse)) return;
 
+                // Detach from the host layer FIRST. KillHostCell notifies its
+                // resident via OnHostCellDestroyed -- and the resident here is
+                // this bacterium. Without the detach, lysing out would kill
+                // the bacterium along with the cell, when the whole point of
+                // lysis is that it survives and keeps walking (section 1b
+                // step 4). ReleaseIntracellular flips Infected -> Healthy and
+                // drops the resident link; KillHostCell then takes that
+                // Healthy cell to Dead + debris with no one to notify.
+                tissueGrid.ReleaseIntracellular(CurrentCoarse);
                 tissueGrid.KillHostCell(CurrentCoarse);
                 IsIntracellular = false;
                 freeSinceTime = currentTime;

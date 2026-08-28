@@ -12,6 +12,57 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 5 -- 2026-08-28
+Tissue is terrain now. Every cell in the tissue band is a host cell with
+its own state -- **Healthy**, **Infected**, **Dead**, or bare **Empty**
+ground -- drawn in four distinct colours, and each coarse position now has
+**two independent layers**: the host cell, and whatever extracellular
+pathogen is squeezing past it. A bacterium can stand on a slot that still
+holds a living cell; one enum could never say that.
+
+**Death leaves a corpse.** Killing an infected cell -- by innate immunity,
+by a bacterium lysing out, by a large bacterium grazing it down, by
+neutrophil collateral -- turns it to **Dead** and drops **debris**, and
+debris is real terrain: nothing regrows on a slot until the debris is
+gone. A **macrophage clears it** (efferocytosis, its real second job), in
+about 2.5 seconds of standing on it, with a calm blue-green pulse when a
+pile is finished. Left alone, debris also fades on its own -- but about
+20x slower, so clearing it is clearly the better answer. Cleared ground
+regrows a healthy cell after ~20s.
+
+**The three pathogen classes finally move differently.** A **virus** only
+ever steps onto a Healthy cell and dies within 6s if it can't find one --
+so a viral infection advances through intact tissue and **physically
+cannot cross ground it has already killed**. Nothing in the code checks
+for a firebreak; it falls out of those two rules, and a headless test
+drives 60 incubation cycles against a band of dead ground and confirms
+nothing ever gets across. An **intracellular bacterium** walks the
+base-biased path while exposed, ducks inside a healthy cell it passes,
+hides there ~12s, then lyses out -- killing that cell -- and walks on. A
+**large bacterium** grazes the host cell under it as it goes, killing it
+over a few steps.
+
+**Also:** the bone-marrow strip and lymph-node backdrop were still sized
+for the 100x40 map and spilled across the board on the 25x10 one -- they
+now fit inside the base band. Two bugs found and fixed while resuming the
+interrupted work: an intracellular bacterium was killing itself when it
+lysed out, and viral spread could waste its one shot landing a doomed
+particle on non-healthy ground instead of stalling against it.
+
+Verified: a new **TissueVerification** harness, 53 assertions across
+two-layer occupancy, debris/regrowth/efferocytosis, the firebreak, and
+class-specific advance -- plus Sprint 4's 71, Sprint 3's 79, and Sprint
+2's 36 all still green. **Not** verified: nobody has watched the firebreak
+happen on screen, or a macrophage clear a pile -- both are the Director's
+playtest, and the firebreak (a viral front stalling against tissue it
+already killed, with no one staging it) is the question this sprint
+exists to answer.
+
+Items 1, 2 and the antigen-barcode design doc were committed by a
+dispatched Code agent before it lost its network connection mid-item-5;
+the head session finished items 3, 5 and 6, found the two bugs, wrote the
+harness, and wrote the docs.
+
 ## Sprint 4 -- 2026-08-21
 The map is real. Instead of one undifferentiated board where pathogens
 appeared at random spots, Map 01 is now 100x40 host cells in three lateral

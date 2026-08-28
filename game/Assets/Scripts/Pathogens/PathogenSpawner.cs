@@ -120,12 +120,22 @@ namespace ImmunologyTD.Pathogens
 
         /// <summary>
         /// Attempts to spread a virus infection from <paramref name="source"/>
-        /// into one free, in-bounds, TISSUE-BAND coarse neighbour. Neighbour
-        /// order is shuffled each call so spread doesn't favour a direction.
+        /// into one in-bounds, TISSUE-BAND, **Healthy** coarse neighbour.
+        /// Neighbour order is shuffled each call so spread doesn't favour a
+        /// direction.
         ///
         /// Sprint 4 added the band check: without it a virus at the tissue's
         /// lumen edge could spread a new infection into the channel, where
         /// nothing would ever be able to reach it.
+        ///
+        /// Sprint 5 added the Healthy check. GAME_DESIGN.md section 1c is
+        /// explicit -- "a virus can only spread into a `Healthy` neighbour"
+        /// -- and it is half of what makes the firebreak emerge: a virus
+        /// ringed by dead or already-infected ground gets `false` here and
+        /// TickCombat retries next interval rather than burning its one
+        /// spread on a doomed free particle. The occupant-free test stays as
+        /// a belt-and-braces guard against dropping a second thing on an
+        /// occupied tile.
         /// </summary>
         public bool RequestSpread(CoarseCoord source, float currentTime)
         {
@@ -146,6 +156,7 @@ namespace ImmunologyTD.Pathogens
                 var candidate = new CoarseCoord(source.Column + dc, source.Row + dr);
                 if (!board.InCoarseBounds(candidate)) continue;
                 if (board.BandOf(candidate) != BoardBand.Tissue) continue;
+                if (!tissueGrid.IsHealthyHost(candidate)) continue;
                 if (!tissueGrid.IsOccupantFree(candidate)) continue;
 
                 var go = pool.Get();
