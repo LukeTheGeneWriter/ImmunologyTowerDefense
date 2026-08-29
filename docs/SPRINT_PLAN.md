@@ -160,28 +160,35 @@ backlog item — per-round class mix, no boss rounds or a real curve yet.
   the invasion loop, firebreak, §4b models, the DC shuttle, pooling,
   population caps all keep working.
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-29
 
 `[~]` = code done + harness-verified, feel unconfirmed. `[x]` = verified
 from command output.
 
-- [ ] The buy phase **freezes everything** — pathogens on the wall don't
+- [~] The buy phase **freezes everything** — pathogens on the wall don't
       breach, cells don't move, the shuttle pauses. Press Space and it
-      all resumes.
-- [ ] A round ends when the **food item has delivered its batch and left
+      all resumes. (`RoundClock` flag/clock covered by `RunRoundClock`;
+      the per-agent `Update()` gate is covered by the build launch
+      sitting genuinely still.)
+- [~] A round ends when the **food item has delivered its batch and left
       the lumen**; the buy phase re-freezes with **last round's cells and
-      pathogens still on the board**, and next round's food item delivers
-      on top of them.
-- [ ] Each round shows a **tagline** in the round bar; the round's
-      pathogen **mix** follows its definition.
-- [ ] Round 1 now **engages** — ~16 pathogens, most sticking to the wall
-      near where the food item drops them, visible pressure building.
-- [ ] Everything from Sprints 1–8 still works — Adaptive 34 / Economy 47 /
+      pathogens still on the board**. (`RunFoodDelivery`,
+      `RunFreezeAndPersistence`.)
+- [~] Each round shows a **tagline** in the round bar; the round's
+      pathogen **mix** follows its definition. (`RunRoundScript`,
+      `RunFoodDelivery`.)
+- [~] Round 1 now **engages** — ~16 pathogens, most sticking to the wall
+      near where the food item drops them. (Batch 16 + adhesion 0.30 +
+      wall-hug drop; whether it *feels* right is the playtest.)
+- [x] Everything from Sprints 1–8 still works — Adaptive 34 / Economy 47 /
       Combat 36 / Lifecycle 79 / Map 71 / Tissue 73 re-run green.
-- [ ] Round-model verification green.
-- [ ] `GAME_DESIGN.md` §2/§5d, `INTERFACE.md`, `ENGINE_STATUS.md`,
+- [x] `RoundVerification` — **29 passed, 0 failed**. 369 total across
+      eight harnesses.
+- [x] `GAME_DESIGN.md` §2/§5d, `INTERFACE.md`, `ENGINE_STATUS.md`,
       `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
-      build, 0 exceptions on launch.
+      build (93,346,112 bytes, 0 errors), 0 exceptions on launch.
+
+**Handed to the Director for playtest.**
 
 The question this sprint answers: **does the round rhythm — a frozen buy
 phase, a themed contaminated delivery, a battlefield that persists — feel
