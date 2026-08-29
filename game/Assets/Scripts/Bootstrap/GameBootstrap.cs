@@ -342,7 +342,7 @@ namespace ImmunologyTD.Bootstrap
                     cellGo.transform.position = board.CoarseToWorldCenter(new CoarseCoord(col, row));
                     cellGo.transform.localScale = new Vector3(size, size, 1f);
                     var sr = cellGo.AddComponent<SpriteRenderer>();
-                    sr.sprite = RuntimeSprites.SquareSprite;
+                    sr.sprite = ImmunologyTD.Rendering.SpriteShapes.HostCell; // Sprint 13 -- BoardRenderer overrides per host state
                     sr.sortingOrder = 0;
                     views[col, row] = sr;
                 }
@@ -365,7 +365,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.position = layout.MarrowBackdropCenter;
             go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 -- trabecular texture
             sr.color = new Color(0.30f, 0.24f, 0.16f); // bone-marrow brown, distinct from the base band's blue-violet
             sr.sortingOrder = 1;
 
@@ -381,7 +381,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.position = layout.LymphCenter;
             go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 -- bean silhouette + follicles
             sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
             sr.sortingOrder = 1;
 

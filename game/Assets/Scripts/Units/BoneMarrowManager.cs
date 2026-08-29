@@ -189,7 +189,7 @@ namespace ImmunologyTD.Units
                 slotGo.transform.localScale = new Vector3(slotWorldSize, slotWorldSize, 1f);
 
                 var sr = slotGo.AddComponent<SpriteRenderer>();
-                sr.sprite = RuntimeSprites.SquareSprite;
+                sr.sprite = ImmunologyTD.Rendering.SpriteShapes.SlotNiche; // Sprint 13 -- recessed socket
                 sr.sortingOrder = 5;
                 sr.color = EmptySlotColor;
 

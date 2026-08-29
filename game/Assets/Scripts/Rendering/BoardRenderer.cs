@@ -140,16 +140,35 @@ namespace ImmunologyTD.Rendering
                 {
                     var coord = new CoarseCoord(col, row);
                     var hostState = isHostGround[col, row] ? tissueGrid.GetHostState(coord) : HostState.Empty;
+                    var resident = isHostGround[col, row] && hostState == HostState.Infected
+                        ? tissueGrid.GetIntracellularAt(coord) : null;
+                    bool bacterial = resident != null && resident.Class == PathogenClass.IntracellularBacterium;
+
                     Color baseColor;
                     if (!isHostGround[col, row])
                         baseColor = baseColors[col, row];
                     else if (hostState == HostState.Infected)
-                        baseColor = InfectedColorFor(tissueGrid.GetIntracellularAt(coord)); // §4b: viral vs. bacterial tint
+                        baseColor = InfectedColorFor(resident); // §4b: viral vs. bacterial tint
                     else
                         baseColor = HostStateColor(hostState);
 
                     var pathogen = tissueGrid.GetOccupantAt(coord);
                     if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
+
+                    // Sprint 13: the host-state sprite alongside the colour.
+                    if (isHostGround[col, row])
+                    {
+                        views[col, row].sprite =
+                            hostState == HostState.Healthy ? SpriteShapes.HostCell :
+                            hostState == HostState.Dead    ? SpriteShapes.Debris :
+                            hostState == HostState.Empty   ? SpriteShapes.EmptyPit :
+                            bacterial ? SpriteShapes.HostCellInfectedBacterial : SpriteShapes.HostCellInfectedViral;
+                    }
+
+                    // Sprint 13: a tiny deterministic per-cell value jitter so
+                    // the sheet reads as a histology plate, not a flat wash.
+                    baseColor *= 1f + CellJitter(col, row);
+                    baseColor.a = 1f;
 
                     float intensity = Mathf.Clamp01(cytokineField.CoarseValueAt(coord) / TissueGrid.MaxSecretionStrength);
                     views[col, row].color = Color.Lerp(baseColor, HotColor, intensity * HeatmapBlendMax);
@@ -164,6 +183,16 @@ namespace ImmunologyTD.Rendering
         /// side-effect-free so a harness can assert the four are actually
         /// distinct without binding a SpriteRenderer array.
         /// </summary>
+        /// <summary>Sprint 13: a deterministic ±3% multiplier per coarse
+        /// cell, so 4,000 identical tiles get a subtle histology-plate
+        /// mottle. Pure function of (col,row); no allocation, no RNG.</summary>
+        private static float CellJitter(int col, int row)
+        {
+            uint h = (uint)(col * 73856093 ^ row * 19349663);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return ((h & 0xFFFFu) / 65535f - 0.5f) * 0.06f;
+        }
+
         public static Color HostStateColor(HostState state)
         {
             switch (state)
