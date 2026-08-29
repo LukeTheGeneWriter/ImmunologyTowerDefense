@@ -46,6 +46,7 @@ public static class AdaptiveVerification
         RunLymphocyteTurnover();
         RunRoundBoundaryDespawn();
         RunDcLaneSpread();
+        RunDcPatrolSweep();
 
         AdaptiveTuning.ResetToDefaults();
         ImmunologyTD.Economy.EconomyTuning.ResetToDefaults();
@@ -387,10 +388,55 @@ public static class AdaptiveVerification
         AdaptiveTuning.ResetToDefaults();
     }
 
+    /// <summary>Sprint 12: a lone DC dropped mid-band should PACE the full
+    /// depth of the tissue band -- reach near the lumen edge, flip, reach
+    /// near the base edge -- within a bounded window; a plain random walk
+    /// (sweep bias 0) should not, in the same window.</summary>
+    private static void RunDcPatrolSweep()
+    {
+        AdaptiveTuning.ResetToDefaults();
+
+        (int min, int max) Run(float sweepBias, int ticks)
+        {
+            AdaptiveTuning.ResetToDefaults();
+            AdaptiveTuning.DcPatrolSweepBias = sweepBias;
+            AdaptiveTuning.DcLaneRepelStrength = 0f;
+
+            var rig = BuildShuttleRig();
+            var dc = rig.Director.EmitDendriticCell(0, null).GetComponent<DendriticCell>();
+            int mid = (rig.Board.TissueBaseEdgeAxisIndex + rig.Board.TissueLumenEdgeAxisIndex) / 2;
+            dc.DebugPlaceForTest(rig.Board.CoarseCenterFine(rig.Board.CoarseFromAxis(mid, rig.Board.CrossLength / 2)));
+
+            int lo = int.MaxValue, hi = int.MinValue;
+            for (int i = 0; i < ticks; i++)
+            {
+                rig.Director.Tick(BoardConfig.TickIntervalSeconds);
+                int a = rig.Board.AxisIndex(dc.Current.ToCoarse(BoardConfig.FineSubdivision));
+                if (a < lo) lo = a;
+                if (a > hi) hi = a;
+            }
+            rig.Dispose();
+            AdaptiveTuning.ResetToDefaults();
+            return (lo, hi);
+        }
+
+        int baseEdge = 6, lumenEdge = 18; // ConfigureForTest(25,10,...,6,6,...): tissue axis 6..18
+        var swept = Run(AdaptiveTuning.DcPatrolSweepBias, 220);
+        var wandered = Run(0f, 220);
+
+        Debug.Log($"[AdaptiveVerification] DC patrol sweep over 220 ticks -- with bias: axis {swept.min}..{swept.max}; random walk: {wandered.min}..{wandered.max} (tissue {baseEdge}..{lumenEdge}).");
+        Check($"a swept DC reaches the lumen edge ({swept.max} >= {lumenEdge - 2})", swept.max >= lumenEdge - 2);
+        Check($"...and the base edge ({swept.min} <= {baseEdge + 2})", swept.min <= baseEdge + 2);
+        Check("a swept DC covers more of the band than a plain random walk in the same window",
+            (swept.max - swept.min) > (wandered.max - wandered.min));
+
+        AdaptiveTuning.ResetToDefaults();
+    }
+
     private static void RunDcLaneSpread()
     {
         const int ticks = 250;
-        PatrolLaneStats(ticks, 1.4f, out int coOn, out float spreadOn);
+        PatrolLaneStats(ticks, 0.8f, out int coOn, out float spreadOn);
         PatrolLaneStats(ticks, 0f, out int coOff, out float spreadOff);
 
         Debug.Log($"[AdaptiveVerification] DC patrol over {ticks} ticks -- repulsion ON: {coOn} co-lane ticks, mean spread {spreadOn:F1}; OFF: {coOff}, {spreadOff:F1}.");

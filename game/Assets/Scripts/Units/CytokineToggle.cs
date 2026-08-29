@@ -3,13 +3,15 @@ using UnityEngine;
 namespace ImmunologyTD.Units
 {
     /// <summary>
-    /// Sprint 1's debug toggle for cytokine sensing (GAME_DESIGN.md
-    /// sections 2a/7/9, rung 2 of the search ladder). Runtime-toggleable
-    /// with the C key so it works in a standalone build, not just in the
-    /// Editor -- an Inspector checkbox alone wouldn't be reachable once
-    /// packaged, and the Director watches a build, not the Editor. Read by
-    /// SearchUnit via the static Enabled flag; the HUD (see
-    /// Rendering/HudOverlay.cs) reads it too, to show current state.
+    /// Cytokine sensing (GAME_DESIGN.md sections 2a/7/9, rung 2 of the
+    /// search ladder).
+    ///
+    /// **Sprint 12 (Director, 2026-08-29): sensing is ON by default and is
+    /// no longer a player-facing choice** — every unit senses; a *buyable
+    /// upgrade* (`ShopItem.CytokineSensingUpgrade` → `Chemotaxis.SensingUpgradeLevel`)
+    /// sharpens it. The `C` key stays as a debug OFF-toggle so a build can
+    /// still show the rung-1-vs-rung-2 contrast for comparison, but it
+    /// starts ON. Read by SearchUnit via `Enabled`; the HUD shows state.
     ///
     /// No UnityEngine.UI dependency here on purpose -- the com.unity.ugui
     /// package isn't in this project's manifest, and adding a package
@@ -20,7 +22,7 @@ namespace ImmunologyTD.Units
     /// </summary>
     public class CytokineToggle : MonoBehaviour
     {
-        public static bool Enabled { get; private set; }
+        public static bool Enabled { get; private set; } = true;
 
         private void Update()
         {

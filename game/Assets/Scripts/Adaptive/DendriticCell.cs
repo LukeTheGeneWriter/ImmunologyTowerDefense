@@ -68,6 +68,11 @@ namespace ImmunologyTD.Adaptive
 
         private int presentationsLeft;
 
+        /// <summary>Sprint 12: +1 = sweeping toward the lumen edge, -1 = back
+        /// toward the base edge. Flipped at the tissue-band edges so the DC
+        /// paces the full depth of the band.</summary>
+        private int patrolHeading = 1;
+
         private static readonly Color EmptyColor = new Color(0.72f, 0.30f, 0.68f);  // dendritic magenta
         private static readonly Color CargoColor = new Color(0.98f, 0.62f, 0.98f);  // brighter -- carrying antigen
 
@@ -92,6 +97,7 @@ namespace ImmunologyTD.Adaptive
             HasCargo = false;
             Frozen = false;
             presentationsLeft = 0;
+            patrolHeading = 1;
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
@@ -235,35 +241,48 @@ namespace ImmunologyTD.Adaptive
             return candidateBuffer[n - 1];
         }
 
-        /// <summary>The patrol step. A random walk that DCs bias **away from
-        /// each other along the CROSS (lane) axis only** (Director,
-        /// 2026-08-29): the threat axis is base↔lumen, so repelling only
-        /// perpendicular to it keeps the DCs spread across the lanes and
-        /// sweeping back and forth, rather than clumping in one lane. The
-        /// threat-axis steps stay unbiased. `DcLaneRepelStrength = 0`
-        /// collapses this back to a plain random walk.</summary>
+        /// <summary>The patrol step (Director, 2026-08-29; reworked Sprint
+        /// 12). A random walk with two biases, both in the axis frame so no
+        /// world direction is hardcoded:
+        ///
+        ///  - **lane repulsion** — CROSS-axis steps are biased away from the
+        ///    local density of other patrolling DCs, so DCs spread evenly
+        ///    across the lanes;
+        ///  - **a back-and-forth sweep** — THREAT-axis steps are biased
+        ///    toward <see cref="patrolHeading"/>, which flips at the
+        ///    tissue-band edges, so a DC paces the whole depth of the band
+        ///    instead of loitering near where it spawned.
+        ///
+        /// Both work at FINE-tile granularity (Sprint 12) — the earlier
+        /// version compared coarse-cell indices, so a bias fired only ~1
+        /// step in 7 and was invisible in play. `DcLaneRepelStrength` /
+        /// `DcPatrolSweepBias` = 0 disable each independently.</summary>
         private FineCoord RepelledPatrolStep(FineCoord from)
         {
-            var fromCoarse = from.ToCoarse(BoardConfig.FineSubdivision);
-            int myCross = tissueBoard.CrossIndex(fromCoarse);
-            int myAxis = tissueBoard.AxisIndex(fromCoarse);
+            int myCross = tissueBoard.FineCrossIndex(from);
+            int myAxis = tissueBoard.FineAxisIndex(from);
+            int myAxisCoarse = tissueBoard.AxisIndex(from.ToCoarse(BoardConfig.FineSubdivision));
 
-            // Cross-axis crowd gradient from other fielded DCs: > 0 means the
-            // crowd sits at LOWER cross indices (drift higher), < 0 the
-            // reverse. Only DCs near me along the threat axis count.
+            // Flip the sweep at the tissue-band edges.
+            if (myAxisCoarse >= tissueBoard.TissueLumenEdgeAxisIndex) patrolHeading = -1;
+            else if (myAxisCoarse <= tissueBoard.TissueBaseEdgeAxisIndex) patrolHeading = 1;
+
+            // Cross-axis crowd gradient from other patrolling DCs, distances
+            // in coarse-cell units. > 0 => the crowd is at lower lanes,
+            // drift to higher ones; < 0 the reverse.
             float crowd = 0f;
             if (cohort != null && AdaptiveTuning.DcLaneRepelStrength != 0f)
             {
+                float axisRangeFine = AdaptiveTuning.DcLaneRepelAxisRange * BoardConfig.FineSubdivision;
                 for (int i = 0; i < cohort.Count; i++)
                 {
                     var o = cohort[i];
                     if (o == null || o == this || o.State == DendriticCellState.InNode) continue;
-                    var oc = o.Current.ToCoarse(BoardConfig.FineSubdivision);
-                    if (Mathf.Abs(tissueBoard.AxisIndex(oc) - myAxis) > AdaptiveTuning.DcLaneRepelAxisRange) continue;
-                    int dCross = myCross - tissueBoard.CrossIndex(oc);
-                    crowd += dCross == 0
+                    if (Mathf.Abs(tissueBoard.FineAxisIndex(o.Current) - myAxis) > axisRangeFine) continue;
+                    float d = (myCross - tissueBoard.FineCrossIndex(o.Current)) / (float)BoardConfig.FineSubdivision;
+                    crowd += Mathf.Abs(d) < 0.001f
                         ? (Random.value < 0.5f ? 0.5f : -0.5f) // exactly stacked -- break the tie
-                        : Mathf.Sign(dCross) / (1f + Mathf.Abs(dCross));
+                        : Mathf.Sign(d) / (1f + Mathf.Abs(d));
                 }
             }
 
@@ -272,10 +291,12 @@ namespace ImmunologyTD.Adaptive
             {
                 var cand = from.Add(off);
                 if (!tissueBoard.InFineBounds(cand)) continue;
-                int candCross = tissueBoard.CrossIndex(cand.ToCoarse(BoardConfig.FineSubdivision));
-                int dir = candCross - myCross; // -1 / 0 / +1 in raw cross (threat-axis steps are dir 0)
+                int crossDir = tissueBoard.FineCrossIndex(cand) - myCross; // +-1 for a lane step, 0 for an axis step
+                int axisDir = tissueBoard.FineAxisIndex(cand) - myAxis;    // +-1 for an axis step, 0 for a lane step
                 candidateBuffer[n] = cand;
-                weightBuffer[n] = dir == 0 ? 1f : Mathf.Exp(AdaptiveTuning.DcLaneRepelStrength * dir * crowd);
+                weightBuffer[n] = crossDir != 0
+                    ? Mathf.Exp(AdaptiveTuning.DcLaneRepelStrength * crossDir * crowd)
+                    : Mathf.Exp(AdaptiveTuning.DcPatrolSweepBias * axisDir * patrolHeading);
                 n++;
             }
             if (n == 0) return from;
@@ -301,6 +322,7 @@ namespace ImmunologyTD.Adaptive
             State = DendriticCellState.PatrolTissue;
             HasCargo = false;
             Frozen = false;
+            patrolHeading = 1;
             tweenStart = tweenEnd = tissueBoard.FineToWorld(Current);
             transform.position = tweenStart;
         }
@@ -347,6 +369,7 @@ namespace ImmunologyTD.Adaptive
             HasCargo = false;
             Frozen = false;
             presentationsLeft = 0;
+            patrolHeading = 1;
             tweenTimer = 0f;
             if (sr != null) { sr.color = EmptyColor; sr.enabled = true; }
         }

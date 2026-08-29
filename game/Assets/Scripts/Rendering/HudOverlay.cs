@@ -100,7 +100,9 @@ namespace ImmunologyTD.Rendering
 
             GUI.Label(new Rect(16, 12, 820, 110), infoLine, style);
 
-            string toggleLine = $"Cytokine sensing: {(CytokineToggle.Enabled ? "ON" : "OFF")}   (press C to toggle)";
+            string toggleLine = CytokineToggle.Enabled
+                ? $"Cytokine sensing: ON (always) — sharpness x{Chemotaxis.EffectiveSharpness / Chemotaxis.GradientSharpness:F1} (buy 'Cytokine sensing +')   [C = debug off]"
+                : "Cytokine sensing: OFF (debug) — press C to restore";
             GUI.Label(new Rect(16, 122, 720, 30), toggleLine, style);
 
             string heatmapLine = "Orange tint on host cells = cytokine field strength (always visible; only pulls units when sensing is ON)";
@@ -118,16 +120,18 @@ namespace ImmunologyTD.Rendering
             GUI.Label(new Rect(16, 358, 1100, 30), BuildPerformanceLine(), style);
         }
 
-        /// <summary>Sprint 11: the buy-phase shop -- placeholder purchases
-        /// (barrier / host-cell upgrades / crypts). Buying spends ATP and
-        /// raises a level; nothing about the simulation changes yet. Only
-        /// shown while the buy phase is frozen.</summary>
+        /// <summary>Sprint 11: the buy-phase shop. Mostly placeholder --
+        /// buying spends ATP and raises a level and nothing changes -- but
+        /// Sprint 12's "Cytokine sensing +" is a real effect (it pushes
+        /// <see cref="Chemotaxis.SensingUpgradeLevel"/>, done in Update).
+        /// Only shown while the buy phase is frozen.</summary>
         private void DrawShopPanel()
         {
             if (shop == null || wallet == null || rounds == null || rounds.Phase != RoundPhase.Building) return;
 
             var items = new (ShopItem item, string name)[]
             {
+                (ShopItem.CytokineSensingUpgrade,   "Cytokine sensing +  (REAL)"),
                 (ShopItem.BarrierMucusTurnover,     "Mucus turnover (barrier)"),
                 (ShopItem.HostDsRnaSensor,          "Host dsRNA sensor"),
                 (ShopItem.HostReducedViralEntry,    "Host: harden vs viral entry"),
@@ -255,6 +259,12 @@ namespace ImmunologyTD.Rendering
 
         private void Update()
         {
+            // Sprint 12: push the bought cytokine-sensing level from the
+            // ledger into the movement code. One-liner bridge so ShopLedger
+            // itself stays a pure "spend + level" ledger.
+            if (shop != null)
+                Chemotaxis.SensingUpgradeLevel = shop.LevelOf(ShopItem.CytokineSensingUpgrade);
+
             // Exponential smoothing; unscaledDeltaTime so a future pause or
             // speed control doesn't distort the reading.
             float frameMs = Time.unscaledDeltaTime * 1000f;

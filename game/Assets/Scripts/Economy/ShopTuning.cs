@@ -29,6 +29,11 @@ namespace ImmunologyTD.Economy
         /// <summary>A stem-cell niche — tissue near a crypt regrows faster
         /// (§6's crypt-based recovery). Repeatable count.</summary>
         Crypt,
+
+        /// <summary>Sprint 12: sharpens cytokine sensing for every unit
+        /// (rung 2 of the search ladder). **This one is a real effect** —
+        /// it raises <c>Chemotaxis.SensingUpgradeLevel</c>. Repeatable.</summary>
+        CytokineSensingUpgrade,
     }
 
     /// <summary>
@@ -46,6 +51,7 @@ namespace ImmunologyTD.Economy
         public static int HostReducedViralEntryBasePrice = 40;
         public static int HostBacterialResistanceBasePrice = 40;
         public static int CryptBasePrice = 25;
+        public static int CytokineSensingUpgradeBasePrice = 35;
 
         /// <summary>Each subsequent level of the same item costs
         /// <c>basePrice * (1 + PriceGrowthPerLevel * currentLevel)</c>.</summary>
@@ -63,6 +69,7 @@ namespace ImmunologyTD.Economy
                 case ShopItem.HostDsRnaSensor: return HostDsRnaSensorBasePrice;
                 case ShopItem.HostReducedViralEntry: return HostReducedViralEntryBasePrice;
                 case ShopItem.HostBacterialResistance: return HostBacterialResistanceBasePrice;
+                case ShopItem.CytokineSensingUpgrade: return CytokineSensingUpgradeBasePrice;
                 default: return CryptBasePrice;
             }
         }
@@ -93,6 +100,7 @@ namespace ImmunologyTD.Economy
             HostReducedViralEntryBasePrice = 40;
             HostBacterialResistanceBasePrice = 40;
             CryptBasePrice = 25;
+            CytokineSensingUpgradeBasePrice = 35;
             PriceGrowthPerLevel = 0.6f;
             ProgenitorUpgradeBasePrice = 35;
         }
