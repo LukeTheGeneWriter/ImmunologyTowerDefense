@@ -303,16 +303,17 @@ public static class MapVerification
         //
         // This sub-test pins AdhesionChanceAtWall itself (rather than taking
         // the shipped default) because it is about the falloff SHAPE, not the
-        // absolute rate -- Sprint 9 raised the default to 0.30, at which a
-        // long depth-blind channel adheres literally everything and the
-        // "some are always excreted" assertion below stops being meaningful.
+        // absolute rate. It is set LOW (0.03) so neither curve saturates over
+        // a full channel transit -- at the shipped 0.30, and even at the old
+        // 0.12, a depth-blind curve adheres literally every pathogen and the
+        // "some are always excreted" assertion stops discriminating.
         InvasionTuning.ResetToDefaults();
-        InvasionTuning.AdhesionChanceAtWall = 0.12f;
+        InvasionTuning.AdhesionChanceAtWall = 0.03f;
         InvasionTuning.AdhesionFalloffCells = 0.5f; // effectively wall-only
         int adheredSteep = RunChannelCohort(rig, 400, "Steep");
 
         InvasionTuning.ResetToDefaults();
-        InvasionTuning.AdhesionChanceAtWall = 0.12f;
+        InvasionTuning.AdhesionChanceAtWall = 0.03f;
         InvasionTuning.AdhesionFalloffCells = 200f; // effectively depth-blind
         int adheredFlat = RunChannelCohort(rig, 400, "Flat");
 
