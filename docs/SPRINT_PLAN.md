@@ -30,32 +30,26 @@ Sprint 13 **implements that spec**: replace the single flat white quad
 for every on-screen entity, so the board reads as a stained tissue
 section with crisp icon-like agents on top.
 
-## Open questions — need a Director decision before/at the start (see `SPRITE_DESIGN.md` §6)
+## Director decisions (2026-08-29) — all as the agent recommended
 
-1. **Palette direction.** Keep the playtested placeholder colours
-   as-is, or let this pass re-hue the ones near `handoff` §8's "avoid"
-   list — cytokine-heat orange (`1.00,0.55,0.05`), the knowledge /
-   efferocytosis greens, neutrophil amber (`0.95,0.78,0.25`)?
-2. **Free virion colour** (§6 Q8) — split it to a colder purple-maroon so
-   "virus" and "bacterium" read apart at a glance, or keep both on
-   `PathogenColor` and let dot-vs-rod carry it?
-3. **Per-instance variation** (§6 Q3) — identical cells (clean clinical
-   plate) or subtle rotation / size / hue jitter (organic)?
-4. **Flash shapes** (§6 Q6) — five distinct silhouettes (stipple / spiky
-   star / soft bloom / shockwave ring / thin ring — colour-blind-safe),
-   or keep all five as the expanding square + colour?
-5. **Compartment + infection detail** (§6 Q4/Q5) — do the lymph node /
-   bone marrow get real organ silhouettes (bean, trabecular region), and
-   does viral-vs-bacterial infection get a texture split (swollen
-   inclusion vs. purulent stipple) as well as the hue? Or keep rectangles
-   + hue-only infection this pass?
-6. **Concurrent-flash cap** (§6 Q7, `GAME_DESIGN.md` §8) — add the hard
-   ceiling on simultaneous `DegranulationFlash` instances now, or defer?
-
-The agent's own recommendations: keep the load-bearing colours but nudge
-neutrophil toward gold and split the virion hue; subtle variation;
-distinct flash shapes; organ silhouettes + a texture split are worth it;
-add the flash cap.
+1. **Palette: nudge the flagged ones only.** Neutrophil amber
+   `0.95,0.78,0.25` → gold `~0.93,0.74,0.30`; free virus particle → a
+   colder purple-maroon `~0.40,0.16,0.34` (so virus ≠ bacterium at a
+   glance). Cytokine-heat orange and the knowledge / efferocytosis greens
+   **stay** (load-bearing, legible). Everything else unchanged.
+2. **Per-instance variation: subtle.** One-time-at-spawn random rotation
+   on non-round shapes, ±8% non-uniform scale jitter, a tiny hue nudge.
+   No per-frame cost.
+3. **Flashes: five distinct silhouettes** (stipple burst / jagged red
+   star / soft bloom / shockwave ring / thin ring) + per-shape timing,
+   via an internal `switch` on `burstColor` so every `Play(...)` call
+   site is unchanged. **And the concurrent-flash cap goes in** (`GAME_DESIGN.md`
+   §8).
+4. **Compartments + infection: full.** Lymph node → bean/ellipse with
+   follicle zones; bone marrow → trabecular texture; gut-wall bar →
+   row-of-cells epithelial skin. Infected cells get a **texture split** —
+   swollen inclusion (viral) vs. granular purulent (bacterial) — on top
+   of the violet / yellow-green hue.
 
 ## Scope
 
