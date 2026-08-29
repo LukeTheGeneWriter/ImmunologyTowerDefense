@@ -1398,6 +1398,25 @@ persisting across a boundary. The `Update()`-only freeze gate is left to
 the build launch. `MapVerification` 4c repinned to `AdhesionChanceAtWall`
 0.03.
 
+## Sprint 10 changes — DC patrol lane-repulsion (`GAME_DESIGN.md` §5a note)
+
+- **`DendriticCell.Initialize(...)`** gained an optional trailing
+  `IReadOnlyList<DendriticCell> cohort` — the live fielded-DC list, for
+  patrol lane-repulsion. `AdaptiveDirector.EmitDendriticCell` passes its
+  `allDcs`.
+- **`DendriticCell.RepelledPatrolStep`** (private) replaces the plain
+  `Chemotaxis.ChooseNextStep` in `TickPatrol`: a random walk biased away
+  from other DCs **along the cross axis only** (threat-axis steps stay
+  unbiased). `TickTravel` / `TickInNode` / `TickReturn` unchanged.
+- **`DendriticCell.DebugPlaceForTest(FineCoord)`** — new test seam (drop a
+  patrolling DC on a chosen tile), same role as `TissueGrid.SeedHostState`.
+- **`AdaptiveTuning`** — new `DcLaneRepelStrength` (1.4, softmax sharpness
+  on the cross bias; 0 = plain random walk) and `DcLaneRepelAxisRange`
+  (12, coarse cells along the threat axis within which another DC counts
+  as crowding). Both in `ResetToDefaults`.
+- `AdaptiveVerification` grew 3 assertions (34 → 37): an A/B on lane
+  spread / shared-lane ticks with repulsion on vs. off.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

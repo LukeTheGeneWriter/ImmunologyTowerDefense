@@ -45,6 +45,7 @@ public static class AdaptiveVerification
         RunShuttleEndToEnd();
         RunLymphocyteTurnover();
         RunRoundBoundaryDespawn();
+        RunDcLaneSpread();
 
         AdaptiveTuning.ResetToDefaults();
         ImmunologyTD.Economy.EconomyTuning.ResetToDefaults();
@@ -342,5 +343,59 @@ public static class AdaptiveVerification
 
         rig.Dispose();
         AdaptiveTuning.ResetToDefaults();
+    }
+
+    // =================================================================
+    // 7. Patrol lane-repulsion -- DCs spread across lanes, not clump
+    // =================================================================
+
+    /// <summary>Emits three DCs, drops all three on the SAME lane a few
+    /// cells into tissue, patrols them for <paramref name="ticks"/> steps,
+    /// and reports two things over the run: how many ticks had 2+ DCs
+    /// sharing a lane, and the mean total pairwise lane distance. Repulsion
+    /// on -> fewer shared-lane ticks, larger spread.</summary>
+    private static void PatrolLaneStats(int ticks, float repelStrength, out int coLaneTicks, out float meanSpread)
+    {
+        AdaptiveTuning.ResetToDefaults();
+        AdaptiveTuning.DcLaneRepelStrength = repelStrength;
+        AdaptiveTuning.DcMaxActiveChildren = 8;
+
+        var rig = BuildShuttleRig();
+        var dcs = new List<DendriticCell>();
+        for (int i = 0; i < 3; i++)
+            dcs.Add(rig.Director.EmitDendriticCell(0, null).GetComponent<DendriticCell>());
+
+        int lane = rig.Board.CrossLength / 2;
+        var start = rig.Board.CoarseCenterFine(
+            rig.Board.CoarseFromAxis(rig.Board.TissueBaseEdgeAxisIndex + 4, lane));
+        foreach (var d in dcs) d.DebugPlaceForTest(start);
+
+        coLaneTicks = 0;
+        long spreadSum = 0;
+        for (int step = 0; step < ticks; step++)
+        {
+            rig.Director.Tick(BoardConfig.TickIntervalSeconds);
+            int c0 = rig.Board.CrossIndex(dcs[0].Current.ToCoarse(BoardConfig.FineSubdivision));
+            int c1 = rig.Board.CrossIndex(dcs[1].Current.ToCoarse(BoardConfig.FineSubdivision));
+            int c2 = rig.Board.CrossIndex(dcs[2].Current.ToCoarse(BoardConfig.FineSubdivision));
+            if (c0 == c1 || c1 == c2 || c0 == c2) coLaneTicks++;
+            spreadSum += Mathf.Abs(c0 - c1) + Mathf.Abs(c1 - c2) + Mathf.Abs(c0 - c2);
+        }
+        meanSpread = spreadSum / (float)ticks;
+
+        rig.Dispose();
+        AdaptiveTuning.ResetToDefaults();
+    }
+
+    private static void RunDcLaneSpread()
+    {
+        const int ticks = 250;
+        PatrolLaneStats(ticks, 1.4f, out int coOn, out float spreadOn);
+        PatrolLaneStats(ticks, 0f, out int coOff, out float spreadOff);
+
+        Debug.Log($"[AdaptiveVerification] DC patrol over {ticks} ticks -- repulsion ON: {coOn} co-lane ticks, mean spread {spreadOn:F1}; OFF: {coOff}, {spreadOff:F1}.");
+        Check($"lane-repulsion cuts the time DCs share a lane ({coOn} vs {coOff})", coOn < coOff);
+        Check($"lane-repulsion widens the mean lane spread ({spreadOn:F1} vs {spreadOff:F1})", spreadOn > spreadOff);
+        Check($"with repulsion on, DCs share a lane on well under half the ticks ({coOn}/{ticks})", coOn < ticks / 2);
     }
 }

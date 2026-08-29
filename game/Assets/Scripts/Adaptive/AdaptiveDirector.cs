@@ -141,7 +141,9 @@ namespace ImmunologyTD.Adaptive
 
             var start = tissueBoard.CoarseCenterFine(tissueBoard.CoarseFromAxis(
                 tissueBoard.TissueBaseEdgeAxisIndex, Random.Range(0, tissueBoard.CrossLength)));
-            dc.Initialize(tissueBoard, tissueGrid, tissueCytokine, node, start, despawn);
+            // allDcs is handed in as the cohort for patrol lane-repulsion --
+            // a live read-only view; the DC skips itself.
+            dc.Initialize(tissueBoard, tissueGrid, tissueCytokine, node, start, despawn, allDcs);
             list.Add(dc);
             allDcs.Add(dc);
             return go;

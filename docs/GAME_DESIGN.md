@@ -737,6 +737,14 @@ number is a placeholder, and **a rising knowledge % unlocks nothing yet**
 — §5's threshold ladder is the next sprint. See `ENGINE_STATUS.md` and
 `SPRINT_PLAN.md`.
 
+**Refined — Sprint 10 (Director, 2026-08-29).** DC patrol was a plain
+random walk and the cells clumped. Rather than debris homing, patrolling
+DCs now **repel each other along the lane axis only** (the base↔lumen
+threat axis is untouched), so they patrol back and forth and stay evenly
+spread across the lanes — the answer to "DC migration capacity."
+Tunable (`DcLaneRepelStrength`); macrophage debris homing is still an
+open `BACKLOG.md` item.
+
 ## 5b. ATP income — LOCKED for now (Director, 2026-08-21)
 
 Two sources:

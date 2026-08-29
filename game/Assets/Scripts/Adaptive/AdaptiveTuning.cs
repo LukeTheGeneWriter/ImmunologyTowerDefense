@@ -86,6 +86,20 @@ namespace ImmunologyTD.Adaptive
         /// a hardcoded direction -- same rule as pathogen advance.</summary>
         public static float DcAxisWalkBiasSharpness = 1.6f;
 
+        /// <summary>While patrolling, a DC biases its random walk **away from
+        /// other DCs, along the CROSS (lane) axis only** (Director,
+        /// 2026-08-29) -- the threat axis is base↔lumen, so repelling along
+        /// the perpendicular keeps DCs spread evenly across the lanes and
+        /// patrolling back and forth rather than clumping. Higher = spreads
+        /// harder. 0 disables it (plain random walk). This is the answer to
+        /// "DCs don't get around" instead of debris homing.</summary>
+        public static float DcLaneRepelStrength = 1.4f;
+
+        /// <summary>Only other DCs within this many coarse cells along the
+        /// THREAT axis count toward a patrolling DC's crowding -- so DCs at
+        /// opposite ends of the tissue band don't push on each other.</summary>
+        public static int DcLaneRepelAxisRange = 12;
+
         // -- The helper-T cell / lymph node (GAME_DESIGN.md §5c) --
 
         /// <summary>A helper-T cell despawns this long after emission, and
@@ -144,6 +158,8 @@ namespace ImmunologyTD.Adaptive
             DcDebrisSamplePerBite = 0.34f;
             DcFineTilesPerTick = 2;
             DcAxisWalkBiasSharpness = 1.6f;
+            DcLaneRepelStrength = 1.4f;
+            DcLaneRepelAxisRange = 12;
             LymphocyteLifespanSeconds = 20f;
             LymphocyteFineTilesPerTick = 2;
             PairingSeconds = 1.5f;

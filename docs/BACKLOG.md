@@ -459,11 +459,18 @@ What's flagged, none scoped:
   self-dissipates; there's no "drains to the node, deleted by resident
   macrophages, nothing learned" path — which §1c says is what makes
   deliberate shuttling worth paying for.
-- **DC / macrophage homing on debris ("find-me" signalling).** DC patrol
-  is a plain random walk. This was already a deferred item (Sprint 6
-  notes); Sprint 8 didn't change it.
+- **~~DC homing on debris~~ / macrophage homing on debris ("find-me"
+  signalling).** **DC patrol got Sprint 10's lane-repulsion instead** —
+  DCs spread across the lanes rather than chasing debris, which covers
+  the "DCs don't get around" concern without a gradient. **Macrophage**
+  debris homing (efferocytosis chemotaxis) is still open — Sprint 5's
+  efferocytosis is opportunistic (a macrophage clears debris it happens
+  to stand on); the Director wants macrophages to sense and move toward
+  it, and a necrotic/loud death should pull harder than a quiet one.
 - **The adaptive arena keeps ticking during the buy phase and Defeat.**
-  `AdaptiveDirector.Update` doesn't gate on `RoundController.Phase`.
+  ~~`AdaptiveDirector.Update` doesn't gate on `RoundController.Phase`.~~
+  **Fixed in Sprint 9** — it gates on `RoundClock.Frozen` now, along with
+  everything else.
   Cosmetic; a real freeze on GAME OVER would gate it.
 - **`AdaptiveDirector` runs its own `Clock`,** not aligned to the tissue
   board's `Time.time`. Fine for now (lifespan / pairing only need it
