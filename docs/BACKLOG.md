@@ -106,6 +106,32 @@ formal sprint plan (`docs/GAME_DESIGN.md` §6d has the full design):
 
 ## Everything else
 
+### Sprite / art pass — a future sprint (Director, 2026-08-29)
+
+Everything on screen is still a flat-coloured `RuntimeSprites.SquareSprite`
+quad (see `docs/UI_STYLE_GUIDE.md` for the full current palette and the
+sorting-order / footprint contract to preserve). A dedicated sprint to
+design and wire real sprites:
+
+- **Scope**: host-cell states, the immune cells (macrophage / neutrophil /
+  dendritic cell / helper-T lymphocyte), the pathogen classes, the
+  contaminated food item, the effect flashes, and the compartment
+  backdrops. Keep the per-instance tint hook so state (cargo, paired,
+  infected, cytokine heat) still reads.
+- **Constraints from `UI_STYLE_GUIDE.md`**: the sorting-order table, the
+  fine-tile footprint sizes, the "intracellular infection shows as the
+  host cell, not itself" rule (§4a — no own sprite), and the five
+  mutually-unmistakable flash colours (winning vs. losing).
+- **Art direction**: `docs/handoff-map01-intestine.md` §8 already has a
+  working answer (histology palette, clinical register) for the first
+  playable slice — start there.
+- **Likely paired with**: a real buy UI (the point at which installing
+  `com.unity.ugui` or committing to UI Toolkit is a conscious call — see
+  `TEAM_RETRO.md` Sprint 1), since the shop / picker / HUD are all IMGUI
+  placeholders too.
+- **Probably wants a Design agent** dispatched for the actual asset
+  design, with the head wiring them in — this project has never used one.
+
 (Nothing else triaged yet.)
 
 ## Triaged from the Sprint 3 playtest (Director, 2026-08-21)

@@ -185,6 +185,23 @@ rather than every dead cell regrowing on an independent clock. New
 
 **Handed to the Director for playtest.**
 
+## Candidate next sprints (Director's call)
+
+- **§5 knowledge-ladder mechanics** — start wiring the rungs the ladder
+  now displays. Cheapest first: neutralizing antibodies (~20%, an
+  adhesion multiplier) and complement (~60%, a passive damage tick).
+  Cytotoxic T cells (~10%) is a new unit and the headline payoff.
+- **Shop mechanics** — make the Sprint 11 placeholders real, starting
+  with the progenitor upgrades (the §6d wiring exists, `UpgradeTower`
+  just needs to write a field) and the mucus-turnover barrier upgrade.
+- **The dsRNA-sensor host-cell upgrade + its third cytokine field**
+  (`GAME_DESIGN.md` §1d) — the DC-recruiting "eat this debris" signal.
+- **Sprite / art pass** — `BACKLOG.md` "Sprite / art pass" +
+  `UI_STYLE_GUIDE.md`. Everything on screen is still a flat quad; this is
+  the first likely job for a dispatched Design agent, probably paired
+  with a real buy UI.
+- **Economy retune** against the persistent army (open since Sprint 9).
+
 ## Process note
 
 Head session, inline, commit after each scope item with a reasoning-heavy
