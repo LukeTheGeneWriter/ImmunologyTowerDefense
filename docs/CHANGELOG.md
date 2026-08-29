@@ -12,6 +12,30 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 12 -- 2026-08-29
+Two fixes from the Sprint 11 playtest.
+
+**Cytokine sensing is on by default now.** You always turned it on, so
+it's no longer a choice -- every unit senses. The **improvement** is what
+you buy: a new shop item, "Cytokine sensing +", sharpens the gradient
+bias for every unit at once (this one's a *real* effect, unlike the other
+shop placeholders). The `C` key still toggles it off for a rung-1-vs-2
+comparison. The HUD shows the current sharpness multiplier.
+
+**Dendritic cells actually spread across the lanes and pace the band
+now.** Sprint 10's lane-repulsion was comparing coarse-cell positions, so
+it only nudged about one step in seven and there was no back-and-forth at
+all. Now it works at fine-tile granularity every step, and a patrolling
+DC also **sweeps the full depth of the tissue band and flips at the
+edges** -- so it covers ground instead of loitering near where it
+spawned, while still holding its own lane. In a headless test, three DCs
+started in one lane now share a lane on 2 of 250 ticks (was 82), and a
+lone DC paces the whole tissue depth where a random walk barely moves.
+
+Verified: a new `Sprint12Verification` (9 assertions) + 3 more in
+`AdaptiveVerification` (37 -> 40). All ten harnesses green -- **410
+total, 0 failed**. Clean Windows build.
+
 ## Sprint 11 -- 2026-08-29
 Framework pass -- a **shop** and the **knowledge ladder**, both mostly
 placeholder.

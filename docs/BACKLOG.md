@@ -594,3 +594,22 @@ drive nothing. Each purchase's real mechanic (design in GAME_DESIGN.md
   question). `ShopTuning` prices are blind placeholders.
 - **`ShopLedger` has no round-boundary / restart handling** — it just
   persists for the run (correct for now).
+
+## Opened / updated by Sprint 12 (2026-08-29)
+
+- **Cytokine sensing is on by default; the *upgrade* is buyable** (a real
+  shop effect via `Chemotaxis.SensingUpgradeLevel`). Rung-1 (pure random
+  walk) is now only reachable via the `C` debug toggle. If the toggle is
+  a player footgun, hide it behind a debug flag.
+- **The sensing upgrade is player-wide (one global static), not
+  per-tower.** If per-tower cytokine sensing is ever wanted it moves onto
+  `UnitLifecycleTuning` like the §6d numbers.
+- **~~DC patrol wasn't spreading / sweeping~~ — fixed Sprint 12.** The
+  Sprint 10 lane-repulsion compared coarse indices (fired ~1/7 of steps);
+  now fine-grained + a threat-axis band sweep. `DcLaneRepelStrength` /
+  `DcPatrolSweepBias` want a playtest tuning pass.
+- **DCs still spend little time patrolling** — with 16-pathogen rounds,
+  debris is everywhere, so a DC samples within a couple of ticks and
+  spends most of its life shuttling. If the patrol behaviour still reads
+  as under-used after Sprint 12, consider letting a DC sample several
+  piles before heading to the node (a cargo capacity > 1).

@@ -1485,6 +1485,47 @@ neighbour-regrowth A/B (surrounded 6.8s vs isolated 20.0s, and identical
 at bonus 0). The OnGUI panels themselves are left to the build launch.
 `TissueVerification`'s regrow sub-test pins `NeighbourRegrowthBonus` to 0.
 
+## Sprint 12 changes — cytokine on-by-default + buyable; the DC movement fix
+
+### Cytokine sensing
+
+- **`CytokineToggle.Enabled`** now defaults `true` (was `false`). The `C`
+  key still flips it (debug OFF-toggle).
+- **`Chemotaxis`** — new statics: `int SensingUpgradeLevel` (0 = base),
+  `float SensingUpgradePerLevel` (0.6), `float EffectiveSharpness` (`=>
+  GradientSharpness * (1 + SensingUpgradeLevel * SensingUpgradePerLevel)`).
+  `ChooseNextStep` uses `EffectiveSharpness`, not `GradientSharpness`.
+- **`ShopItem.CytokineSensingUpgrade`** (new value) +
+  `ShopTuning.CytokineSensingUpgradeBasePrice` 35. **The one shop item
+  with a real effect**: `HudOverlay.Update` sets
+  `Chemotaxis.SensingUpgradeLevel = shop.LevelOf(ShopItem.CytokineSensingUpgrade)`
+  each frame. `ShopLedger` is unchanged (still a pure spend+level ledger).
+- **`HudOverlay`** — the cytokine line shows the effective-sharpness
+  multiplier; the shop panel lists the new item first (marked `REAL`).
+
+### `BoardConfig`
+
+- **`int FineAxisIndex(FineCoord)`** / **`int FineCrossIndex(FineCoord)`**
+  — fine-tile analogues of `AxisIndex` / `CrossIndex` (axis-frame
+  correct; `FineAxisIndex` flips for a Positive base end).
+
+### `DendriticCell`
+
+- **`RepelledPatrolStep`** reworked to fine granularity + a threat-axis
+  sweep. Private `int patrolHeading` (±1, flips at the tissue-band
+  edges), reset everywhere the DC resets. `DebugPlaceForTest` unchanged.
+- **`AdaptiveTuning`** — `DcLaneRepelStrength` 1.4 → **0.8**; new
+  `DcPatrolSweepBias` 1.0 (both in `ResetToDefaults`).
+
+### `Assets/Editor/Sprint12Verification.cs` (new)
+
+`Sprint12Verification.RunAll` — **9 assertions**: sensing default-on,
+`EffectiveSharpness` scaling with level, `ShopLedger` tracking
+`CytokineSensingUpgrade` + the bridge reproduced inline, and a stronger
+upgrade level biasing `ChooseNextStep` harder toward a source.
+`AdaptiveVerification` grew 3 (37 → 40) for the DC patrol sweep (a lone
+DC paces the band depth; a random walk doesn't).
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

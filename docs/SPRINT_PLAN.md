@@ -1,4 +1,17 @@
-# Sprint Plan — Sprint 11
+# Sprint Plan — Sprint 11 (+ Sprint 12 follow-up); next: Sprint 13 (sprite pass)
+
+## Sprint 12 — closed 2026-08-29
+
+Two Sprint 11 playtest fixes. **(1)** Cytokine sensing is ON by default
+(the `C` key is now a debug OFF-toggle); the *improvement* is a real
+buyable shop item, `ShopItem.CytokineSensingUpgrade` →
+`Chemotaxis.SensingUpgradeLevel` → `EffectiveSharpness`. **(2)** The DC
+patrol movement fix — Sprint 10's lane-repulsion compared coarse indices
+(fired ~1/7 of steps, no back-and-forth); now fine-grained every step
+plus a threat-axis band sweep (`DcPatrolSweepBias`; `DcLaneRepelStrength`
+1.4 → 0.8). New `Sprint12Verification` (9) + `AdaptiveVerification` +3
+(→ 40). 410 total, 0 failed. Sprite/art pass = Sprint 13 (design agent
+dispatched 2026-08-29; `docs/SPRITE_DESIGN.md`).
 
 ## Sprint 10 — closed 2026-08-29
 

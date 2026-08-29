@@ -127,6 +127,23 @@ namespace ImmunologyTD.Grid
         public int CrossIndex(CoarseCoord c) =>
             threatAxis == BoardAxis.Horizontal ? c.Row : c.Column;
 
+        /// <summary>Fine-tile analogue of <see cref="AxisIndex"/> — distance
+        /// from the base end measured in FINE tiles. Flips for a Positive
+        /// base end, exactly as the coarse version does. For movement code
+        /// that biases at fine granularity (Sprint 12's DC patrol sweep)
+        /// rather than only at coarse-cell boundaries.</summary>
+        public int FineAxisIndex(FineCoord c)
+        {
+            int raw = threatAxis == BoardAxis.Horizontal ? c.Column : c.Row;
+            int len = threatAxis == BoardAxis.Horizontal ? FineColumns : FineRows;
+            return baseEnd == AxisEnd.Negative ? raw : len - 1 - raw;
+        }
+
+        /// <summary>Fine-tile analogue of <see cref="CrossIndex"/> — the lane
+        /// index in FINE tiles, raw and unflipped.</summary>
+        public int FineCrossIndex(FineCoord c) =>
+            threatAxis == BoardAxis.Horizontal ? c.Row : c.Column;
+
         /// <summary>Inverse of AxisIndex/CrossIndex.</summary>
         public CoarseCoord CoarseFromAxis(int axisIndex, int crossIndex)
         {

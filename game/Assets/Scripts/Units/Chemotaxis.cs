@@ -52,6 +52,23 @@ namespace ImmunologyTD.Units
         /// overridden at runtime for that sweep.</summary>
         public static float GradientSharpness = 4f;
 
+        /// <summary>Sprint 12: a **buyable, player-wide** upgrade that
+        /// sharpens cytokine sensing for every unit at once (the Director
+        /// always turned sensing on, so it is now default-on and the
+        /// *improvement* is what you buy). `ShopItem.CytokineSensingUpgrade`
+        /// raises this level; `HudOverlay` pushes it here from the
+        /// `ShopLedger` each frame. 0 = base sensing.</summary>
+        public static int SensingUpgradeLevel = 0;
+
+        /// <summary>Each upgrade level multiplies the effective gradient
+        /// sharpness by this much again (level 2 → ×2.2 at 0.6).</summary>
+        public static float SensingUpgradePerLevel = 0.6f;
+
+        /// <summary>The gradient sharpness actually used, after the buyable
+        /// upgrade. `GradientSharpness · (1 + SensingUpgradeLevel · perLevel)`.</summary>
+        public static float EffectiveSharpness =>
+            GradientSharpness * (1f + SensingUpgradeLevel * SensingUpgradePerLevel);
+
         /// <summary>
         /// Picks the next fine-tile step among the in-bounds von Neumann
         /// neighbours of <paramref name="current"/>. Uniform when
@@ -85,9 +102,10 @@ namespace ImmunologyTD.Units
             if (validCount == 0) return current; // shouldn't happen on any board >= 2x2 fine tiles
 
             float totalWeight = 0f;
+            float sharpness = EffectiveSharpness; // Sprint 12: base × the buyable upgrade
             for (int i = 0; i < validCount; i++)
             {
-                weightBuffer[i] = Mathf.Exp(GradientSharpness * (weightBuffer[i] - maxValue));
+                weightBuffer[i] = Mathf.Exp(sharpness * (weightBuffer[i] - maxValue));
                 totalWeight += weightBuffer[i];
             }
 
