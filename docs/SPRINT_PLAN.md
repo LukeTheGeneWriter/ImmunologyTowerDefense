@@ -1,222 +1,171 @@
-# Sprint Plan — Sprint 11 (+ Sprint 12 follow-up); next: Sprint 13 (sprite pass)
+# Sprint Plan — Sprint 13: the sprite / visual identity pass
 
-## Sprint 12 — closed 2026-08-29
+## Recent sprints — closed 2026-08-29
 
-Two Sprint 11 playtest fixes. **(1)** Cytokine sensing is ON by default
-(the `C` key is now a debug OFF-toggle); the *improvement* is a real
-buyable shop item, `ShopItem.CytokineSensingUpgrade` →
-`Chemotaxis.SensingUpgradeLevel` → `EffectiveSharpness`. **(2)** The DC
-patrol movement fix — Sprint 10's lane-repulsion compared coarse indices
-(fired ~1/7 of steps, no back-and-forth); now fine-grained every step
-plus a threat-axis band sweep (`DcPatrolSweepBias`; `DcLaneRepelStrength`
-1.4 → 0.8). New `Sprint12Verification` (9) + `AdaptiveVerification` +3
-(→ 40). 410 total, 0 failed. Sprite/art pass = Sprint 13 (design agent
-dispatched 2026-08-29; `docs/SPRITE_DESIGN.md`).
+- **Sprint 11** — placeholder buy-phase shop (`ShopLedger` / `ShopTuning`,
+  per-tower `UpgradeTower`), the §5 knowledge ladder as data + a
+  per-species HUD readout, and one real change: neighbour-accelerated
+  regrowth (`TissueTuning.NeighbourRegrowthBonus`). `Sprint11Verification`
+  26.
+- **Sprint 12** — two Sprint 11 playtest fixes: cytokine sensing is ON by
+  default with a real buyable sharpen (`ShopItem.CytokineSensingUpgrade`
+  → `Chemotaxis.SensingUpgradeLevel` → `EffectiveSharpness`; `C` = debug
+  off), and the DC patrol movement fix (fine-grained lane-repulsion +
+  a threat-axis band sweep; `BoardConfig.FineCrossIndex` / `FineAxisIndex`;
+  `DcPatrolSweepBias`). `Sprint12Verification` 9. **410 assertions total,
+  0 failed.**
 
-## Sprint 10 — closed 2026-08-29
+## Direction for Sprint 13 (Director, 2026-08-29)
 
-DC patrol lane-repulsion: patrolling dendritic cells bias their random
-walk away from each other **along the lane axis only** (the base↔lumen
-threat axis stays unbiased), so they spread evenly across the lanes and
-sweep back and forth instead of clumping. `AdaptiveTuning.DcLaneRepelStrength`
-1.4 / `DcLaneRepelAxisRange` 12. `AdaptiveVerification` 34 → 37. 372
-total, 0 failed.
+"It's starting to look good — time to dispatch a design agent and plan
+the next sprint." A **design agent was dispatched and delivered
+`docs/SPRITE_DESIGN.md`** — a full visual-identity spec (direction,
+per-entity sprite spec, the five flashes, a procedural-`Texture2D`
+implementation recommendation with a shape library, an 11-call-site
+migration plan) plus an uncompiled prototype
+`game/Assets/Scripts/Rendering/SpriteShapes.cs`.
 
-## Direction for Sprint 11 (Director, 2026-08-29)
+Sprint 13 **implements that spec**: replace the single flat white quad
+(`RuntimeSprites.SquareSprite`) with real procedurally-drawn shape sprites
+for every on-screen entity, so the board reads as a stained tissue
+section with crisp icon-like agents on top.
 
-Two things: a **shop with placeholder buy options**, and the **§5
-knowledge-ladder roster** made concrete.
+## Open questions — need a Director decision before/at the start (see `SPRITE_DESIGN.md` §6)
 
-### 1. Shop — placeholder buy options (no mechanical effect yet)
+1. **Palette direction.** Keep the playtested placeholder colours
+   as-is, or let this pass re-hue the ones near `handoff` §8's "avoid"
+   list — cytokine-heat orange (`1.00,0.55,0.05`), the knowledge /
+   efferocytosis greens, neutrophil amber (`0.95,0.78,0.25`)?
+2. **Free virion colour** (§6 Q8) — split it to a colder purple-maroon so
+   "virus" and "bacterium" read apart at a glance, or keep both on
+   `PathogenColor` and let dot-vs-rod carry it?
+3. **Per-instance variation** (§6 Q3) — identical cells (clean clinical
+   plate) or subtle rotation / size / hue jitter (organic)?
+4. **Flash shapes** (§6 Q6) — five distinct silhouettes (stipple / spiky
+   star / soft bloom / shockwave ring / thin ring — colour-blind-safe),
+   or keep all five as the expanding square + colour?
+5. **Compartment + infection detail** (§6 Q4/Q5) — do the lymph node /
+   bone marrow get real organ silhouettes (bean, trabecular region), and
+   does viral-vs-bacterial infection get a texture split (swollen
+   inclusion vs. purulent stipple) as well as the hue? Or keep rectangles
+   + hue-only infection this pass?
+6. **Concurrent-flash cap** (§6 Q7, `GAME_DESIGN.md` §8) — add the hard
+   ceiling on simultaneous `DegranulationFlash` instances now, or defer?
 
-The Director's framing: "These are placeholders for now, no actual
-changes during an upgrade." Build the shop *framework* — purchases cost
-ATP, register as owned / a level, and show in the UI — and record the
-intended design for each so the mechanics sprint has a spec. Categories:
-
-- **Lumen barrier** — the §6b mucus-turnover upgrade (raise the shed
-  rate; flush barrier residents back to the lumen). Repeatable level.
-- **Host-cell upgrades** — the Director's design (all placeholder):
-  - **Pattern-recognition receptor → immunogenic apoptosis.** Upgrade a
-    cell to sense a pathogen signature (example: **dsRNA**). An infected
-    cell then has a ~20% chance to **self-destruct** when infected by the
-    matching class (an RNA virus for dsRNA), dying cleanly and releasing
-    a **strong "eat this debris" cytokine that pulls in dendritic cells
-    specifically** — a *third* signal, distinct from the §7/§9
-    recruitment cytokine and the §5c co-localisation signal. This is
-    intrinsic antiviral defence + immunogenic cell death, and it is the
-    host cell actively feeding the adaptive loop.
-  - **Reduced viral entry** — lower the per-tick chance a virus gets
-    inside a healthy cell.
-  - **Bacterial-damage resistance** — a large bacterium grazing the cell
-    does less host-cell damage per step.
-  - **Crypts** — placeable stem-cell niches; tissue near a crypt regrows
-    faster (§6's crypt-based recovery). Repeatable count.
-- **Progenitor upgrades** — per-tower (§6d: "an upgrade is a write to one
-  tower's field"). Clicking a *placed* marrow slot opens its upgrade
-  options (kill count, degranulation collateral, …), each a placeholder
-  that spends ATP and bumps that tower's upgrade level.
-
-### 2. Knowledge ladder — define + show, no mechanics
-
-The Director's roster (his mechanic notes in parentheses), mapped onto
-§5's existing threshold proposals:
-
-| % | Capability | Mechanic (for the later sprint) |
-|---|---|---|
-| ~10 | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the quiet version of §4b's stress-sense kill) |
-| ~20 | **Neutralizing antibodies** | reduced adhesion probability for a known species |
-| ~30 | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it |
-| ~45 | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting |
-| ~60 | **Complement activation** | antibody destroys the target's membrane directly, no immune cell needed — passive damage to a coated pathogen |
-| ~70 | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** |
-
-This sprint: a `KnowledgeLadder` data table + a per-species HUD readout of
-which rungs are unlocked at the current KNOWLEDGE %. **Crossing a
-threshold changes the display and nothing else** — every capability's
-real mechanic is a later sprint (each is a substantial piece: CTL is a
-new unit, antibodies are a new entity, IgA is a new lumen mechanic).
-
-### 3. One real change: neighbour-accelerated regrowth
-
-Not a placeholder — the Director asked to "tune repairing so that healthy
-cells can fill in neighbouring empty space more quickly." An `Empty`
-host-ground cell's regrowth time scales down with its count of `Healthy`
-von Neumann neighbours, so tissue heals inward from its intact edges
-rather than every dead cell regrowing on an independent clock. New
-`TissueTuning.NeighbourRegrowthBonus` (0 restores the old behaviour).
+The agent's own recommendations: keep the load-bearing colours but nudge
+neutrophil toward gold and split the virion hue; subtle variation;
+distinct flash shapes; organ silhouettes + a texture split are worth it;
+add the flash cap.
 
 ## Scope
 
-### A. `ImmunologyTD.Economy.ShopLedger` + `ShopTuning`
+### 1. `SpriteShapes.cs` — review, compile, land
 
-- **`ShopItem` enum** — `BarrierMucusTurnover`, `HostDsRnaSensor`,
-  `HostReducedViralEntry`, `HostBacterialResistance`, `Crypt`.
-- **`ShopLedger`** — plain reference type, per run. `int LevelOf(ShopItem)`,
-  `bool CanBuy(ShopItem, AtpWallet)`, `bool TryBuy(ShopItem, AtpWallet)`
-  (spends `ShopTuning.PriceFor(item, currentLevel)` and increments the
-  level), `void Reset()`. **No side effect beyond the ledger + the
-  wallet.**
-- **`ShopTuning`** — mutable statics, `ResetToDefaults()`. A base price
-  per item and a per-level multiplier (so repeat buys cost more). All
-  placeholder.
+Review the dispatched prototype (`game/Assets/Scripts/Rendering/SpriteShapes.cs`,
+uncompiled), fix whatever Unity's compiler flags, confirm it follows the
+project's lazy-static-cache style (like `RuntimeSprites`) and references
+no gameplay type. Land it + its `.meta`, wired nowhere, with
+`RuntimeSprites.SquareSprite` kept as the fallback. Shapes per
+`SPRITE_DESIGN.md` §4 (disc, ring, capsule, lobed blob, star, rounded,
+stipple, inner/rim shade), 64×64, white with the shape in alpha so every
+per-instance tint keeps working.
 
-### B. Per-tower progenitor upgrades (`BoneMarrowManager`)
+### 2. Swap the call sites, one entity at a time (`SPRITE_DESIGN.md` §5.1)
 
-- `Slot` gains `int UpgradeLevel` (and optionally a small `int[]` per
-  upgrade kind — keep it one level for now).
-- Clicking a **placed** slot (currently a no-op) opens an IMGUI upgrade
-  panel: one "Upgrade → Lv N+1" button, priced from `ShopTuning`,
-  greyed-out when unaffordable. `UpgradeTower(index)` spends ATP and
-  bumps the level. **No mechanical effect** — the `UnitLifecycleTuning`
-  is untouched (the §6d wiring for real upgrades already exists; this
-  just doesn't call it yet).
-- `int GetUpgradeLevel(int)` for the HUD / harness.
+Each an isolated `sr.sprite = SpriteShapes.X` with **no change** to
+`sortingOrder`, `localScale`, or `color`. Order (each its own commit):
 
-### C. `ImmunologyTD.Adaptive.KnowledgeLadder` + HUD
+- **a–b.** `UnitProfile` gains a `Sprite Shape` field (mirrors `Color`);
+  `GameBootstrap` sets it per profile; `SearchUnit` uses `profile.Shape`
+  (macrophage = amoeboid blob, neutrophil = lobed-nucleus disc).
+- **c.** `PathogenAgent` picks by `Class` — large bacterium = maroon rod
+  (random rotation), free virion = small dot. `sr.enabled = !IsIntracellular`
+  untouched (the intracellular "no sprite" rule).
+- **d.** `PathogenSpawner` food item = lumpy ochre bolus.
+- **e.** `DendriticCell` = dendritic star (optional loaded-core variant on
+  `HasCargo`).
+- **f.** `Lymphocyte` = nucleus-heavy teal circle.
+- **g.** `BoneMarrowManager` slot = rounded niche (optional: show the
+  placed unit's shape).
+- **h.** `GutInterfaceRenderer` bar = epithelial row-of-cells texture;
+  the thicken+heat `Refresh()` maths untouched.
+- **i.** `BoardRenderer` + `GameBootstrap.BuildBoardVisual` — the 4,000
+  coarse-cell grid picks `HostCell` / `HostCellInfected` / `Debris` /
+  `EmptyPit` per state alongside the colour it already computes. Keep the
+  host-cell sprite **opaque** (rim drawn inside) so there's no added
+  overdraw vs. today's quads. Cytokine heat tint applied after, unchanged.
+- **j.** Marrow / lymph backdrops → region / (bean) silhouettes (per Q5).
+- **k.** `DegranulationFlash.Begin` picks a shape from `burstColor` via an
+  internal `switch` over the five `static readonly` colours — **every
+  `Play(...)` call site unchanged**. Per-shape timing/scale if adopted
+  (Q4): make the current `const` duration/scale instance fields.
 
-- **`KnowledgeCapability` enum** — the six above.
-- **`KnowledgeLadder`** (static) — `struct Rung { KnowledgeCapability
-  Capability; float ThresholdPercent; string ShortName; }`, an ordered
-  `Rung[] Rungs`, `bool IsUnlocked(KnowledgeCapability, float pct)`, and
-  `IEnumerable<Rung>` iteration for the HUD.
-- **`HudOverlay`** — the KNOWLEDGE line becomes a small block: per
-  species, `Name pct%` then the six rungs as `[x] 10 CTL  [ ] 20 NeutAb
-  …`. Still drives nothing.
+### 3. Concurrent-flash cap (if Q6 = now)
 
-### D. Neighbour-accelerated regrowth (`TissueGrid` / `TissueTuning`)
+`DegranulationFlash` (or its pool owner) drops new `Play` requests past a
+tunable `MaxConcurrent` — `GAME_DESIGN.md` §8's "explicit, tunable cap on
+simultaneous cosmetic effects that degrades gracefully". A new
+`RenderTuning` (or a field on the class).
 
-- `TissueTuning.NeighbourRegrowthBonus` (new, default `0.5`).
-- `TissueGrid.Tick`'s `Empty → Healthy` branch: `effectiveRegen =
-  HostRegenerationSeconds / (1 + NeighbourRegrowthBonus * healthyNeighbourCount)`,
-  clamped so 4 healthy neighbours ≈ 3× faster. Isolated `Empty` ground
-  regrows at the old rate.
+### 4. Visual QA
 
-### E. Shop panel (`HudOverlay` or a new `ShopPanel` MonoBehaviour)
+No headless harness covers rendering (`Update()` doesn't run in
+batchmode). So:
 
-- Drawn only during `RoundPhase.Building` (the frozen buy phase). IMGUI
-  panel, left side, clear of the debug panel. One row per `ShopItem`:
-  name, "Lv N", price, a Buy button greyed-out when broke. Wired to
-  `ShopLedger.TryBuy`.
-- The Director should be able to open the game, see the shop, click
-  every option, and watch ATP go down and levels go up.
+- A scratch **debug key** that spawns one of every entity in every state
+  and fires all five flashes at once, for a single-frame `PrintWindow`
+  capture (per `AGENT_HANDBOOK.md`'s screenshot notes).
+- Checklist: sorting still back-to-front; DC cargo / lymphocyte paired /
+  pathogen contact-flash / infected-cell + cytokine-heat all still
+  visibly change; footprints unchanged (macrophage > neutrophil; food
+  1.4×); intracellular infection shows **only** as the host-cell
+  background; the four host states are four distinct reads.
 
-### F. Verification + docs
+### 5. Docs
 
-- **`ShopVerification`** (new, or fold into `EconomyVerification`):
-  `ShopLedger` spend / refuse / level-up and price scaling; per-tower
-  `UpgradeTower` spend + level; `KnowledgeLadder.IsUnlocked` at boundary
-  percentages (9.9 vs 10.0, etc.) and rung ordering; neighbour-regrowth
-  (an `Empty` cell ringed by `Healthy` regrows measurably faster than an
-  isolated one).
-- Re-run all eight prior harnesses green.
-- `GAME_DESIGN.md` §5 (roster promoted to Director-confirmed, mechanic
-  notes) + a new host-cell-upgrades subsection (the dsRNA-sensor design
-  in full, the DC-attractant third signal, reduced viral entry, bacterial
-  resistance, crypts); `ENGINE_STATUS.md`, `INTERFACE.md`, `CHANGELOG.md`,
-  `BACKLOG.md`, `TEAM_RETRO.md`. Clean Windows build, 0 exceptions.
+- `docs/UI_STYLE_GUIDE.md` **rewritten** to describe the shipped sprites
+  (it currently documents the placeholder quads) — the two docs merge:
+  `SPRITE_DESIGN.md` is the spec, `UI_STYLE_GUIDE.md` becomes "what's on
+  screen now".
+- `ENGINE_STATUS.md`, `INTERFACE.md` (the `UnitProfile.Shape` field, the
+  `SpriteShapes` surface, any `PathogenAgent` colour branch), `CHANGELOG.md`,
+  `BACKLOG.md`, `TEAM_RETRO.md`. Clean Windows build, 0 exceptions,
+  **a screenshot in the handoff**.
 
 ## Not in scope
 
-- **Every knowledge-ladder capability's real mechanic** — CTL as a unit,
-  antibody entities, IgA in the lumen, complement damage, Fc/opsonisation,
-  the memory-CTL burst. All defined this sprint, built later.
-- **Every shop purchase's real effect** — mucus turnover, the host-cell
-  receptor upgrades, crypts, progenitor upgrades. Framework only.
-- **The DC-attractant third cytokine field** — described in the design,
-  not built.
-- **A real economy pass** (prices are placeholder; the persistent-army
-  ATP question from Sprint 9 is still open).
-- Anything from Sprints 1–10 changing behaviour, except neighbour-regrowth
-  (scope D).
+- **Authored PNG art / an asset pipeline / `com.unity.ugui`** — the spec
+  explicitly rejects these for now (no Editor in the loop). Everything
+  stays procedural.
+- **A real buy UI** (uGUI / UI Toolkit) — the shop / picker / HUD stay
+  IMGUI. Flagged as the natural companion, but its own sprint.
+- **Animation** beyond the existing position tween and the flash
+  expand/fade. No sprite-sheet animation.
+- **New gameplay, tuning, or mechanics.** Sprint 13 is visual-only —
+  `sr.sprite` swaps and the flash cap, nothing else.
+- **Camera / zoom / lighting changes.**
 
-## Stopping point (definition of done) — status 2026-08-29
+## Stopping point (definition of done)
 
-`[~]` = code done + harness-verified. `[x]` = verified from command output.
-
-- [~] A **shop** is drawn in the frozen buy phase with buy options for
-      the barrier, host-cell upgrades, and crypts; each priced, greying
-      out when broke, buying spends ATP and raises a level and **nothing
-      about the simulation changes**. (`RunShopLedger`; the OnGUI panel
-      itself is the build launch.)
-- [~] Clicking a **placed progenitor tower** offers an upgrade that
-      spends ATP and bumps the tower's level, `UnitLifecycleTuning`
-      untouched. (`RunProgenitorUpgrade`.)
-- [~] The HUD KNOWLEDGE block shows the **six-rung ladder per species**,
-      rungs ticking on as the % crosses their thresholds, driving
-      nothing. (`RunKnowledgeLadder`; the HUD lines are the build launch.)
-- [~] Tissue **fills in from its healthy edges faster** than isolated
-      dead cells regrow. (`RunNeighbourRegrowth`: surrounded 6.8s vs
-      isolated 20.0s.)
-- [x] Everything from Sprints 1–10 still works — eight prior harnesses
-      re-run green.
-- [x] `Sprint11Verification` — **26 passed, 0 failed**. 398 total across
-      nine harnesses.
-- [x] `GAME_DESIGN.md` §5 + §1d, `INTERFACE.md`, `ENGINE_STATUS.md`,
-      `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
-      build (93,353,280 bytes, 0 errors), 0 exceptions on launch.
-
-**Handed to the Director for playtest.**
-
-## Candidate next sprints (Director's call)
-
-- **§5 knowledge-ladder mechanics** — start wiring the rungs the ladder
-  now displays. Cheapest first: neutralizing antibodies (~20%, an
-  adhesion multiplier) and complement (~60%, a passive damage tick).
-  Cytotoxic T cells (~10%) is a new unit and the headline payoff.
-- **Shop mechanics** — make the Sprint 11 placeholders real, starting
-  with the progenitor upgrades (the §6d wiring exists, `UpgradeTower`
-  just needs to write a field) and the mucus-turnover barrier upgrade.
-- **The dsRNA-sensor host-cell upgrade + its third cytokine field**
-  (`GAME_DESIGN.md` §1d) — the DC-recruiting "eat this debris" signal.
-- **Sprite / art pass** — `BACKLOG.md` "Sprite / art pass" +
-  `UI_STYLE_GUIDE.md`. Everything on screen is still a flat quad; this is
-  the first likely job for a dispatched Design agent, probably paired
-  with a real buy UI.
-- **Economy retune** against the persistent army (open since Sprint 9).
+- [ ] `SpriteShapes.cs` compiles and is committed; `RuntimeSprites.SquareSprite`
+      still present as the fallback.
+- [ ] Every entity (host-cell states, macrophage, neutrophil, DC,
+      lymphocyte, large bacterium, free virion, food item, marrow/lymph
+      backdrops, gut-wall bar) draws its shape sprite; every per-instance
+      tint / state change still reads.
+- [ ] The five flashes are distinguishable (by shape if Q4 = yes, by
+      colour + location otherwise); the concurrent cap is in if Q6 = now.
+- [ ] Intracellular infection still shows **only** as the host-cell
+      background (§4a) — verified in a build screenshot.
+- [ ] Everything from Sprints 1–12 still works — all ten harnesses re-run
+      green (rendering changes shouldn't touch them; confirm).
+- [ ] Clean Windows build, 0 exceptions, **a screenshot** in the CHANGELOG
+      handoff. `UI_STYLE_GUIDE.md` rewritten; `ENGINE_STATUS.md` /
+      `INTERFACE.md` / `CHANGELOG.md` / `BACKLOG.md` / `TEAM_RETRO.md`
+      updated.
 
 ## Process note
 
-Head session, inline, commit after each scope item with a reasoning-heavy
-message; update `INTERFACE.md` / `TEAM_RETRO.md` as signatures change and
-calls are made, not in a final sweep.
+Head session integrates the design agent's output. Commit per call-site
+swap with a reasoning-heavy message; screenshot-verify each watched
+entity as it lands, not in a final sweep.
