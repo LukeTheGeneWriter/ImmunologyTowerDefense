@@ -797,6 +797,14 @@ spread across the lanes — the answer to "DC migration capacity."
 Tunable (`DcLaneRepelStrength`); macrophage debris homing is still an
 open `BACKLOG.md` item.
 
+**Fixed — Sprint 12.** The Sprint 10 version wasn't visible in play — it
+compared *coarse* cell indices, so the bias fired only ~1 step in 7 and
+there was no back-and-forth at all. Now the lane-repulsion works at
+fine-tile granularity every step, and a patrolling DC also **sweeps the
+full depth of the tissue band, flipping at the edges**
+(`DcPatrolSweepBias`), so it genuinely paces the band and covers ground
+rather than loitering near where it spawned.
+
 ## 5b. ATP income — LOCKED for now (Director, 2026-08-21)
 
 Two sources:
@@ -1326,6 +1334,15 @@ pre-position at high-risk sites and stop searching entirely.
 Every step must be **visible in the movement of units on screen**, not
 only in a stat readout. See `docs/handoff-map01-intestine.md` for the full
 round 1 script this anchors.
+
+**Revised — Sprint 12 (Director, 2026-08-29).** In playtest the Director
+always turned cytokine sensing on immediately, so step (2) is no longer a
+binary on/off purchase: **sensing is ON from the start** (rung 1 as the
+pure-random-walk baseline is now only reachable via the `C` debug
+toggle), and the *purchasable upgrade* is **"Cytokine sensing +"** — a
+repeatable buy that sharpens the gradient bias for every unit
+(`Chemotaxis.EffectiveSharpness`). Rungs (3) directed chemotaxis and (4)
+tissue residency are unbuilt and remain the later steps of the ladder.
 
 ## TBD — still needs a Director decision before it can be built
 

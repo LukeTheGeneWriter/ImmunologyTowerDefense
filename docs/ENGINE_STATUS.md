@@ -1,9 +1,11 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 11** (a framework pass: a placeholder
-buy-phase shop, the knowledge ladder as data + HUD, and one real change —
-neighbour-accelerated regrowth). Recent structural state is **Sprint 9**
+reflects the state after **Sprint 12** (two playtest fixes: cytokine
+sensing on-by-default + a buyable sharpen, and the DC patrol movement
+rework). The prior framework pass was **Sprint 11** (a placeholder shop,
+the knowledge ladder as data + HUD, neighbour-accelerated regrowth).
+Recent structural state is **Sprint 9**
 (the reworked round model — a frozen buy phase, a persistent battlefield,
 food-item delivery) and **Sprint 10** (DC patrol lane-repulsion). Sprint 0's
 engine/platform decision section is preserved below since it is still
@@ -694,6 +696,45 @@ edges. `NeighbourRegrowthBonus` 0.5 (0 restores the old per-cell clock).
 Measured: a cell ringed by 4 healthy neighbours regrows in ~6.8s vs the
 20s base. `TissueVerification`'s regrow sub-test pins the bonus to 0.
 
+### Sprint 12 additions — cytokine sensing on-by-default + buyable; the DC movement fix
+
+Design: `GAME_DESIGN.md` §9 note (cytokine), §5a note (DC patrol).
+Signatures in `INTERFACE.md` ("Sprint 12 changes").
+
+**1. Cytokine sensing.** `CytokineToggle.Enabled` now defaults **true**
+(the `C` key is a debug OFF-toggle). `Chemotaxis` gained
+`static int SensingUpgradeLevel` (0 = base), `static float
+SensingUpgradePerLevel` (0.6), and `static float EffectiveSharpness =>
+GradientSharpness * (1 + SensingUpgradeLevel * SensingUpgradePerLevel)`,
+which `ChooseNextStep` now uses instead of `GradientSharpness` directly.
+New `ShopItem.CytokineSensingUpgrade` (`ShopTuning.CytokineSensingUpgradeBasePrice`
+35) — **the one shop item that is a real effect**: `HudOverlay.Update`
+pushes `shop.LevelOf(CytokineSensingUpgrade)` into
+`Chemotaxis.SensingUpgradeLevel` each frame (a one-liner bridge; the
+`ShopLedger` stays a pure spend+level ledger).
+
+**2. `BoardConfig.FineCrossIndex` / `FineAxisIndex`** — fine-tile
+analogues of `CrossIndex` / `AxisIndex` (axis-frame correct, flipped for
+a Positive base end). Movement code can now bias at fine granularity
+instead of only at coarse-cell boundaries.
+
+**3. `DendriticCell.RepelledPatrolStep` reworked.** The Sprint 10 version
+compared *coarse* cross/axis indices, so a fine step changed the index
+only ~1 time in 7 — the lane-repulsion fired ~1/7 of steps and there was
+no threat-axis behaviour. Now:
+- **lane repulsion** runs every step against other DCs' *fine* lane
+  positions (distances in coarse-cell units); `DcLaneRepelStrength`
+  lowered 1.4 → **0.8** (a gentler per-step push for the same visible
+  spread);
+- **a back-and-forth sweep** — threat-axis steps bias toward a
+  `patrolHeading` (±1) that flips at `TissueLumenEdgeAxisIndex` /
+  `TissueBaseEdgeAxisIndex`, so a DC paces the full band depth.
+  `AdaptiveTuning.DcPatrolSweepBias` 1.0 (0 = plain random walk).
+Measured: three DCs from one lane now share a lane on **2 of 250** ticks
+(Sprint 10: 82) with mean pairwise lane spread **16.7** (of ~18 max); a
+lone swept DC covers tissue axis **7..17** where a random walk covers
+12..14.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -733,21 +774,24 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
-| `Sprint11Verification.RunAll` (**new**, Sprint 11) | **26 passed, 0 failed** |
+| `Sprint12Verification.RunAll` (**new**, Sprint 12) | **9 passed, 0 failed** |
+| `Sprint11Verification.RunAll` (Sprint 11) | 26 passed, 0 failed |
 | `RoundVerification.RunAll` (Sprint 9) | 29 passed, 0 failed |
-| `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10) | 37 passed, 0 failed |
+| `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10, +3 Sprint 12) | **40 passed, 0 failed** |
 | `EconomyVerification.RunAll` (Sprint 7) | 47 passed, 0 failed |
 | `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**398 assertions, 0 failed** (Sprint 11 added 26 in `Sprint11Verification`
-— `ShopLedger` spend / refuse / price scaling, the per-tower upgrade
-placeholder leaving `UnitLifecycleTuning` untouched, `KnowledgeLadder`
-thresholds + monotonicity, and the regrowth A/B: a cell ringed by healthy
-tissue regrows in 6.8s vs an isolated one's 20.0s), on a clean working
-tree after every commit.
+**410 assertions, 0 failed** (Sprint 12 added 9 in `Sprint12Verification`
+— cytokine sensing default-on, `EffectiveSharpness` scaling with the
+upgrade level, the `ShopLedger` tracking `CytokineSensingUpgrade`, and a
+higher level biasing `ChooseNextStep` harder toward a source: 3997 vs
+3041 of 4000 picks — plus 3 in `AdaptiveVerification` for the DC patrol
+sweep), on a clean working tree after every commit.
+`CytokineVerification` (the Sprint 1 tuning diagnostic, `RunComparison` /
+sweep methods, no PASS/FAIL) still runs clean.
 
 `RoundVerification` drives `RoundClock` (opens frozen; `Advance` is a
 no-op while frozen, accumulates while running; re-freezing holds the
@@ -866,9 +910,9 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 11)
+### Windows build (Sprint 12)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,353,280 bytes, 0 errors.**
+`BuildScript.BuildWindows()` — **Succeeded, 93,354,304 bytes, 0 errors.**
 Launched headlessly for ~20s: **0 exceptions / 0 errors** — the bootstrap
 diagnostic prints clean (25×10 layout). The game opens in the **frozen**
 buy phase, so a passive launch sits genuinely still — the round-model
@@ -1056,6 +1100,22 @@ exercised here only in the sense that nothing moves.
   tissue "fills in"), but it means the regrow clock isn't a fixed
   countdown — a pocket that loses its healthy border mid-heal slows back
   down.
+- **(New, Sprint 12) The cytokine-sensing upgrade is player-wide, not
+  per-tower.** `Chemotaxis.SensingUpgradeLevel` is one global static
+  affecting every unit at once (unlike the §6d per-tower
+  `UnitLifecycleTuning`). Fine for a "you upgrade your immune system"
+  framing; if it ever needs to be per-tower it moves onto
+  `UnitLifecycleTuning` like the rest.
+- **(New, Sprint 12) The `C` debug OFF-toggle still exists** and still
+  flips *all* sensing off — a player who hits C by accident loses rung 2
+  until they hit it again. It's kept deliberately (the rung-1-vs-2
+  contrast is worth being able to show) but it's a player-reachable
+  footgun.
+- **(New, Sprint 12) `CytokineToggle.Enabled` defaults `true` as a field
+  initializer**, and `Chemotaxis.SensingUpgradeLevel` as a mutable
+  static — a harness that pokes either must restore it
+  (`Sprint12Verification` does; `CytokineVerification` never touches
+  `CytokineToggle`).
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell

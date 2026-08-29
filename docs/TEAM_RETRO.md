@@ -779,3 +779,35 @@ comment that says "no side effect beyond the ledger + wallet", is the
 whole contract. The harness asserts the *negative* -- `UpgradeTower`
 leaves `UnitLifecycleTuning.KillLimit` unchanged -- so a future sprint
 that wires the real effect will trip that assertion and know to update it.
+
+### Sprint 12 — head session (2026-08-29, cytokine on-by-default + the DC movement fix)
+
+Two Sprint 11 playtest fixes.
+
+**"Always on, buy the improvement" is a clean pattern for a binary
+upgrade the player always takes.** Cytokine sensing was an on/off debug
+toggle the Director flipped on every game. Making it default-on and
+turning the *purchase* into a repeatable sharpen (`Chemotaxis.
+SensingUpgradeLevel` → `EffectiveSharpness`) keeps rung 2 in the game
+without a dead "do I turn this on" decision. The `C` toggle stays for the
+rung-1-vs-2 demo. This one shop item is a REAL effect while the rest of
+the Sprint 11 shop is placeholder -- worth a `(REAL)` tag in the UI so a
+playtester isn't confused about which do anything.
+
+**A movement bias that compares COARSE indices barely fires.** Sprint
+10's DC lane-repulsion looked right in the harness (spread 12.4 vs 6.2)
+but was invisible in play. Root cause: it computed `CrossIndex(from.
+ToCoarse(7))` for a *fine* step, so the index only changed when a step
+crossed a coarse-cell boundary -- ~1 step in 7. The fix was
+`BoardConfig.FineCrossIndex` / `FineAxisIndex` (fine-tile analogues) and
+comparing those. After the fix the same test reads 16.7 vs 2.9 and
+co-lane ticks 2 vs 158. **Lesson: if a fine-lattice walker is supposed to
+respond to a gradient/field, compute the response at fine granularity --
+a coarse comparison silently throttles it 7x.**
+
+**The harness passed the whole time.** 250 ticks x 2 steps = 500 steps /
+7 ≈ 71 boundary crossings was *just* enough signal for the directional
+assertions (`coOn < coOff`) to pass on 3 forced-together DCs. A harness
+that asserts "A beats B" can be green while the effect is far too weak to
+see. Where it matters, assert a magnitude floor too (the sweep test does:
+"reaches within 2 of each band edge").
