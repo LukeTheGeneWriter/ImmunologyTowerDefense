@@ -80,11 +80,9 @@ namespace ImmunologyTD.Adaptive
         }
         private readonly List<ActivePair> pairs = new List<ActivePair>();
 
-        // Reused each Tick so Recompute's source enumeration allocates nothing.
+        // Reused each Step so Recompute's source enumeration allocates nothing.
         private readonly List<(CoarseCoord Coord, float Strength)> sourceBuffer =
             new List<(CoarseCoord, float)>(16);
-
-        private float tickAccumulator;
 
         /// <summary>World-space rectangle the node is drawn inside (the lymph
         /// backdrop). Agents render here via <see cref="NodeToWorld"/>.</summary>
@@ -168,20 +166,17 @@ namespace ImmunologyTD.Adaptive
         }
 
         /// <summary>
-        /// One node step: recompute the co-localisation field, resolve and
-        /// form pairings, move residents, age residents out. DCs are moved by
-        /// <see cref="AdaptiveDirector"/> (their state machine also runs a
-        /// tissue-side walk), so this does not step them -- but it does read
-        /// their <see cref="INodeVisitor.NodePos"/> and set their
-        /// <see cref="INodeVisitor.Frozen"/>.
+        /// One logical node step (the tick gate lives in
+        /// <see cref="AdaptiveDirector"/>, which also sub-steps the DCs, so
+        /// there is one clock for the whole arena): recompute the
+        /// co-localisation field, resolve and form pairings, move residents,
+        /// age residents out. DCs are moved by their own
+        /// <c>SimulationTick</c> (their state machine also runs a tissue-side
+        /// walk); this reads their <see cref="INodeVisitor.NodePos"/> and
+        /// sets their <see cref="INodeVisitor.Frozen"/>.
         /// </summary>
-        public void Tick(float deltaTime, float currentTime)
+        public void Step(float currentTime)
         {
-            if (deltaTime <= 0f) return;
-            tickAccumulator += deltaTime;
-            if (tickAccumulator < BoardConfig.TickIntervalSeconds) return;
-            tickAccumulator -= BoardConfig.TickIntervalSeconds;
-
             RecomputeColoc();
             ResolvePairs(currentTime);
             FormPairs(currentTime);

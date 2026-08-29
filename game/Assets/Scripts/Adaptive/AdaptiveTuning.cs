@@ -80,6 +80,12 @@ namespace ImmunologyTD.Adaptive
         /// the neutrophil (3) -- a DC migrates, but it is not fast.</summary>
         public static int DcFineTilesPerTick = 2;
 
+        /// <summary>Softmax sharpness of the DC's axis-frame biased walk when
+        /// travelling to the node (toward the base) and returning (into
+        /// tissue). Higher = straighter. Expressed in the axis frame, never
+        /// a hardcoded direction -- same rule as pathogen advance.</summary>
+        public static float DcAxisWalkBiasSharpness = 1.6f;
+
         // -- The helper-T cell / lymph node (GAME_DESIGN.md §5c) --
 
         /// <summary>A helper-T cell despawns this long after emission, and
@@ -137,6 +143,7 @@ namespace ImmunologyTD.Adaptive
             DcPresentationsPerCargo = 4;
             DcDebrisSamplePerBite = 0.34f;
             DcFineTilesPerTick = 2;
+            DcAxisWalkBiasSharpness = 1.6f;
             LymphocyteLifespanSeconds = 20f;
             LymphocyteFineTilesPerTick = 2;
             PairingSeconds = 1.5f;
