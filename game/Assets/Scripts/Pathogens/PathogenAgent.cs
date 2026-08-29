@@ -278,8 +278,14 @@ namespace ImmunologyTD.Pathogens
             contactFlashTimer = 0f;
             lastSpreadAttemptTime = float.NegativeInfinity;
 
-            restColor = BoardRenderer.PathogenColor; // visible as itself in the channel, whatever its class
+            // Visible as itself in the channel. Sprint 13: class-specific
+            // sprite + colour (virion = cold dot, bacterium = maroon rod).
+            restColor = Class == PathogenClass.IntracellularVirus
+                ? BoardRenderer.VirionColor : BoardRenderer.PathogenColor;
             sr.color = restColor;
+            sr.sprite = Class == PathogenClass.IntracellularVirus
+                ? ImmunologyTD.Rendering.SpriteShapes.Virion
+                : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
             sr.enabled = true;
 
             SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
@@ -958,10 +964,17 @@ namespace ImmunologyTD.Pathogens
         /// now driven by <see cref="IsIntracellular"/>.</summary>
         private void ApplyRestColorForCurrentClass()
         {
-            restColor = IsIntracellular ? BoardRenderer.InfectedHostColor : BoardRenderer.PathogenColor;
+            restColor = IsIntracellular
+                ? BoardRenderer.InfectedHostColor
+                : (Class == PathogenClass.IntracellularVirus ? BoardRenderer.VirionColor : BoardRenderer.PathogenColor);
             if (sr == null) return;
             sr.color = restColor;
             sr.enabled = !IsIntracellular;
+            // Sprint 13: shape by class -- a small cold dot for a free
+            // virion, a maroon rod for either bacterium.
+            sr.sprite = Class == PathogenClass.IntracellularVirus
+                ? ImmunologyTD.Rendering.SpriteShapes.Virion
+                : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
         }
 
         /// <summary>

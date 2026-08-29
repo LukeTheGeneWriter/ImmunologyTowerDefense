@@ -34,17 +34,22 @@ namespace ImmunologyTD.Rendering
     /// </summary>
     public class DegranulationFlash : MonoBehaviour
     {
-        /// <summary>Burst lifetime. Long enough to be unmissable at a
-        /// glance, short enough not to leave visual litter when several
-        /// neutrophils deplete near each other -- a judgment call, see
-        /// docs/TEAM_RETRO.md.</summary>
+        /// <summary>Default burst lifetime. Sprint 13: per-event timing is
+        /// set per-instance in <see cref="Begin"/> (breach fastest, effero
+        /// slowest); this stays as the nominal value / external reference.</summary>
         public const float DurationSeconds = 0.45f;
 
-        /// <summary>Start/end size as a multiple of the size passed to
-        /// Play() (one coarse cell, in practice) -- it starts smaller than
-        /// the cell and blows out well past it.</summary>
-        private const float StartScale = 0.35f;
-        private const float EndScale = 1.6f;
+        // Sprint 13: per-instance so each event can have its own timing/size
+        // as well as its own colour and shape. Defaulted to the old consts.
+        private float durationSeconds = DurationSeconds;
+        private float startScale = 0.35f;
+        private float endScale = 1.6f;
+
+        /// <summary>GAME_DESIGN.md §8: a hard, tunable ceiling on simultaneous
+        /// cosmetic flashes so the pool degrades gracefully under load
+        /// rather than growing unbounded. Requests past this are dropped.</summary>
+        public static int MaxConcurrent = 24;
+        private static int active;
 
         /// <summary>Hot granule yellow-white, deliberately unlike anything
         /// else on the board (host pink, pathogen maroon, macrophage blue,
@@ -107,6 +112,7 @@ namespace ImmunologyTD.Rendering
         public static void Play(Vector3 worldPosition, float worldSize, Color color)
         {
             if (pool == null) return;
+            if (active >= MaxConcurrent) return; // §8 cap -- drop, don't queue
             var go = pool.Get();
             go.transform.position = worldPosition;
             var flash = go.GetComponent<DegranulationFlash>();
@@ -118,22 +124,42 @@ namespace ImmunologyTD.Rendering
             baseSize = worldSize;
             burstColor = color;
             age = 0f;
+            active++;
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            // Sprint 13: shape + timing per event, keyed off the (static
+            // readonly) burst colour, so every Play(...) call site is
+            // unchanged. Ring vs. bloom vs. stipple vs. spiky-star keeps the
+            // five unmistakable when they overlap / on a screenshot / for
+            // colour-blind players.
+            sr.sprite = ShapeFor(color);
             sr.sortingOrder = 30; // above units (10) and pathogens (20)
             sr.color = burstColor;
             sr.enabled = true;
             ApplyScale(0f);
         }
 
+        private Sprite ShapeFor(Color c)
+        {
+            if (Same(c, BreachBurstColor))    { durationSeconds = 0.35f; startScale = 0.40f; endScale = 1.9f; return SpriteShapes.BreachStar; }
+            if (Same(c, EfferocytosisColor))  { durationSeconds = 0.55f; startScale = 0.30f; endScale = 1.3f; return SpriteShapes.EffeBloom; }
+            if (Same(c, StressKillColor))     { durationSeconds = 0.45f; startScale = 0.35f; endScale = 1.6f; return SpriteShapes.StressRing; }
+            if (Same(c, KnowledgeMatchColor)) { durationSeconds = 0.50f; startScale = 0.30f; endScale = 1.4f; return SpriteShapes.KnowledgeRing; }
+            // default = neutrophil degranulation
+            durationSeconds = 0.40f; startScale = 0.35f; endScale = 1.6f;
+            return SpriteShapes.GranuleBurst;
+        }
+
+        private static bool Same(Color a, Color b) =>
+            Mathf.Abs(a.r - b.r) < 0.001f && Mathf.Abs(a.g - b.g) < 0.001f && Mathf.Abs(a.b - b.b) < 0.001f;
+
         private void Update()
         {
             if (sr == null) return;
 
             age += Time.deltaTime;
-            float t = Mathf.Clamp01(age / DurationSeconds);
+            float t = Mathf.Clamp01(age / durationSeconds);
             ApplyScale(t);
 
             var c = burstColor;
@@ -143,6 +169,7 @@ namespace ImmunologyTD.Rendering
             if (t >= 1f)
             {
                 sr = null;
+                active = Mathf.Max(0, active - 1);
                 if (pool != null) pool.Release(gameObject);
                 else gameObject.SetActive(false);
             }
@@ -150,7 +177,7 @@ namespace ImmunologyTD.Rendering
 
         private void ApplyScale(float t)
         {
-            float s = baseSize * Mathf.Lerp(StartScale, EndScale, t);
+            float s = baseSize * Mathf.Lerp(startScale, endScale, t);
             transform.localScale = new Vector3(s, s, 1f);
         }
     }

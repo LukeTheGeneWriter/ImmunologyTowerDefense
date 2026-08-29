@@ -1,39 +1,48 @@
 # UI & Visual Style Guide
 
-Status: **first pass, 2026-08-29 (end of Sprint 11)**, written by the head
-session. Rewritten (not appended) as visual decisions land. This records
-the *current* visual language — 11 sprints of placeholder flat-colour
-rendering and IMGUI HUD — so the planned sprite/art pass has a baseline to
-replace rather than reverse-engineer.
+Status: **rewritten after Sprint 13** (the sprite / visual-identity pass).
+This is "what's on screen now"; `docs/SPRITE_DESIGN.md` is the spec it
+implements and the rationale for every choice. Rewritten (not appended)
+as visual decisions land.
 
-Everything visual today is a **deliberate placeholder**: flat-coloured
-quads and IMGUI text. No imported art assets, no uGUI package. The colours
-below were each chosen for *legibility and mutual distinctness in a
-playtest*, not for a final art direction. `docs/handoff-map01-intestine.md`
-§8 has the intended art direction (histology palette, clinical register)
-for whenever the real pass happens.
+## Direction
 
-## Rendering primitives
+**"A histology plate at a glance; a readable icon up close."** The tissue
+board reads as a stained section — packed eosin-pink host cells, a violet
+bruise where a virus spreads, grey-brown necrotic debris, near-black
+where the sheet is gone — desaturated and clinical, no hazard iconography.
+The mobile agents are the only crisp, saturated, hard-edged shapes on
+top: one silhouette family each, with a thin dark "membrane" rim for
+figure-ground separation. Identity survives downscaling to ~14–22 px via
+four channels: **silhouette family**, **hue**, **footprint size**, and
+**movement behaviour** (the sim already does the last one). Interior
+detail (nuclei, stipple, inclusion bodies) only resolves up close and is
+never load-bearing.
 
-- **`RuntimeSprites.SquareSprite`** — one cached procedurally-generated
-  white sprite (4×4 texture), tinted per-instance via
-  `SpriteRenderer.color`. Every game object on screen is this quad in a
-  different colour/scale. A sprite pass replaces the `sprite` assignment
-  (and probably the per-class colour constants) — the *positions, scales,
-  and sorting orders* below are the contract to preserve.
-- **Two-resolution lattice** (`GAME_DESIGN.md` §7): coarse cell = 7×7 fine
-  tiles; `FineTileWorldSize` 0.16 world units; coarse cell = 1.12 world
-  units. Units/pathogens sit at coarse-cell centres or walk the fine grid;
-  sprites tween between grid positions so movement isn't steppy.
-- **Camera**: orthographic, background `(0.05, 0.05, 0.07)` near-black,
-  fitted to the board each launch (+ a one-frame-later refit).
+## How sprites work
 
-## Sorting order (z-layering, back to front)
+- **`ImmunologyTD.Rendering.SpriteShapes`** — ~20 procedurally-drawn
+  64×64 `Texture2D` shapes, generated once at first access, cached in
+  lazy statics (the `RuntimeSprites` pattern). Drawn **white with the
+  silhouette in the alpha channel**, so the per-instance
+  `SpriteRenderer.color` multiply produces the class hue and every state
+  tint (cargo, paired, infected, cytokine heat, contact flash) keeps
+  working with no code change. `RuntimeSprites.SquareSprite` remains as a
+  fallback.
+- A swap is `sr.sprite = SpriteShapes.Foo` and nothing else — no
+  `sortingOrder`, no `localScale` magnitude, no `color` hook changes.
+- **Per-instance variation** (subtle): a one-time random spin + ±8%
+  non-uniform scale jitter on `SearchUnit` / food, and a deterministic
+  ±3% per-cell colour jitter (`BoardRenderer.CellJitter`) on the host
+  grid. Set once, zero per-frame cost.
+
+## Sorting order (z-layering, back to front) — unchanged
 
 | Order | What |
 |---|---|
 | 0 | Host-cell background grid (`BoardRenderer`, one `SpriteRenderer` per coarse cell) |
 | 1 | Compartment backdrops (bone marrow, lymph node) |
+| 3 | Gut-wall bar (`GutInterfaceRenderer`) |
 | 5 | Bone-marrow slots |
 | 10 | Immune cells (`SearchUnit`) |
 | 12 | Lymphocytes (in the node) |
@@ -42,81 +51,54 @@ for whenever the real pass happens.
 | 22 | The contaminated food item |
 | 30 | Effect flashes (`DegranulationFlash`) |
 
-## Colour palette (current placeholders)
+## Entity sprites & palette (as shipped)
 
-### Host-cell grid (`BoardRenderer`)
+| Entity | `SpriteShapes` | Colour (0–1 RGB) | Silhouette |
+|---|---|---|---|
+| Host cell — Healthy | `HostCell` | `0.80,0.62,0.66` eosin pink | rounded opaque tile, dark 1px rim, faint nucleus |
+| Host cell — Infected (viral) | `HostCellInfectedViral` | `0.54,0.36,0.60` bruised violet | tile + a crisp opaque **inclusion-body disc** + inset border |
+| Host cell — Infected (bacterial) | `HostCellInfectedBacterial` | `0.62,0.60,0.26` sickly yellow-green | tile + **purulent stipple** interior + inset border |
+| Host cell — Dead | `Debris` | `0.38,0.34,0.28` grey-brown | cluster of small fragments, not a whole cell |
+| Host cell — Empty | `EmptyPit` | `0.13,0.11,0.12` near-black | mostly transparent, faint pit |
+| Macrophage | `Macrophage` | `0.30,0.40,0.80` blue | large ruffled amoeboid blob, footprint 5 |
+| Neutrophil | `Neutrophil` | **`0.93,0.74,0.30` gold** *(nudged from amber, Sprint 13)* | compact disc, multi-lobed nucleus hint, footprint 3 |
+| Dendritic cell | `DendriteStar` / `DendriteStarLoaded` | `0.72,0.30,0.68` magenta → `0.98,0.62,0.98` carrying antigen | spiky ~9-point star; loaded variant adds a bright core |
+| Helper-T lymphocyte | `Lymphocyte` | `0.32,0.72,0.70` teal → `0.82,0.94,0.92` paired | nucleus-heavy circle, thin cytoplasm rim (node only) |
+| Large bacterium | `LargeBacterium` | `0.42,0.12,0.16` dark maroon | maroon rod / capsule, random rotation, footprint 3.5 |
+| Free virus particle | `Virion` | **`0.40,0.16,0.34` cold purple** *(split from `PathogenColor`, Sprint 13)* | small crisp dot |
+| Intracellular pathogen | *no sprite* (`sr.enabled=false`) | — | conveyed **only** by the host-cell background (§4a) |
+| Contaminated food item | `FoodBolus` | `0.55,0.47,0.28` ochre | lumpy stippled bolus, 1.4× a coarse cell |
+| Bone-marrow backdrop | `MarrowRegion` | `0.30,0.24,0.16` brown | trabecular sponge texture |
+| Bone-marrow slot | `SlotNiche` | `0.62,0.56,0.42` tan → unit colour when placed | recessed rounded socket |
+| Lymph-node backdrop | `LymphNodeBean` | `0.34,0.40,0.28` lymphoid green | bean / ellipse + 2 faint follicle zones |
+| Gut-wall bar | `EpithelialBar` | `0.55,0.47,0.40` quiet → `0.95,0.30,0.20` alarm | row-of-cells epithelial strip; thicken+heat animation unchanged |
 
-| Role | RGB | Note |
+Cytokine heat tint (`1.00,0.55,0.05`, up to 65% blend) is applied by
+`BoardRenderer` **after** sprite/colour selection, unchanged.
+
+## Effect flashes — five distinct silhouettes (`DegranulationFlash`)
+
+Each event now has its own shape **and** timing, not just colour — so
+they stay unmistakable overlapping, on a screenshot, and for colour-blind
+players. Selected in `ShapeFor(color)` keyed off the burst colour.
+
+| Event | Colour | Shape / timing |
 |---|---|---|
-| `HostColor` — healthy | `0.80, 0.62, 0.66` | eosin-ish pink |
-| `InfectedHostColor` — viral | `0.54, 0.36, 0.60` | bruised violet |
-| `InfectedByBacteriumColor` | sickly yellow-green | tells a bacterial infection from a viral one |
-| `DebrisColor` — dead | `0.38, 0.34, 0.28` | grey-brown |
-| `EmptyGroundColor` | `0.13, 0.11, 0.12` | near-black bare ground |
-| cytokine heat tint | `1.00, 0.55, 0.05` | warm, blended up to 65% at full field strength; always visible |
+| Neutrophil degranulation | `1.00,0.97,0.72` yellow-white | scattered granule stipple, ~0.40s |
+| Gut-wall breach | `1.00,0.35,0.22` hot red | jagged spiky starburst, ~0.35s, largest |
+| Efferocytosis (pile cleared) | `0.45,0.80,0.68` blue-green | soft filled bloom, ~0.55s, smallest |
+| Stress-sense loud kill (§4b) | `0.95,0.40,0.80` magenta | shockwave ring + core, ~0.45s, 1.5× |
+| Knowledge match (§5c) | `0.40,0.92,0.45` green | clean thin ring + dot, ~0.50s |
 
-### Units & agents
+`DegranulationFlash.MaxConcurrent` (24) caps simultaneous flashes
+(`GAME_DESIGN.md` §8) — requests past it are dropped.
 
-| Thing | RGB | Footprint (fine tiles) |
-|---|---|---|
-| Macrophage | `0.30, 0.40, 0.80` blue | 5 |
-| Neutrophil | `0.95, 0.78, 0.25` amber | 3 |
-| Dendritic cell | `0.72, 0.30, 0.68` magenta (→ `0.98, 0.62, 0.98` carrying antigen) | 4 |
-| Lymphocyte (helper-T) | `0.32, 0.72, 0.70` teal (→ near-white `0.82, 0.94, 0.92` while paired) | small, node-scaled |
-| Pathogen (large bacterium) | dark maroon `PathogenColor` | 3.5 |
-| Pathogen (intracellular) | **sprite disabled** — the coarse-cell background is the only tell | — |
-| Contaminated food item | `0.55, 0.47, 0.28` dull ochre | 1.4× a coarse cell |
+**F9** in a build fires all five at once for a look.
 
-### Effect flashes (`DegranulationFlash`) — each event a distinct colour, on purpose
+## HUD / panels — IMGUI (`OnGUI`), unchanged this pass
 
-| Event | RGB |
-|---|---|
-| Neutrophil degranulation | `1.00, 0.97, 0.72` granule yellow-white |
-| Gut-wall breach burst | `1.00, 0.35, 0.22` hot red |
-| Efferocytosis (pile finished) | `0.45, 0.80, 0.68` calm blue-green |
-| Stress-sense loud kill (§4b) | `0.95, 0.40, 0.80` magenta, played 1.5× size |
-| Knowledge match (§5c) | `0.40, 0.92, 0.45` bright green |
-
-Burst is a 0.45s expanding, fading square (`StartScale` 0.35 → `EndScale`
-1.6 of the passed size), pooled.
-
-### Compartments
-
-- Bone-marrow backdrop `0.30, 0.24, 0.16` brown; empty slot `0.62, 0.56,
-  0.42` tan; a placed slot recolours to its unit's colour.
-- Lymph-node backdrop `0.34, 0.40, 0.28` pale lymphoid green.
-
-## HUD / panels — IMGUI (`OnGUI`)
-
-No `com.unity.ugui` in the manifest (adding it is a conscious
-network-requiring step). Everything is `GUI.Label` / `GUI.Button` /
-`GUI.Box` over dark dimming rectangles.
-
-- **Text**: white, `GUI.skin.label`, `fontSize` 18; 24 bold for the
-  top-line ATP/Lives readout. Buttons `fontSize` 13.
-- **Dimming panels**: black at 0.72–0.78 alpha behind every text block, so
-  the readout stays legible over the board.
-- **Debug panel** (top-left, ~1180×392): sprint title, board dims,
-  cytokine toggle state, population / pathogen / invasion / KNOWLEDGE /
-  frame-cost lines.
-- **Round bar** (top-right, ~380×150): ATP · Lives, round + phase, the
-  round tagline, the buy-phase prompt + Start button / GAME OVER.
-- **Shop panel** (left, buy-phase only): one row per `ShopItem`, priced,
-  greyed when unaffordable.
-- **Marrow picker / upgrade panel**: anchored to the clicked slot's world
-  position via `Camera.main.WorldToScreenPoint`.
-
-## For the sprite / art pass
-
-- Replace `RuntimeSprites.SquareSprite` usage (or make it a fallback);
-  keep the per-instance tint hook so state changes (cargo, paired,
-  infected) still read.
-- Preserve the sorting-order table and the fine-tile footprint sizes.
-- The **intracellular-pathogen "invisible sprite"** rule matters: an
-  established infection must read as the *host cell*, not the pathogen,
-  until sensed (`GAME_DESIGN.md` §4a). Don't give it its own sprite.
-- The **five flash colours must stay mutually unmistakable** — one is the
-  player winning (efferocytosis, knowledge), one is losing (breach).
-- IMGUI is fine to keep for the debug HUD; a real buy UI is the point at
-  which installing uGUI or committing to UI Toolkit is a conscious call
-  (see `docs/TEAM_RETRO.md` Sprint 1).
+No `com.unity.ugui`. White text (`fontSize` 18; 24 bold for ATP/Lives;
+13 buttons) over dark dimming panels (black 0.72–0.78 α). Debug panel
+top-left, round bar top-right, shop panel left (buy phase), marrow
+picker/upgrade panel anchored to the clicked slot. A real buy UI (uGUI /
+UI Toolkit) is still a future sprint — see `BACKLOG.md`.

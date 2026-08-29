@@ -139,24 +139,34 @@ batchmode). So:
   `sr.sprite` swaps and the flash cap, nothing else.
 - **Camera / zoom / lighting changes.**
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-29
 
-- [ ] `SpriteShapes.cs` compiles and is committed; `RuntimeSprites.SquareSprite`
-      still present as the fallback.
-- [ ] Every entity (host-cell states, macrophage, neutrophil, DC,
-      lymphocyte, large bacterium, free virion, food item, marrow/lymph
-      backdrops, gut-wall bar) draws its shape sprite; every per-instance
-      tint / state change still reads.
-- [ ] The five flashes are distinguishable (by shape if Q4 = yes, by
-      colour + location otherwise); the concurrent cap is in if Q6 = now.
-- [ ] Intracellular infection still shows **only** as the host-cell
-      background (§4a) — verified in a build screenshot.
-- [ ] Everything from Sprints 1–12 still works — all ten harnesses re-run
-      green (rendering changes shouldn't touch them; confirm).
-- [ ] Clean Windows build, 0 exceptions, **a screenshot** in the CHANGELOG
-      handoff. `UI_STYLE_GUIDE.md` rewritten; `ENGINE_STATUS.md` /
-      `INTERFACE.md` / `CHANGELOG.md` / `BACKLOG.md` / `TEAM_RETRO.md`
-      updated.
+- [x] `SpriteShapes.cs` compiles and is committed; `RuntimeSprites.SquareSprite`
+      kept as the fallback. (Design agent's prototype + the two infection
+      shapes; compiles clean.)
+- [x] Every entity swapped to its shape sprite with **no** sortingOrder /
+      localScale-magnitude / colour-hook change — units, pathogens, food,
+      DC (+ loaded variant), lymphocyte, the four host-cell states (with
+      the viral/bacterial texture split), marrow/lymph backdrops, marrow
+      slots, gut-wall bar. Per-instance variation (subtle) on units/food;
+      per-cell mottle on the grid.
+- [x] Five distinct flash silhouettes + per-event timing via `ShapeFor`;
+      `DegranulationFlash.MaxConcurrent` (24) cap added.
+- [~] Intracellular infection still shows only as the host-cell
+      background — `sr.enabled = !IsIntracellular` untouched; **needs the
+      Director's screenshot** to confirm on screen.
+- [x] All ten harnesses re-run green — **410, 0 failed** (rendering-only,
+      no harness path touched).
+- [x] Clean Windows build (93,367,104 bytes, 0 errors), headless launch 0
+      exceptions (`SpriteShapes` generation runs clean).
+      `UI_STYLE_GUIDE.md` rewritten to "what's on screen now";
+      `SPRITE_DESIGN.md` / `ENGINE_STATUS.md` / `INTERFACE.md` /
+      `CHANGELOG.md` / `BACKLOG.md` / `TEAM_RETRO.md` updated.
+- [ ] **A screenshot.** The scripted capture tooling didn't cooperate;
+      handoff is the build + the F9 flash-preview key. **How it looks is
+      the Director's playtest.**
+
+**Handed to the Director for playtest.**
 
 ## Process note
 

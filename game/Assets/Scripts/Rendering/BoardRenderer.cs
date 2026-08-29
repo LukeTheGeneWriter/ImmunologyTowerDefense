@@ -37,6 +37,12 @@ namespace ImmunologyTD.Rendering
         public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, a HEALTHY host cell
         public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- pathogens visible as themselves
 
+        /// <summary>Sprint 13: a free (extracellular) virus particle. A
+        /// colder purple-maroon -- same "foreign dark-red/violet" family as
+        /// PathogenColor but distinct enough that "virus" (small cold dot)
+        /// and "bacterium" (maroon rod) read apart at a glance.</summary>
+        public static readonly Color VirionColor = new Color(0.40f, 0.16f, 0.34f);
+
         /// <summary>An INFECTED host cell (GAME_DESIGN.md section 1c). A
         /// bruised violet: recognisably still tissue (same value as
         /// HostColor, so it does not read as a hole) but off-hue enough that
@@ -134,16 +140,35 @@ namespace ImmunologyTD.Rendering
                 {
                     var coord = new CoarseCoord(col, row);
                     var hostState = isHostGround[col, row] ? tissueGrid.GetHostState(coord) : HostState.Empty;
+                    var resident = isHostGround[col, row] && hostState == HostState.Infected
+                        ? tissueGrid.GetIntracellularAt(coord) : null;
+                    bool bacterial = resident != null && resident.Class == PathogenClass.IntracellularBacterium;
+
                     Color baseColor;
                     if (!isHostGround[col, row])
                         baseColor = baseColors[col, row];
                     else if (hostState == HostState.Infected)
-                        baseColor = InfectedColorFor(tissueGrid.GetIntracellularAt(coord)); // §4b: viral vs. bacterial tint
+                        baseColor = InfectedColorFor(resident); // §4b: viral vs. bacterial tint
                     else
                         baseColor = HostStateColor(hostState);
 
                     var pathogen = tissueGrid.GetOccupantAt(coord);
                     if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
+
+                    // Sprint 13: the host-state sprite alongside the colour.
+                    if (isHostGround[col, row])
+                    {
+                        views[col, row].sprite =
+                            hostState == HostState.Healthy ? SpriteShapes.HostCell :
+                            hostState == HostState.Dead    ? SpriteShapes.Debris :
+                            hostState == HostState.Empty   ? SpriteShapes.EmptyPit :
+                            bacterial ? SpriteShapes.HostCellInfectedBacterial : SpriteShapes.HostCellInfectedViral;
+                    }
+
+                    // Sprint 13: a tiny deterministic per-cell value jitter so
+                    // the sheet reads as a histology plate, not a flat wash.
+                    baseColor *= 1f + CellJitter(col, row);
+                    baseColor.a = 1f;
 
                     float intensity = Mathf.Clamp01(cytokineField.CoarseValueAt(coord) / TissueGrid.MaxSecretionStrength);
                     views[col, row].color = Color.Lerp(baseColor, HotColor, intensity * HeatmapBlendMax);
@@ -158,6 +183,16 @@ namespace ImmunologyTD.Rendering
         /// side-effect-free so a harness can assert the four are actually
         /// distinct without binding a SpriteRenderer array.
         /// </summary>
+        /// <summary>Sprint 13: a deterministic ±3% multiplier per coarse
+        /// cell, so 4,000 identical tiles get a subtle histology-plate
+        /// mottle. Pure function of (col,row); no allocation, no RNG.</summary>
+        private static float CellJitter(int col, int row)
+        {
+            uint h = (uint)(col * 73856093 ^ row * 19349663);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return ((h & 0xFFFFu) / 65535f - 0.5f) * 0.06f;
+        }
+
         public static Color HostStateColor(HostState state)
         {
             switch (state)

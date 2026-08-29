@@ -265,6 +265,20 @@ namespace ImmunologyTD.Rendering
             if (shop != null)
                 Chemotaxis.SensingUpgradeLevel = shop.LevelOf(ShopItem.CytokineSensingUpgrade);
 
+            // Sprint 13: F9 fires all five effect flashes in a row across the
+            // tissue band, for a single-frame visual QA of the flash shapes.
+            if (board != null && Input.GetKeyDown(KeyCode.F9))
+            {
+                float sz = BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision;
+                int mid = board.Rows / 2;
+                int c0 = board.Columns / 2 - 6;
+                DegranulationFlash.Play(board.CoarseToWorldCenter(new CoarseCoord(c0 + 0, mid)), sz, DegranulationFlash.GranuleBurstColor);
+                DegranulationFlash.Play(board.CoarseToWorldCenter(new CoarseCoord(c0 + 3, mid)), sz, DegranulationFlash.BreachBurstColor);
+                DegranulationFlash.Play(board.CoarseToWorldCenter(new CoarseCoord(c0 + 6, mid)), sz, DegranulationFlash.EfferocytosisColor);
+                DegranulationFlash.Play(board.CoarseToWorldCenter(new CoarseCoord(c0 + 9, mid)), sz * 1.5f, DegranulationFlash.StressKillColor);
+                DegranulationFlash.Play(board.CoarseToWorldCenter(new CoarseCoord(c0 + 12, mid)), sz, DegranulationFlash.KnowledgeMatchColor);
+            }
+
             // Exponential smoothing; unscaledDeltaTime so a future pause or
             // speed control doesn't distort the reading.
             float frameMs = Time.unscaledDeltaTime * 1000f;

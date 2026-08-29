@@ -12,6 +12,47 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 13 -- 2026-08-29
+The board has a face now. Everything was a flat tinted square; a
+dispatched design agent wrote the visual-identity spec
+(`docs/SPRITE_DESIGN.md`) and this sprint implements it.
+
+**Direction: "a histology plate at a glance, a readable icon up close."**
+The tissue reads like a stained section -- packed pink host cells, a
+violet bruise where a virus spreads, grey-brown necrotic debris -- and
+the mobile agents are the only crisp saturated shapes on top: macrophage
+= ruffled blob, neutrophil = lobed-nucleus disc, dendritic cell = spiky
+star (bright core when carrying antigen), helper-T = nucleus-heavy
+circle, large bacterium = maroon rod, free virus = a small cold-purple
+dot, the food item = a lumpy stippled bolus. Each drawn once at boot as
+a ~64px procedural texture and tinted per-instance exactly as before, so
+every state change (cargo, paired, infected, cytokine heat, contact
+flash) still reads.
+
+- **Palette:** only the two flagged colours moved -- neutrophil amber →
+  gold (away from hazard-orange), and the free virus particle → its own
+  cold purple so virus and bacterium separate at a glance.
+- **Host-cell grid:** four distinct sprites for the four states; infected
+  cells get a texture split (swollen inclusion for viral, purulent
+  stipple for bacterial) on top of the violet / yellow-green hue; a tiny
+  deterministic per-cell jitter gives the sheet a histology mottle.
+- **Compartments:** the lymph node is a bean with follicle zones, the
+  bone marrow a trabecular sponge, the marrow slots recessed sockets,
+  the gut wall a row-of-cells epithelial strip (the thicken+heat breach
+  animation untouched).
+- **The five effect flashes** now have distinct silhouettes AND timings,
+  not just colours -- granule stipple, jagged breach star, soft
+  efferocytosis bloom, stress-kill shockwave ring, clean knowledge ring
+  -- so they stay unmistakable when they overlap and for colour-blind
+  players. And a hard cap on concurrent flashes (`GAME_DESIGN.md` §8).
+- **F9** in a build fires all five flashes at once for a look.
+
+Verified: all ten harnesses still green (**410 total, 0 failed** --
+rendering has no headless coverage), and a headless launch is clean (0
+exceptions -- the procedural texture generation runs without throwing).
+**Not** verified: how it actually *looks* -- that's the Director's
+screenshot, same as every rendering change in this project.
+
 ## Sprint 12 -- 2026-08-29
 Two fixes from the Sprint 11 playtest.
 

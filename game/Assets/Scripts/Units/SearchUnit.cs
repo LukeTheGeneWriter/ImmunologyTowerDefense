@@ -151,12 +151,18 @@ namespace ImmunologyTD.Units
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = profile.Shape != null ? profile.Shape : RuntimeSprites.SquareSprite; // Sprint 13
             sr.color = profile.Color; // full reset: a recycled unit must not carry a flash tint or faded alpha
             sr.enabled = true;
             sr.sortingOrder = 10;
             float worldSize = BoardConfig.FineTileWorldSize * Mathf.Max(1, profile.FootprintFineTiles);
-            transform.localScale = new Vector3(worldSize, worldSize, 1f);
+            // Sprint 13: subtle one-time per-instance variation so a cluster
+            // doesn't look stamped -- random spin + a small non-uniform
+            // scale jitter, set once here (no per-frame cost).
+            transform.localRotation = Quaternion.Euler(0f, 0f, Random.value * 360f);
+            transform.localScale = new Vector3(
+                worldSize * Random.Range(0.92f, 1.08f),
+                worldSize * Random.Range(0.92f, 1.08f), 1f);
 
             tickStartWorld = tickEndWorld = board.FineToWorld(Current);
             transform.position = tickStartWorld;

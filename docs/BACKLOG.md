@@ -613,3 +613,33 @@ drive nothing. Each purchase's real mechanic (design in GAME_DESIGN.md
   spends most of its life shuttling. If the patrol behaviour still reads
   as under-used after Sprint 12, consider letting a DC sample several
   piles before heading to the node (a cargo capacity > 1).
+
+## Opened / updated by Sprint 13 (2026-08-29) — the sprite pass shipped
+
+Procedural shape sprites replaced the flat quad for every entity. What's
+left / flagged (from `docs/SPRITE_DESIGN.md` §6 and the implementation):
+
+- **Visual QA is the Director's.** Nothing headless covers rendering.
+  Whether the four host states read apart, agents are legible at ~14 px,
+  the flash shapes are distinct, and the palette nudges landed -- all a
+  screenshot check. `SpriteShapes.cs` came from a dispatched agent,
+  "compiles + launches clean" but unseen.
+- **`SPRITE_DESIGN.md` §6 open questions the Director hasn't ruled on:**
+  exact per-cell mottle amount (shipped ±3%), the flash timing values
+  (shipped the agent's suggestions), whether a filled marrow slot should
+  draw the *placed unit's* shape (not done -- slot just recolours),
+  whether the free-virion facet hint / other interior details are worth
+  adding.
+- **`SpriteShapes.Prewarm()` is not called** -- generation happens lazily
+  (macrophage/neutrophil in `Awake`, the rest on first spawn of each
+  kind), so there's a tiny first-of-kind hitch. Call `Prewarm()` in
+  bootstrap if that reads badly.
+- **`DegranulationFlash.ShapeFor` matches on burst colour** rather than a
+  `Shape` enum -- fine while the five colours are far apart, brittle if a
+  sixth event lands near one.
+- **A real buy UI** (uGUI or UI Toolkit). The shop / marrow picker /
+  upgrade panel / HUD are all IMGUI placeholders. The natural companion
+  to a visual pass; its own sprint. Installing `com.unity.ugui` is a
+  network-requiring, conscious step (`TEAM_RETRO.md` Sprint 1).
+- **Authored art / an asset pipeline** -- deferred; the procedural
+  approach is the fit until a real artist joins (`SPRITE_DESIGN.md` §4).

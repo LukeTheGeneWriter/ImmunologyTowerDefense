@@ -57,7 +57,7 @@ namespace ImmunologyTD.Rendering
                 go.transform.SetParent(container, false);
                 go.transform.position = board.InterfaceWorldCenter(position);
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = RuntimeSprites.SquareSprite;
+                sr.sprite = SpriteShapes.EpithelialBar; // Sprint 13 -- row-of-cells skin; Refresh() scale/colour maths untouched
                 sr.sortingOrder = 3; // above the cell quads (0), below pathogens (20)
                 bars[position] = sr;
             }

@@ -1526,6 +1526,66 @@ upgrade level biasing `ChooseNextStep` harder toward a source.
 `AdaptiveVerification` grew 3 (37 → 40) for the DC patrol sweep (a lone
 DC paces the band depth; a random walk doesn't).
 
+## Sprint 13 changes — the sprite / visual-identity pass
+
+Design: `docs/SPRITE_DESIGN.md`. Rendering-only — no gameplay, tuning, or
+harness surface changes.
+
+### `ImmunologyTD.Rendering.SpriteShapes` (new)
+
+Static class, lazy-static-cached like `RuntimeSprites`. Public `Sprite`
+accessors: `Macrophage`, `Neutrophil`, `DendriteStar`,
+`DendriteStarLoaded`, `Lymphocyte`, `LargeBacterium`, `Virion`,
+`FoodBolus`, `HostCell`, `HostCellInfectedViral`,
+`HostCellInfectedBacterial`, `Debris`, `EmptyPit`, `SlotNiche`,
+`EpithelialBar`, `MarrowRegion`, `LymphNodeBean`, `GranuleBurst`,
+`BreachStar`, `EffeBloom`, `StressRing`, `KnowledgeRing`; plus
+`void Prewarm()`. Each a 64×64 white-with-alpha `Texture2D` →
+`Sprite.Create(..., 64 PPU)`. Every consumer swaps only `sr.sprite`;
+`SpriteRenderer.color` stays the hue/state channel.
+
+### `UnitProfile`
+
+- **`[System.NonSerialized] public Sprite Shape`** — the kind's shape
+  sprite, assigned by `GameBootstrap.Awake` (`SpriteShapes.Macrophage` /
+  `.Neutrophil`), read by `SearchUnit` (null → `RuntimeSprites.SquareSprite`).
+
+### `BoardRenderer`
+
+- **`static readonly Color VirionColor`** (`0.40,0.16,0.34`) — a free
+  virus particle, distinct from `PathogenColor` maroon.
+- `Refresh` sets `views[c,r].sprite` per host state (`HostCell` /
+  `HostCellInfectedViral` / `HostCellInfectedBacterial` / `Debris` /
+  `EmptyPit`) alongside the colour, and multiplies `baseColor` by a
+  private static `CellJitter(col,row)` (deterministic ±3%).
+
+### `PathogenAgent`
+
+- `Initialize` / `ApplyRestColorForCurrentClass` now also set `sr.sprite`
+  and `restColor` by `Class` — `IntracellularVirus` → `Virion` +
+  `VirionColor`; either bacterium → `LargeBacterium` + `PathogenColor`.
+  `sr.enabled = !IsIntracellular` unchanged.
+
+### `DegranulationFlash`
+
+- `const DurationSeconds` kept (external reference / nominal); new
+  per-instance `durationSeconds` / `startScale` / `endScale`, set by
+  `Sprite ShapeFor(Color)` which also returns the silhouette, keyed off
+  the five `static readonly` burst colours (`Same()` within 0.001/ch).
+  Every `Play(...)` call site unchanged.
+- **`static int MaxConcurrent`** (24) + a private `static int active` —
+  `Play` returns without spawning past the cap (`GAME_DESIGN.md` §8).
+
+### `HudOverlay`
+
+- `Update` — `KeyCode.F9` plays all five flashes across the tissue band
+  (visual QA; no gameplay effect).
+
+### Verification
+
+No new harness — rendering isn't headlessly testable. All ten existing
+harnesses re-run green (410); headless launch clean.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

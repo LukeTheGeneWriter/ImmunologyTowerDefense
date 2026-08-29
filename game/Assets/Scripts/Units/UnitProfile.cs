@@ -34,6 +34,13 @@ namespace ImmunologyTD.Units
         [Min(1)] public int FootprintFineTiles = 3;
         public Color Color = Color.white;
 
+        /// <summary>Sprint 13: the procedurally-drawn shape sprite for this
+        /// kind (`ImmunologyTD.Rendering.SpriteShapes`). Not serializable
+        /// (a runtime-generated `Sprite`), so `GameBootstrap` assigns it in
+        /// `Awake` after the profiles exist; `SearchUnit` reads it. Null
+        /// falls back to `RuntimeSprites.SquareSprite`.</summary>
+        [System.NonSerialized] public Sprite Shape;
+
         [Header("Lifecycle defaults (seed a tower's own mutable copy)")]
 
         /// <summary>Default max simultaneously-alive children per tower of

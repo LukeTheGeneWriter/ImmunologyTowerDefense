@@ -63,7 +63,8 @@ namespace ImmunologyTD.Bootstrap
             DisplayName = "Neutrophil",
             FineTilesPerTick = 3,
             FootprintFineTiles = 3,
-            Color = new Color(0.95f, 0.78f, 0.25f),
+            Color = new Color(0.93f, 0.74f, 0.30f), // Sprint 13: nudged amber -> gold, away from hazard-orange
+
             MaxActiveChildren = 10,
             KillLimit = 5,
             DegranulatesOnDepletion = true,
@@ -135,6 +136,12 @@ namespace ImmunologyTD.Bootstrap
         {
             board = GetComponent<BoardConfig>();
             WarnOnDegenerateBands();
+
+            // Sprint 13: the procedural shape sprites for each unit kind
+            // (runtime-generated, so not settable in the serialized profile
+            // initializer -- see UnitProfile.Shape).
+            macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
+            neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
             tissueGrid = new TissueGrid(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
@@ -335,7 +342,7 @@ namespace ImmunologyTD.Bootstrap
                     cellGo.transform.position = board.CoarseToWorldCenter(new CoarseCoord(col, row));
                     cellGo.transform.localScale = new Vector3(size, size, 1f);
                     var sr = cellGo.AddComponent<SpriteRenderer>();
-                    sr.sprite = RuntimeSprites.SquareSprite;
+                    sr.sprite = ImmunologyTD.Rendering.SpriteShapes.HostCell; // Sprint 13 -- BoardRenderer overrides per host state
                     sr.sortingOrder = 0;
                     views[col, row] = sr;
                 }
@@ -358,7 +365,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.position = layout.MarrowBackdropCenter;
             go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 -- trabecular texture
             sr.color = new Color(0.30f, 0.24f, 0.16f); // bone-marrow brown, distinct from the base band's blue-violet
             sr.sortingOrder = 1;
 
@@ -374,7 +381,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.position = layout.LymphCenter;
             go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 -- bean silhouette + follicles
             sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
             sr.sortingOrder = 1;
 

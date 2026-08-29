@@ -101,7 +101,7 @@ namespace ImmunologyTD.Adaptive
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = SpriteShapes.DendriteStar; // Sprint 13
             sr.color = EmptyColor;
             sr.enabled = true;
             sr.sortingOrder = 13;
@@ -134,7 +134,11 @@ namespace ImmunologyTD.Adaptive
             }
 
             tweenEnd = WorldPos();
-            if (sr != null) sr.color = HasCargo ? CargoColor : EmptyColor;
+            if (sr != null)
+            {
+                sr.color = HasCargo ? CargoColor : EmptyColor;
+                sr.sprite = HasCargo ? SpriteShapes.DendriteStarLoaded : SpriteShapes.DendriteStar; // Sprint 13
+            }
         }
 
         private void TickPatrol(float currentTime)
