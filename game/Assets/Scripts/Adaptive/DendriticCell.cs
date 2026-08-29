@@ -245,6 +245,7 @@ namespace ImmunologyTD.Adaptive
         private void Update()
         {
             if (tissueBoard == null) return;
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: freeze mid-glide during the buy phase
             tweenTimer += Time.deltaTime;
             float t = Mathf.Clamp01(tweenTimer / BoardConfig.TickIntervalSeconds);
             transform.position = Vector3.Lerp(tweenStart, tweenEnd, t);

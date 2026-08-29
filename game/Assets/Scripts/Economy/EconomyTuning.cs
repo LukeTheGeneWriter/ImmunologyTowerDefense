@@ -58,9 +58,13 @@ namespace ImmunologyTD.Economy
 
         /// <summary>Round N's batch is <c>BatchSizeBase + (N-1) *
         /// BatchSizeGrowthPerRound</c> pathogens. Linear growth only --
-        /// real per-round composition is out of scope for the framework.</summary>
-        public static int BatchSizeBase = 8;
-        public static int BatchSizeGrowthPerRound = 3;
+        /// real per-round composition is a light per-class mix in
+        /// <c>RoundScript</c>; a real difficulty curve is still out of scope.
+        /// **Sprint 9 doubled these (8/3 -> 16/6)** on the Director's note
+        /// that rounds were too easy. Round 1 = 16, round 5 = 40. Still a
+        /// placeholder.</summary>
+        public static int BatchSizeBase = 16;
+        public static int BatchSizeGrowthPerRound = 6;
 
         /// <summary>Batch size for round <paramref name="roundNumber"/>
         /// (1-based). Clamped at 1.</summary>
@@ -83,8 +87,8 @@ namespace ImmunologyTD.Economy
             StartingLives = 100;
             LifeRegenRounds = 2;
             LifeRegenAmount = 1;
-            BatchSizeBase = 8;
-            BatchSizeGrowthPerRound = 3;
+            BatchSizeBase = 16;
+            BatchSizeGrowthPerRound = 6;
         }
     }
 }

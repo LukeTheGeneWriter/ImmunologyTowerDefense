@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Pooling;
+using ImmunologyTD.Rendering;
+using ImmunologyTD.Rounds;
 
 namespace ImmunologyTD.Pathogens
 {
@@ -66,6 +68,26 @@ namespace ImmunologyTD.Pathogens
         private int batchTarget;
         private int batchEmitted;
 
+        // -- Sprint 9: the contaminated food item --
+        //
+        // BeginRound(count, def) sets foodRound = true and spawns a single
+        // food item that transits the lumen, releasing the batch in bursts
+        // near the wall. Under a food round the round ends when the food has
+        // EXITED, not when the field is clear (the field persists now). The
+        // plain BeginBatch(count) path keeps its old field-clear completion,
+        // for the harnesses.
+        private bool foodRound;
+        private bool foodActive;
+        private bool foodExited;
+        private RoundDefinition foodDef;
+        private int foodAxisIndex;   // distance-from-base index, held near the wall
+        private int foodCrossIndex;  // position along the flow -- this is what advances
+        private float foodStepTimer;
+        private int burstsDone;
+        private GameObject foodVisual;
+
+        public bool FoodActive => foodActive;
+
         /// <summary>Read-only view of currently live pathogens -- exposed so
         /// a headless harness can advance every agent with an explicit
         /// simulated clock (Unity's Update() does not run in Editor
@@ -77,30 +99,73 @@ namespace ImmunologyTD.Pathogens
         public int BatchEmitted => batchEmitted;
 
         /// <summary>Arms the spawner to emit <paramref name="count"/>
-        /// pathogens, then stop. Resets the spawn clock so the first one
-        /// arrives a full interval into the round.</summary>
+        /// pathogens on the bare spawn interval, then stop -- **no food
+        /// item**. Kept for the verification harnesses; the game uses
+        /// <see cref="BeginRound"/>.</summary>
         public void BeginBatch(int count)
         {
             inBatch = true;
+            foodRound = false;
+            foodActive = false;
+            foodExited = false;
             batchTarget = count < 0 ? 0 : count;
             batchEmitted = 0;
             spawnTimer = 0f;
         }
 
-        /// <summary>Disarms the spawner (round over / defeat). Live
-        /// pathogens are untouched.</summary>
-        public void EndBatch() => inBatch = false;
+        /// <summary>Sprint 9: begins a round delivered by a contaminated food
+        /// item. It enters the lumen, transits the flow over
+        /// <see cref="InvasionTuning.FoodItemTransitSeconds"/>, and drops the
+        /// <paramref name="count"/> pathogens in
+        /// <see cref="InvasionTuning.FoodItemBurstCount"/> bursts near the
+        /// wall, class mix per <paramref name="def"/>. The round ends when
+        /// the food has exited.</summary>
+        public void BeginRound(int count, RoundDefinition def)
+        {
+            inBatch = true;
+            foodRound = true;
+            foodActive = true;
+            foodExited = false;
+            foodDef = def;
+            batchTarget = count < 0 ? 0 : count;
+            batchEmitted = 0;
+            burstsDone = 0;
+            foodStepTimer = 0f;
 
-        /// <summary>The round's batch is done: every pathogen in it has been
-        /// emitted, and none remain in the lumen or the tissue. Pathogens
-        /// still colonising the GUT WALL are deliberately NOT counted --
-        /// §6b says a barrier pile persists round to round, so a smouldering
-        /// wall does not hold the round open.</summary>
+            foodAxisIndex = Mathf.Clamp(
+                board.LumenNearWallAxisIndex + Mathf.Max(0, InvasionTuning.FoodItemWallHugDepth),
+                board.LumenNearWallAxisIndex, board.AxisLength - 1);
+            foodCrossIndex = board.LumenEntryCrossIndex;
+
+            EnsureFoodVisual();
+            foodVisual.SetActive(true);
+            PositionFoodVisual();
+        }
+
+        /// <summary>Disarms the spawner (round over / defeat). Live
+        /// pathogens and the persistent field are untouched; the food item
+        /// (if any) is hidden.</summary>
+        public void EndBatch()
+        {
+            inBatch = false;
+            foodActive = false;
+            if (foodVisual != null) foodVisual.SetActive(false);
+        }
+
+        /// <summary>The round's delivery is finished.
+        ///
+        /// **Sprint 9:** under a food round (the game's path) that means the
+        /// batch is fully emitted **and the food item has exited the lumen**
+        /// -- the field itself is no longer required to be clear, because it
+        /// persists round to round now. The plain <see cref="BeginBatch"/>
+        /// path keeps the old rule (emitted + nothing loose in lumen/tissue;
+        /// a gut-WALL pile still doesn't count, §6b).</summary>
         public bool BatchComplete
         {
             get
             {
                 if (!inBatch || batchEmitted < batchTarget) return false;
+                if (foodRound) return foodExited;
                 CountByState(out int inLumen, out _, out int inTissue);
                 return inLumen == 0 && inTissue == 0;
             }
@@ -123,7 +188,8 @@ namespace ImmunologyTD.Pathogens
         private void Update()
         {
             if (board == null) return;
-            Tick(Time.deltaTime, Time.time);
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: the buy phase freezes the spawner, the breach clock, everything
+            Tick(Time.deltaTime, ImmunologyTD.Rounds.RoundClock.Time);
         }
 
         /// <summary>
@@ -138,13 +204,20 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void Tick(float deltaTime, float currentTime)
         {
-            spawnTimer += deltaTime;
-            if (inBatch && batchEmitted < batchTarget
-                && spawnTimer >= spawnIntervalSeconds && live.Count < maxLivePathogens)
+            if (foodRound)
             {
-                spawnTimer = 0f;
-                SpawnOne();
-                batchEmitted++;
+                if (foodActive) AdvanceFood(deltaTime, currentTime);
+            }
+            else
+            {
+                spawnTimer += deltaTime;
+                if (inBatch && batchEmitted < batchTarget
+                    && spawnTimer >= spawnIntervalSeconds && live.Count < maxLivePathogens)
+                {
+                    spawnTimer = 0f;
+                    SpawnOne();
+                    batchEmitted++;
+                }
             }
 
             if (gutInterface != null) gutInterface.Tick(deltaTime, currentTime);
@@ -163,6 +236,99 @@ namespace ImmunologyTD.Pathogens
             var agent = go.GetComponent<PathogenAgent>();
             agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear);
             live.Add(agent);
+        }
+
+        // ------------------------------------------------------------------
+        // Sprint 9: the contaminated food item
+        // ------------------------------------------------------------------
+
+        /// <summary>Advances the food item one slice: crawl it along the
+        /// flow, drop a burst when it has travelled far enough for the next
+        /// one, and retire it once it leaves the channel -- force-emitting
+        /// any cargo it didn't get to, so a round always delivers its full
+        /// count.</summary>
+        private void AdvanceFood(float deltaTime, float currentTime)
+        {
+            int lanes = Mathf.Max(1, board.CrossLength);
+            float stepInterval = Mathf.Max(0.01f, InvasionTuning.FoodItemTransitSeconds / lanes);
+
+            foodStepTimer += deltaTime;
+            while (foodStepTimer >= stepInterval && foodActive)
+            {
+                foodStepTimer -= stepInterval;
+                foodCrossIndex += board.FlowCrossStep;
+
+                if (!board.InCrossBounds(foodCrossIndex))
+                {
+                    // Off the downstream end -- excreted. Deliver whatever is
+                    // left at the last valid lane, then retire.
+                    foodCrossIndex -= board.FlowCrossStep;
+                    while (batchEmitted < batchTarget && live.Count < maxLivePathogens)
+                        SpawnFromFood();
+                    foodActive = false;
+                    foodExited = true;
+                    if (foodVisual != null) foodVisual.SetActive(false);
+                    return;
+                }
+
+                PositionFoodVisual();
+            }
+
+            // Burst schedule: bursts k = 1..FoodItemBurstCount fire at
+            // travelled-fractions k / (FoodItemBurstCount + 1), so they land
+            // through the middle of the transit rather than at the ends.
+            int burstCount = Mathf.Max(1, InvasionTuning.FoodItemBurstCount);
+            float travelled = Mathf.Abs(foodCrossIndex - board.LumenEntryCrossIndex) / (float)lanes;
+            while (burstsDone < burstCount
+                   && travelled >= (burstsDone + 1) / (float)(burstCount + 1))
+            {
+                burstsDone++;
+                int remainingBursts = burstCount - burstsDone + 1;
+                int perBurst = Mathf.CeilToInt((batchTarget - batchEmitted) / (float)Mathf.Max(1, remainingBursts));
+                for (int i = 0; i < perBurst && batchEmitted < batchTarget && live.Count < maxLivePathogens; i++)
+                    SpawnFromFood();
+            }
+        }
+
+        /// <summary>Drops one pathogen into the lumen at a wall-hugging cell
+        /// near the food item's current position, class per the round
+        /// definition. It then rides the flow and rolls adhesion like any
+        /// other lumen pathogen -- but starting at the wall, so it mostly
+        /// sticks.</summary>
+        private void SpawnFromFood()
+        {
+            int axis = Mathf.Clamp(
+                board.LumenNearWallAxisIndex + Random.Range(0, Mathf.Max(1, InvasionTuning.FoodItemWallHugDepth + 1)),
+                board.LumenNearWallAxisIndex, board.AxisLength - 1);
+            int cross = Mathf.Clamp(foodCrossIndex, 0, board.CrossLength - 1);
+            var cell = board.CoarseFromAxis(axis, cross);
+
+            var go = pool.Get();
+            var agent = go.GetComponent<PathogenAgent>();
+            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear,
+                cell, foodDef.RollClass());
+            live.Add(agent);
+            batchEmitted++;
+        }
+
+        private void EnsureFoodVisual()
+        {
+            if (foodVisual != null) return;
+            foodVisual = new GameObject("ContaminatedFoodItem");
+            var sr = foodVisual.AddComponent<SpriteRenderer>();
+            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.color = new Color(0.55f, 0.47f, 0.28f); // dull spoiled-food ochre, unlike any pathogen
+            sr.sortingOrder = 22; // above pathogens (20)
+            float s = board.CoarseCellWorldSize * 1.4f;
+            foodVisual.transform.localScale = new Vector3(s, s, 1f);
+            foodVisual.SetActive(false);
+        }
+
+        private void PositionFoodVisual()
+        {
+            if (foodVisual == null) return;
+            int cross = Mathf.Clamp(foodCrossIndex, 0, board.CrossLength - 1);
+            foodVisual.transform.position = board.CoarseToWorldCenter(board.CoarseFromAxis(foodAxisIndex, cross));
         }
 
         /// <summary>

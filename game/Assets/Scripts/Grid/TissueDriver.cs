@@ -28,7 +28,8 @@ namespace ImmunologyTD.Grid
         private void Update()
         {
             if (tissueGrid == null) return;
-            tissueGrid.Tick(Time.deltaTime, Time.time);
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: the buy phase freezes tissue healing too
+            tissueGrid.Tick(Time.deltaTime, ImmunologyTD.Rounds.RoundClock.Time);
         }
     }
 }

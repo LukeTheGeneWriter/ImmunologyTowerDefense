@@ -487,6 +487,7 @@ namespace ImmunologyTD.Units
         private void Update()
         {
             if (board == null) return;
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: towers don't emit during the frozen buy phase
             Tick(Time.deltaTime);
         }
 

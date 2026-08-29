@@ -167,6 +167,8 @@ namespace ImmunologyTD.Units
         {
             if (board == null) return; // not yet initialized, or already returned to the pool
 
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: the buy phase freezes movement mid-glide
+
             tickTimer += Time.deltaTime;
             float t = Mathf.Clamp01(tickTimer / BoardConfig.TickIntervalSeconds);
             transform.position = Vector3.Lerp(tickStartWorld, tickEndWorld, t);
@@ -174,7 +176,7 @@ namespace ImmunologyTD.Units
             if (tickTimer >= BoardConfig.TickIntervalSeconds)
             {
                 tickTimer -= BoardConfig.TickIntervalSeconds;
-                SimulationTick(Time.time);
+                SimulationTick(ImmunologyTD.Rounds.RoundClock.Time);
             }
         }
 

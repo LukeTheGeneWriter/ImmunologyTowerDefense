@@ -130,8 +130,8 @@ namespace ImmunologyTD.Rendering
         {
             if (rounds == null || wallet == null) return;
 
-            float w = 360f;
-            var box = new Rect(Screen.width - w - 12f, 12f, w, 118f);
+            float w = 380f;
+            var box = new Rect(Screen.width - w - 12f, 12f, w, 150f);
             var prev = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.78f);
             GUI.DrawTexture(box, Texture2D.whiteTexture);
@@ -146,28 +146,34 @@ namespace ImmunologyTD.Rendering
                 rounds.Phase == RoundPhase.Defeat ? "GAME OVER" : "BUY PHASE";
             string batch = spawner == null ? "" :
                 $"   batch {spawner.BatchEmitted}/{spawner.BatchTarget}, {spawner.LiveCount} in play";
-            GUI.Label(new Rect(x, box.y + 42f, w - 28f, 26f),
-                $"Round {Mathf.Max(1, rounds.Phase == RoundPhase.Building ? rounds.RoundNumber + 1 : rounds.RoundNumber)} -- {phase}{(rounds.Phase == RoundPhase.Active ? batch : "")}",
-                style);
+            int shownRound = Mathf.Max(1, rounds.Phase == RoundPhase.Building ? rounds.RoundNumber + 1 : rounds.RoundNumber);
+            GUI.Label(new Rect(x, box.y + 42f, w - 28f, 24f),
+                $"Round {shownRound} -- {phase}{(rounds.Phase == RoundPhase.Active ? batch : "")}", style);
+
+            string tagline = rounds.Phase == RoundPhase.Building
+                ? RoundScript.ForRound(rounds.RoundNumber + 1).Tagline
+                : rounds.CurrentTagline;
+            if (!string.IsNullOrEmpty(tagline))
+                GUI.Label(new Rect(x, box.y + 64f, w - 28f, 24f), $"“{tagline}”", style);
 
             if (rounds.Phase == RoundPhase.Building)
             {
-                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 24f),
-                    $"+{ImmunologyTD.Economy.EconomyTuning.RoundStartLumpSum} ATP added.  Buy, then:", style);
-                if (GUI.Button(new Rect(x, box.y + 90f, w - 28f, 24f), $"Start Round {rounds.RoundNumber + 1}   (Space)"))
+                GUI.Label(new Rect(x, box.y + 90f, w - 28f, 22f),
+                    $"Time is frozen. +{ImmunologyTD.Economy.EconomyTuning.RoundStartLumpSum} ATP. Buy, then:", style);
+                if (GUI.Button(new Rect(x, box.y + 114f, w - 28f, 24f), $"Start Round {rounds.RoundNumber + 1}   (Space)"))
                 {
                     rounds.StartRound();
                 }
             }
             else if (rounds.Phase == RoundPhase.Defeat)
             {
-                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 44f),
+                GUI.Label(new Rect(x, box.y + 90f, w - 28f, 44f),
                     $"Reached the base {tally?.ReachedBase ?? 0} times over {rounds.RoundsCleared} cleared round(s).", style);
             }
             else
             {
-                GUI.Label(new Rect(x, box.y + 68f, w - 28f, 44f),
-                    "Round clears when the batch is resolved\n(wall-pile pathogens carry over).", style);
+                GUI.Label(new Rect(x, box.y + 90f, w - 28f, 44f),
+                    "A contaminated food item is delivering\nthis round's batch. Cells & pathogens persist.", style);
             }
         }
 

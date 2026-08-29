@@ -32,8 +32,13 @@ namespace ImmunologyTD.Pathogens
         // -- Proximity-gated adhesion (SPRINT_PLAN.md item 5) --
 
         /// <summary>Per-step adhesion chance for a pathogen hugging the gut
-        /// wall (lumen depth 0).</summary>
-        public static float AdhesionChanceAtWall = 0.12f;
+        /// wall (lumen depth 0). **Sprint 9 raised this 0.12 -> 0.30**
+        /// (Director, 2026-08-29): at 0.12 a round could pass with almost
+        /// everything excreted harmlessly and "nothing happened." Combined
+        /// with the food item dropping its cargo *already at the wall*
+        /// (see the FoodItem* fields below), most of a batch now sticks and
+        /// piles up. Placeholder, not a balance pass.</summary>
+        public static float AdhesionChanceAtWall = 0.30f;
 
         /// <summary>Exponential falloff length, in coarse cells, of adhesion
         /// chance with distance from the wall:
@@ -201,6 +206,20 @@ namespace ImmunologyTD.Pathogens
         public static int IntracellularMaxBrood = 6;
 
         /// <summary>Damage a LARGE bacterium does to the host cell it is
+        /// <summary>Sprint 9 (Director, 2026-08-29): the contaminated food
+        /// item. It enters the lumen at the upstream end, drifts the full
+        /// width of the channel over <see cref="FoodItemTransitSeconds"/>,
+        /// and releases the round's batch in <see cref="FoodItemBurstCount"/>
+        /// evenly-spaced bursts as it travels. Each burst drops its
+        /// pathogens at lumen cells within <see cref="FoodItemWallHugDepth"/>
+        /// of the wall, near the food's current position -- so they adhere
+        /// instead of washing through. A pure delivery vehicle this pass:
+        /// not attackable. All placeholder.</summary>
+        public static float FoodItemTransitSeconds = 30f;
+        public static int FoodItemBurstCount = 4;
+        public static int FoodItemWallHugDepth = 1;
+
+        /// <summary>Damage a LARGE bacterium does to the host cell it is
         /// standing on, per tissue step, as it grazes its way toward the
         /// base. Against TissueTuning.HostCellMaxHealth of 10 that is four
         /// steps on one cell to kill it.
@@ -222,8 +241,11 @@ namespace ImmunologyTD.Pathogens
         public static void ResetToDefaults()
         {
             LumenStepIntervalSeconds = 0.35f;
-            AdhesionChanceAtWall = 0.12f;
+            AdhesionChanceAtWall = 0.30f;
             AdhesionFalloffCells = 5f;
+            FoodItemTransitSeconds = 30f;
+            FoodItemBurstCount = 4;
+            FoodItemWallHugDepth = 1;
             BreachRollIntervalSeconds = 1f;
             PerPathogenBreachChance = 0.012f;
             MaxReleaseAxisDepth = 3;

@@ -300,11 +300,19 @@ public static class MapVerification
         // 4c. Depth dependence, end to end. Same cohort size, same spawn
         // distribution; only the falloff changes. A steep falloff means only
         // pathogens hugging the wall can adhere, so far fewer do.
+        //
+        // This sub-test pins AdhesionChanceAtWall itself (rather than taking
+        // the shipped default) because it is about the falloff SHAPE, not the
+        // absolute rate -- Sprint 9 raised the default to 0.30, at which a
+        // long depth-blind channel adheres literally everything and the
+        // "some are always excreted" assertion below stops being meaningful.
         InvasionTuning.ResetToDefaults();
+        InvasionTuning.AdhesionChanceAtWall = 0.12f;
         InvasionTuning.AdhesionFalloffCells = 0.5f; // effectively wall-only
         int adheredSteep = RunChannelCohort(rig, 400, "Steep");
 
         InvasionTuning.ResetToDefaults();
+        InvasionTuning.AdhesionChanceAtWall = 0.12f;
         InvasionTuning.AdhesionFalloffCells = 200f; // effectively depth-blind
         int adheredFlat = RunChannelCohort(rig, 400, "Flat");
 
