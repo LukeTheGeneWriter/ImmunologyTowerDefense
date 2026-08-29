@@ -382,6 +382,17 @@ it emits, with a real biological referent here.
   balance, so the player experiences a standing population, not an
   accumulating one.
 
+> **Superseded in part — Sprint 9 (Director, 2026-08-29), after the
+> Sprint 8 playtest.** Despawning every fielded cell at the round boundary
+> "looked like a bug" — the screen froze the player's army while
+> straggler pathogens kept moving. **Emitted cells now PERSIST round to
+> round.** The buy phase **freezes time** instead (see §5d), so the
+> standing army carries seamlessly into the next round. Population is
+> still bounded — the per-tower `MaxActiveChildren` cap and the
+> clamp-don't-bank emission timer (§6d) do that work; the round-end
+> despawn was never the backstop. Towers do not emit during the frozen
+> buy phase; they resume on Start.
+
 ## 2a. Placement and entry — LOCKED
 
 **The player places progenitor towers in the bone marrow.** Bone marrow
@@ -787,6 +798,41 @@ weights per round, boss rounds, a real difficulty curve — placeholder is
 linear size growth), bone-marrow slot expansion (§2a, slots fixed at 5),
 ATP tower upgrades (no upgrade system yet), and anything addressing §2a's
 "round 1 is buy-then-observe with no in-round action" risk.
+
+### Reworked — Sprint 9 (Director, 2026-08-29, after the Sprint 8 playtest)
+
+The round model above was replaced after playtest. Three complaints:
+breaches fired during the buy phase (only spawning paused); the round-end
+despawn of the player's army "looked like a bug"; round 1 was
+anticlimactic (adhesion 0.12 → almost everything excreted).
+
+- **The buy phase FREEZES TIME** — not just spawning. Pathogens on the
+  wall stop rolling breaches, immune cells stop, the DC shuttle pauses.
+  Press Start and everything resumes exactly where it was. (`RoundClock`.)
+- **The battlefield PERSISTS.** Fielded immune cells and loose pathogens
+  both carry into the frozen buy phase and the next round delivers on top
+  of them. The "emitted cells die at round end" of §2 is retired.
+- **A round is delivered by a CONTAMINATED FOOD ITEM** — a bolus that
+  enters the lumen, transits the flow, and releases the round's batch in
+  a few bursts *at the wall* as it travels (so the batch adheres instead
+  of washing through — this is also the "faster cadence"). It is a pure
+  delivery vehicle, not attackable. **The round ends when the food has
+  delivered its batch and exited the lumen**, not when the board is clear
+  (the board is never clear now). Predictable round length ≈ transit time.
+- **Each round has a gut-themed tagline and a per-class mix** — a light
+  version of "round batch composition" above ("Undercooked egg,
+  Salmonella"; "Contaminated water, poliovirus"). `RoundScript`, ~6
+  hand-written rounds then a procedural fallback.
+- **Difficulty, placeholder:** `BatchSizeBase`/`GrowthPerRound` 8/3 →
+  **16/6**; `AdhesionChanceAtWall` 0.12 → **0.30**. New `InvasionTuning`
+  `FoodItemTransitSeconds` 30 / `FoodItemBurstCount` 4 /
+  `FoodItemWallHugDepth` 1. Economy (`RoundStartLumpSum`, `AtpPerKill`)
+  **unchanged** — expect ATP to build up faster now that you don't
+  rebuild each round; retune later.
+- **Still deferred:** emergency granulopoiesis (§6c), a real difficulty
+  curve / boss rounds, the food item being destructible, a run restart.
+  §2a's "round 1 buy-then-observe" risk is unaddressed but softer now (a
+  persistent field means the screen is never empty).
 
 ## 5c. Antigen specificity — the 8-bit barcode — LOCKED (Director, 2026-08-21)
 

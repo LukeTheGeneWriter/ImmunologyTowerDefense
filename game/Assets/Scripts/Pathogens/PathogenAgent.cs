@@ -252,17 +252,24 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
+            CoarseCoord? lumenCellOverride = null, PathogenClass? classOverride = null)
         {
             BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
             EnsureSprite();
 
-            Class = PickRandomClass();
+            Class = classOverride ?? PickRandomClass();
             SetHealthForClass();
             AssignVirusTraits();
 
-            int axisIndex = Random.Range(board.LumenNearWallAxisIndex, board.AxisLength);
-            CurrentCoarse = board.CoarseFromAxis(axisIndex, board.LumenEntryCrossIndex);
+            // Sprint 9: a contaminated food item drops its cargo at a chosen
+            // lumen cell (near the wall, near the food's current position) so
+            // most of a batch actually adheres instead of washing straight
+            // through. With no override it's the Sprint 4 random-depth spawn
+            // at the upstream end.
+            CurrentCoarse = lumenCellOverride ?? board.CoarseFromAxis(
+                Random.Range(board.LumenNearWallAxisIndex, board.AxisLength),
+                board.LumenEntryCrossIndex);
             Current = board.CoarseCenterFine(CurrentCoarse);
 
             State = PathogenState.Lumen;
@@ -380,8 +387,9 @@ namespace ImmunologyTD.Pathogens
         private void Update()
         {
             if (board == null) return;
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: the buy phase freezes time
 
-            SimulationTick(Time.deltaTime, Time.time);
+            SimulationTick(Time.deltaTime, ImmunologyTD.Rounds.RoundClock.Time);
 
             if (moveDuration > 0f && moveElapsed < moveDuration)
             {

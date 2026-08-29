@@ -474,3 +474,42 @@ What's flagged, none scoped:
   pile also clears a bite of it, so `DcDebrisSamplePerBite` vs.
   `EfferocytosisDebrisPerTick` is the real tension to tune once balance
   starts.
+
+## Opened / updated by Sprint 9 (2026-08-29) — the round model was reworked
+
+Buy-phase freeze, persistent battlefield, and food-item delivery are in.
+What's flagged, none scoped:
+
+- **A real difficulty curve.** Sprint 9 just doubled the batch and adhesion
+  placeholders and added a per-class mix (`RoundScript`). A real curve
+  wants milestone / boss rounds, harder pathogen behaviours introduced
+  over time, and pacing tuned against the persistent-army economy. Still
+  depends on a pathogen-species roster.
+- **The economy vs. a persistent army.** `RoundStartLumpSum` /
+  `AtpPerKill` are unchanged; with no per-round rebuild, ATP should
+  accumulate faster. The Director wants to judge from a playtest before
+  retuning — likely the lump sum drops or per-kill carries more of the
+  weight.
+- **`GutInterface`'s roll clock jumps on unfreeze.** The spawner passes
+  `RoundClock.Time` (frozen-aware) but `GutInterface.Tick` compares
+  `now - lastRollTime`, so every occupied wall position rolls once on the
+  first unfrozen tick — a breach can fire in round-frame 1. One roll, not
+  a flood; revisit if it reads badly. The clean fix is a per-position
+  roll clock that also freezes.
+- **A destructible food item.** Right now it's a pure vehicle — you can't
+  interrupt a delivery. Making it attackable (shoot the bolus before it
+  drops its cargo, or reduce the burst it delivers) is a plausible
+  mechanic; `FoodItem*` tuning + the single-GameObject visual are where it
+  attaches.
+- **The buy phase freezes tissue healing and the adaptive shuttle too.**
+  Intended, but a long buy phase genuinely pauses debris dissipation,
+  regrowth, and DC travel. If that feels wrong, those could be exempted
+  from the freeze (heal/learn between rounds) while combat stays frozen.
+- **§2a's "round 1 is buy-then-observe" is softer but not solved.** A
+  persistent field means the screen is never empty, but round 1 still has
+  no in-round player action once you press Start.
+- **`RoundClock` as an instance path** if the game ever runs two boards.
+- **A run restart.** Still unbuilt — `Defeat` is terminal. Now there's
+  `RoundController.DespawnAllFieldedUnits()` as one piece of the reset;
+  it still needs a fresh `RoundController` (breach baseline) + `RoundClock.
+  Reset()` + `InvasionTally.Reset()` + despawning loose pathogens.

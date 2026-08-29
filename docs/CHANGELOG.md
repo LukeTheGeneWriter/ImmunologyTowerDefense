@@ -12,6 +12,44 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 9 -- 2026-08-29
+The round has a rhythm now. Reworked after the Sprint 8 playtest.
+
+**The buy phase freezes time.** Not just spawning -- everything. Pathogens
+piled on the gut wall stop rolling breaches, your cells stop moving, the
+dendritic-cell shuttle pauses. Press **Space** and it all resumes exactly
+where it was. (This fixes pathogens bursting through while you shopped.)
+
+**The battlefield persists.** Your immune cells and any pathogens still on
+the board carry from one round into the next -- no more the round ending
+and abruptly despawning your whole army while stragglers keep walking. A
+round now ends when its **batch has been delivered**, not when the board
+is clear (it's never clear).
+
+**Rounds are delivered by a contaminated food item.** A bolus enters the
+lumen at the start of a round, drifts across the channel, and drops that
+round's pathogens in four bursts **right at the gut wall** as it travels
+-- so they stick and pile up instead of washing past. It passes through
+and is excreted; the round ends. Each round has a **gut-themed tagline**
+("Undercooked egg, Salmonella"; "Contaminated water, poliovirus") and its
+own pathogen **mix** -- shown in the round bar.
+
+**Rounds hit harder.** Batch size doubled (round 1 = 16, round 5 = 40)
+and wall adhesion went 0.12 -> 0.30, so round 1 actually engages now
+instead of passing with everything excreted. Economy numbers unchanged --
+you're spending less on rebuilding, so expect ATP to accumulate; that's a
+later tuning pass.
+
+Verified: a new **RoundVerification** harness, **29 assertions** -- the
+freeze flag + gated sim clock, the round-script taglines / class mix, the
+food item delivering its full batch and the round ending only once it
+exits, and cells + pathogens surviving a round boundary -- plus Adaptive
+34 / Economy 47 / Combat 36 / Lifecycle 79 / Map 71 / Tissue 73 all still
+green (**369 total, 0 failed**). Clean Windows build, 0 exceptions on
+launch. **Not** verified: nobody has played the new rhythm -- a frozen
+buy phase, a themed contaminated delivery, a battlefield that persists --
+which is the whole question, and the Director's playtest.
+
 ## Sprint 8 -- 2026-08-29
 The adaptive system can learn a pathogen now. The framework, not the
 balance -- **every number is a placeholder**, and knowledge unlocks

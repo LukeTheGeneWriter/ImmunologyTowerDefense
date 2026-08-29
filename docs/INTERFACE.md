@@ -1296,6 +1296,108 @@ non-matching → freeze + cargo spent, teaches 0), lymphocyte turnover, the
 round boundary. Same no-Play-Mode philosophy as the six before it;
 deterministic (seeded `Random`, forced match thresholds).
 
+## Sprint 9 changes — the reworked round model (`GAME_DESIGN.md` §5d / §2)
+
+The buy phase freezes time; the battlefield persists round to round; each
+round is delivered by a contaminated food item. Difficulty numbers are
+placeholder.
+
+### `ImmunologyTD.Rounds.RoundClock` (new static) + `RoundClockDriver`
+
+- **`static bool Frozen`** — opens `true`. `false` only while a round is
+  `Active`. Every `Update()`-driven sim system reads this and
+  early-returns when true.
+- **`static float Time { get; }`** — a sim clock; `static void
+  Advance(float dt)` adds `dt` only when `!Frozen`; `static void Reset()`
+  (→ `Frozen = true`, `Time = 0`). Systems that used to pass
+  `UnityEngine.Time.time` into a `SimulationTick` now pass `RoundClock.Time`.
+- **`RoundClockDriver` (MonoBehaviour)** — one line: `Update() =>
+  RoundClock.Advance(UnityEngine.Time.deltaTime)`. Added by `GameBootstrap`.
+
+Harnesses never touch `RoundClock` (they drive every tick explicitly).
+
+### `RoundController`
+
+- `StartRound()` → `RoundClock.Frozen = false`, `CurrentTagline =
+  RoundScript.ForRound(RoundNumber).Tagline`, `spawner.BeginRound(batch,
+  def)` (was `BeginBatch`).
+- A round ending (`ClearRound`) and `Defeat` → `RoundClock.Frozen = true`.
+- **`ClearRound` no longer calls `marrow.ClearFieldedUnits()`** — the
+  field persists.
+- **`string CurrentTagline { get; }`** — new.
+- **`void DespawnAllFieldedUnits()`** — new public passthrough to
+  `marrow.ClearFieldedUnits()`, kept for a future run-restart (not called
+  at the boundary).
+- `Initialize` signature unchanged.
+
+### `PathogenSpawner`
+
+- **`void BeginRound(int count, RoundDefinition def)`** — a food round:
+  spawns one food item at the lumen entry, arms `count`, records `def`'s
+  class mix. **`void BeginBatch(int count)`** kept unchanged (no food) for
+  the harnesses.
+- **`bool FoodActive { get; }`** — new.
+- **`bool BatchComplete`** — under a food round: `batchEmitted >=
+  batchTarget && foodExited`. Under `BeginBatch`: the old
+  emitted + lumen/tissue-clear rule (a gut-WALL pile still doesn't count).
+- `EndBatch()` also hides the food visual.
+- Private: `AdvanceFood(dt, now)` crawls the food along `FlowCrossStep`
+  over `InvasionTuning.FoodItemTransitSeconds`, fires
+  `FoodItemBurstCount` bursts at travelled-fractions `k/(burstCount+1)`,
+  `SpawnFromFood()` drops each pathogen at a wall-hugging lumen cell
+  (`LumenNearWallAxisIndex + [0..FoodItemWallHugDepth]`) at the food's
+  current cross index, class `def.RollClass()`. A food excreted off the
+  end force-delivers any remaining cargo. The food visual is one
+  non-pooled `GameObject` (ochre, `sortingOrder` 22).
+
+### `PathogenAgent`
+
+- **`Initialize(..., CoarseCoord? lumenCellOverride = null, PathogenClass?
+  classOverride = null)`** — optional trailing args. With no override,
+  Sprint 4's random-depth upstream spawn and random class. Every existing
+  caller keeps compiling.
+- `Update()` early-returns while `RoundClock.Frozen`; passes
+  `RoundClock.Time` to `SimulationTick`.
+
+### `ImmunologyTD.Rounds.RoundScript` (new static)
+
+- **`struct RoundDefinition { string Tagline; float VirusWeight,
+  BacteriumWeight, LargeBacteriumWeight; PathogenClass RollClass(); }`** —
+  `RollClass` normalises the weights; an all-zero mix returns
+  `LargeBacterium` (no divide-by-zero).
+- **`static RoundDefinition ForRound(int roundNumber)`** — ~6 hand-written
+  gut-themed entries, then a procedural `"Spoiled leftovers, day N"`
+  fallback with an even mix.
+
+### `HudOverlay`
+
+Round bar shows `rounds.CurrentTagline` (or `RoundScript.ForRound(next)`
+during Building) and a "Time is frozen … Buy, then:" / "A contaminated
+food item is delivering …" line. Box grew to 380×150.
+
+### `EconomyTuning` / `InvasionTuning`
+
+- `EconomyTuning.BatchSizeBase` 8 → **16**, `BatchSizeGrowthPerRound` 3 →
+  **6**.
+- `InvasionTuning.AdhesionChanceAtWall` 0.12 → **0.30**; new
+  `FoodItemTransitSeconds` 30, `FoodItemBurstCount` 4,
+  `FoodItemWallHugDepth` 1 (all in `ResetToDefaults`).
+
+### Other `Update()` freeze gates
+
+`SearchUnit`, `TissueDriver`, `BoneMarrowManager`, `AdaptiveDirector`,
+`DendriticCell`, `Lymphocyte` all early-return while `RoundClock.Frozen`;
+the first four pass `RoundClock.Time` where they passed `Time.time`.
+
+### `Assets/Editor/RoundVerification.cs` (new)
+
+`RoundVerification.RunAll` — **29 assertions**: `RoundClock` flag +
+clock, `RoundScript` taglines / mix, the food-round delivery path through
+the real `PathogenSpawner` / `RoundController`, and cells + pathogens
+persisting across a boundary. The `Update()`-only freeze gate is left to
+the build launch. `MapVerification` 4c repinned to `AdhesionChanceAtWall`
+0.03.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

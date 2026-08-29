@@ -678,3 +678,56 @@ owns the one tick gate, sub-steps `LymphNode.Step(Clock)` + every fielded
 DC's `SimulationTick(Clock)`. `LymphNode` lost its own accumulator (was
 `Tick(dt,now)`, became `Step(now)`) so there's no second accumulator to
 drift. A harness drives it by calling `Tick(0.12f)` in a loop.
+
+### Sprint 9 — head session (2026-08-29, the round-model rework)
+
+Head session, inline, straight after Sprint 8 was pushed — Director
+playtested and sent a bundle of notes that added up to one coherent
+rework (frozen buy phase, persistent field, themed food-item delivery,
+2x difficulty). Two `AskUserQuestion` rounds up front again; the Director
+skipped the "what ends a round" fork and instead proposed the food-item /
+tagline idea, which answered it (a round ends when the food finishes
+delivering).
+
+**One static did the whole freeze.** `RoundClock { bool Frozen; float
+Time }` + a 3-line driver. Every `Update()`-driven sim system got two
+lines: `if (RoundClock.Frozen) return;` and `Time.time` -> `RoundClock.
+Time`. The clock swap matters — just skipping ticks while `Time.time`
+keeps running would fast-forward infection ramps / burnout timers the
+moment you unfreeze. `GutInterface`'s roll clock still sees a jump
+(flagged), because it's driven through the spawner's `currentTime` rather
+than owning a frozen-aware clock — a per-position roll clock is the real
+fix, deferred.
+
+**The Update()-only gate is not headlessly testable.** Editor batchmode
+never runs `Update()`, so `if (RoundClock.Frozen) return` can't be
+asserted in a harness — same limitation as every other `Update()`-only
+path in this project (`DegranulationFlash`, the tween loops). Covered by
+the build launch sitting genuinely still. What the harness *can* test is
+the flag/clock state machine and the `RoundController` transitions that
+set it, which `RoundVerification` does.
+
+**Kept `BeginBatch` beside the new `BeginRound`.** The food-item path
+(`BeginRound`) changes what "batch complete" means — delivered vs.
+field-clear. Rather than rewrite every `EconomyVerification` round-loop
+assertion, `BeginBatch(int)` keeps its exact old semantics (no food,
+field-clear completion) for the harnesses, and `BatchComplete` branches
+on a `foodRound` flag. `EconomyVerification` stayed 47/47 untouched; only
+`RoundController` (the game's path) moved to `BeginRound`.
+
+**A tuning change broke a harness assertion sitting on a knife-edge.**
+`AdhesionChanceAtWall` 0.12 -> 0.30 made `MapVerification` 4c's
+"depth-blind curve doesn't adhere *everything*" assertion fail (400/400).
+Turned out it was already borderline at 0.12 (~397/400) — the test pins
+the falloff *shape*, not the rate, so the fix was to pin
+`AdhesionChanceAtWall` low (0.03) for that sub-test so neither curve
+saturates. Grep-the-harness-when-a-number-moves (Sprint 6 lesson) caught
+it on the first sweep.
+
+**Food-item delivery test determinism.** The "not complete while the food
+is still in the lumen" assertion needs the loop to stop the *exact* tick
+`BatchEmitted` hits the target — the last burst lands at ~0.8 of transit,
+leaving ~6s where all cargo is out but the food hasn't exited. Overshoot
+that window by ticking too long and `foodExited` flips and the assertion
+is meaningless. `for (...; BatchEmitted < expected; ...)` stops on the
+right tick.

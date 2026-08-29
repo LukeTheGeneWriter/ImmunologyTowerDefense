@@ -1,274 +1,212 @@
-# Sprint Plan — Sprint 8
+# Sprint Plan — Sprint 9
 
-## Sprint 7 — closed 2026-08-28
+## Sprint 8 — closed 2026-08-29
 
-Delivered the ATP economy framework and the round loop (`GAME_DESIGN.md`
-§5b/§5d/§6c): `AtpWallet`, `EconomyTuning` (every number a placeholder),
-`RoundController` (`Building → Active → Defeat`, wave batch + buy phase),
-`PathogenSpawner` batch gating, placement cost, the 100-life pool with a
-`0 → GAME OVER` lose condition, and a HUD economy bar. 47 new
-`EconomyVerification` assertions, 306 total, clean Windows build. Handed to
-the Director; nobody has *played* the loop — that's his playtest.
+Delivered the dendritic-cell shuttle and the 8-bit antigen barcode
+(`GAME_DESIGN.md` §5a/§5c): the `ImmunologyTD.Adaptive` namespace
+(`Antigen`, `KnowledgeLedger`, `AdaptiveTuning`), debris carrying an
+antigen identity, a real `LymphNode` arena with its own co-localisation
+cytokine field, `DendriticCell` / `Lymphocyte` agents, `AdaptiveDirector`,
+and DC + helper-T as bought progenitor towers sharing the 5 marrow slots.
+34 new `AdaptiveVerification` assertions, 340 total, clean Windows build.
+Handed to the Director; he playtested it.
 
-## Direction for Sprint 8 (Director, 2026-08-29)
+## Direction for Sprint 9 (Director, 2026-08-29, from the Sprint 8 playtest)
 
-Build the **dendritic-cell shuttle and the antigen barcode** — the
-mechanism by which the adaptive system actually learns a pathogen
-(`GAME_DESIGN.md` §5a + §5c, with §1c's "debris is the antigen source").
-This is the Director's long-standing most-wanted item and "the sprint
-after" in the Sprint 7 plan.
+Playtest notes:
 
-Framework pass, same standard as Sprints 6–7: **the loop is built and
-legible, every number is a deliberate placeholder, no balance attempted.**
+1. Pathogens piled on the gut wall still **burst through during the buy
+   phase** — only spawning pauses, the wall keeps rolling breaches and
+   pathogens keep walking.
+2. A round clearing **abruptly despawns every fielded immune cell** (§2)
+   while wall-pile / straggler pathogens keep moving — reads as a bug.
+3. **Round 1 is anticlimactic**: with adhesion low (0.12) most pathogens
+   ride the lumen out untouched and the round can pass with nothing
+   engaged — "it looks like a bug when the game abruptly kills my cells
+   while pathogens still move forward."
+4. Rounds are **too easy** — the placeholder batch curve (8, +3/round).
 
-### Five decisions taken up front (Director, 2026-08-29)
+Director's model: **freeze time in the buy phase, and keep cells *and*
+pathogens on the field round to round.** Plus a difficulty pass —
+**all** of: ~2× batch size, higher wall adhesion, faster spawn cadence —
+where the cadence mechanism is a **contaminated food item** that enters
+the lumen, transits the flow, and **releases the round's pathogen batch
+in bursts as it travels**. And each round gets a **gut-themed tagline**
+("Incoming lettuce infected with E. coli", "Contaminated water carries
+poliovirus"). Economy: **unchanged this pass** — expect ATP to build up
+faster now that you're not rebuilding each round; retune later.
 
-1. **Scope: the shuttle + the 8-bit barcode.** DC picks up antigen from
-   tissue debris → carries it to a now-real lymph node → collides with
-   helper-T cells there → a **Hamming-distance barcode match** teaches the
-   adaptive system (per-species knowledge %). **No threshold capabilities
-   this sprint** — knowledge goes up and is shown on the HUD, but unlocks
-   nothing yet (§5's ladder is next).
-2. **DC and helper-T are bought bone-marrow progenitor towers**, sharing
-   the existing **5 slots** with macrophage/neutrophil. Marrow real estate
-   is the constraint (§1c/§2a) — one of each innate + one of each adaptive
-   is 4 of 5 slots, on purpose.
-3. **The lymph node becomes a real compartment** — a small bounded arena
-   with its own coordinate space that DCs and helper-T cells move around
-   in and collide in. It was a non-functional backdrop since Sprint 2.
-4. **A second cytokine field** — the co-localisation signal of §5c step 4,
-   distinct from the infection cytokine — is built for the node, and both
-   DCs and helper-T cells bias toward it via the existing `Chemotaxis`
-   code so meetings reliably happen instead of relying on two random walks
-   intersecting.
-5. **Barcode match rule: Hamming distance ≤ 2** (≥ 6 of 8 bits agree ≈
-   14.5% per random pairing). `MatchMaxHammingDistance` is a mutable
-   tuning field so it can move (exact-match = 0, looser = 3+).
-
-Authority: `GAME_DESIGN.md` §5a (the DC shuttle loop), §5c (the 8-bit
-barcode, pairing, turnover), §1c (debris is the antigen source; the
-three-fate debris table), §5 (knowledge is a per-species %), §2 (emitted
-cells die at round end, progenitor towers persist).
+This **supersedes the round model of §5d and the "emitted cells die at
+round end" of §2** — both get dated updates.
 
 ## Scope
 
-### 1. `ImmunologyTD.Adaptive` — the pure-logic core
+### 1. Buy-phase freeze — one authority over "is the simulation running"
 
-- **`Antigen`** (static) — the 8-bit barcode. `byte RandomTag()`,
-  `int HammingDistance(byte, byte)` (`popcount(a ^ b)`),
-  `bool IsMatch(byte, byte)` (distance ≤ `AdaptiveTuning.MatchMaxHammingDistance`),
-  `byte TagForClass(PathogenClass)` (a fixed per-class antigen — see the
-  species note below).
-- **`KnowledgeLedger`** — plain reference type, per run. `float Get(PathogenClass)`
-  (0–100), `void Add(PathogenClass, float)` (clamped), `void Reset()`,
-  and a `Changed` hook for the HUD. This is §5's "percentage per pathogen
-  species."
-- **`AdaptiveTuning`** — mutable statics, `ResetToDefaults()`, same pattern
-  as `InvasionTuning`/`EconomyTuning`. Every number placeholder:
-  `MatchMaxHammingDistance` 2, `KnowledgePerMatch` 3, `KnowledgeMax` 100,
-  `DcPresentationsPerCargo` 4, `DcDebrisSamplePerBite` 0.34 (≈3 bites to
-  drain a pile — it *does* compete with efferocytosis, §1c), `PairingSeconds`
-  1.5, `LymphocyteLifespanSeconds` 20, `NodeColocalisationSourceStrength`
-  18, `NodeLymphocyteSourceStrength` 6, DC/helper-T fine-tiles-per-tick,
-  emission intervals, `MaxActiveChildren`. Per-class antigens
-  (`VirusAntigen` etc.) live here too.
+New static `ImmunologyTD.Rounds.RoundClock { public static bool Frozen }`
+(same pattern as `CytokineToggle.Enabled` / `EconomyHooks`). Starts
+`true` (the game opens in the buy phase). `RoundController` sets it:
+`false` on `StartRound()`, `true` on a round ending and on `Defeat`.
 
-**Species key = `PathogenClass` for now.** There is no pathogen-species
-roster yet (a known `BACKLOG.md` item, also needed for §4b's
-budding-vs-chain trait). The three `PathogenClass` values stand in as the
-three "species," each with a fixed antigen barcode. When a real roster
-lands, knowledge keys off species id and each species rolls its own
-antigen. Flagged, not blocking.
+Everything that advances the simulation early-returns while frozen:
+`SearchUnit`, `PathogenAgent`, `DendriticCell` (in tissue), the
+`FoodItem`, `BoneMarrowManager.Update`, `PathogenSpawner.Update`,
+`AdaptiveDirector.Update`, `TissueDriver`, and the `CytokineField`
+recompute. Visual tweens freeze too — a true time-stop, not a slow
+drift. The harness path (explicit `Tick`/`SimulationTick`) is unaffected;
+only the `Update()`-driven auto-advance is gated.
 
-### 2. Debris carries an antigen identity (`TissueGrid`)
+This alone fixes note 1 (nothing moves in the buy phase, so nothing
+breaches) and note 2's abruptness (no despawn — see item 2).
 
-A dead cell's debris has to remember *what killed it* for a DC to sample
-it. The host layer gains a per-cell `PathogenClass? DebrisAntigen`;
-`KillHostCell` gains an optional `PathogenClass? antigen` argument;
-every call site passes the responsible class (intracellular resident's
-class on a stress-sense / drain / burn-out death, the grazing large
-bacterium's class, `null` for neutrophil collateral on bare tissue).
-New read `PathogenClass? GetDebrisAntigen(CoarseCoord)`. `ClearDebris`
-clears it with the pile. Existing harness call sites pass no antigen and
-keep working (optional arg).
+### 2. Persistent field — cells and pathogens carry round to round
 
-### 3. `LymphNode` — the second arena
+- `RoundController` **no longer calls `marrow.ClearFieldedUnits()`** (nor
+  the adaptive despawn) on a round ending. Fielded immune cells persist;
+  the towers keep their populations. `ClearFieldedUnits` stays on the
+  class for a future run-restart, just isn't called at the boundary.
+- Pathogens already have no boundary despawn — with time frozen they
+  simply hold position through the buy phase and resume.
+- **A round ends when its batch has been fully delivered** — the food
+  item has emitted all its cargo **and** left the lumen (excreted off the
+  downstream end). Whatever is still alive on the board carries into the
+  frozen buy phase. `PathogenSpawner.BatchComplete` drops its
+  "lumen+tissue empty" requirement and becomes "the round's delivery is
+  finished." Predictable round length ≈ the food item's transit time.
+- The per-tower `MaxActiveChildren` cap and the clamp-don't-bank emission
+  timer (§6d) still bound population across many rounds — nothing
+  accumulates without limit.
 
-Plain reference type (not a MonoBehaviour), constructed by `GameBootstrap`.
+### 3. Difficulty numbers (`EconomyTuning` / `InvasionTuning`)
 
-- Owns a small dedicated `BoardConfig` (via `ConfigureForTest` to ~a
-  6×6 coarse / 42×42 fine box) and its own `CytokineField` — this is the
-  reuse the Director asked for: node movement runs through the exact
-  `Chemotaxis.ChooseNextStep` path, and the co-localisation field is a
-  real `CytokineField` recomputed each node tick from a **static central
-  source** plus **each resident lymphocyte as a weak source** (so DCs
-  drift toward where the T cells actually are). The node is small enough
-  that `strength / (1 + distance)` is steep across it — the flat-at-scale
-  problem is a large-map problem.
-- Holds `List<Lymphocyte>` residents and `List<DendriticCell>` visitors.
-- `Tick(float dt, float now)` — recompute the field, step every resident
-  and visitor, run pairing, age out residents past
-  `LymphocyteLifespanSeconds`.
-- `void Admit(DendriticCell)` / `void Release(DendriticCell)` — a DC
-  entering / leaving on its shuttle.
-- `FineCoord RandomInteriorFine()` — spawn helper.
-- World-space transform helpers so the renderer can draw node agents
-  inside the node backdrop rect.
+Placeholder pass, not final balance:
 
-### 4. `Lymphocyte` — the helper-T cell (MonoBehaviour agent)
+- `BatchSizeBase` 8 → **16**, `BatchSizeGrowthPerRound` 3 → **6**
+  (round 1 = 16, round 5 = 40).
+- `InvasionTuning.AdhesionChanceAtWall` 0.12 → **0.30** — the single
+  biggest lever on "round 1 felt like nothing happened." Combined with
+  the food item releasing pathogens *already near the wall* (item 4),
+  most of a batch now sticks and piles up instead of flowing past.
+- Spawn cadence: the food item drives emission now (item 4); the bare
+  `PathogenSpawner` interval is kept only as a fallback.
 
-- `Initialize(LymphNode, byte tag, FineCoord start, float now)`.
-- Born with a **random 8-bit `Tag`** (`Antigen.RandomTag()`), set by the
-  progenitor at emission.
-- Wanders the node via `Chemotaxis` against the co-localisation field
-  (`cytokineEnabled: true`). Frozen while `Paired`.
-- `float BornAt`; the node ages it out at `LymphocyteLifespanSeconds` →
-  despawn to its pool. The progenitor keeps emitting new ones, so the
-  barcode repertoire **turns over** within a round (§5c step 6) as well
-  as at the round boundary.
+### 4. `FoodItem` — the contaminated delivery vehicle
 
-### 5. `DendriticCell` — the shuttle (MonoBehaviour agent)
+New pooled MonoBehaviour, `ImmunologyTD.Pathogens.FoodItem`.
 
-State machine, explicit-time `Tick`/`SimulationTick` like every other
-agent:
+- One per round. `RoundController.StartRound()` → `spawner.BeginRound(def)`
+  spawns it at the lumen entry (upstream end of the flow).
+- It **drifts down the lumen** on the flow (cross-axis step, like a
+  pathogen riding the current), unattackable — a pure delivery vehicle
+  this pass (destructible food is a later idea, flagged).
+- As it travels it **emits its cargo in `FoodItemBurstCount` bursts**
+  (default 4), `batchSize / burstCount` pathogens per burst, spawned at
+  lumen cells **near its current position and hugging the wall** so
+  `AdhesionChanceAt` (depth-gated) gives them a high stick rate. Class
+  mix per the round definition (item 5).
+- Reaching the downstream end → excreted, returns to its pool. The
+  round's delivery is "complete" once it has emitted every burst **and**
+  exited.
+- Rendered as a distinct chunky sprite (a dull food-bolus colour,
+  unlike any pathogen).
+- New `InvasionTuning` fields: `FoodItemBurstCount` 4,
+  `FoodItemLumenStepIntervalSeconds` (its transit speed),
+  `FoodItemBurstWallHugDepth` (how close to the wall it drops its cargo).
 
-- **`PatrolTissue`** — emitted at the tissue base edge on a random lane
-  (same entry as innate units). Plain random walk (no debris homing —
-  that's a deferred `BACKLOG.md` item). Standing on a `Dead` cell with
-  debris and no cargo → **sample**: `Cargo = TissueGrid.GetDebrisAntigen`,
-  `HasCargo = true`, take one `DcDebrisSamplePerBite` bite of the pile
-  (this is the efferocytosis competition of §1c — a DC that samples a
-  pile is clearing it too). `presentationsLeft = DcPresentationsPerCargo`.
-- **`TravelToNode`** — base-biased walk (axis frame, `dAxis = -1`) until
-  it reaches the base band, then `lymphNode.Admit(this)` → `InNode`.
-- **`InNode`** — wanders the node via `Chemotaxis` against the
-  co-localisation field. On contact with an unpaired `Lymphocyte`: both
-  enter a `PairingSeconds` freeze; on resolve, if
-  `Antigen.IsMatch(Cargo, other.Tag)` → `knowledge.Add(species,
-  KnowledgePerMatch)` and a green `KnowledgeFlash`; either way
-  `presentationsLeft--`. At 0 → `HasCargo = false` → `ReturnToTissue`.
-- **`ReturnToTissue`** — `lymphNode.Release(this)`, walk back out into
-  tissue, → `PatrolTissue` (a spent DC **returns empty, it does not
-  die** — travel time is the cost; §5a's "dies or returns empty" open
-  question is resolved this way for now).
+### 5. Round definitions + taglines
 
-Round boundary despawns fielded DCs like any emitted cell (§2); knowledge
-% persists on the `KnowledgeLedger`.
+New `ImmunologyTD.Rounds.RoundScript` (static): `RoundDefinition
+ForRound(int n)` → `{ string Tagline, (PathogenClass, float)[] CargoMix }`.
+~6 hand-written gut-themed rounds (lettuce/E. coli, raw egg/Salmonella,
+contaminated water/poliovirus, undercooked pork, etc.), then a
+procedural fallback (linear size growth, default class weights) for
+rounds past the script. Batch **size** still comes from
+`EconomyTuning.BatchSizeForRound`; the definition supplies the **mix**
+and the flavour text.
 
-### 6. Bone-marrow integration
+- `RoundController` exposes `string CurrentTagline`.
+- `HudOverlay`'s round bar shows it: `Round 3 — "Contaminated water:
+  poliovirus"`.
 
-- `UnitKind` gains `DendriticCell` and `HelperT`.
-- `EconomyTuning` gains `DendriticCellPrice` (placeholder 30) and
-  `HelperTPrice` (placeholder 25); `PriceFor` covers them.
-- `BoneMarrowManager` stays the slot / picker / placement-cost / cap /
-  `ClearFieldedUnits` authority. The two adaptive kinds don't emit a
-  `SearchUnit` — placement and per-interval emission for them delegate to
-  an injected `IAdaptiveEmitter` (implemented by a new small
-  `AdaptiveDirector` MonoBehaviour that owns the DC pool, the lymphocyte
-  pool, and the `LymphNode`). The manager still tracks child counts for
-  the `MaxActiveChildren` cap and despawns them on `ClearFieldedUnits`,
-  via emitter callbacks.
-- The IMGUI picker gets two more buttons (four total), each showing its
-  price and greying out when unaffordable — same as Sprint 7.
+This is a light version of the long-deferred "round batch composition"
+backlog item — per-round class mix, no boss rounds or a real curve yet.
 
-### 7. HUD + rendering + bootstrap
+### 6. Verification + docs
 
-- `HudOverlay` — a **KNOWLEDGE** readout (per class: `Virus 14% ·
-  Bacterium 3% · LargeBac 0%`), plus node population (`DC n · helperT n`)
-  and a one-line "DCs carry antigen from debris to the lymph node" hint.
-- `DendriticCell` / `Lymphocyte` visuals — flat squares like everything
-  else, distinct colours (DC dendritic-magenta, brighter when carrying
-  cargo; helper-T teal; a paired agent tinted toward white). Tween
-  between tiles like `SearchUnit`.
-- `KnowledgeFlash` — reuse the pooled `DegranulationFlash` with a new
-  green colour for a successful match.
-- Lymph-node backdrop relabelled ("Lymph Node — antigen presentation";
-  drop "not functional yet"), enlarged a little so agents are visible.
-- `GameBootstrap` wires the `KnowledgeLedger`, the `LymphNode`, the
-  `AdaptiveDirector`, the DC/lymphocyte pools, and the new HUD args, and
-  resets `AdaptiveTuning`.
+- Extend `EconomyVerification` (or a small new `RoundVerification`): the
+  freeze flag gates the auto-advance; `BatchComplete` is delivery-only
+  now; a round boundary leaves fielded cells **and** loose pathogens
+  alive; the food item emits its whole cargo and then exits; the round
+  boundary re-freezes; `RoundScript.ForRound` returns a tagline for
+  scripted and fallback rounds.
+- Re-run all seven prior harnesses green.
+- `GAME_DESIGN.md` §2 + §5d dated updates (the round model changed);
+  `ENGINE_STATUS.md`, `INTERFACE.md`, `CHANGELOG.md`, `BACKLOG.md`,
+  `TEAM_RETRO.md`. Clean Windows build, 0 exceptions on launch.
 
-### 8. `AdaptiveVerification.cs`
+### 7. Not in scope
 
-New headless harness, same no-Play-Mode philosophy as the six before it.
-Covers: `Antigen` popcount / Hamming / `IsMatch` boundary (distance 2
-matches, 3 doesn't), `KnowledgeLedger` clamp at 0 and `KnowledgeMax`,
-debris antigen set by `KillHostCell` and read back / cleared by
-`ClearDebris`, a **full simulated shuttle** (seed a debris pile of a
-known class, drive a DC through patrol → sample → travel → node → force a
-matching lymphocyte → assert knowledge rose by exactly `KnowledgePerMatch`
-and a non-matching one adds nothing), lymphocyte turnover (a resident
-past `LymphocyteLifespanSeconds` is gone; the count refills), and the
-round boundary despawning DCs/lymphocytes while the two progenitors stay
-placed and re-emit. Deterministic: any test that watches barcodes forces
-`RandomTag`/match via explicit tags, and calls `ResetToDefaults()` after.
-
-### 9. Not in scope
-
-- **Threshold capabilities** (§5's ladder — MHC-I precise kill,
-  neutralisation, complement, IgA, specific sensing). Knowledge unlocks
-  nothing yet.
-- **B cells.** §5c is helper-T; B cells wait.
-- **A real pathogen-species roster.** `PathogenClass` is the species key.
-- **DC homing on debris / macrophage homing on debris** ("find-me"
-  signalling) — already a deferred `BACKLOG.md` item; DC patrol is a
-  plain walk.
-- **Barcode length** — fixed at 8 by the Director; not a variable.
-- **Passive lymphatic drainage** as a knowledge sink (§1c's third debris
-  fate). Only the DC-shuttle fate is built; unsampled debris still just
-  self-dissipates.
-- **Mutation / knowledge erosion** (§5's discrete step-change discount).
-- **The DC:T pairing consuming a helper-T "slot" / helper-T barcode
-  banking toward memory** — pairing is a timed freeze only.
-- Anything from Sprints 1–7 changing behaviour: the invasion loop, the
-  firebreak, §4b intracellular models, the economy/round loop, pooling,
+- **The food item being attackable / a target.** Pure vehicle this pass.
+- **Boss / milestone rounds** and a real difficulty *curve* — just the
+  ~2× placeholder and the per-round class mix.
+- **§5's knowledge threshold ladder** (still the other candidate next
+  sprint — MHC-I precise kill, neutralisation, …). Sprint 8's knowledge
+  % still unlocks nothing.
+- **Emergency granulopoiesis** (§6c breach consequence) — still deferred.
+- **A run restart** — `Defeat` is still terminal.
+- **Economy retuning** — Director's call: leave `RoundStartLumpSum` /
+  `AtpPerKill` alone and judge from the playtest.
+- Anything from Sprints 1–8 changing behaviour beyond the round model:
+  the invasion loop, firebreak, §4b models, the DC shuttle, pooling,
   population caps all keep working.
 
 ## Stopping point (definition of done) — status 2026-08-29
 
-`[~]` = code done + harness-verified, feel unconfirmed (the Director's
-playtest). `[x]` = verified from command output.
+`[~]` = code done + harness-verified, feel unconfirmed. `[x]` = verified
+from command output.
 
-- [~] Open into the buy phase; the picker now offers **four** progenitors
-      (Macrophage 40 · Neutrophil 15 · Dendritic 30 · HelperT 25), each
-      priced and greyed-out when unaffordable, all drawing from the same
-      5 slots. (`BoneMarrowManager`, `RunRoundBoundaryDespawn` places both
-      adaptive kinds through the real picker path.)
-- [~] A placed **helper-T progenitor** populates the lymph node with teal
-      lymphocytes that wander and turn over on a lifespan.
-      (`RunLymphocyteTurnover`, `RunRoundBoundaryDespawn`.)
-- [~] A placed **dendritic-cell progenitor** puts DCs in tissue that walk
-      to a `Dead` cell, pick up antigen (visibly change colour), carry it
-      left into the lymph node, mill among the lymphocytes, and pair with
-      them. (`RunShuttleEndToEnd` drives the whole path.)
-- [~] A **barcode match** (Hamming ≤ 2) on a pairing raises that species'
-      **KNOWLEDGE %** on the HUD with a green flash; a mismatch does not.
-      (`RunShuttleEndToEnd`: matching → exactly `KnowledgePerMatch` on
-      exactly one species; non-matching → 0.)
-- [~] Cargo is spent after `DcPresentationsPerCargo` pairings and the DC
-      **walks back to tissue** for more. (`RunShuttleEndToEnd` asserts the
-      DC reaches `ReturnToTissue` with `!HasCargo`.)
-- [~] The round boundary despawns fielded DCs and lymphocytes; the two
-      progenitor towers stay placed and refill next round; knowledge %
-      persists across rounds. (`RunRoundBoundaryDespawn`.)
-- [x] Everything from Sprints 1–7 still works — Economy 47 / Combat 36 /
-      Lifecycle 79 / Map 71 / Tissue 73 re-run green.
-- [x] `AdaptiveVerification` — **34 passed, 0 failed**. 340 total across
-      all seven harnesses.
-- [x] `GAME_DESIGN.md` §5a/§5c status, `INTERFACE.md`, `ENGINE_STATUS.md`,
+- [~] The buy phase **freezes everything** — pathogens on the wall don't
+      breach, cells don't move, the shuttle pauses. Press Space and it
+      all resumes. (`RoundClock` flag/clock covered by `RunRoundClock`;
+      the per-agent `Update()` gate is covered by the build launch
+      sitting genuinely still.)
+- [~] A round ends when the **food item has delivered its batch and left
+      the lumen**; the buy phase re-freezes with **last round's cells and
+      pathogens still on the board**. (`RunFoodDelivery`,
+      `RunFreezeAndPersistence`.)
+- [~] Each round shows a **tagline** in the round bar; the round's
+      pathogen **mix** follows its definition. (`RunRoundScript`,
+      `RunFoodDelivery`.)
+- [~] Round 1 now **engages** — ~16 pathogens, most sticking to the wall
+      near where the food item drops them. (Batch 16 + adhesion 0.30 +
+      wall-hug drop; whether it *feels* right is the playtest.)
+- [x] Everything from Sprints 1–8 still works — Adaptive 34 / Economy 47 /
+      Combat 36 / Lifecycle 79 / Map 71 / Tissue 73 re-run green.
+- [x] `RoundVerification` — **29 passed, 0 failed**. 369 total across
+      eight harnesses.
+- [x] `GAME_DESIGN.md` §2/§5d, `INTERFACE.md`, `ENGINE_STATUS.md`,
       `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
-      build (93,342,016 bytes, 0 errors), 0 exceptions on launch.
+      build (93,346,112 bytes, 0 errors), 0 exceptions on launch.
 
 **Handed to the Director for playtest.**
 
-The question this sprint answers: **is the shuttle — sample, carry,
-present, match, learn — there and legible on screen**, even with every
-number wrong, and does the lymph node read as a second place where a
-search problem is playing out?
+The question this sprint answers: **does the round rhythm — a frozen buy
+phase, a themed contaminated delivery, a battlefield that persists — feel
+like a game now**, and does round 1 finally engage.
 
 ## Process note
 
-Same as Sprints 6–7: head session, inline, commit after each scope item
-with a reasoning-heavy message, update `INTERFACE.md` and `TEAM_RETRO.md`
-as signatures change and judgment calls are made — not in a final sweep
-(the retro's repeated lesson).
+Head session, inline, commit after each scope item with a reasoning-heavy
+message; update `INTERFACE.md` and `TEAM_RETRO.md` as signatures change
+and judgment calls are made, not in a final sweep.
+
+## Judgment calls being made up front (Director can overrule at playtest)
+
+- **A round ends when the food item exits**, not when the board is clear
+  (the board is never clear now). Round length ≈ food transit time.
+- **The food item is not attackable** — a pure vehicle.
+- **Towers don't emit during the frozen buy phase** (consistent with
+  "freeze time"); they resume on Start. Persisting cells + resumed
+  emission is the standing army.
+- **`ClearFieldedUnits` is kept but no longer called** at the boundary,
+  so a future run-restart still has it.

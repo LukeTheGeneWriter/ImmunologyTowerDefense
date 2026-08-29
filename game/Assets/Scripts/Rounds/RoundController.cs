@@ -55,6 +55,11 @@ namespace ImmunologyTD.Rounds
         public int Lives { get; private set; }
         public int MaxLives { get; private set; }
 
+        /// <summary>Sprint 9: the current round's gut-themed flavour line,
+        /// shown in the HUD round bar ("Contaminated water: poliovirus").
+        /// Empty before the first round.</summary>
+        public string CurrentTagline { get; private set; } = "";
+
         /// <summary>Baseline for the per-tick breach delta -- breaches are
         /// counted globally on <c>InvasionTally</c>, so we track how many we
         /// have already charged for.</summary>
@@ -77,6 +82,7 @@ namespace ImmunologyTD.Rounds
             RoundsCleared = 0;
             breachesCharged = tally != null ? tally.ReachedBase : 0;
             Phase = RoundPhase.Building;
+            RoundClock.Frozen = true; // Sprint 9: the game opens in a frozen buy phase
         }
 
         /// <summary>Begins the next round: pays nothing (the lump sum is
@@ -88,7 +94,14 @@ namespace ImmunologyTD.Rounds
 
             RoundNumber++;
             int batch = EconomyTuning.BatchSizeForRound(RoundNumber);
-            spawner?.BeginBatch(batch);
+
+            // Sprint 9: the round is delivered by a contaminated food item
+            // whose cargo mix and flavour text come from the round script.
+            var def = RoundScript.ForRound(RoundNumber);
+            CurrentTagline = def.Tagline;
+            spawner?.BeginRound(batch, def);
+
+            RoundClock.Frozen = false; // time runs
             Phase = RoundPhase.Active;
         }
 
@@ -121,6 +134,7 @@ namespace ImmunologyTD.Rounds
                 Lives = 0;
                 Phase = RoundPhase.Defeat;
                 spawner?.EndBatch();
+                RoundClock.Frozen = true; // GAME OVER -- everything stops
             }
         }
 
@@ -139,13 +153,22 @@ namespace ImmunologyTD.Rounds
                 Lives = Mathf.Min(MaxLives, Lives + EconomyTuning.LifeRegenAmount);
             }
 
-            // §2: the cells the towers emitted die at the end of the round;
-            // the towers themselves stay placed and re-emit next round.
-            marrow?.ClearFieldedUnits();
-
+            // Sprint 9 (Director, 2026-08-29): the battlefield PERSISTS.
+            // §2's "the cells they emit die at the end of the round" is
+            // retired -- fielded immune cells and loose pathogens both carry
+            // into the (frozen) buy phase and the next round delivers on top
+            // of them. `marrow.ClearFieldedUnits()` is kept on the class for
+            // a future run-restart but is no longer called here.
             spawner?.EndBatch();
+            RoundClock.Frozen = true; // freeze the field for the buy phase
             Phase = RoundPhase.Building;
         }
+
+        /// <summary>Sprint 9: no longer called at the round boundary — the
+        /// battlefield persists — but kept for a future run-restart, which
+        /// wants a clean field. Despawns every fielded immune cell; the
+        /// towers stay placed.</summary>
+        public void DespawnAllFieldedUnits() => marrow?.ClearFieldedUnits();
 
         private void Update()
         {

@@ -82,6 +82,7 @@ namespace ImmunologyTD.Adaptive
         private void Update()
         {
             if (node == null) return;
+            if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: the shuttle pauses during the buy phase / defeat
             Tick(Time.deltaTime);
         }
 

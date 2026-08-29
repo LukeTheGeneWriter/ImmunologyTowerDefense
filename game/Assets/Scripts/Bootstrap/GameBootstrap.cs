@@ -153,6 +153,12 @@ namespace ImmunologyTD.Bootstrap
             // of whether anything is invading (GAME_DESIGN.md section 1c).
             gameObject.AddComponent<TissueDriver>().Bind(tissueGrid);
 
+            // Sprint 9: the buy phase freezes time. RoundClockDriver advances
+            // the sim clock only while a round is Active (RoundController sets
+            // RoundClock.Frozen); every Update()-driven system checks it.
+            RoundClock.Reset();
+            gameObject.AddComponent<RoundClockDriver>();
+
             var layout = BuildLayout();
 
             BuildCamera(layout.Bounds);

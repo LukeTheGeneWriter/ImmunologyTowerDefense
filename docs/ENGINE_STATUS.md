@@ -1,21 +1,24 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 8** (the dendritic-cell shuttle and the
-antigen barcode). Sprint 0's engine/platform decision section is preserved
-below since it is still accurate. Earlier sprints' histories are in
-`docs/CHANGELOG.md`; this file only carries forward what is still true.
+reflects the state after **Sprint 9** (the reworked round model — a frozen
+buy phase, a persistent battlefield, food-item delivery). Sprint 0's
+engine/platform decision section is preserved below since it is still
+accurate. Earlier sprints' histories are in `docs/CHANGELOG.md`; this file
+only carries forward what is still true.
 
 **Sprints 3–5 were implemented by dispatched Code agents interrupted
-mid-task**; the head session finished each. **Sprints 6, 7 and 8 were done
+mid-task**; the head session finished each. **Sprints 6–9 were done
 entirely by the head session**, inline. Anything below that says
 "verified" was verified from actual command output — see "Build status
-(Sprint 8)" and `docs/TEAM_RETRO.md`.
+(Sprint 9)" and `docs/TEAM_RETRO.md`.
 
-**Sprint 8 is a framework pass — every adaptive number is a deliberate
-placeholder, and a rising knowledge % unlocks nothing yet** (§5's
-threshold ladder is the next sprint). The shuttle loop is built and
-harness-verified; whether it *reads* on screen is the Director's playtest.
+**Sprint 9 reworked the round model** (§5d / §2 got dated updates) after
+the Sprint 8 playtest: the buy phase now freezes the whole simulation, the
+battlefield persists round to round, and each round is delivered by a
+contaminated food item that transits the lumen. Difficulty numbers roughly
+doubled — still placeholder. **Sprint 8's adaptive knowledge % still
+unlocks nothing** (§5's threshold ladder is a candidate next sprint).
 
 ## Engine & platform decision
 
@@ -569,6 +572,62 @@ ledger, the `LymphNode` (world rect inset inside the lymph backdrop), the
 two agent pools, and the `AdaptiveDirector`; the lymph-node label drops
 "reserved — not functional yet".
 
+### Sprint 9 additions — the reworked round model
+
+Design: `GAME_DESIGN.md` §5d (reworked) / §2 (dated update). Full
+signature detail in `docs/INTERFACE.md` ("Sprint 9 changes"). Framework
+pass — difficulty numbers are placeholder.
+
+**1. `ImmunologyTD.Rounds.RoundClock` (new static) + `RoundClockDriver`.**
+The one authority on "is the simulation running." `bool Frozen` (opens
+`true`), and `float Time` — a sim clock that only advances while not
+frozen. `RoundController` sets `Frozen = false` on `StartRound`, `true`
+on a round ending and on `Defeat`. Every `Update()`-driven system
+early-returns while frozen and passes `RoundClock.Time` (not
+`UnityEngine.Time.time`) into its `SimulationTick` / `Tick`, so infection
+ramps, the gut breach clock, and burnout timers do **not** fast-forward
+across a buy phase: `PathogenAgent`, `PathogenSpawner`, `SearchUnit`,
+`TissueDriver`, `BoneMarrowManager`, `AdaptiveDirector`, `DendriticCell`,
+`Lymphocyte`. `RoundClockDriver` (3 lines, added by `GameBootstrap`)
+advances the clock. Harnesses never touch it — they drive every tick
+explicitly and never run `Update()`.
+
+**2. Persistent battlefield.** `RoundController` **no longer calls
+`marrow.ClearFieldedUnits()`** at a round boundary — fielded immune cells
+and loose pathogens persist into the frozen buy phase and the next round.
+`RoundController.DespawnAllFieldedUnits()` is a new public passthrough
+that keeps the method reachable for a future run-restart. A round ends
+when its **batch is delivered** (see 3), not when the board is clear.
+
+**3. `PathogenSpawner` — the contaminated food item.** New
+`BeginRound(int count, RoundDefinition def)`: sets a food round, spawns
+one food item at the lumen entry, and — in `Tick` via `AdvanceFood` —
+crawls it along the flow over `InvasionTuning.FoodItemTransitSeconds`,
+dropping the batch in `FoodItemBurstCount` evenly-spaced bursts at
+wall-hugging lumen cells near its position (`SpawnFromFood`, class per
+`def.RollClass()`). A food excreted off the downstream end
+force-delivers any remaining cargo, then retires. `BatchComplete` under a
+food round = **batch emitted AND `foodExited`** (the field is no longer
+required clear); the old `BeginBatch(int)` path keeps its
+emitted+lumen/tissue-clear rule for the harnesses. The food item is a
+non-pooled single `GameObject` the spawner shows/hides/moves (dull ochre,
+`sortingOrder` 22). `PathogenAgent.Initialize` gained optional
+`lumenCellOverride` / `classOverride`.
+
+**4. `ImmunologyTD.Rounds.RoundScript` (new static).**
+`struct RoundDefinition { string Tagline; float VirusWeight /
+BacteriumWeight / LargeBacteriumWeight; PathogenClass RollClass(); }`.
+`RoundScript.ForRound(int)` — ~6 hand-written gut-themed rounds, then a
+procedural "spoiled leftovers, day N" fallback. `RoundController` exposes
+`string CurrentTagline`; `HudOverlay`'s round bar shows the tagline plus
+"Time is frozen" / "a contaminated food item is delivering."
+
+**5. Difficulty (all placeholder).** `EconomyTuning.BatchSizeBase` 8 →
+**16**, `BatchSizeGrowthPerRound` 3 → **6**.
+`InvasionTuning.AdhesionChanceAtWall` 0.12 → **0.30**. New
+`FoodItemTransitSeconds` 30 / `FoodItemBurstCount` 4 /
+`FoodItemWallHugDepth` 1. Economy untouched.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -600,7 +659,7 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 8)
+## Build status (Sprint 9)
 
 All run by the **head session**. Numbers copied from actual output.
 
@@ -608,15 +667,34 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
-| `AdaptiveVerification.RunAll` (**new**, Sprint 8) | **34 passed, 0 failed** |
+| `RoundVerification.RunAll` (**new**, Sprint 9) | **29 passed, 0 failed** |
+| `AdaptiveVerification.RunAll` (Sprint 8) | 34 passed, 0 failed |
 | `EconomyVerification.RunAll` (Sprint 7) | 47 passed, 0 failed |
 | `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**340 assertions, 0 failed**, on a clean working tree after every Sprint 8
+**369 assertions, 0 failed**, on a clean working tree after every Sprint 9
 commit.
+
+`RoundVerification` drives `RoundClock` (opens frozen; `Advance` is a
+no-op while frozen, accumulates while running; re-freezing holds the
+clock), `RoundScript` (scripted rounds 1–6 distinct; procedural fallback
+names the round; a weighted mix respects its weights; all-zero doesn't
+divide by zero), and the real `PathogenSpawner` / `RoundController`
+food-round path: `StartRound` arms a food round + unfreezes + sets the
+tagline; the food emits the whole batch as it travels; `BatchComplete`
+stays false while the food is still in the lumen even after the last
+burst; the round ends once the food exits; clear re-freezes + grants the
+lump; and — with adhesion forced to 0.95 so the batch sticks — fielded
+immune cells **and** loose pathogens both survive the round boundary,
+with `DespawnAllFieldedUnits` still clearing the field for a restart. The
+`Update()`-only freeze *gate* (every agent's `if (RoundClock.Frozen)
+return`) can't run headlessly and is covered by the build launch.
+`MapVerification` 4c was repinned to `AdhesionChanceAtWall` 0.03 (it
+tests falloff shape, and both the new 0.30 default and the old 0.12
+saturated a depth-blind channel at 400/400).
 
 `AdaptiveVerification` drives the real `Antigen` math (popcount / Hamming
 / `IsMatch` boundary / threshold-0 exact-match), `KnowledgeLedger`
@@ -717,33 +795,36 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 8)
+### Windows build (Sprint 9)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,342,016 bytes, 0 errors.**
-Launched headlessly for ~22s: **0 exceptions / 0 errors** — the bootstrap
-diagnostic prints clean (25×10, base axis 0..5 / tissue 6..18 / lumen
-19..24; lymph-node world position logged). The game opens in the buy
-phase with the spawner un-armed, so a passive launch sits idle by design
-— the adaptive code paths (sample, travel, pair, match, turnover,
-boundary) are covered by `AdaptiveVerification`, not this launch.
+`BuildScript.BuildWindows()` — **Succeeded, 93,346,112 bytes, 0 errors.**
+Launched headlessly for ~20s: **0 exceptions / 0 errors** — the bootstrap
+diagnostic prints clean (25×10 layout). The game opens in the **frozen**
+buy phase, so a passive launch sits genuinely still — the round-model
+code paths (freeze, food delivery, persistence, re-freeze) are covered by
+`RoundVerification`, not this launch. The `Update()` freeze gate is
+exercised here only in the sense that nothing moves.
 
 ### What was NOT verified
 
-- **Nobody has watched the shuttle.** A DC picking up antigen off a dead
-  cell, crossing to the lymph node, milling among the helper-T cells,
-  pairing (the freeze), and the KNOWLEDGE % moving on a match — that whole
-  sequence is the question this sprint exists to answer, and it needs a
-  human watching a build. So does whether the lymph node reads as a second
-  arena with its own search problem, and whether any placeholder number
-  (match threshold, pairing time, lifespan, cargo capacity, node size) is
-  even the right order of magnitude.
-- **The four-way buy decision** with only 5 slots — whether it feels like
-  the intended tension or just cramped — is a playtest question.
-- **Placement / clicking** through the running build's UI (the picker now
-  has four priced, grey-out buttons), same as every sprint since 3.
-- **Nobody has played the Sprint 7 loop either** (buy → start → survive →
-  get paid), carried forward — and now with a real wallet also paying for
-  adaptive towers.
+- **Nobody has played the new round rhythm.** A frozen buy phase, a
+  contaminated food item transiting the lumen and dropping its bursts at
+  the wall, a battlefield that persists into the next round, the tagline
+  — that whole loop is the question this sprint exists to answer and it
+  needs a human at the keyboard. So does whether the doubled difficulty
+  (16-batch round 1, adhesion 0.30) makes round 1 *engage* without
+  overwhelming, and whether ATP now accumulates too fast with a
+  persistent army.
+- **Nobody has watched the Sprint 8 shuttle** either (DC sample → node →
+  pair → KNOWLEDGE % moves), carried forward — and it now pauses in the
+  frozen buy phase, which is new behaviour to eyeball.
+- **Placement / clicking** through the running build's UI, same as every
+  sprint since 3.
+- **A `Time.time`-based timer's behaviour on the FIRST tick after
+  unfreeze** — infection ramps and burnout windows read `RoundClock.Time`
+  now so they don't fast-forward, but `GutInterface`'s roll clock sees a
+  `currentTime` that jumped, so it rolls once immediately on unfreeze.
+  One roll, not a flood; unverified in a build.
 - Sprint 6's §4b visuals and Sprint 5's infected-cell colours — still
   unwatched, carried forward.
 - **WebGL** not re-verified (unchanged since Sprint 1).
@@ -843,6 +924,39 @@ boundary) are covered by `AdaptiveVerification`, not this launch.
   a knowledge sink) is not built.** Unsampled debris still just
   self-dissipates; there is no "drains to the node and is deleted with
   nothing learned" path yet.
+- **(New, Sprint 9) Every round-model number is a placeholder.**
+  `EconomyTuning` batch curve (16/6), `InvasionTuning.AdhesionChanceAtWall`
+  0.30, `FoodItemTransitSeconds` 30 / `FoodItemBurstCount` 4 /
+  `FoodItemWallHugDepth` 1. Difficulty roughly doubled on the Director's
+  say-so; not a balance pass.
+- **(New, Sprint 9) The economy is un-retuned against a persistent army.**
+  `RoundStartLumpSum` 80 and `AtpPerKill` 3 are unchanged, but the player
+  no longer rebuilds each round, so ATP should accumulate faster than
+  before. Deliberate — judge from the playtest.
+- **(New, Sprint 9) `RoundClock` is a process-global static** (like
+  `CytokineToggle` / `EconomyHooks`). Fine for one scene / one round loop;
+  a second board would need an instance path. A harness that pokes it
+  must `RoundClock.Reset()` afterwards.
+- **(New, Sprint 9) `GutInterface`'s roll clock sees a time jump on
+  unfreeze.** The spawner passes `RoundClock.Time` (which doesn't
+  advance while frozen) but `GutInterface.Tick` compares `now -
+  lastRollTime`; after a long buy phase that delta is large, so every
+  occupied wall position rolls once on the first unfrozen tick. One roll,
+  not a flood, but it means a breach can fire in the first frame of a
+  round. Revisit if it reads badly.
+- **(New, Sprint 9) The food item is not attackable.** A pure delivery
+  vehicle — no health, no way to intercept it before it drops its cargo.
+  Destructible food (interrupt the delivery) is a plausible later
+  mechanic; the `FoodItem*` tuning and the single-`GameObject` visual are
+  where it would attach.
+- **(New, Sprint 9) A round ends when the food EXITS, not when the board
+  is clear** (the board is never clear now). `PathogenSpawner.BatchComplete`
+  branches on `foodRound`. If the food ever becomes destructible or the
+  round model changes again, that branch is the place to look.
+- **(New, Sprint 9) The buy phase / defeat freeze the adaptive arena and
+  tissue healing too.** Intended ("freeze time"), but it means debris
+  doesn't dissipate and cells don't regrow while you shop — a long buy
+  phase is genuinely paused, not just spawn-paused.
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell
