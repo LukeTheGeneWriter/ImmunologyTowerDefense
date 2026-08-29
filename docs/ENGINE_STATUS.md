@@ -1,20 +1,21 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 7** (the ATP economy framework and the
-round loop). Sprint 0's engine/platform decision section is preserved below
-since it is still accurate. Earlier sprints' histories are in
+reflects the state after **Sprint 8** (the dendritic-cell shuttle and the
+antigen barcode). Sprint 0's engine/platform decision section is preserved
+below since it is still accurate. Earlier sprints' histories are in
 `docs/CHANGELOG.md`; this file only carries forward what is still true.
 
 **Sprints 3–5 were implemented by dispatched Code agents interrupted
-mid-task**; the head session finished each. **Sprints 6 and 7 were done
+mid-task**; the head session finished each. **Sprints 6, 7 and 8 were done
 entirely by the head session**, inline. Anything below that says
 "verified" was verified from actual command output — see "Build status
-(Sprint 7)" and `docs/TEAM_RETRO.md`.
+(Sprint 8)" and `docs/TEAM_RETRO.md`.
 
-**Sprint 7 is a framework pass — every economy/round number is a
-deliberate placeholder** (Director's instruction). The state machine is
-right; the balance is not attempted.
+**Sprint 8 is a framework pass — every adaptive number is a deliberate
+placeholder, and a rising knowledge % unlocks nothing yet** (§5's
+threshold ladder is the next sprint). The shuttle loop is built and
+harness-verified; whether it *reads* on screen is the Director's playtest.
 
 ## Engine & platform decision
 
@@ -470,6 +471,104 @@ lives, round + phase, batch progress, buy-phase prompt + Start button,
 GAME OVER). `GameBootstrap` wires the wallet, the kill hook, the
 `RoundController`; the game opens in a buy phase with the spawner un-armed.
 
+### Sprint 8 additions — the dendritic-cell shuttle and the antigen barcode
+
+Design: `GAME_DESIGN.md` §5a (the DC shuttle loop), §5c (the 8-bit
+barcode, pairing, turnover), §1c (debris is the antigen source), §5
+(knowledge is a per-species %). Signature-level detail in
+`docs/INTERFACE.md` ("Sprint 8 changes"). **Framework pass — a rising
+knowledge % unlocks nothing yet; §5's threshold ladder is next.**
+
+**1. `ImmunologyTD.Adaptive` (new namespace).**
+
+- **`Antigen`** — the 8-bit barcode as a plain `byte`, side-effect-free
+  like `Chemotaxis`: `RandomTag`, `HammingDistance` (manual 8-iter
+  popcount of `a ^ b`), `IsMatch` (distance ≤
+  `AdaptiveTuning.MatchMaxHammingDistance`), `ForClass`.
+- **`KnowledgeLedger`** — `float[3]` keyed by `(int)PathogenClass` (the
+  species key until a roster exists). `Get` / `Add` (clamped
+  `0..KnowledgeMax`) / `Reset`, `Revision` for cheap HUD change-detection.
+  Per run, constructed by `GameBootstrap`, passed by reference.
+- **`AdaptiveTuning`** — mutable statics + `ResetToDefaults()`, every value
+  placeholder: `MatchMaxHammingDistance` 2, `KnowledgePerMatch` 3,
+  `KnowledgeMax` 100, per-class antigens (≥4 bits apart),
+  `DcPresentationsPerCargo` 4, `DcDebrisSamplePerBite` 0.34,
+  `DcFineTilesPerTick` 2, `DcAxisWalkBiasSharpness` 1.6,
+  `LymphocyteLifespanSeconds` 20, `LymphocyteFineTilesPerTick` 2,
+  `PairingSeconds` 1.5, `NodePairingContactFineTiles` 3,
+  `NodeColocalisationSourceStrength` 18, `NodeLymphocyteSourceStrength` 6,
+  DC/lymphocyte emission intervals and `MaxActiveChildren`.
+
+**2. Debris carries an antigen (`TissueGrid`).** New per-cell
+`PathogenClass? debrisAntigen`, set on death, cleared with the pile
+(`BecomeEmpty`). `KillHostCell` / `DamageHostCell` gained an optional
+trailing `PathogenClass? antigen`; when null and the cell has an
+intracellular resident, the resident's `Class` is used — so the
+stress-sense loud kill and neutrophil collateral record the right antigen
+with no caller change. `BurstBrood` / `BurnOut` detach before killing, so
+they pass `Class` explicitly. New read `GetDebrisAntigen(coord)`.
+
+**3. `LymphNode` (plain class, like `TissueGrid`).** Its own 6×6
+`BoardConfig` (42×42 fine) and a `CytokineField` — the **co-localisation
+signal** of §5c step 4, recomputed each step from a fixed central source
+plus every resident lymphocyte as a weak source, so a DC drifts toward
+where the T cells actually are. Node movement runs the **exact
+`Chemotaxis.ChooseNextStep` path** the tissue units use (the reuse the
+Director asked for); the small grid keeps `strength / (1 + distance)`
+steep, so Sprint 4's flat-at-scale finding doesn't bite here.
+`NodeToWorld` maps node fine tiles into the lymph backdrop rect.
+`Step(now)` recomputes the field, resolves + forms DC:helper-T pairings
+(`INodeVisitor` interface stands in for `DendriticCell`), moves residents,
+ages them out. The tick gate lives one level up in `AdaptiveDirector`.
+
+**4. `Lymphocyte` (MonoBehaviour agent).** Born with a random 8-bit
+`Tag`, wanders the node via `Chemotaxis` against the co-localisation
+field, frozen while paired, aged out at `LymphocyteLifespanSeconds` — the
+progenitor re-emits a fresh tag, which is §5c's barcode turnover. Tween in
+`Update()`; `NodeTick` driven by `LymphNode.Step`.
+
+**5. `DendriticCell` (MonoBehaviour agent, implements `INodeVisitor`).**
+State machine `PatrolTissue → TravelToNode → InNode → ReturnToTissue`.
+Patrol is a plain random walk (no debris homing — deferred `BACKLOG.md`
+item); on a `Dead` cell with an antigen it **samples** (picks up the
+antigen, eats one `DcDebrisSamplePerBite` — so it competes with
+efferocytosis, §1c). Travel and return are **axis-frame** softmax biased
+walks (`dir * AxisIndex`, never a world direction — same rule as pathogen
+advance). In the node it wanders the co-localisation gradient;
+`OnPairingResolved` spends one presentation whether or not it taught; at
+zero the cargo is spent and it walks back **empty** (it does not die —
+travel time is the cost; §5a's open "dies or returns empty" resolved this
+way). `Update()` tween deliberately slides across the tissue↔node gap so
+"the DC went to the node" reads.
+
+**6. `AdaptiveDirector` (MonoBehaviour).** Owns the DC pool, the
+lymphocyte pool and the `LymphNode`, runs the whole arena on one
+simulated `Clock`: a single tick gate sub-steps `LymphNode.Step` and every
+fielded DC's `SimulationTick`. `EmitDendriticCell` (tissue base edge,
+random lane) / `EmitLymphocyte` (into the node) keyed by marrow slot;
+`DendriticCellCount` / `LymphocyteCount` for the cap; `DespawnAllFielded`
+for the round boundary.
+
+**7. Bone-marrow integration.** `UnitKind` gains `DendriticCell`,
+`HelperT`. `EconomyTuning` gains `DendriticCellPrice` 30 / `HelperTPrice`
+25. `BoneMarrowManager` stays the slot / picker / cost / cap /
+round-boundary authority; `Initialize` gained an optional trailing
+`AdaptiveDirector` (null in the innate-only harnesses — placing an
+adaptive kind is then refused). A placed adaptive slot's `Tuning` carries
+only `MaxActiveChildren`; its interval is `IntervalFor(kind)`; its live
+count is `GetActiveChildren(i)` over `AdaptiveChildren`. `Emit` branches
+to `EmitAdaptive` → the director; `OnAdaptiveChildDespawned` drops the
+tracking ref when an agent pools itself. `ClearFieldedUnits` calls
+`adaptive.DespawnAllFielded()`. The picker shows four priced, grey-out
+buttons (the last two only when a director is wired).
+
+**8. HUD + bootstrap.** `HudOverlay.Bind` gained optional
+`KnowledgeLedger` + `AdaptiveDirector`; new KNOWLEDGE line (per-species %
++ node population). `GameBootstrap` resets `AdaptiveTuning`, builds the
+ledger, the `LymphNode` (world rect inset inside the lymph backdrop), the
+two agent pools, and the `AdaptiveDirector`; the lymph-node label drops
+"reserved — not functional yet".
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -501,7 +600,7 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 7)
+## Build status (Sprint 8)
 
 All run by the **head session**. Numbers copied from actual output.
 
@@ -509,14 +608,31 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
-| `EconomyVerification.RunAll` (**new**, Sprint 7) | **47 passed, 0 failed** |
+| `AdaptiveVerification.RunAll` (**new**, Sprint 8) | **34 passed, 0 failed** |
+| `EconomyVerification.RunAll` (Sprint 7) | 47 passed, 0 failed |
 | `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**306 assertions, 0 failed**, on a clean working tree after every Sprint 7
+**340 assertions, 0 failed**, on a clean working tree after every Sprint 8
 commit.
+
+`AdaptiveVerification` drives the real `Antigen` math (popcount / Hamming
+/ `IsMatch` boundary / threshold-0 exact-match), `KnowledgeLedger`
+(per-species, clamped both ends, `Revision`, `Reset`), debris carrying an
+antigen (`KillHostCell(coord, class)` → `GetDebrisAntigen` → cleared by
+`ClearDebris`), a **full simulated shuttle** through the real
+`AdaptiveDirector` / `LymphNode` / `DendriticCell` / `Lymphocyte` — seed a
+tissue-wide debris pile of one species, emit one DC + one lymphocyte,
+drive `Tick` until the DC returns; a **matching** pairing (threshold
+forced to 8) raises exactly that species' knowledge by exactly
+`KnowledgePerMatch` and nothing else's, a **non-matching** one (threshold
+−1) still freezes + spends the cargo but teaches 0 — lymphocyte turnover
+(a resident past its lifespan despawns, fires its callback, the progenitor
+re-populates), and the round boundary (place a DC + a helper-T tower via
+the real `BoneMarrowManager`, tick to emit, `ClearFieldedUnits` despawns
+every fielded agent, both towers stay `Placed` and re-emit).
 
 `EconomyVerification` drives the real `AtpWallet` (arithmetic, overspend,
 non-positive edge cases), `PathogenSpawner` batch gating (un-armed emits
@@ -601,32 +717,35 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 7)
+### Windows build (Sprint 8)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,325,632 bytes, 0 errors.**
-Launched headlessly for ~22s: **0 exceptions / 0 errors** in `Player.log`.
-The game opens in the buy phase with the spawner un-armed, so a passive
-launch sits idle by design — the round-loop code paths (StartRound, batch,
-clear, defeat) are covered by `EconomyVerification`, not this launch.
-Bootstrap diagnostic unchanged (25×10, layout fits).
+`BuildScript.BuildWindows()` — **Succeeded, 93,342,016 bytes, 0 errors.**
+Launched headlessly for ~22s: **0 exceptions / 0 errors** — the bootstrap
+diagnostic prints clean (25×10, base axis 0..5 / tissue 6..18 / lumen
+19..24; lymph-node world position logged). The game opens in the buy
+phase with the spawner un-armed, so a passive launch sits idle by design
+— the adaptive code paths (sample, travel, pair, match, turnover,
+boundary) are covered by `AdaptiveVerification`, not this launch.
 
 ### What was NOT verified
 
-- **Nobody has played the loop.** Buy → start → survive → get paid → buy
-  more is the whole question of the sprint, and it needs a human at the
-  keyboard: the buy decision, the Start keypress, watching a batch resolve
-  and land back in a buy phase, seeing ATP tick up per kill and lives tick
-  down per breach, and — the point of a *framework* pass — whether any of
-  the placeholder numbers are even in the right order of magnitude.
-- **The §6 combat/infection mechanics under the round loop.** The
-  harnesses drive economy and combat separately; nobody has watched a
-  round's worth of pathogens meet a bought defence with a real wallet
-  constraining it.
+- **Nobody has watched the shuttle.** A DC picking up antigen off a dead
+  cell, crossing to the lymph node, milling among the helper-T cells,
+  pairing (the freeze), and the KNOWLEDGE % moving on a match — that whole
+  sequence is the question this sprint exists to answer, and it needs a
+  human watching a build. So does whether the lymph node reads as a second
+  arena with its own search problem, and whether any placeholder number
+  (match threshold, pairing time, lifespan, cargo capacity, node size) is
+  even the right order of magnitude.
+- **The four-way buy decision** with only 5 slots — whether it feels like
+  the intended tension or just cramped — is a playtest question.
 - **Placement / clicking** through the running build's UI (the picker now
-  also has price buttons and grey-out), same as every sprint since 3.
-- Sprint 6's §4b visuals (loud kill, brood burst, budding disk, burn-out)
-  and Sprint 5's infected-cell colours — still unwatched, carried forward.
-- **WebGL** not re-verified (unchanged since Sprint 1).
+  has four priced, grey-out buttons), same as every sprint since 3.
+- **Nobody has played the Sprint 7 loop either** (buy → start → survive →
+  get paid), carried forward — and now with a real wallet also paying for
+  adaptive towers.
+- Sprint 6's §4b visuals and Sprint 5's infected-cell colours — still
+  unwatched, carried forward.
 - **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
@@ -692,6 +811,38 @@ Bootstrap diagnostic unchanged (25×10, layout fits).
   granulopoiesis, §6c) is not built.** A breach is currently "just the
   counter", which §6c itself warns reads as a cushion. Flagged for the
   playtest.
+- **(New, Sprint 8) Every adaptive number is a placeholder, and knowledge
+  unlocks nothing.** `AdaptiveTuning` — match threshold, knowledge per
+  match, per-class antigens, cargo capacity, debris-sample bite, pairing
+  time, lymphocyte lifespan, node field strengths, emission cadence /
+  caps. A rising KNOWLEDGE % is a HUD number only; §5's threshold ladder
+  (MHC-I precise kill, neutralisation, complement, IgA, specific sensing)
+  is the next sprint.
+- **(New, Sprint 8) Species key = `PathogenClass` (3 values), not a
+  roster.** Each class has one fixed antigen barcode in `AdaptiveTuning`.
+  A real pathogen-species system (also needed for §4b's budding-vs-chain
+  trait) makes knowledge key off species id and each species roll its own
+  antigen.
+- **(New, Sprint 8) The whole adaptive arena runs on `AdaptiveDirector`'s
+  own `Clock`,** advanced one tick per sub-step in `Tick`, not aligned to
+  the tissue board's `Time.time`. Fine for lifespan / pairing (they only
+  need it internally consistent); a future feature that needs the two
+  clocks in lockstep would have to thread one through.
+- **(New, Sprint 8) `AdaptiveDirector` ticks the node every frame
+  regardless of round phase** — the lymph node keeps milling during the
+  buy phase and during `Defeat`. Cosmetic; a real pause/freeze would gate
+  it on `RoundController.Phase`.
+- **(New, Sprint 8) A spent DC returns to tissue empty, it does not die.**
+  §5a's "does the DC die or return empty" is resolved as *return* for
+  now; the travel time is the only cost of a spent cargo.
+- **(New, Sprint 8) The DC:helper-T pairing is a timed freeze only.** No
+  §5c "pair for a few *turns*" per-turn cost model beyond the single
+  `PairingSeconds` window, and a helper-T's tag is not banked toward
+  memory. B cells are not built (helper-T only).
+- **(New, Sprint 8) Passive lymphatic drainage (§1c's third debris fate —
+  a knowledge sink) is not built.** Unsampled debris still just
+  self-dissipates; there is no "drains to the node and is deleted with
+  nothing learned" path yet.
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell

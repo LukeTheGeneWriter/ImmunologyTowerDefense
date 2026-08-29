@@ -224,34 +224,42 @@ placed and re-emit. Deterministic: any test that watches barcodes forces
   firebreak, §4b intracellular models, the economy/round loop, pooling,
   population caps all keep working.
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-29
 
 `[~]` = code done + harness-verified, feel unconfirmed (the Director's
 playtest). `[x]` = verified from command output.
 
-- [ ] Open into the buy phase; the picker now offers **four** progenitors
+- [~] Open into the buy phase; the picker now offers **four** progenitors
       (Macrophage 40 · Neutrophil 15 · Dendritic 30 · HelperT 25), each
       priced and greyed-out when unaffordable, all drawing from the same
-      5 slots.
-- [ ] A placed **helper-T progenitor** populates the lymph node with teal
+      5 slots. (`BoneMarrowManager`, `RunRoundBoundaryDespawn` places both
+      adaptive kinds through the real picker path.)
+- [~] A placed **helper-T progenitor** populates the lymph node with teal
       lymphocytes that wander and turn over on a lifespan.
-- [ ] A placed **dendritic-cell progenitor** puts DCs in tissue that walk
+      (`RunLymphocyteTurnover`, `RunRoundBoundaryDespawn`.)
+- [~] A placed **dendritic-cell progenitor** puts DCs in tissue that walk
       to a `Dead` cell, pick up antigen (visibly change colour), carry it
       left into the lymph node, mill among the lymphocytes, and pair with
-      them.
-- [ ] A **barcode match** (Hamming ≤ 2) on a pairing raises that species'
+      them. (`RunShuttleEndToEnd` drives the whole path.)
+- [~] A **barcode match** (Hamming ≤ 2) on a pairing raises that species'
       **KNOWLEDGE %** on the HUD with a green flash; a mismatch does not.
-- [ ] Cargo is spent after `DcPresentationsPerCargo` pairings and the DC
-      **walks back to tissue** for more.
-- [ ] The round boundary despawns fielded DCs and lymphocytes; the two
+      (`RunShuttleEndToEnd`: matching → exactly `KnowledgePerMatch` on
+      exactly one species; non-matching → 0.)
+- [~] Cargo is spent after `DcPresentationsPerCargo` pairings and the DC
+      **walks back to tissue** for more. (`RunShuttleEndToEnd` asserts the
+      DC reaches `ReturnToTissue` with `!HasCargo`.)
+- [~] The round boundary despawns fielded DCs and lymphocytes; the two
       progenitor towers stay placed and refill next round; knowledge %
-      persists across rounds.
-- [ ] Everything from Sprints 1–7 still works — Economy 47 / Combat 36 /
+      persists across rounds. (`RunRoundBoundaryDespawn`.)
+- [x] Everything from Sprints 1–7 still works — Economy 47 / Combat 36 /
       Lifecycle 79 / Map 71 / Tissue 73 re-run green.
-- [ ] `AdaptiveVerification` — all green.
-- [ ] `GAME_DESIGN.md` §5a/§5c status, `INTERFACE.md`, `ENGINE_STATUS.md`,
+- [x] `AdaptiveVerification` — **34 passed, 0 failed**. 340 total across
+      all seven harnesses.
+- [x] `GAME_DESIGN.md` §5a/§5c status, `INTERFACE.md`, `ENGINE_STATUS.md`,
       `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
-      build, 0 exceptions on launch.
+      build (93,342,016 bytes, 0 errors), 0 exceptions on launch.
+
+**Handed to the Director for playtest.**
 
 The question this sprint answers: **is the shuttle — sample, carry,
 present, match, learn — there and legible on screen**, even with every

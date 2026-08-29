@@ -12,6 +12,51 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 8 -- 2026-08-29
+The adaptive system can learn a pathogen now. The framework, not the
+balance -- **every number is a placeholder**, and knowledge unlocks
+nothing yet (that's the next sprint).
+
+**The lymph node is a real place.** It was a labelled backdrop since
+Sprint 2; now it's a small arena with its own co-localisation cytokine
+signal that pulls its two cell types together.
+
+**Two new progenitor towers** in the bone marrow, sharing the same 5
+slots as macrophage/neutrophil (one of each innate + one of each adaptive
+is 4 of 5 -- on purpose): **Dendritic** (30 ATP) and **Helper-T** (25
+ATP), each priced and greyed-out when you can't afford it.
+
+**The shuttle** (GAME_DESIGN 5a): a dendritic cell patrols tissue; when it
+walks onto a **dead cell**, it picks up that cell's **antigen** -- debris
+now remembers what killed it -- and eats a bite of the pile (so it
+competes with a macrophage for the same debris, 5c). It then carries the
+antigen left into the **lymph node**, mills among the helper-T cells, and
+**pairs** with them: both freeze for ~1.5s.
+
+**The barcode** (GAME_DESIGN 5c): every helper-T cell is born with a
+random **8-bit tag**; the antigen is an 8-bit tag too. If they match
+within a **Hamming distance of 2** (>=6 of 8 bits agree -- a tunable
+field), the pairing **teaches**: that species' **KNOWLEDGE %** on the HUD
+goes up, with a green flash. If not, the freeze still cost both cells
+their time. A cargo is good for 4 pairings, then the DC walks back to
+tissue for more. Helper-T cells age out on a lifespan and the progenitor
+emits fresh tags, so the repertoire keeps turning over -- you're never
+permanently stuck without a match. Knowledge persists across rounds; the
+round boundary despawns the fielded DCs and lymphocytes like any emitted
+cell, and the towers refill next round.
+
+Verified: a new **AdaptiveVerification** harness, **34 assertions** --
+the barcode math, the knowledge ledger's clamp, debris carrying an
+antigen, a **full simulated shuttle** (a matching pairing raises exactly
+one species' knowledge by exactly one increment; a non-matching one
+teaches nothing), lymphocyte turnover, and the round boundary -- plus
+Economy 47 / Combat 36 / Lifecycle 79 / Map 71 / Tissue 73 all still
+green (**340 total, 0 failed**). Clean Windows build, 0 exceptions on
+launch. **Not** verified: nobody has watched the shuttle run -- a DC pick
+up antigen, cross to the node, pair, and the number move -- or judged
+whether the lymph node reads as a second search arena. That's the
+Director's playtest, and it's the question this sprint exists to answer.
+
 ## Sprint 7 -- 2026-08-28
 There is a game loop now. The framework, not the balance -- **every number
 is a placeholder**.

@@ -1146,6 +1146,156 @@ Defeat, inert after Defeat, regen), placement cost, per-kill income
 through the real `SearchUnit.RegisterKill`, and round-boundary unit
 clearing. Same no-Play-Mode philosophy as the five before it.
 
+## Sprint 8 changes — the dendritic-cell shuttle and the antigen barcode (`GAME_DESIGN.md` §5a/§5c)
+
+Design: §5a (the DC shuttle loop), §5c (the 8-bit barcode / pairing /
+turnover), §1c (debris is the antigen source), §5 (knowledge is a
+per-species %). **Framework pass — a rising knowledge % unlocks nothing
+yet.**
+
+### `ImmunologyTD.Adaptive` (new namespace)
+
+- **`Antigen`** (static, side-effect-free) — the 8-bit barcode as a plain
+  `byte`. `byte RandomTag()`, `int HammingDistance(byte, byte)`
+  (`popcount(a ^ b)`), `bool IsMatch(byte, byte)` (distance ≤
+  `AdaptiveTuning.MatchMaxHammingDistance`), `byte ForClass(PathogenClass)`.
+- **`KnowledgeLedger`** — plain reference type, per run. `float Get(PathogenClass)`
+  (0..`KnowledgeMax`), `float Add(PathogenClass, float)` (clamped, returns
+  new value), `void Reset()`, `int Revision` (bumps on change, for cheap
+  HUD polling). Backing store is `float[3]` keyed by `(int)PathogenClass`.
+- **`AdaptiveTuning`** — mutable statics + `ResetToDefaults()`, all
+  placeholder. `const int BarcodeBits = 8` (fixed by the Director).
+  Mutable: `MatchMaxHammingDistance` 2, `KnowledgePerMatch` 3,
+  `KnowledgeMax` 100, `VirusAntigen`/`BacteriumAntigen`/`LargeBacteriumAntigen`
+  (≥4 bits apart), `DcPresentationsPerCargo` 4, `DcDebrisSamplePerBite`
+  0.34, `DcFineTilesPerTick` 2, `DcAxisWalkBiasSharpness` 1.6,
+  `LymphocyteLifespanSeconds` 20, `LymphocyteFineTilesPerTick` 2,
+  `PairingSeconds` 1.5, `NodePairingContactFineTiles` 3,
+  `NodeColocalisationSourceStrength` 18, `NodeLymphocyteSourceStrength` 6,
+  `Dc/LymphocyteEmissionIntervalSeconds`, `Dc/LymphocyteMaxActiveChildren`.
+
+### `TissueGrid` — debris antigen
+
+- **`PathogenClass? GetDebrisAntigen(CoarseCoord)`** (new read) — the
+  class of whatever killed the cell whose debris sits here, or null.
+- **`KillHostCell(CoarseCoord, PathogenClass? antigen = null)`** and
+  **`DamageHostCell(CoarseCoord, float, PathogenClass? antigen = null)`** —
+  optional trailing arg. When null and the cell has an intracellular
+  resident, `resident.Class` is used, so the stress-sense loud kill
+  (`SearchUnit`) and neutrophil collateral need no change. `BurstBrood` /
+  `BurnOut` (which detach the resident first) pass `Class` explicitly.
+  Every pre-Sprint-8 caller keeps compiling (optional arg). Cleared with
+  the pile in `BecomeEmpty`.
+
+### `LymphNode` (`ImmunologyTD.Adaptive`, plain class)
+
+Constructed by `GameBootstrap` / a harness: `new LymphNode(KnowledgeLedger,
+Rect worldRect)`. Owns its own `BoardConfig` (6×6 coarse, built via
+`ConfigureForTest`) and a `CytokineField` — the **co-localisation signal**
+(§5c step 4), recomputed each `Step` from a fixed central source + every
+resident lymphocyte as a weak source.
+
+- `void Step(float currentTime)` — recompute the field, `ResolvePairs` /
+  `FormPairs`, move residents (`Lymphocyte.NodeTick`), age residents past
+  `LymphocyteLifespanSeconds`. **The tick gate is in `AdaptiveDirector`**,
+  not here — one clock for the whole arena.
+- `void RegisterResident(Lymphocyte)` / `UnregisterResident(Lymphocyte)`;
+  `void Admit(INodeVisitor)` / `Release(INodeVisitor)`.
+- `BoardConfig NodeBoard`, `CytokineField Coloc`, `Rect WorldRect`,
+  `float AgentWorldSize`, `Vector3 NodeToWorld(FineCoord)`,
+  `FineCoord RandomInteriorFine()`.
+- `int ResidentCount` / `int VisitorCount`, `IReadOnlyList<Lymphocyte> Residents`.
+- **`interface INodeVisitor`** — `FineCoord NodePos`, `byte Cargo`,
+  `PathogenClass CargoClass`, `bool HasCargo`, `bool Frozen { get; set; }`,
+  `void OnPairingResolved(bool taught)`. Implemented by `DendriticCell`;
+  lets pairing be written without the node depending on the concrete type.
+- Pairing: a visitor with cargo not already paired, and a resident not
+  paired, within `NodePairingContactFineTiles` (Chebyshev) → both
+  `Frozen`, resolve at `now + PairingSeconds`. On resolve:
+  `taught = HasCargo && Antigen.IsMatch(Cargo, resident.Tag)`; if taught,
+  `knowledge.Add(CargoClass, KnowledgePerMatch)` + a
+  `DegranulationFlash.KnowledgeMatchColor` burst. Either way both unfreeze
+  and `visitor.OnPairingResolved(taught)`.
+
+### `Lymphocyte` (`ImmunologyTD.Adaptive`, MonoBehaviour agent)
+
+`Initialize(LymphNode, byte tag, FineCoord start, float bornAt, System.Action<Lymphocyte> onDespawn)`.
+`byte Tag` (fixed at birth), `FineCoord Node`, `float BornAt`, `bool Frozen`.
+`NodeTick(float)` — `Chemotaxis.ChooseNextStep` against `node.Coloc`
+unless frozen; driven by `LymphNode.Step`. `Update()` tweens only.
+`DespawnToPool()` routes through `onDespawn`.
+
+### `DendriticCell` (`ImmunologyTD.Adaptive`, MonoBehaviour agent, `INodeVisitor`)
+
+`Initialize(BoardConfig tissueBoard, TissueGrid, CytokineField, LymphNode,
+FineCoord tissueStart, System.Action<DendriticCell> onDespawn)`.
+`enum DendriticCellState { PatrolTissue, TravelToNode, InNode, ReturnToTissue }`.
+Public: `State`, `Current` (tissue fine), `NodePos`, `Cargo`, `CargoClass`,
+`HasCargo`, `Frozen`.
+
+- `void SimulationTick(float currentTime)` — dispatches by state. Patrol:
+  `Chemotaxis` random walk (cytokine off), then if standing on a `Dead`
+  cell with `GetDebrisAntigen` → sample (`Cargo = Antigen.ForClass(...)`,
+  `presentationsLeft = DcPresentationsPerCargo`, `ClearDebris` one bite) →
+  `TravelToNode`. Travel/return: softmax biased walk in the **axis frame**
+  (`dir * AxisIndex`, `DcAxisWalkBiasSharpness`), enter the node at the
+  base band / resume patrol at the tissue band. InNode: `Chemotaxis`
+  against `node.Coloc`; when `!HasCargo` → `node.Release` → `ReturnToTissue`.
+- `OnPairingResolved(bool)` — `presentationsLeft--`; at 0, `HasCargo = false`.
+- `void DespawnToPool()` / `void ResetForPool()`.
+
+### `AdaptiveDirector` (`ImmunologyTD.Adaptive`, MonoBehaviour)
+
+`Initialize(LymphNode, PrefabPool lymphocytePool, PrefabPool dcPool,
+BoardConfig tissueBoard, TissueGrid, CytokineField)`.
+
+- `float Clock` — the arena's simulated clock.
+- `void Tick(float deltaTime)` — sub-steps at `BoardConfig.TickIntervalSeconds`;
+  each sub-step advances `Clock`, calls `LymphNode.Step(Clock)` then every
+  fielded DC's `SimulationTick(Clock)`. `Update()` forwards `Time.deltaTime`.
+- `GameObject EmitDendriticCell(int slotIndex, System.Action<int,GameObject> onSlotChildDespawned)`
+  — tissue base edge, random lane. `GameObject EmitLymphocyte(int slotIndex, …)`
+  — into the node with `Antigen.RandomTag()`.
+- `int DendriticCellCount(int slotIndex)` / `int LymphocyteCount(int slotIndex)`
+  — for `BoneMarrowManager`'s cap. `void DespawnAllFielded()` — round boundary.
+- `LymphNode Node`.
+
+### `BoneMarrowManager` — four kinds
+
+- **`enum UnitKind { Macrophage, Neutrophil, DendriticCell, HelperT }`**
+  (was two). `static bool IsAdaptive(UnitKind)`.
+- `Initialize(…, AtpWallet wallet = null, AdaptiveDirector adaptive = null)`
+  — trailing optional. An adaptive kind can't be placed without a director.
+- `static int PriceFor(UnitKind)` — switch over four; `EconomyTuning`
+  gains `DendriticCellPrice` 30 / `HelperTPrice` 25.
+- A placed adaptive slot: `Tuning` carries only `MaxActiveChildren` (from
+  `AdaptiveTuning`); its emission interval is `IntervalFor(kind)`; its
+  live count is `GetActiveChildren(i)` over the new
+  `Slot.AdaptiveChildren` (`List<GameObject>`). `Emit` → `EmitAdaptive` →
+  the director; `void OnAdaptiveChildDespawned(int, GameObject)` drops the
+  tracking ref. `ClearFieldedUnits` calls `adaptive.DespawnAllFielded()`.
+- Picker: four priced, grey-out buttons (last two only when `adaptive != null`).
+
+### `HudOverlay`
+
+`Bind(…, KnowledgeLedger knowledge = null, AdaptiveDirector adaptive = null)`
+— trailing optional. New KNOWLEDGE line: per-species % + `lymph node: DC n
+helper-T n`.
+
+### `DegranulationFlash`
+
+`static readonly Color KnowledgeMatchColor` (bright green) — a matching
+DC:helper-T pairing.
+
+### `Assets/Editor/AdaptiveVerification.cs` (new)
+
+`AdaptiveVerification.RunAll` — **34 assertions**: `Antigen` math,
+`KnowledgeLedger` clamp, debris antigen, a full simulated shuttle
+(matching pairing → exactly one increment on exactly one species;
+non-matching → freeze + cargo spent, teaches 0), lymphocyte turnover, the
+round boundary. Same no-Play-Mode philosophy as the six before it;
+deterministic (seeded `Random`, forced match thresholds).
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame
