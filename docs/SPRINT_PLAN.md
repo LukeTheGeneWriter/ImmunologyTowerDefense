@@ -1,243 +1,186 @@
-# Sprint Plan — Sprint 10 (small follow-up) → next: Sprint 11
+# Sprint Plan — Sprint 11
 
 ## Sprint 10 — closed 2026-08-29
 
-One-feature follow-up after the Sprint 9 playtest ("the new rhythm works
-well!"). Director: DCs clump — have them **repel each other along the
-lane axis only** so they spread across the lanes and patrol back and
-forth, rather than debris homing.
+DC patrol lane-repulsion: patrolling dendritic cells bias their random
+walk away from each other **along the lane axis only** (the base↔lumen
+threat axis stays unbiased), so they spread evenly across the lanes and
+sweep back and forth instead of clumping. `AdaptiveTuning.DcLaneRepelStrength`
+1.4 / `DcLaneRepelAxisRange` 12. `AdaptiveVerification` 34 → 37. 372
+total, 0 failed.
 
-- `DendriticCell.RepelledPatrolStep` — patrol is now a random walk biased
-  away from other DCs along the **cross axis**; threat axis unbiased.
-  `AdaptiveTuning.DcLaneRepelStrength` 1.4 / `DcLaneRepelAxisRange` 12
-  (0 = plain walk). Cohort = `AdaptiveDirector.allDcs`.
-- `AdaptiveVerification` +3 (34 → 37): A/B — repulsion widens three
-  co-spawned DCs' mean pairwise lane spread ~6 → ~12 and cuts their
-  shared-lane ticks.
-- All 8 harnesses green (**372**, 0 failed); clean Windows build.
+## Direction for Sprint 11 (Director, 2026-08-29)
 
-### Candidate next (Sprint 11) — Director's call
+Two things: a **shop with placeholder buy options**, and the **§5
+knowledge-ladder roster** made concrete.
 
-- **§5's knowledge threshold ladder** — make the KNOWLEDGE % *do*
-  something (MHC-I precise kill ~10%, neutralisation / reduced adhesion
-  ~20%, … the search-problem capstone ~90%). Been the flagged "next" for
-  two sprints.
-- **A real difficulty curve + economy retune** against the persistent
-  army (Sprint 9 left both as placeholders).
-- **Macrophage debris homing** (efferocytosis chemotaxis) — the other
-  half of the "find-me" item.
+### 1. Shop — placeholder buy options (no mechanical effect yet)
 
----
+The Director's framing: "These are placeholders for now, no actual
+changes during an upgrade." Build the shop *framework* — purchases cost
+ATP, register as owned / a level, and show in the UI — and record the
+intended design for each so the mechanics sprint has a spec. Categories:
 
-# Sprint Plan — Sprint 9
+- **Lumen barrier** — the §6b mucus-turnover upgrade (raise the shed
+  rate; flush barrier residents back to the lumen). Repeatable level.
+- **Host-cell upgrades** — the Director's design (all placeholder):
+  - **Pattern-recognition receptor → immunogenic apoptosis.** Upgrade a
+    cell to sense a pathogen signature (example: **dsRNA**). An infected
+    cell then has a ~20% chance to **self-destruct** when infected by the
+    matching class (an RNA virus for dsRNA), dying cleanly and releasing
+    a **strong "eat this debris" cytokine that pulls in dendritic cells
+    specifically** — a *third* signal, distinct from the §7/§9
+    recruitment cytokine and the §5c co-localisation signal. This is
+    intrinsic antiviral defence + immunogenic cell death, and it is the
+    host cell actively feeding the adaptive loop.
+  - **Reduced viral entry** — lower the per-tick chance a virus gets
+    inside a healthy cell.
+  - **Bacterial-damage resistance** — a large bacterium grazing the cell
+    does less host-cell damage per step.
+  - **Crypts** — placeable stem-cell niches; tissue near a crypt regrows
+    faster (§6's crypt-based recovery). Repeatable count.
+- **Progenitor upgrades** — per-tower (§6d: "an upgrade is a write to one
+  tower's field"). Clicking a *placed* marrow slot opens its upgrade
+  options (kill count, degranulation collateral, …), each a placeholder
+  that spends ATP and bumps that tower's upgrade level.
 
-## Sprint 8 — closed 2026-08-29
+### 2. Knowledge ladder — define + show, no mechanics
 
-Delivered the dendritic-cell shuttle and the 8-bit antigen barcode
-(`GAME_DESIGN.md` §5a/§5c): the `ImmunologyTD.Adaptive` namespace
-(`Antigen`, `KnowledgeLedger`, `AdaptiveTuning`), debris carrying an
-antigen identity, a real `LymphNode` arena with its own co-localisation
-cytokine field, `DendriticCell` / `Lymphocyte` agents, `AdaptiveDirector`,
-and DC + helper-T as bought progenitor towers sharing the 5 marrow slots.
-34 new `AdaptiveVerification` assertions, 340 total, clean Windows build.
-Handed to the Director; he playtested it.
+The Director's roster (his mechanic notes in parentheses), mapped onto
+§5's existing threshold proposals:
 
-## Direction for Sprint 9 (Director, 2026-08-29, from the Sprint 8 playtest)
+| % | Capability | Mechanic (for the later sprint) |
+|---|---|---|
+| ~10 | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the quiet version of §4b's stress-sense kill) |
+| ~20 | **Neutralizing antibodies** | reduced adhesion probability for a known species |
+| ~30 | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it |
+| ~45 | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting |
+| ~60 | **Complement activation** | antibody destroys the target's membrane directly, no immune cell needed — passive damage to a coated pathogen |
+| ~70 | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** |
 
-Playtest notes:
+This sprint: a `KnowledgeLadder` data table + a per-species HUD readout of
+which rungs are unlocked at the current KNOWLEDGE %. **Crossing a
+threshold changes the display and nothing else** — every capability's
+real mechanic is a later sprint (each is a substantial piece: CTL is a
+new unit, antibodies are a new entity, IgA is a new lumen mechanic).
 
-1. Pathogens piled on the gut wall still **burst through during the buy
-   phase** — only spawning pauses, the wall keeps rolling breaches and
-   pathogens keep walking.
-2. A round clearing **abruptly despawns every fielded immune cell** (§2)
-   while wall-pile / straggler pathogens keep moving — reads as a bug.
-3. **Round 1 is anticlimactic**: with adhesion low (0.12) most pathogens
-   ride the lumen out untouched and the round can pass with nothing
-   engaged — "it looks like a bug when the game abruptly kills my cells
-   while pathogens still move forward."
-4. Rounds are **too easy** — the placeholder batch curve (8, +3/round).
+### 3. One real change: neighbour-accelerated regrowth
 
-Director's model: **freeze time in the buy phase, and keep cells *and*
-pathogens on the field round to round.** Plus a difficulty pass —
-**all** of: ~2× batch size, higher wall adhesion, faster spawn cadence —
-where the cadence mechanism is a **contaminated food item** that enters
-the lumen, transits the flow, and **releases the round's pathogen batch
-in bursts as it travels**. And each round gets a **gut-themed tagline**
-("Incoming lettuce infected with E. coli", "Contaminated water carries
-poliovirus"). Economy: **unchanged this pass** — expect ATP to build up
-faster now that you're not rebuilding each round; retune later.
-
-This **supersedes the round model of §5d and the "emitted cells die at
-round end" of §2** — both get dated updates.
+Not a placeholder — the Director asked to "tune repairing so that healthy
+cells can fill in neighbouring empty space more quickly." An `Empty`
+host-ground cell's regrowth time scales down with its count of `Healthy`
+von Neumann neighbours, so tissue heals inward from its intact edges
+rather than every dead cell regrowing on an independent clock. New
+`TissueTuning.NeighbourRegrowthBonus` (0 restores the old behaviour).
 
 ## Scope
 
-### 1. Buy-phase freeze — one authority over "is the simulation running"
+### A. `ImmunologyTD.Economy.ShopLedger` + `ShopTuning`
 
-New static `ImmunologyTD.Rounds.RoundClock { public static bool Frozen }`
-(same pattern as `CytokineToggle.Enabled` / `EconomyHooks`). Starts
-`true` (the game opens in the buy phase). `RoundController` sets it:
-`false` on `StartRound()`, `true` on a round ending and on `Defeat`.
+- **`ShopItem` enum** — `BarrierMucusTurnover`, `HostDsRnaSensor`,
+  `HostReducedViralEntry`, `HostBacterialResistance`, `Crypt`.
+- **`ShopLedger`** — plain reference type, per run. `int LevelOf(ShopItem)`,
+  `bool CanBuy(ShopItem, AtpWallet)`, `bool TryBuy(ShopItem, AtpWallet)`
+  (spends `ShopTuning.PriceFor(item, currentLevel)` and increments the
+  level), `void Reset()`. **No side effect beyond the ledger + the
+  wallet.**
+- **`ShopTuning`** — mutable statics, `ResetToDefaults()`. A base price
+  per item and a per-level multiplier (so repeat buys cost more). All
+  placeholder.
 
-Everything that advances the simulation early-returns while frozen:
-`SearchUnit`, `PathogenAgent`, `DendriticCell` (in tissue), the
-`FoodItem`, `BoneMarrowManager.Update`, `PathogenSpawner.Update`,
-`AdaptiveDirector.Update`, `TissueDriver`, and the `CytokineField`
-recompute. Visual tweens freeze too — a true time-stop, not a slow
-drift. The harness path (explicit `Tick`/`SimulationTick`) is unaffected;
-only the `Update()`-driven auto-advance is gated.
+### B. Per-tower progenitor upgrades (`BoneMarrowManager`)
 
-This alone fixes note 1 (nothing moves in the buy phase, so nothing
-breaches) and note 2's abruptness (no despawn — see item 2).
+- `Slot` gains `int UpgradeLevel` (and optionally a small `int[]` per
+  upgrade kind — keep it one level for now).
+- Clicking a **placed** slot (currently a no-op) opens an IMGUI upgrade
+  panel: one "Upgrade → Lv N+1" button, priced from `ShopTuning`,
+  greyed-out when unaffordable. `UpgradeTower(index)` spends ATP and
+  bumps the level. **No mechanical effect** — the `UnitLifecycleTuning`
+  is untouched (the §6d wiring for real upgrades already exists; this
+  just doesn't call it yet).
+- `int GetUpgradeLevel(int)` for the HUD / harness.
 
-### 2. Persistent field — cells and pathogens carry round to round
+### C. `ImmunologyTD.Adaptive.KnowledgeLadder` + HUD
 
-- `RoundController` **no longer calls `marrow.ClearFieldedUnits()`** (nor
-  the adaptive despawn) on a round ending. Fielded immune cells persist;
-  the towers keep their populations. `ClearFieldedUnits` stays on the
-  class for a future run-restart, just isn't called at the boundary.
-- Pathogens already have no boundary despawn — with time frozen they
-  simply hold position through the buy phase and resume.
-- **A round ends when its batch has been fully delivered** — the food
-  item has emitted all its cargo **and** left the lumen (excreted off the
-  downstream end). Whatever is still alive on the board carries into the
-  frozen buy phase. `PathogenSpawner.BatchComplete` drops its
-  "lumen+tissue empty" requirement and becomes "the round's delivery is
-  finished." Predictable round length ≈ the food item's transit time.
-- The per-tower `MaxActiveChildren` cap and the clamp-don't-bank emission
-  timer (§6d) still bound population across many rounds — nothing
-  accumulates without limit.
+- **`KnowledgeCapability` enum** — the six above.
+- **`KnowledgeLadder`** (static) — `struct Rung { KnowledgeCapability
+  Capability; float ThresholdPercent; string ShortName; }`, an ordered
+  `Rung[] Rungs`, `bool IsUnlocked(KnowledgeCapability, float pct)`, and
+  `IEnumerable<Rung>` iteration for the HUD.
+- **`HudOverlay`** — the KNOWLEDGE line becomes a small block: per
+  species, `Name pct%` then the six rungs as `[x] 10 CTL  [ ] 20 NeutAb
+  …`. Still drives nothing.
 
-### 3. Difficulty numbers (`EconomyTuning` / `InvasionTuning`)
+### D. Neighbour-accelerated regrowth (`TissueGrid` / `TissueTuning`)
 
-Placeholder pass, not final balance:
+- `TissueTuning.NeighbourRegrowthBonus` (new, default `0.5`).
+- `TissueGrid.Tick`'s `Empty → Healthy` branch: `effectiveRegen =
+  HostRegenerationSeconds / (1 + NeighbourRegrowthBonus * healthyNeighbourCount)`,
+  clamped so 4 healthy neighbours ≈ 3× faster. Isolated `Empty` ground
+  regrows at the old rate.
 
-- `BatchSizeBase` 8 → **16**, `BatchSizeGrowthPerRound` 3 → **6**
-  (round 1 = 16, round 5 = 40).
-- `InvasionTuning.AdhesionChanceAtWall` 0.12 → **0.30** — the single
-  biggest lever on "round 1 felt like nothing happened." Combined with
-  the food item releasing pathogens *already near the wall* (item 4),
-  most of a batch now sticks and piles up instead of flowing past.
-- Spawn cadence: the food item drives emission now (item 4); the bare
-  `PathogenSpawner` interval is kept only as a fallback.
+### E. Shop panel (`HudOverlay` or a new `ShopPanel` MonoBehaviour)
 
-### 4. `FoodItem` — the contaminated delivery vehicle
+- Drawn only during `RoundPhase.Building` (the frozen buy phase). IMGUI
+  panel, left side, clear of the debug panel. One row per `ShopItem`:
+  name, "Lv N", price, a Buy button greyed-out when broke. Wired to
+  `ShopLedger.TryBuy`.
+- The Director should be able to open the game, see the shop, click
+  every option, and watch ATP go down and levels go up.
 
-New pooled MonoBehaviour, `ImmunologyTD.Pathogens.FoodItem`.
+### F. Verification + docs
 
-- One per round. `RoundController.StartRound()` → `spawner.BeginRound(def)`
-  spawns it at the lumen entry (upstream end of the flow).
-- It **drifts down the lumen** on the flow (cross-axis step, like a
-  pathogen riding the current), unattackable — a pure delivery vehicle
-  this pass (destructible food is a later idea, flagged).
-- As it travels it **emits its cargo in `FoodItemBurstCount` bursts**
-  (default 4), `batchSize / burstCount` pathogens per burst, spawned at
-  lumen cells **near its current position and hugging the wall** so
-  `AdhesionChanceAt` (depth-gated) gives them a high stick rate. Class
-  mix per the round definition (item 5).
-- Reaching the downstream end → excreted, returns to its pool. The
-  round's delivery is "complete" once it has emitted every burst **and**
-  exited.
-- Rendered as a distinct chunky sprite (a dull food-bolus colour,
-  unlike any pathogen).
-- New `InvasionTuning` fields: `FoodItemBurstCount` 4,
-  `FoodItemLumenStepIntervalSeconds` (its transit speed),
-  `FoodItemBurstWallHugDepth` (how close to the wall it drops its cargo).
+- **`ShopVerification`** (new, or fold into `EconomyVerification`):
+  `ShopLedger` spend / refuse / level-up and price scaling; per-tower
+  `UpgradeTower` spend + level; `KnowledgeLadder.IsUnlocked` at boundary
+  percentages (9.9 vs 10.0, etc.) and rung ordering; neighbour-regrowth
+  (an `Empty` cell ringed by `Healthy` regrows measurably faster than an
+  isolated one).
+- Re-run all eight prior harnesses green.
+- `GAME_DESIGN.md` §5 (roster promoted to Director-confirmed, mechanic
+  notes) + a new host-cell-upgrades subsection (the dsRNA-sensor design
+  in full, the DC-attractant third signal, reduced viral entry, bacterial
+  resistance, crypts); `ENGINE_STATUS.md`, `INTERFACE.md`, `CHANGELOG.md`,
+  `BACKLOG.md`, `TEAM_RETRO.md`. Clean Windows build, 0 exceptions.
 
-### 5. Round definitions + taglines
+## Not in scope
 
-New `ImmunologyTD.Rounds.RoundScript` (static): `RoundDefinition
-ForRound(int n)` → `{ string Tagline, (PathogenClass, float)[] CargoMix }`.
-~6 hand-written gut-themed rounds (lettuce/E. coli, raw egg/Salmonella,
-contaminated water/poliovirus, undercooked pork, etc.), then a
-procedural fallback (linear size growth, default class weights) for
-rounds past the script. Batch **size** still comes from
-`EconomyTuning.BatchSizeForRound`; the definition supplies the **mix**
-and the flavour text.
+- **Every knowledge-ladder capability's real mechanic** — CTL as a unit,
+  antibody entities, IgA in the lumen, complement damage, Fc/opsonisation,
+  the memory-CTL burst. All defined this sprint, built later.
+- **Every shop purchase's real effect** — mucus turnover, the host-cell
+  receptor upgrades, crypts, progenitor upgrades. Framework only.
+- **The DC-attractant third cytokine field** — described in the design,
+  not built.
+- **A real economy pass** (prices are placeholder; the persistent-army
+  ATP question from Sprint 9 is still open).
+- Anything from Sprints 1–10 changing behaviour, except neighbour-regrowth
+  (scope D).
 
-- `RoundController` exposes `string CurrentTagline`.
-- `HudOverlay`'s round bar shows it: `Round 3 — "Contaminated water:
-  poliovirus"`.
+## Stopping point (definition of done)
 
-This is a light version of the long-deferred "round batch composition"
-backlog item — per-round class mix, no boss rounds or a real curve yet.
+`[~]` = code done + harness-verified. `[x]` = verified from command output.
 
-### 6. Verification + docs
-
-- Extend `EconomyVerification` (or a small new `RoundVerification`): the
-  freeze flag gates the auto-advance; `BatchComplete` is delivery-only
-  now; a round boundary leaves fielded cells **and** loose pathogens
-  alive; the food item emits its whole cargo and then exits; the round
-  boundary re-freezes; `RoundScript.ForRound` returns a tagline for
-  scripted and fallback rounds.
-- Re-run all seven prior harnesses green.
-- `GAME_DESIGN.md` §2 + §5d dated updates (the round model changed);
-  `ENGINE_STATUS.md`, `INTERFACE.md`, `CHANGELOG.md`, `BACKLOG.md`,
-  `TEAM_RETRO.md`. Clean Windows build, 0 exceptions on launch.
-
-### 7. Not in scope
-
-- **The food item being attackable / a target.** Pure vehicle this pass.
-- **Boss / milestone rounds** and a real difficulty *curve* — just the
-  ~2× placeholder and the per-round class mix.
-- **§5's knowledge threshold ladder** (still the other candidate next
-  sprint — MHC-I precise kill, neutralisation, …). Sprint 8's knowledge
-  % still unlocks nothing.
-- **Emergency granulopoiesis** (§6c breach consequence) — still deferred.
-- **A run restart** — `Defeat` is still terminal.
-- **Economy retuning** — Director's call: leave `RoundStartLumpSum` /
-  `AtpPerKill` alone and judge from the playtest.
-- Anything from Sprints 1–8 changing behaviour beyond the round model:
-  the invasion loop, firebreak, §4b models, the DC shuttle, pooling,
-  population caps all keep working.
-
-## Stopping point (definition of done) — status 2026-08-29
-
-`[~]` = code done + harness-verified, feel unconfirmed. `[x]` = verified
-from command output.
-
-- [~] The buy phase **freezes everything** — pathogens on the wall don't
-      breach, cells don't move, the shuttle pauses. Press Space and it
-      all resumes. (`RoundClock` flag/clock covered by `RunRoundClock`;
-      the per-agent `Update()` gate is covered by the build launch
-      sitting genuinely still.)
-- [~] A round ends when the **food item has delivered its batch and left
-      the lumen**; the buy phase re-freezes with **last round's cells and
-      pathogens still on the board**. (`RunFoodDelivery`,
-      `RunFreezeAndPersistence`.)
-- [~] Each round shows a **tagline** in the round bar; the round's
-      pathogen **mix** follows its definition. (`RunRoundScript`,
-      `RunFoodDelivery`.)
-- [~] Round 1 now **engages** — ~16 pathogens, most sticking to the wall
-      near where the food item drops them. (Batch 16 + adhesion 0.30 +
-      wall-hug drop; whether it *feels* right is the playtest.)
-- [x] Everything from Sprints 1–8 still works — Adaptive 34 / Economy 47 /
-      Combat 36 / Lifecycle 79 / Map 71 / Tissue 73 re-run green.
-- [x] `RoundVerification` — **29 passed, 0 failed**. 369 total across
-      eight harnesses.
-- [x] `GAME_DESIGN.md` §2/§5d, `INTERFACE.md`, `ENGINE_STATUS.md`,
-      `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
-      build (93,346,112 bytes, 0 errors), 0 exceptions on launch.
-
-**Handed to the Director for playtest.**
-
-The question this sprint answers: **does the round rhythm — a frozen buy
-phase, a themed contaminated delivery, a battlefield that persists — feel
-like a game now**, and does round 1 finally engage.
+- [ ] Open the game → a **shop** is visible in the frozen buy phase with
+      buy options for the barrier, host-cell upgrades, and crypts; every
+      one is priced, greys out when broke, and buying it spends ATP and
+      raises its level. **Nothing about the simulation changes.**
+- [ ] Clicking a **placed progenitor tower** offers an upgrade that
+      spends ATP and bumps that tower's level (no mechanical effect).
+- [ ] The HUD KNOWLEDGE block shows the **six-rung ladder per species**,
+      ticking rungs on as the % crosses their thresholds — and still
+      driving nothing.
+- [ ] Tissue **fills in from its healthy edges faster** than dead cells
+      regrow in isolation (neighbour-regrowth).
+- [ ] Everything from Sprints 1–10 still works — eight harnesses re-run
+      green.
+- [ ] Shop / ladder / regrowth verification green.
+- [ ] `GAME_DESIGN.md` §5 + host-cell-upgrades, `INTERFACE.md`,
+      `ENGINE_STATUS.md`, `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md`
+      updated. Clean Windows build, 0 exceptions on launch.
 
 ## Process note
 
 Head session, inline, commit after each scope item with a reasoning-heavy
-message; update `INTERFACE.md` and `TEAM_RETRO.md` as signatures change
-and judgment calls are made, not in a final sweep.
-
-## Judgment calls being made up front (Director can overrule at playtest)
-
-- **A round ends when the food item exits**, not when the board is clear
-  (the board is never clear now). Round length ≈ food transit time.
-- **The food item is not attackable** — a pure vehicle.
-- **Towers don't emit during the frozen buy phase** (consistent with
-  "freeze time"); they resume on Start. Persisting cells + resumed
-  emission is the standing army.
-- **`ClearFieldedUnits` is kept but no longer called** at the boundary,
-  so a future run-restart still has it.
+message; update `INTERFACE.md` / `TEAM_RETRO.md` as signatures change and
+calls are made, not in a final sweep.
