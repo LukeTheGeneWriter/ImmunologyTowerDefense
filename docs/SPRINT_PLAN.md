@@ -1,3 +1,34 @@
+# Sprint Plan — Sprint 10 (small follow-up) → next: Sprint 11
+
+## Sprint 10 — closed 2026-08-29
+
+One-feature follow-up after the Sprint 9 playtest ("the new rhythm works
+well!"). Director: DCs clump — have them **repel each other along the
+lane axis only** so they spread across the lanes and patrol back and
+forth, rather than debris homing.
+
+- `DendriticCell.RepelledPatrolStep` — patrol is now a random walk biased
+  away from other DCs along the **cross axis**; threat axis unbiased.
+  `AdaptiveTuning.DcLaneRepelStrength` 1.4 / `DcLaneRepelAxisRange` 12
+  (0 = plain walk). Cohort = `AdaptiveDirector.allDcs`.
+- `AdaptiveVerification` +3 (34 → 37): A/B — repulsion widens three
+  co-spawned DCs' mean pairwise lane spread ~6 → ~12 and cuts their
+  shared-lane ticks.
+- All 8 harnesses green (**372**, 0 failed); clean Windows build.
+
+### Candidate next (Sprint 11) — Director's call
+
+- **§5's knowledge threshold ladder** — make the KNOWLEDGE % *do*
+  something (MHC-I precise kill ~10%, neutralisation / reduced adhesion
+  ~20%, … the search-problem capstone ~90%). Been the flagged "next" for
+  two sprints.
+- **A real difficulty curve + economy retune** against the persistent
+  army (Sprint 9 left both as placeholders).
+- **Macrophage debris homing** (efferocytosis chemotaxis) — the other
+  half of the "find-me" item.
+
+---
+
 # Sprint Plan — Sprint 9
 
 ## Sprint 8 — closed 2026-08-29

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Units;
@@ -44,6 +45,11 @@ namespace ImmunologyTD.Adaptive
         private SpriteRenderer sr;
         private System.Action<DendriticCell> onDespawn;
 
+        /// <summary>Live, read-only view of every fielded DC (AdaptiveDirector
+        /// owns the list). Read during patrol for lane-repulsion; never
+        /// mutated here.</summary>
+        private IReadOnlyList<DendriticCell> cohort;
+
         private readonly FineCoord[] candidateBuffer = new FineCoord[4];
         private readonly float[] weightBuffer = new float[4];
 
@@ -71,13 +77,15 @@ namespace ImmunologyTD.Adaptive
 
         public void Initialize(
             BoardConfig tissueBoard, TissueGrid tissueGrid, CytokineField tissueCytokine,
-            LymphNode node, FineCoord tissueStart, System.Action<DendriticCell> onDespawn)
+            LymphNode node, FineCoord tissueStart, System.Action<DendriticCell> onDespawn,
+            IReadOnlyList<DendriticCell> cohort = null)
         {
             this.tissueBoard = tissueBoard;
             this.tissueGrid = tissueGrid;
             this.tissueCytokine = tissueCytokine;
             this.node = node;
             this.onDespawn = onDespawn;
+            this.cohort = cohort;
 
             State = DendriticCellState.PatrolTissue;
             Current = tissueStart;
@@ -126,10 +134,7 @@ namespace ImmunologyTD.Adaptive
         private void TickPatrol(float currentTime)
         {
             for (int i = 0; i < AdaptiveTuning.DcFineTilesPerTick; i++)
-            {
-                Current = Chemotaxis.ChooseNextStep(
-                    Current, tissueBoard, tissueCytokine, false, candidateBuffer, weightBuffer);
-            }
+                Current = RepelledPatrolStep(Current);
 
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
             if (tissueGrid.GetHostState(coarse) != HostState.Dead) return;
@@ -230,6 +235,76 @@ namespace ImmunologyTD.Adaptive
             return candidateBuffer[n - 1];
         }
 
+        /// <summary>The patrol step. A random walk that DCs bias **away from
+        /// each other along the CROSS (lane) axis only** (Director,
+        /// 2026-08-29): the threat axis is base↔lumen, so repelling only
+        /// perpendicular to it keeps the DCs spread across the lanes and
+        /// sweeping back and forth, rather than clumping in one lane. The
+        /// threat-axis steps stay unbiased. `DcLaneRepelStrength = 0`
+        /// collapses this back to a plain random walk.</summary>
+        private FineCoord RepelledPatrolStep(FineCoord from)
+        {
+            var fromCoarse = from.ToCoarse(BoardConfig.FineSubdivision);
+            int myCross = tissueBoard.CrossIndex(fromCoarse);
+            int myAxis = tissueBoard.AxisIndex(fromCoarse);
+
+            // Cross-axis crowd gradient from other fielded DCs: > 0 means the
+            // crowd sits at LOWER cross indices (drift higher), < 0 the
+            // reverse. Only DCs near me along the threat axis count.
+            float crowd = 0f;
+            if (cohort != null && AdaptiveTuning.DcLaneRepelStrength != 0f)
+            {
+                for (int i = 0; i < cohort.Count; i++)
+                {
+                    var o = cohort[i];
+                    if (o == null || o == this || o.State == DendriticCellState.InNode) continue;
+                    var oc = o.Current.ToCoarse(BoardConfig.FineSubdivision);
+                    if (Mathf.Abs(tissueBoard.AxisIndex(oc) - myAxis) > AdaptiveTuning.DcLaneRepelAxisRange) continue;
+                    int dCross = myCross - tissueBoard.CrossIndex(oc);
+                    crowd += dCross == 0
+                        ? (Random.value < 0.5f ? 0.5f : -0.5f) // exactly stacked -- break the tie
+                        : Mathf.Sign(dCross) / (1f + Mathf.Abs(dCross));
+                }
+            }
+
+            int n = 0;
+            foreach (var off in FineCoord.VonNeumannOffsets)
+            {
+                var cand = from.Add(off);
+                if (!tissueBoard.InFineBounds(cand)) continue;
+                int candCross = tissueBoard.CrossIndex(cand.ToCoarse(BoardConfig.FineSubdivision));
+                int dir = candCross - myCross; // -1 / 0 / +1 in raw cross (threat-axis steps are dir 0)
+                candidateBuffer[n] = cand;
+                weightBuffer[n] = dir == 0 ? 1f : Mathf.Exp(AdaptiveTuning.DcLaneRepelStrength * dir * crowd);
+                n++;
+            }
+            if (n == 0) return from;
+
+            float total = 0f;
+            for (int i = 0; i < n; i++) total += weightBuffer[i];
+            float pick = Random.value * total;
+            float running = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                running += weightBuffer[i];
+                if (pick <= running) return candidateBuffer[i];
+            }
+            return candidateBuffer[n - 1];
+        }
+
+        /// <summary>Test seam (Assets/Editor/AdaptiveVerification.cs): drop a
+        /// patrolling DC onto a chosen tissue tile. Not called by
+        /// production -- same role as TissueGrid.SeedHostState.</summary>
+        public void DebugPlaceForTest(FineCoord tissuePos)
+        {
+            Current = tissuePos;
+            State = DendriticCellState.PatrolTissue;
+            HasCargo = false;
+            Frozen = false;
+            tweenStart = tweenEnd = tissueBoard.FineToWorld(Current);
+            transform.position = tweenStart;
+        }
+
         private Vector3 WorldPos() => State == DendriticCellState.InNode
             ? node.NodeToWorld(NodePos)
             : tissueBoard.FineToWorld(Current);
@@ -268,6 +343,7 @@ namespace ImmunologyTD.Adaptive
             tissueCytokine = null;
             node = null;
             onDespawn = null;
+            cohort = null;
             HasCargo = false;
             Frozen = false;
             presentationsLeft = 0;

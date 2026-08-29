@@ -1,8 +1,10 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 9** (the reworked round model — a frozen
-buy phase, a persistent battlefield, food-item delivery). Sprint 0's
+reflects the state after **Sprint 10** (a small follow-up: DC patrol
+lane-repulsion). The bulk of the current state is **Sprint 9** (the
+reworked round model — a frozen buy phase, a persistent battlefield,
+food-item delivery). Sprint 0's
 engine/platform decision section is preserved below since it is still
 accurate. Earlier sprints' histories are in `docs/CHANGELOG.md`; this file
 only carries forward what is still true.
@@ -628,6 +630,26 @@ procedural "spoiled leftovers, day N" fallback. `RoundController` exposes
 `FoodItemTransitSeconds` 30 / `FoodItemBurstCount` 4 /
 `FoodItemWallHugDepth` 1. Economy untouched.
 
+### Sprint 10 addition — DC patrol lane-repulsion
+
+Design: `GAME_DESIGN.md` §5a note (Director, 2026-08-29). The Sprint 8 DC
+patrolled on a plain random walk and clumped. Instead of debris homing
+(the deferred `BACKLOG.md` option), a patrolling DC now biases its walk
+**away from other fielded DCs along the cross (lane) axis only** — the
+base↔lumen threat axis is left unbiased, so DCs sweep back and forth and
+spread evenly across the lanes.
+
+`DendriticCell.RepelledPatrolStep` replaces the `Chemotaxis.ChooseNextStep`
+call in `TickPatrol`. It sums a cross-axis crowd gradient
+(`sign(myCross − otherCross) / (1 + |Δcross|)`) over other non-InNode DCs
+within `AdaptiveTuning.DcLaneRepelAxisRange` (12) coarse cells along the
+threat axis, then softmax-weights the two cross-direction candidates by
+`exp(DcLaneRepelStrength · dir · crowd)` (`DcLaneRepelStrength` 1.4;
+threat-axis candidates stay weight 1). `AdaptiveDirector` hands each DC
+its live `allDcs` list as the cohort (`DendriticCell.Initialize` gained an
+optional `IReadOnlyList<DendriticCell> cohort`); `DendriticCell.DebugPlaceForTest`
+is a new test seam.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -667,16 +689,18 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
-| `RoundVerification.RunAll` (**new**, Sprint 9) | **29 passed, 0 failed** |
-| `AdaptiveVerification.RunAll` (Sprint 8) | 34 passed, 0 failed |
+| `RoundVerification.RunAll` (Sprint 9) | 29 passed, 0 failed |
+| `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10) | **37 passed, 0 failed** |
 | `EconomyVerification.RunAll` (Sprint 7) | 47 passed, 0 failed |
 | `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**369 assertions, 0 failed**, on a clean working tree after every Sprint 9
-commit.
+**372 assertions, 0 failed** (Sprint 10 added 3 to `AdaptiveVerification`
+for DC patrol lane-repulsion — an A/B showing repulsion widens the mean
+pairwise lane spread of three co-spawned DCs from ~6 to ~12 and cuts
+their shared-lane ticks), on a clean working tree after every commit.
 
 `RoundVerification` drives `RoundClock` (opens frozen; `Advance` is a
 no-op while frozen, accumulates while running; re-freezing holds the
@@ -795,9 +819,9 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 9)
+### Windows build (Sprint 10)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,346,112 bytes, 0 errors.**
+`BuildScript.BuildWindows()` — **Succeeded, 93,347,136 bytes, 0 errors.**
 Launched headlessly for ~20s: **0 exceptions / 0 errors** — the bootstrap
 diagnostic prints clean (25×10 layout). The game opens in the **frozen**
 buy phase, so a passive launch sits genuinely still — the round-model

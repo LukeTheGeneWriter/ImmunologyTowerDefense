@@ -731,3 +731,23 @@ leaving ~6s where all cargo is out but the food hasn't exited. Overshoot
 that window by ticking too long and `foodExited` flips and the assertion
 is meaningless. `for (...; BatchEmitted < expected; ...)` stops on the
 right tick.
+
+### Sprint 10 — head session (2026-08-29, DC patrol lane-repulsion)
+
+Small follow-up after the Sprint 9 playtest. Director's idea: instead of
+debris homing, have DCs repel each other **only along the cross (lane)
+axis** so they spread across lanes and sweep back and forth, while the
+base↔lumen threat axis stays a plain random walk. ~40 lines: a
+`RepelledPatrolStep` that softmax-weights the two cross-direction
+candidates by `exp(k · dir · crowd)` where `crowd` is a
+`sign/(1+dist)` sum over the other fielded DCs; the cohort list is
+`AdaptiveDirector.allDcs` handed in through `Initialize`.
+
+**The A/B metric mattered.** First cut asserted "co-lane ticks drop" —
+but with only 3 DCs on 10 lanes, random collisions happen ~28% of ticks
+even with repulsion working perfectly, and the initial all-in-one-lane
+transient front-loads both arms, so the gap was 82 vs 97 (real but thin).
+The decisive signal was **mean pairwise lane spread**: 12.4 with
+repulsion vs 6.2 without, on an 18-max scale. Kept both, asserting the
+direction of each plus a loose absolute — but if you're A/B-testing a
+spreading behaviour, measure the spread, not the collisions.

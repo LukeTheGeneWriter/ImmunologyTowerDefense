@@ -12,6 +12,22 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 10 -- 2026-08-29
+Small follow-up after the Sprint 9 playtest ("the new rhythm works
+well!"): **dendritic cells now spread across the lanes instead of
+clumping.** While patrolling, a DC biases its random walk *away from
+other DCs, along the lane axis only* -- the base↔lumen threat axis is
+left alone, so DCs patrol back and forth and stay evenly distributed
+across the lanes, covering far more ground per cell. This is the answer
+to "DC migration capacity" instead of debris homing. `DcLaneRepelStrength`
+(1.4) and `DcLaneRepelAxisRange` (12) are tunable; 0 restores the plain
+random walk.
+
+Verified: 3 new `AdaptiveVerification` assertions (an A/B -- with
+repulsion on, three DCs started in one lane hold a mean pairwise lane
+spread of ~12 vs ~6 with it off, and share a lane on far fewer ticks).
+All eight harnesses green -- **372 total, 0 failed**. Clean Windows build.
+
 ## Sprint 9 -- 2026-08-29
 The round has a rhythm now. Reworked after the Sprint 8 playtest.
 
