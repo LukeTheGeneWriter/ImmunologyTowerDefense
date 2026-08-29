@@ -36,7 +36,9 @@ namespace ImmunologyTD.Rendering
         private RoundController rounds;
         private KnowledgeLedger knowledge;
         private AdaptiveDirector adaptive;
+        private ShopLedger shop;
         private string infoLine;
+        private GUIStyle buttonStyle;
         private GUIStyle style;
         private GUIStyle bigStyle;
         private float smoothedFrameMs;
@@ -45,7 +47,8 @@ namespace ImmunologyTD.Rendering
             BoardConfig board, int macrophageSpeed, int neutrophilSpeed, BoneMarrowManager boneMarrow,
             GutInterface gutInterface, InvasionTally tally, PathogenSpawner spawner,
             AtpWallet wallet, RoundController rounds,
-            KnowledgeLedger knowledge = null, AdaptiveDirector adaptive = null)
+            KnowledgeLedger knowledge = null, AdaptiveDirector adaptive = null,
+            ShopLedger shop = null)
         {
             this.board = board;
             this.boneMarrow = boneMarrow;
@@ -56,8 +59,9 @@ namespace ImmunologyTD.Rendering
             this.rounds = rounds;
             this.knowledge = knowledge;
             this.adaptive = adaptive;
+            this.shop = shop;
             infoLine =
-                "Immunology TD -- Sprint 8 dendritic-cell shuttle & antigen barcode\n" +
+                "Immunology TD -- Sprint 11 placeholder shop & knowledge ladder\n" +
                 $"Board: {board.Columns} x {board.Rows} coarse cells " +
                 $"(base {board.BaseBandCells} | tissue {board.TissueBandCells} | lumen {board.LumenBandCells}), " +
                 $"{BoardConfig.FineSubdivision}x{BoardConfig.FineSubdivision} fine per cell\n" +
@@ -77,16 +81,18 @@ namespace ImmunologyTD.Rendering
                     normal = { textColor = Color.white }
                 };
                 bigStyle = new GUIStyle(style) { fontSize = 24, fontStyle = FontStyle.Bold };
+                buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 13 };
             }
 
             DrawRoundBar();
+            DrawShopPanel();
 
             // Map 01's base band now sits underneath this text, so the HUD
             // needs to stop being transparent white-on-whatever. A dimming
             // panel keeps both the readout and the board readable; without
             // it the bone marrow slot labels and these lines overprint each
             // other into mush.
-            var panel = new Rect(0, 0, 1180, 324);
+            var panel = new Rect(0, 0, 1180, 392);
             var prev = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.72f);
             GUI.DrawTexture(panel, Texture2D.whiteTexture);
@@ -103,24 +109,80 @@ namespace ImmunologyTD.Rendering
             GUI.Label(new Rect(16, 178, 900, 30), BuildPopulationLine(), style);
             GUI.Label(new Rect(16, 206, 1100, 30), BuildPathogenLine(), style);
             GUI.Label(new Rect(16, 234, 1100, 30), BuildInvasionLine(), style);
-            GUI.Label(new Rect(16, 262, 1100, 30), BuildKnowledgeLine(), style);
-            GUI.Label(new Rect(16, 290, 1100, 30), BuildPerformanceLine(), style);
+
+            GUI.Label(new Rect(16, 262, 1100, 24), BuildKnowledgeHeader(), style);
+            GUI.Label(new Rect(16, 286, 1100, 22), BuildLadderLine(PathogenClass.IntracellularVirus, "virus"), style);
+            GUI.Label(new Rect(16, 308, 1100, 22), BuildLadderLine(PathogenClass.IntracellularBacterium, "bacterium"), style);
+            GUI.Label(new Rect(16, 330, 1100, 22), BuildLadderLine(PathogenClass.LargeBacterium, "large-bac"), style);
+
+            GUI.Label(new Rect(16, 358, 1100, 30), BuildPerformanceLine(), style);
         }
 
-        /// <summary>Sprint 8: per-species adaptive knowledge % (§5), plus the
-        /// live lymph-node population. Knowledge rises when a DC and a
-        /// helper-T pair with matching barcodes; it persists across rounds.
-        /// It unlocks nothing yet -- §5's threshold ladder is next.</summary>
-        private string BuildKnowledgeLine()
+        /// <summary>Sprint 11: the buy-phase shop -- placeholder purchases
+        /// (barrier / host-cell upgrades / crypts). Buying spends ATP and
+        /// raises a level; nothing about the simulation changes yet. Only
+        /// shown while the buy phase is frozen.</summary>
+        private void DrawShopPanel()
+        {
+            if (shop == null || wallet == null || rounds == null || rounds.Phase != RoundPhase.Building) return;
+
+            var items = new (ShopItem item, string name)[]
+            {
+                (ShopItem.BarrierMucusTurnover,     "Mucus turnover (barrier)"),
+                (ShopItem.HostDsRnaSensor,          "Host dsRNA sensor"),
+                (ShopItem.HostReducedViralEntry,    "Host: harden vs viral entry"),
+                (ShopItem.HostBacterialResistance,  "Host: bacterial resistance"),
+                (ShopItem.Crypt,                    "Crypt (local regrowth)"),
+            };
+
+            float w = 320f, rowH = 26f;
+            var box = new Rect(12f, 404f, w, 34f + items.Length * (rowH + 4f) + 4f);
+            var prev = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.78f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = prev;
+
+            GUI.Label(new Rect(box.x + 10, box.y + 6, w - 20, 22), "SHOP (placeholder -- no effect yet)", style);
+            float y = box.y + 32f;
+            for (int i = 0; i < items.Length; i++)
+            {
+                int price = shop.NextPrice(items[i].item);
+                int lvl = shop.LevelOf(items[i].item);
+                bool ok = shop.CanBuy(items[i].item, wallet);
+                bool wasEnabled = GUI.enabled;
+                GUI.enabled = ok;
+                if (GUI.Button(new Rect(box.x + 10, y, w - 20, rowH),
+                        $"{items[i].name}   Lv{lvl}   {price} ATP", buttonStyle) && ok)
+                {
+                    shop.TryBuy(items[i].item, wallet);
+                }
+                GUI.enabled = wasEnabled;
+                y += rowH + 4f;
+            }
+        }
+
+        /// <summary>Sprint 8/11: the KNOWLEDGE block header -- what it is, and
+        /// the live lymph-node population.</summary>
+        private string BuildKnowledgeHeader()
         {
             if (knowledge == null) return string.Empty;
-            float v = knowledge.Get(PathogenClass.IntracellularVirus);
-            float b = knowledge.Get(PathogenClass.IntracellularBacterium);
-            float l = knowledge.Get(PathogenClass.LargeBacterium);
             string node = adaptive == null || adaptive.Node == null
                 ? string.Empty
                 : $"      lymph node: DC {adaptive.Node.VisitorCount}  helper-T {adaptive.Node.ResidentCount}";
-            return $"KNOWLEDGE -- virus {v:F0}%   bacterium {b:F0}%   large-bac {l:F0}%{node}";
+            return $"KNOWLEDGE per species -- ladder rungs unlock nothing yet, display only:{node}";
+        }
+
+        /// <summary>Sprint 11: one species' knowledge % and its six ladder
+        /// rungs, ticked on as the % crosses each threshold. Drives nothing.</summary>
+        private string BuildLadderLine(PathogenClass species, string label)
+        {
+            if (knowledge == null) return string.Empty;
+            float pct = knowledge.Get(species);
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"  {label,-10} {pct,3:F0}%  ");
+            foreach (var rung in KnowledgeLadder.Rungs)
+                sb.Append(pct >= rung.ThresholdPercent ? $"[x]{rung.ShortName} " : $"[ ]{rung.ShortName} ");
+            return sb.ToString();
         }
 
         /// <summary>The Sprint 7 economy / round readout -- top-right, clear
