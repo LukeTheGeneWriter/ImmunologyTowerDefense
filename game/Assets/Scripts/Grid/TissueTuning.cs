@@ -41,6 +41,14 @@ namespace ImmunologyTD.Grid
         /// within one playtest rather than having to take it on trust.</summary>
         public static float HostRegenerationSeconds = 20f;
 
+        /// <summary>Sprint 11 (Director, 2026-08-29): tissue fills in **from
+        /// its healthy edges**, not every dead cell on an independent clock.
+        /// An `Empty` cell's regrow time is divided by
+        /// <c>1 + NeighbourRegrowthBonus * healthyVonNeumannNeighbours</c>,
+        /// so a cell ringed by 4 healthy neighbours regrows ~3x faster than
+        /// an isolated one. **0 restores the old per-cell behaviour.**</summary>
+        public static float NeighbourRegrowthBonus = 0.5f;
+
         /// <summary>Seconds for untended debris to dissipate on its own from
         /// full (1.0) to nothing. GAME_DESIGN.md section 1c requires this to
         /// exist ("a player who never invests in clearance is not
@@ -64,6 +72,7 @@ namespace ImmunologyTD.Grid
         {
             HostCellMaxHealth = 10f;
             HostRegenerationSeconds = 20f;
+            NeighbourRegrowthBonus = 0.5f;
             DebrisSelfDissipationSeconds = 60f;
             SweepIntervalSeconds = 0.25f;
         }

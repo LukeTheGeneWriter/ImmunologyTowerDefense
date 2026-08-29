@@ -88,6 +88,10 @@ namespace ImmunologyTD.Units
             /// tower emits -- built once at placement so emission allocates
             /// no closure per unit (GAME_DESIGN.md section 8).</summary>
             public System.Action<SearchUnit> OnChildDespawned;
+
+            /// <summary>Sprint 11: placeholder per-tower upgrade level. Spends
+            /// ATP, bumps this, does nothing else yet (§6d).</summary>
+            public int UpgradeLevel;
         }
 
         /// <summary>The two adaptive kinds emit their own agent types via
@@ -130,6 +134,7 @@ namespace ImmunologyTD.Units
 
         private readonly List<Slot> slots = new List<Slot>();
         private int? pendingChoiceIndex;
+        private int? pendingUpgradeIndex;
         private GUIStyle labelStyle;
         private GUIStyle buttonStyle;
 
@@ -206,9 +211,38 @@ namespace ImmunologyTD.Units
         public void OnSlotClicked(int index)
         {
             if (index < 0 || index >= slots.Count) return;
-            if (slots[index].State != BoneMarrowSlotState.Empty) return;
-            pendingChoiceIndex = index;
+            if (slots[index].State == BoneMarrowSlotState.Empty)
+            {
+                pendingChoiceIndex = index;
+                pendingUpgradeIndex = null;
+            }
+            else
+            {
+                // Sprint 11: clicking a PLACED tower opens its upgrade panel.
+                pendingUpgradeIndex = index;
+                pendingChoiceIndex = null;
+            }
         }
+
+        /// <summary>Sprint 11: a placeholder per-tower upgrade (GAME_DESIGN.md
+        /// §6d says an upgrade is "a write to one tower's field" -- this
+        /// spends the ATP and bumps a level counter, but does **not** touch
+        /// the tower's <see cref="UnitLifecycleTuning"/> yet). Public for the
+        /// harness.</summary>
+        public bool UpgradeTower(int index)
+        {
+            if (index < 0 || index >= slots.Count) return false;
+            var slot = slots[index];
+            if (slot.State != BoneMarrowSlotState.Placed) return false;
+
+            int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(slot.UpgradeLevel);
+            if (wallet != null && !wallet.TrySpend(price)) return false;
+            slot.UpgradeLevel++;
+            return true;
+        }
+
+        public int GetUpgradeLevel(int index) =>
+            index >= 0 && index < slots.Count ? slots[index].UpgradeLevel : 0;
 
         /// <summary>Places a tower -- public so both the IMGUI picker
         /// buttons and a headless verification harness call the same real
@@ -505,7 +539,7 @@ namespace ImmunologyTD.Units
                 // play rather than being something the player has to trust.
                 string label = slot.State == BoneMarrowSlotState.Empty
                     ? "empty\n(click)"
-                    : $"{KindLabel(slot.Kind)}\n{GetActiveChildren(i)}/{slot.Tuning.MaxActiveChildren} alive";
+                    : $"{KindLabel(slot.Kind)}{(slot.UpgradeLevel > 0 ? $" +{slot.UpgradeLevel}" : "")}\n{GetActiveChildren(i)}/{slot.Tuning.MaxActiveChildren} alive";
                 GUI.Label(new Rect(screen.x - 45, screen.y - 40, 90, 40), label, labelStyle);
             }
 
@@ -526,6 +560,31 @@ namespace ImmunologyTD.Units
                     DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.DendriticCell, "Dendritic"); y += 30;
                     DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.HelperT, "Helper-T");
                 }
+            }
+
+            // Sprint 11: the per-tower upgrade panel (placeholder -- spends
+            // ATP, bumps the level, no mechanical effect yet).
+            if (pendingUpgradeIndex.HasValue)
+            {
+                int idx = pendingUpgradeIndex.Value;
+                var slot = slots[idx];
+                var screen = WorldToGui(slot.WorldPosition);
+                float panelW = 220, panelH = 84;
+                var panelRect = new Rect(screen.x - panelW / 2f, screen.y + 15, panelW, panelH);
+                GUI.Box(panelRect, $"{KindLabel(slot.Kind)}  --  upgrade Lv {slot.UpgradeLevel}");
+
+                int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(slot.UpgradeLevel);
+                bool affordable = wallet == null || wallet.CanAfford(price);
+                bool wasEnabled = GUI.enabled;
+                GUI.enabled = affordable;
+                if (GUI.Button(new Rect(panelRect.x + 10, panelRect.y + 28, panelW - 20, 24),
+                        $"Upgrade -> Lv {slot.UpgradeLevel + 1}   {price} ATP", buttonStyle) && affordable)
+                {
+                    UpgradeTower(idx);
+                }
+                GUI.enabled = wasEnabled;
+                if (GUI.Button(new Rect(panelRect.x + 10, panelRect.y + 54, panelW - 20, 22), "close", buttonStyle))
+                    pendingUpgradeIndex = null;
             }
         }
 

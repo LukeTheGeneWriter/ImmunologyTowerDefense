@@ -378,6 +378,18 @@ namespace ImmunologyTD.Grid
             HealthyCount++;
         }
 
+        /// <summary>Von Neumann neighbours of <paramref name="c"/> that are
+        /// `Healthy` host cells (0..4). Drives Sprint 11's inward regrowth.</summary>
+        private int HealthyNeighbourCount(CoarseCoord c)
+        {
+            int n = 0;
+            if (GetHostState(new CoarseCoord(c.Column + 1, c.Row)) == HostState.Healthy) n++;
+            if (GetHostState(new CoarseCoord(c.Column - 1, c.Row)) == HostState.Healthy) n++;
+            if (GetHostState(new CoarseCoord(c.Column, c.Row + 1)) == HostState.Healthy) n++;
+            if (GetHostState(new CoarseCoord(c.Column, c.Row - 1)) == HostState.Healthy) n++;
+            return n;
+        }
+
         /// <summary>Test/bootstrap hook: force a position's host state
         /// directly. Used by the verification harnesses to lay out a band of
         /// dead ground (the firebreak fixture) without having to kill fifty
@@ -579,7 +591,11 @@ namespace ImmunologyTD.Grid
                         case HostState.Empty:
                             if (!IsHostGround(c)) break;
                             if (emptySince[col, row] < 0f) { emptySince[col, row] = currentTime; break; }
-                            if (currentTime - emptySince[col, row] >= regrowAfter) Regrow(c);
+                            // Sprint 11: heal inward from healthy edges -- more
+                            // Healthy neighbours -> shorter effective regrow time.
+                            float effectiveRegen = regrowAfter /
+                                (1f + TissueTuning.NeighbourRegrowthBonus * HealthyNeighbourCount(c));
+                            if (currentTime - emptySince[col, row] >= effectiveRegen) Regrow(c);
                             break;
                     }
                 }

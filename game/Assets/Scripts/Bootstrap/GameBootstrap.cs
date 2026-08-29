@@ -129,6 +129,7 @@ namespace ImmunologyTD.Bootstrap
 
         private AtpWallet wallet;
         private KnowledgeLedger knowledge;
+        private ShopLedger shop;
 
         private void Awake()
         {
@@ -148,6 +149,10 @@ namespace ImmunologyTD.Bootstrap
             // (GAME_DESIGN.md §5a/§5c). Knowledge % persists for the run.
             AdaptiveTuning.ResetToDefaults();
             knowledge = new KnowledgeLedger();
+
+            // Sprint 11: the placeholder buy-phase shop.
+            ShopTuning.ResetToDefaults();
+            shop = new ShopLedger();
 
             // Sprint 5: the host layer heals on its own clock, independent
             // of whether anything is invading (GAME_DESIGN.md section 1c).
@@ -486,7 +491,7 @@ namespace ImmunologyTD.Bootstrap
             hudGo.AddComponent<CytokineToggle>();
             var overlay = hudGo.AddComponent<HudOverlay>();
             overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick,
-                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds, knowledge, adaptive);
+                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds, knowledge, adaptive, shop);
         }
     }
 }

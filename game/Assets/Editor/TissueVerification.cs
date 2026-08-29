@@ -256,8 +256,12 @@ public static class TissueVerification
         }
 
         // Clearing the debris unblocks regrowth: Empty ground regrows after
-        // HostRegenerationSeconds and not before.
+        // HostRegenerationSeconds and not before. Sprint 11 added
+        // neighbour-accelerated regrowth; pin its bonus to 0 here so this
+        // sub-test stays about the base per-cell clock (a dedicated
+        // neighbour-acceleration test lives in Sprint11Verification).
         {
+            TissueTuning.NeighbourRegrowthBonus = 0f;
             var rig = BuildRig("Regrow");
             var c = TissueCell(rig, 10, 5);
             rig.Grid.KillHostCell(c);
@@ -271,6 +275,7 @@ public static class TissueVerification
             rig.Grid.Tick(regrow, regrow * 1.5f + 1f);
             Check("Empty ground regrows to Healthy once the regrow period elapses", rig.Grid.GetHostState(c) == HostState.Healthy);
             rig.Dispose();
+            TissueTuning.ResetToDefaults();
         }
 
         // Self-dissipation: debris left completely alone disappears on its
