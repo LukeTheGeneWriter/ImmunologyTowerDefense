@@ -63,7 +63,8 @@ namespace ImmunologyTD.Bootstrap
             DisplayName = "Neutrophil",
             FineTilesPerTick = 3,
             FootprintFineTiles = 3,
-            Color = new Color(0.95f, 0.78f, 0.25f),
+            Color = new Color(0.93f, 0.74f, 0.30f), // Sprint 13: nudged amber -> gold, away from hazard-orange
+
             MaxActiveChildren = 10,
             KillLimit = 5,
             DegranulatesOnDepletion = true,
@@ -135,6 +136,12 @@ namespace ImmunologyTD.Bootstrap
         {
             board = GetComponent<BoardConfig>();
             WarnOnDegenerateBands();
+
+            // Sprint 13: the procedural shape sprites for each unit kind
+            // (runtime-generated, so not settable in the serialized profile
+            // initializer -- see UnitProfile.Shape).
+            macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
+            neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
             tissueGrid = new TissueGrid(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();

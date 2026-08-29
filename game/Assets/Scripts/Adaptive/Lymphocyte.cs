@@ -66,7 +66,7 @@ namespace ImmunologyTD.Adaptive
 
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = RuntimeSprites.SquareSprite;
+            sr.sprite = SpriteShapes.Lymphocyte; // Sprint 13
             sr.color = RestColor;
             sr.enabled = true;
             sr.sortingOrder = 12;

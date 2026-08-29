@@ -37,6 +37,12 @@ namespace ImmunologyTD.Rendering
         public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, a HEALTHY host cell
         public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- pathogens visible as themselves
 
+        /// <summary>Sprint 13: a free (extracellular) virus particle. A
+        /// colder purple-maroon -- same "foreign dark-red/violet" family as
+        /// PathogenColor but distinct enough that "virus" (small cold dot)
+        /// and "bacterium" (maroon rod) read apart at a glance.</summary>
+        public static readonly Color VirionColor = new Color(0.40f, 0.16f, 0.34f);
+
         /// <summary>An INFECTED host cell (GAME_DESIGN.md section 1c). A
         /// bruised violet: recognisably still tissue (same value as
         /// HostColor, so it does not read as a hole) but off-hue enough that
