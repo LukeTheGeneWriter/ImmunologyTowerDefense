@@ -2,7 +2,13 @@ using UnityEngine;
 
 namespace ImmunologyTD.Units
 {
-    public enum UnitKind { Macrophage, Neutrophil }
+    /// <summary>The four progenitor kinds the bone marrow can place. The
+    /// first two are innate <see cref="SearchUnit"/> towers; Sprint 8 adds
+    /// the two adaptive kinds, which emit their own agent types
+    /// (<c>DendriticCell</c> / <c>Lymphocyte</c>) via <c>AdaptiveDirector</c>
+    /// rather than a SearchUnit. All four share the same 5 marrow slots
+    /// (GAME_DESIGN.md §1c/§2a -- marrow real estate is the constraint).</summary>
+    public enum UnitKind { Macrophage, Neutrophil, DendriticCell, HelperT }
 
     /// <summary>
     /// Per-unit-type tuning. Each type gets its own configurable speed in

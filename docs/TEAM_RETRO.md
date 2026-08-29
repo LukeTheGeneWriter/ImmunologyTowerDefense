@@ -614,3 +614,67 @@ harness that tests it just points the hook at a test wallet.
 null); `PlaceTower` only charges when it's non-null. `LifecycleVerification`'s
 9-arg call still compiles and still gets free placement, no edit. Optional
 params are a clean way to add an economy gate without a harness sweep.
+
+### Sprint 8 — head session (2026-08-29, the DC shuttle + antigen barcode)
+
+Head session, inline, one sitting, straight after Sprint 7. Biggest sprint
+yet (a new namespace, two new agent types, a second arena, a `UnitKind`
+enum widening) — the commit-green-after-each-item discipline held for the
+sixth sprint running, and the full regression (six prior harnesses) was
+re-run at least once mid-sprint, not just at the end.
+
+**Five up-front decisions again (`AskUserQuestion` x2).** Scope depth
+(slice vs. +barcode vs. +capability), DC as a bought tower vs. auto-emit,
+node search (random walk vs. second cytokine field), then the match rule
+(exact vs. Hamming) and the slot budget. Same as Sprint 7: each genuinely
+changed what got built, each cheap to ask. Director picked +barcode,
+bought tower, second cytokine field, Hamming ≤ 2, shared 5 slots.
+
+**An interface stand-in kept every commit compiling across a split
+feature.** `LymphNode`'s pairing logic (item 3) needed to reference the
+dendritic cell, which didn't exist until item 4. `interface INodeVisitor`
+(NodePos / Cargo / HasCargo / Frozen / OnPairingResolved) let the whole
+node — pairing, freeze, knowledge increment — be written and committed a
+commit early; `DendriticCell : MonoBehaviour, INodeVisitor` just slotted
+in. Worth reaching for whenever a feature splits across commits.
+
+**The node arena reused `CytokineField` + `Chemotaxis` wholesale** by
+giving `LymphNode` its own tiny `BoardConfig` via `ConfigureForTest(6, 6,
+…)`. No new movement code. Sprint 4's flat-`strength/(1+distance)`-at-scale
+finding is a non-issue at 6×6 — the gradient is steep across a small grid,
+which is the whole reason it worked on the 30×5 board and not Map 01.
+`BoardConfig.FineToWorld` is centre-on-origin though, so the node needed
+its own `NodeToWorld` mapping fine tiles into the lymph backdrop rect.
+
+**`KillHostCell(coord, PathogenClass? antigen = null)` with a
+`antigen ?? resident?.Class` fallback meant the two loud-kill call sites
+(stress-sense, degranulation collateral) needed ZERO changes** — the
+resident is still attached when they call in, so the fallback picks up the
+right antigen. Only the detach-before-kill paths (`BurstBrood`,
+`BurnOut`) had to pass `Class` explicitly. Applied Sprint 6's
+"grep the harnesses for the old verb" lesson: `grep -n "KillHostCell\|
+DamageHostCell"` first, then decide per call site.
+
+**`UnitKind` going 2 → 4 values: the `kind == Macrophage ? X : Y`
+ternaries in `BoneMarrowManager` were landmines** (they'd silently treat
+DC/HelperT as Neutrophil). Converted `PriceFor`/label/colour to switches,
+and guarded `Emit` to branch to the adaptive path *before* it reaches
+`ProfileFor`/`PoolFor`. The innate-only harnesses never pass the new
+kinds, so they stayed green untouched (optional `AdaptiveDirector` param,
+unreachable branches).
+
+**Making the end-to-end shuttle test deterministic without controlling
+private state.** A helper-T's `Tag` is `Antigen.RandomTag()` set in
+`Initialize` (no setter); the DC's cargo comes from the debris antigen.
+Rather than fight that: (1) pre-seed the *entire tissue band* with debris
+of the target species so the DC samples on tick 1 wherever its random
+lane put it, and (2) force `MatchMaxHammingDistance` to 8 (every pairing
+teaches) or −1 (none do) for the two sub-cases. Assert exact knowledge
+delta (`== KnowledgePerMatch`) with `DcPresentationsPerCargo = 1` so
+there's exactly one pairing. 34/34 first run.
+
+**The adaptive arena runs on its own clock.** `AdaptiveDirector.Tick(dt)`
+owns the one tick gate, sub-steps `LymphNode.Step(Clock)` + every fielded
+DC's `SimulationTick(Clock)`. `LymphNode` lost its own accumulator (was
+`Tick(dt,now)`, became `Step(now)`) so there's no second accumulator to
+drift. A harness drives it by calling `Tick(0.12f)` in a loop.

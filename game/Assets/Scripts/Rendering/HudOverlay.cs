@@ -4,6 +4,7 @@ using ImmunologyTD.Pathogens;
 using ImmunologyTD.Units;
 using ImmunologyTD.Economy;
 using ImmunologyTD.Rounds;
+using ImmunologyTD.Adaptive;
 
 namespace ImmunologyTD.Rendering
 {
@@ -33,6 +34,8 @@ namespace ImmunologyTD.Rendering
         private PathogenSpawner spawner;
         private AtpWallet wallet;
         private RoundController rounds;
+        private KnowledgeLedger knowledge;
+        private AdaptiveDirector adaptive;
         private string infoLine;
         private GUIStyle style;
         private GUIStyle bigStyle;
@@ -41,7 +44,8 @@ namespace ImmunologyTD.Rendering
         public void Bind(
             BoardConfig board, int macrophageSpeed, int neutrophilSpeed, BoneMarrowManager boneMarrow,
             GutInterface gutInterface, InvasionTally tally, PathogenSpawner spawner,
-            AtpWallet wallet, RoundController rounds)
+            AtpWallet wallet, RoundController rounds,
+            KnowledgeLedger knowledge = null, AdaptiveDirector adaptive = null)
         {
             this.board = board;
             this.boneMarrow = boneMarrow;
@@ -50,13 +54,15 @@ namespace ImmunologyTD.Rendering
             this.spawner = spawner;
             this.wallet = wallet;
             this.rounds = rounds;
+            this.knowledge = knowledge;
+            this.adaptive = adaptive;
             infoLine =
-                "Immunology TD -- Sprint 7 economy & round framework\n" +
+                "Immunology TD -- Sprint 8 dendritic-cell shuttle & antigen barcode\n" +
                 $"Board: {board.Columns} x {board.Rows} coarse cells " +
                 $"(base {board.BaseBandCells} | tissue {board.TissueBandCells} | lumen {board.LumenBandCells}), " +
                 $"{BoardConfig.FineSubdivision}x{BoardConfig.FineSubdivision} fine per cell\n" +
                 $"Macrophage speed: {macrophageSpeed} fine-tiles/tick   Neutrophil speed: {neutrophilSpeed} fine-tiles/tick\n" +
-                "Buy towers in the base band, then press SPACE (or the button) to start the round. Every number is a placeholder.";
+                "Buy 4 progenitor kinds in the base band (they share 5 slots); SPACE starts the round. DCs carry antigen from debris to the lymph node. Every number is a placeholder.";
         }
 
         private void OnGUI()
@@ -80,7 +86,7 @@ namespace ImmunologyTD.Rendering
             // panel keeps both the readout and the board readable; without
             // it the bone marrow slot labels and these lines overprint each
             // other into mush.
-            var panel = new Rect(0, 0, 1180, 296);
+            var panel = new Rect(0, 0, 1180, 324);
             var prev = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.72f);
             GUI.DrawTexture(panel, Texture2D.whiteTexture);
@@ -97,7 +103,24 @@ namespace ImmunologyTD.Rendering
             GUI.Label(new Rect(16, 178, 900, 30), BuildPopulationLine(), style);
             GUI.Label(new Rect(16, 206, 1100, 30), BuildPathogenLine(), style);
             GUI.Label(new Rect(16, 234, 1100, 30), BuildInvasionLine(), style);
-            GUI.Label(new Rect(16, 262, 1100, 30), BuildPerformanceLine(), style);
+            GUI.Label(new Rect(16, 262, 1100, 30), BuildKnowledgeLine(), style);
+            GUI.Label(new Rect(16, 290, 1100, 30), BuildPerformanceLine(), style);
+        }
+
+        /// <summary>Sprint 8: per-species adaptive knowledge % (§5), plus the
+        /// live lymph-node population. Knowledge rises when a DC and a
+        /// helper-T pair with matching barcodes; it persists across rounds.
+        /// It unlocks nothing yet -- §5's threshold ladder is next.</summary>
+        private string BuildKnowledgeLine()
+        {
+            if (knowledge == null) return string.Empty;
+            float v = knowledge.Get(PathogenClass.IntracellularVirus);
+            float b = knowledge.Get(PathogenClass.IntracellularBacterium);
+            float l = knowledge.Get(PathogenClass.LargeBacterium);
+            string node = adaptive == null || adaptive.Node == null
+                ? string.Empty
+                : $"      lymph node: DC {adaptive.Node.VisitorCount}  helper-T {adaptive.Node.ResidentCount}";
+            return $"KNOWLEDGE -- virus {v:F0}%   bacterium {b:F0}%   large-bac {l:F0}%{node}";
         }
 
         /// <summary>The Sprint 7 economy / round readout -- top-right, clear

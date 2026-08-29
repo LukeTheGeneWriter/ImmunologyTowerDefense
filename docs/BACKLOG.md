@@ -428,3 +428,49 @@ difficulty pass needs, none scoped:
   "play again" needs a fresh controller (and `InvasionTally.Reset()`).
 - **`EconomyHooks.PayForKill` as an instance path** if the game ever runs
   two boards / two wallets at once (currently a process-global static).
+
+## Opened / updated by Sprint 8 (2026-08-29) — the DC shuttle + barcode shipped
+
+The shuttle loop and the 8-bit barcode are built and harness-verified.
+What's flagged, none scoped:
+
+- **§5's threshold ladder — the whole point of the knowledge number.**
+  Sprint 8 wires the % and shows it; it unlocks nothing. Next: MHC-I
+  precise kill (~10%), neutralisation / reduced adhesion (~20%), recall
+  speed (~30%), weak opsonisation (~45%), complement (~60%), secretory
+  IgA at depth 0 (~70%), specific sensing / the search-problem capstone
+  (~90%). This is the natural next sprint.
+- **All of `AdaptiveTuning`.** Match threshold (Hamming 2), knowledge per
+  match, per-class antigens, cargo capacity, debris-sample bite, pairing
+  time, lymphocyte lifespan, node field strengths, DC/helper-T emission
+  cadence and caps. The Director's playtest of the shuttle is the input —
+  especially whether the match rate (≈14.5% per pairing) plus the walk
+  times makes knowledge accrue at a watchable rate or a glacial one.
+- **A real pathogen-species roster.** `PathogenClass` (3 values) is the
+  species key; each has one fixed antigen. A roster makes knowledge key
+  off species id, each species roll its own antigen (and carry its
+  budding-vs-chain trait, §4b — same dependency the Sprint 6/7 notes
+  flag). Mutation's "discrete step-change discount" to a species'
+  knowledge (§5) has nowhere to attach until then.
+- **B cells.** §5c is helper-T only; B cells (antibody, neutralisation,
+  the §5 ladder's antibody-driven rungs) are unbuilt.
+- **Passive lymphatic drainage as a knowledge sink (§1c).** Only the
+  DC-shuttle debris fate is built. Unsampled debris still just
+  self-dissipates; there's no "drains to the node, deleted by resident
+  macrophages, nothing learned" path — which §1c says is what makes
+  deliberate shuttling worth paying for.
+- **DC / macrophage homing on debris ("find-me" signalling).** DC patrol
+  is a plain random walk. This was already a deferred item (Sprint 6
+  notes); Sprint 8 didn't change it.
+- **The adaptive arena keeps ticking during the buy phase and Defeat.**
+  `AdaptiveDirector.Update` doesn't gate on `RoundController.Phase`.
+  Cosmetic; a real freeze on GAME OVER would gate it.
+- **`AdaptiveDirector` runs its own `Clock`,** not aligned to the tissue
+  board's `Time.time`. Fine for now (lifespan / pairing only need it
+  internally consistent); a feature needing both clocks in lockstep would
+  have to thread one through.
+- **The "don't eat me" signal / clearance-vs-sampling ratio knob** (§1c,
+  already flagged) now has a concrete second consumer: a DC sampling a
+  pile also clears a bite of it, so `DcDebrisSamplePerBite` vs.
+  `EfferocytosisDebrisPerTick` is the real tension to tune once balance
+  starts.

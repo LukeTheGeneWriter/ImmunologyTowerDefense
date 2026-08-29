@@ -747,7 +747,7 @@ namespace ImmunologyTD.Pathogens
                 float remaining = tissueGrid.GetHostHealth(CurrentCoarse) - InvasionTuning.IntracellularDrainPerReplication;
                 if (remaining > 0f)
                 {
-                    tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.IntracellularDrainPerReplication);
+                    tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.IntracellularDrainPerReplication, Class);
                     return;
                 }
 
@@ -787,8 +787,8 @@ namespace ImmunologyTD.Pathogens
         {
             var at = CurrentCoarse;
 
-            tissueGrid.ReleaseIntracellular(at); // Infected -> Healthy, drop the resident link
-            tissueGrid.KillHostCell(at);         // Healthy -> Dead + debris, no one to notify
+            tissueGrid.ReleaseIntracellular(at);   // Infected -> Healthy, drop the resident link
+            tissueGrid.KillHostCell(at, Class);    // Healthy -> Dead + debris (bacterial antigen), no one to notify
             IsIntracellular = false;
 
             // I am back on the occupant layer of the now-dead cell. A fresh
@@ -815,7 +815,7 @@ namespace ImmunologyTD.Pathogens
             // InvasionTuning.LargeBacteriumHostDamagePerStep.
             if (Class == PathogenClass.LargeBacterium)
             {
-                tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.LargeBacteriumHostDamagePerStep);
+                tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.LargeBacteriumHostDamagePerStep, Class);
             }
 
             StepTissue();
@@ -1022,7 +1022,7 @@ namespace ImmunologyTD.Pathogens
         {
             var at = CurrentCoarse;
             tissueGrid.ReleaseIntracellular(at);
-            tissueGrid.KillHostCell(at);
+            tissueGrid.KillHostCell(at, Class); // viral antigen in the debris
             IsIntracellular = false;
             freeSinceTime = currentTime;
             hasSpread = false;

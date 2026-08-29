@@ -3,6 +3,7 @@ using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Pooling;
 using ImmunologyTD.Rendering;
+using ImmunologyTD.Adaptive;
 
 namespace ImmunologyTD.Units
 {
@@ -76,11 +77,23 @@ namespace ImmunologyTD.Units
             /// the O(n) Remove on despawn is trivially cheap.</summary>
             public readonly List<SearchUnit> Children = new List<SearchUnit>();
 
+            /// <summary>Sprint 8: for the two ADAPTIVE kinds, children are
+            /// DendriticCell / Lymphocyte GameObjects owned by
+            /// AdaptiveDirector, not SearchUnits. Tracked here only so the
+            /// per-tower MaxActiveChildren cap and the round boundary have a
+            /// count / a list. Empty for innate towers.</summary>
+            public readonly List<GameObject> AdaptiveChildren = new List<GameObject>();
+
             /// <summary>Cached despawn callback handed to every child this
             /// tower emits -- built once at placement so emission allocates
             /// no closure per unit (GAME_DESIGN.md section 8).</summary>
             public System.Action<SearchUnit> OnChildDespawned;
         }
+
+        /// <summary>The two adaptive kinds emit their own agent types via
+        /// <see cref="AdaptiveDirector"/> rather than a SearchUnit.</summary>
+        public static bool IsAdaptive(UnitKind k) =>
+            k == UnitKind.DendriticCell || k == UnitKind.HelperT;
 
         /// <summary>Seconds between emissions from a placed tower. A
         /// judgment call, not specified by SPRINT_PLAN.md -- see
@@ -109,6 +122,11 @@ namespace ImmunologyTD.Units
         /// null and placement stays free, exactly as it was before the
         /// economy existed.</summary>
         private ImmunologyTD.Economy.AtpWallet wallet;
+
+        /// <summary>Emission target for the two adaptive kinds. Null in a
+        /// harness that only exercises the innate towers -- placing an
+        /// adaptive kind is then refused.</summary>
+        private AdaptiveDirector adaptive;
 
         private readonly List<Slot> slots = new List<Slot>();
         private int? pendingChoiceIndex;
@@ -145,7 +163,8 @@ namespace ImmunologyTD.Units
             UnitProfile macrophageProfile, PrefabPool macrophagePool,
             UnitProfile neutrophilProfile, PrefabPool neutrophilPool,
             Vector3[] slotWorldPositions, float slotWorldSize,
-            ImmunologyTD.Economy.AtpWallet wallet = null)
+            ImmunologyTD.Economy.AtpWallet wallet = null,
+            AdaptiveDirector adaptive = null)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
@@ -155,6 +174,7 @@ namespace ImmunologyTD.Units
             this.neutrophilProfile = neutrophilProfile;
             this.neutrophilPool = neutrophilPool;
             this.wallet = wallet;
+            this.adaptive = adaptive;
 
             for (int i = 0; i < slotWorldPositions.Length; i++)
             {
@@ -204,6 +224,9 @@ namespace ImmunologyTD.Units
             var slot = slots[index];
             if (slot.State != BoneMarrowSlotState.Empty) return;
 
+            // An adaptive kind needs the AdaptiveDirector to emit into.
+            if (IsAdaptive(kind) && adaptive == null) return;
+
             // Sprint 7: placement costs ATP (GAME_DESIGN.md §2a/§5b). A
             // null wallet (harness) keeps placement free. If the player
             // can't afford it, nothing happens -- the picker button is also
@@ -213,10 +236,17 @@ namespace ImmunologyTD.Units
             slot.State = BoneMarrowSlotState.Placed;
             slot.Kind = kind;
             slot.EmissionTimer = 0f;
-            slot.Tuning = UnitLifecycleTuning.FromProfile(ProfileFor(kind));
+            slot.Children.Clear();
+            slot.AdaptiveChildren.Clear();
+            // Innate towers seed a full lifecycle-tuning copy from their
+            // profile; adaptive towers only need the MaxActiveChildren
+            // ceiling (their agents have no kill-count depletion).
+            slot.Tuning = IsAdaptive(kind)
+                ? new UnitLifecycleTuning { MaxActiveChildren = AdaptiveCapFor(kind) }
+                : UnitLifecycleTuning.FromProfile(ProfileFor(kind));
             int capturedIndex = index;
             slot.OnChildDespawned = unit => OnChildDespawned(capturedIndex, unit);
-            slot.Visual.color = kind == UnitKind.Macrophage ? macrophageProfile.Color : neutrophilProfile.Color;
+            slot.Visual.color = ColorForKind(kind);
 
             if (pendingChoiceIndex == index) pendingChoiceIndex = null;
         }
@@ -225,8 +255,12 @@ namespace ImmunologyTD.Units
         public UnitKind GetSlotKind(int index) => slots[index].Kind;
 
         /// <summary>How many of this tower's own children are alive right
-        /// now. Compared against GetTuning(index).MaxActiveChildren.</summary>
-        public int GetActiveChildren(int index) => slots[index].Children.Count;
+        /// now. Compared against GetTuning(index).MaxActiveChildren. For an
+        /// adaptive tower this counts DendriticCell / Lymphocyte agents.</summary>
+        public int GetActiveChildren(int index) =>
+            IsAdaptive(slots[index].Kind)
+                ? slots[index].AdaptiveChildren.Count
+                : slots[index].Children.Count;
 
         /// <summary>This tower's live, mutable tuning instance -- null until
         /// the slot is placed. Handed out by reference on purpose: a future
@@ -250,8 +284,9 @@ namespace ImmunologyTD.Units
                 var slot = slots[i];
                 if (slot.State != BoneMarrowSlotState.Placed) continue;
 
+                float interval = IntervalFor(slot.Kind);
                 slot.EmissionTimer += deltaTime;
-                if (slot.EmissionTimer < EmissionIntervalSeconds) continue;
+                if (slot.EmissionTimer < interval) continue;
 
                 // At the max-active-children ceiling: hold the timer AT the
                 // interval instead of letting it bank up. This is what makes
@@ -262,13 +297,13 @@ namespace ImmunologyTD.Units
                 // it refills at the emission rate, it does not burst back to
                 // full. Without the clamp, a tower blocked for 40s would bank
                 // ten emissions and dump them all on the tick a child died.
-                if (slot.Children.Count >= slot.Tuning.MaxActiveChildren)
+                if (GetActiveChildren(i) >= slot.Tuning.MaxActiveChildren)
                 {
-                    slot.EmissionTimer = EmissionIntervalSeconds;
+                    slot.EmissionTimer = interval;
                     continue;
                 }
 
-                slot.EmissionTimer -= EmissionIntervalSeconds;
+                slot.EmissionTimer -= interval;
                 Emit(i, slot);
             }
         }
@@ -276,10 +311,53 @@ namespace ImmunologyTD.Units
         /// <summary>ATP price for a tower of this kind (GAME_DESIGN.md §5b).
         /// Public so the HUD / picker can show it and grey out what the
         /// player can't afford.</summary>
-        public static int PriceFor(UnitKind kind) =>
-            kind == UnitKind.Macrophage
-                ? ImmunologyTD.Economy.EconomyTuning.MacrophagePrice
-                : ImmunologyTD.Economy.EconomyTuning.NeutrophilPrice;
+        public static int PriceFor(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.Macrophage: return ImmunologyTD.Economy.EconomyTuning.MacrophagePrice;
+                case UnitKind.Neutrophil: return ImmunologyTD.Economy.EconomyTuning.NeutrophilPrice;
+                case UnitKind.DendriticCell: return ImmunologyTD.Economy.EconomyTuning.DendriticCellPrice;
+                default: return ImmunologyTD.Economy.EconomyTuning.HelperTPrice;
+            }
+        }
+
+        private static float IntervalFor(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.DendriticCell: return AdaptiveTuning.DcEmissionIntervalSeconds;
+                case UnitKind.HelperT: return AdaptiveTuning.LymphocyteEmissionIntervalSeconds;
+                default: return EmissionIntervalSeconds;
+            }
+        }
+
+        private static int AdaptiveCapFor(UnitKind kind) =>
+            kind == UnitKind.DendriticCell
+                ? AdaptiveTuning.DcMaxActiveChildren
+                : AdaptiveTuning.LymphocyteMaxActiveChildren;
+
+        private Color ColorForKind(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.Macrophage: return macrophageProfile.Color;
+                case UnitKind.Neutrophil: return neutrophilProfile.Color;
+                case UnitKind.DendriticCell: return new Color(0.72f, 0.30f, 0.68f); // dendritic magenta
+                default: return new Color(0.32f, 0.72f, 0.70f);                     // helper-T teal
+            }
+        }
+
+        private static string KindLabel(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.Macrophage: return "Macrophage";
+                case UnitKind.Neutrophil: return "Neutrophil";
+                case UnitKind.DendriticCell: return "Dendritic";
+                default: return "Helper-T";
+            }
+        }
 
         /// <summary>Despawns every fielded immune cell of every tower --
         /// the round boundary (GAME_DESIGN.md §2: "the cells they emit ...
@@ -288,6 +366,11 @@ namespace ImmunologyTD.Units
         /// Called by RoundController when a round clears.</summary>
         public void ClearFieldedUnits()
         {
+            // One call clears every fielded adaptive agent (DCs + lymphocytes)
+            // of every adaptive tower; each agent's despawn callback drops it
+            // from its slot's AdaptiveChildren list.
+            adaptive?.DespawnAllFielded();
+
             for (int i = 0; i < slots.Count; i++)
             {
                 var slot = slots[i];
@@ -299,6 +382,7 @@ namespace ImmunologyTD.Units
                 {
                     OnChildDespawned(i, children[c]);
                 }
+                slot.AdaptiveChildren.Clear(); // belt-and-braces if a callback was missed
                 slot.EmissionTimer = 0f;
             }
         }
@@ -311,6 +395,12 @@ namespace ImmunologyTD.Units
 
         private void Emit(int slotIndex, Slot slot)
         {
+            if (IsAdaptive(slot.Kind))
+            {
+                EmitAdaptive(slotIndex, slot);
+                return;
+            }
+
             var profile = ProfileFor(slot.Kind);
             var pool = PoolFor(slot.Kind);
 
@@ -348,6 +438,31 @@ namespace ImmunologyTD.Units
             LastEmittedStart = start;
             LastEmittedKind = slot.Kind;
             LastEmittedUnit = unit;
+        }
+
+        /// <summary>Sprint 8: emit a dendritic cell (into tissue) or a
+        /// helper-T cell (into the lymph node) via AdaptiveDirector, and
+        /// track the returned GameObject against this tower's cap.</summary>
+        private void EmitAdaptive(int slotIndex, Slot slot)
+        {
+            GameObject go = slot.Kind == UnitKind.DendriticCell
+                ? adaptive.EmitDendriticCell(slotIndex, OnAdaptiveChildDespawned)
+                : adaptive.EmitLymphocyte(slotIndex, OnAdaptiveChildDespawned);
+            if (go == null) return;
+
+            slot.AdaptiveChildren.Add(go);
+            EmittedCount++;
+            LastEmittedKind = slot.Kind;
+        }
+
+        /// <summary>An adaptive agent (DC / lymphocyte) returned to its pool
+        /// -- by lifespan expiry, cargo spend cycling, or the round boundary.
+        /// AdaptiveDirector has already released it; this just drops the
+        /// marrow's tracking reference so the cap frees up.</summary>
+        public void OnAdaptiveChildDespawned(int slotIndex, GameObject go)
+        {
+            if (slotIndex < 0 || slotIndex >= slots.Count) return;
+            slots[slotIndex].AdaptiveChildren.Remove(go);
         }
 
         /// <summary>
@@ -389,19 +504,27 @@ namespace ImmunologyTD.Units
                 // play rather than being something the player has to trust.
                 string label = slot.State == BoneMarrowSlotState.Empty
                     ? "empty\n(click)"
-                    : $"{(slot.Kind == UnitKind.Macrophage ? "Macrophage" : "Neutrophil")}\n{slot.Children.Count}/{slot.Tuning.MaxActiveChildren} alive";
+                    : $"{KindLabel(slot.Kind)}\n{GetActiveChildren(i)}/{slot.Tuning.MaxActiveChildren} alive";
                 GUI.Label(new Rect(screen.x - 45, screen.y - 40, 90, 40), label, labelStyle);
             }
 
             if (pendingChoiceIndex.HasValue)
             {
                 var screen = WorldToGui(slots[pendingChoiceIndex.Value].WorldPosition);
-                float panelW = 200, panelH = 92;
+                bool adaptiveAvailable = adaptive != null;
+                float panelW = 210;
+                float panelH = adaptiveAvailable ? 152 : 92;
                 var panelRect = new Rect(screen.x - panelW / 2f, screen.y + 15, panelW, panelH);
                 GUI.Box(panelRect, "Place progenitor tower");
 
-                DrawBuyButton(new Rect(panelRect.x + 10, panelRect.y + 28, panelW - 20, 26), UnitKind.Macrophage, "Macrophage");
-                DrawBuyButton(new Rect(panelRect.x + 10, panelRect.y + 58, panelW - 20, 26), UnitKind.Neutrophil, "Neutrophil");
+                float y = panelRect.y + 28;
+                DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.Macrophage, "Macrophage"); y += 30;
+                DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.Neutrophil, "Neutrophil"); y += 30;
+                if (adaptiveAvailable)
+                {
+                    DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.DendriticCell, "Dendritic"); y += 30;
+                    DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.HelperT, "Helper-T");
+                }
             }
         }
 

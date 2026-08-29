@@ -6,6 +6,7 @@ using ImmunologyTD.Pooling;
 using ImmunologyTD.Rendering;
 using ImmunologyTD.Economy;
 using ImmunologyTD.Rounds;
+using ImmunologyTD.Adaptive;
 
 namespace ImmunologyTD.Bootstrap
 {
@@ -127,6 +128,7 @@ namespace ImmunologyTD.Bootstrap
         }
 
         private AtpWallet wallet;
+        private KnowledgeLedger knowledge;
 
         private void Awake()
         {
@@ -141,6 +143,11 @@ namespace ImmunologyTD.Bootstrap
             EconomyTuning.ResetToDefaults();
             wallet = new AtpWallet(EconomyTuning.StartingAtp);
             EconomyHooks.PayForKill = () => wallet.Grant(EconomyTuning.AtpPerKill);
+
+            // Sprint 8: the dendritic-cell shuttle + antigen barcode
+            // (GAME_DESIGN.md §5a/§5c). Knowledge % persists for the run.
+            AdaptiveTuning.ResetToDefaults();
+            knowledge = new KnowledgeLedger();
 
             // Sprint 5: the host layer heals on its own clock, independent
             // of whether anything is invading (GAME_DESIGN.md section 1c).
@@ -159,12 +166,13 @@ namespace ImmunologyTD.Bootstrap
 
             var macrophagePool = BuildUnitPool(macrophageProfile);
             var neutrophilPool = BuildUnitPool(neutrophilProfile);
-            var boneMarrow = BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool);
+            var adaptive = BuildAdaptiveDirector(layout);
+            var boneMarrow = BuildBoneMarrowManager(layout, macrophagePool, neutrophilPool, adaptive);
 
             var rounds = BuildRoundController(boneMarrow);
 
             BuildDegranulationFlashPool();
-            BuildHud(boneMarrow, rounds);
+            BuildHud(boneMarrow, rounds, adaptive);
 
             Debug.Log(
                 $"[GameBootstrap] Map 01 -- {board.Columns}x{board.Rows} coarse cells; " +
@@ -361,7 +369,7 @@ namespace ImmunologyTD.Bootstrap
 
             var labelGo = new GameObject("LymphNodeLabel");
             var label = labelGo.AddComponent<CompartmentLabel>();
-            label.Initialize(layout.LymphCenter, "Lymph Node\n(reserved -- not functional yet)", new Vector2(220, 46));
+            label.Initialize(layout.LymphCenter, "Lymph Node\nantigen presentation", new Vector2(220, 46));
         }
 
         private GameObject BuildPathogenTemplate()
@@ -396,7 +404,8 @@ namespace ImmunologyTD.Bootstrap
             return pool;
         }
 
-        private BoneMarrowManager BuildBoneMarrowManager(Layout layout, PrefabPool macrophagePool, PrefabPool neutrophilPool)
+        private BoneMarrowManager BuildBoneMarrowManager(
+            Layout layout, PrefabPool macrophagePool, PrefabPool neutrophilPool, AdaptiveDirector adaptive)
         {
             var go = new GameObject("BoneMarrowManager");
             var manager = go.AddComponent<BoneMarrowManager>();
@@ -405,8 +414,43 @@ namespace ImmunologyTD.Bootstrap
                 macrophageProfile, macrophagePool,
                 neutrophilProfile, neutrophilPool,
                 layout.MarrowSlotPositions, layout.MarrowSlotSize,
-                wallet);
+                wallet, adaptive);
             return manager;
+        }
+
+        /// <summary>Sprint 8: the lymph node arena + the DC/helper-T pools +
+        /// the AdaptiveDirector that emits and ticks them (GAME_DESIGN.md
+        /// §5a/§5c). The node draws its agents inside the lymph backdrop
+        /// rect, inset a little so nothing sits on the border.</summary>
+        private AdaptiveDirector BuildAdaptiveDirector(Layout layout)
+        {
+            var rect = new Rect(
+                layout.LymphCenter.x - layout.LymphSize.x * 0.43f,
+                layout.LymphCenter.y - layout.LymphSize.y * 0.43f,
+                layout.LymphSize.x * 0.86f,
+                layout.LymphSize.y * 0.86f);
+            var node = new LymphNode(knowledge, rect);
+
+            var dcPool = BuildAgentPool<DendriticCell>("DendriticCell");
+            var lymphocytePool = BuildAgentPool<Lymphocyte>("Lymphocyte");
+
+            var go = new GameObject("AdaptiveDirector");
+            var director = go.AddComponent<AdaptiveDirector>();
+            director.Initialize(node, lymphocytePool, dcPool, board, tissueGrid, cytokineField);
+            return director;
+        }
+
+        private PrefabPool BuildAgentPool<T>(string label) where T : Component
+        {
+            var template = new GameObject($"{label}Template");
+            template.AddComponent<SpriteRenderer>();
+            template.AddComponent<T>();
+            template.SetActive(false);
+
+            var poolGo = new GameObject($"{label}Pool");
+            var pool = poolGo.AddComponent<PrefabPool>();
+            pool.SetPrefab(template);
+            return pool;
         }
 
         private RoundController BuildRoundController(BoneMarrowManager boneMarrow)
@@ -430,13 +474,13 @@ namespace ImmunologyTD.Bootstrap
             DegranulationFlash.Configure(pool);
         }
 
-        private void BuildHud(BoneMarrowManager boneMarrow, RoundController rounds)
+        private void BuildHud(BoneMarrowManager boneMarrow, RoundController rounds, AdaptiveDirector adaptive)
         {
             var hudGo = new GameObject("HUD");
             hudGo.AddComponent<CytokineToggle>();
             var overlay = hudGo.AddComponent<HudOverlay>();
             overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick,
-                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds);
+                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds, knowledge, adaptive);
         }
     }
 }

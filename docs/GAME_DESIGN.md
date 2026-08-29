@@ -709,6 +709,23 @@ encounter increments, how many T/B cells populate the node and where they
 come from, and whether a spent DC dies or returns empty. All tuning, none
 blocking the sprints before this one.
 
+**Built — Sprint 8 (Director, 2026-08-29).** The shuttle is built: a
+bought **dendritic-cell progenitor** emits DCs that patrol tissue, sample
+antigen off a dead cell's **debris** (which now carries the class of
+whatever killed it — §1c), carry it left into a now-real **lymph node**
+compartment, and **pair** with the helper-T cells there. The lymph node
+is a real bounded arena with its own **co-localisation cytokine signal**
+(§5c step 4) driving both cell types together via the existing chemotaxis
+code. Implementation choices recorded: a spent DC **returns to tissue
+empty, it does not die** (the travel time is the cost); a **cargo is good
+for `DcPresentationsPerCargo` (4) pairings**; the DC **eats a bite of the
+debris pile when it samples**, so it competes with macrophage
+efferocytosis for the same debris; **B cells are not built** (helper-T
+only); the species key is `PathogenClass` until a roster exists. Every
+number is a placeholder, and **a rising knowledge % unlocks nothing yet**
+— §5's threshold ladder is the next sprint. See `ENGINE_STATUS.md` and
+`SPRINT_PLAN.md`.
+
 ## 5b. ATP income — LOCKED for now (Director, 2026-08-21)
 
 Two sources:
@@ -841,6 +858,18 @@ which combined with pairing time could make learning glacial. A Hamming
 threshold is the obvious dial if that proves too slow — flagged here so
 whoever tunes it knows the lever exists rather than reaching for barcode
 length.
+
+**Built — Sprint 8 (Director, 2026-08-29).** The 8-bit barcode is built.
+Decisions taken: the match rule is a **Hamming threshold of 2** (≥ 6 of 8
+bits agree ≈ 14.5% of random pairings teach) — `MatchMaxHammingDistance`
+is a mutable tuning field, so exact-match (0) or looser is one write away;
+**pairing is a single timed freeze** of `PairingSeconds` on both cells,
+not a per-turn cost; a helper-T cell's tag is **not** banked toward
+memory; the repertoire turns over via a **helper-T lifespan** plus
+re-emission (a fresh random tag each time) *and* the round boundary. The
+"second cytokine" co-localisation field is real (its own small
+`CytokineField` inside the node). Every number is a placeholder. See
+`ENGINE_STATUS.md` and `SPRINT_PLAN.md`.
 
 ## 6. Tissue recovery and fibrosis — LOCKED in principle
 

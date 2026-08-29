@@ -85,6 +85,15 @@ namespace ImmunologyTD.Grid
         private readonly PathogenAgent[,] intracellular;
         private readonly float[,] infectionStartTime;
         private readonly float[,] debrisAmount;
+
+        /// <summary>What killed the cell whose debris sits here, or null.
+        /// This is the ANTIGEN a dendritic cell picks up when it samples the
+        /// pile (GAME_DESIGN.md §1c -- "dead host cells are the antigen
+        /// source"; §5a step 1). Set when the cell dies, cleared with the
+        /// pile. Species key = <see cref="PathogenClass"/> for now (no
+        /// species roster yet).</summary>
+        private readonly PathogenClass?[,] debrisAntigen;
+
         private readonly float[,] emptySince;
 
         // -- Occupant layer --
@@ -121,6 +130,7 @@ namespace ImmunologyTD.Grid
             intracellular = new PathogenAgent[cols, rows];
             infectionStartTime = new float[cols, rows];
             debrisAmount = new float[cols, rows];
+            debrisAntigen = new PathogenClass?[cols, rows];
             emptySince = new float[cols, rows];
             occupant = new PathogenAgent[cols, rows];
             occupantStartTime = new float[cols, rows];
@@ -177,6 +187,14 @@ namespace ImmunologyTD.Grid
         /// exactly when the host state is <see cref="HostState.Dead"/>.</summary>
         public float GetDebrisAmount(CoarseCoord c) =>
             board.InCoarseBounds(c) ? debrisAmount[c.Column, c.Row] : 0f;
+
+        /// <summary>The antigen carried by the debris here -- the class of
+        /// whatever killed this cell -- or null if there is no debris or the
+        /// killer left no antigen (neutrophil collateral on a bare healthy
+        /// cell). A dendritic cell standing on the pile samples this
+        /// (GAME_DESIGN.md §5a step 1).</summary>
+        public PathogenClass? GetDebrisAntigen(CoarseCoord c) =>
+            board.InCoarseBounds(c) ? debrisAntigen[c.Column, c.Row] : null;
 
         /// <summary>The pathogen living inside this position's host cell, or
         /// null. Non-null exactly when the host state is
@@ -262,8 +280,17 @@ namespace ImmunologyTD.Grid
         /// clearing, bacterial lysis, bacterial grazing, and neutrophil
         /// collateral all funnel here, so "killing an infected cell leaves
         /// debris" cannot be true on one path and false on another.
+        ///
+        /// <paramref name="antigen"/> is the class of whatever killed the
+        /// cell, stored on the debris for a dendritic cell to sample later
+        /// (GAME_DESIGN.md §1c/§5a). If left null and the cell has an
+        /// intracellular resident, the resident's class is used -- so a
+        /// stress-sense loud kill or neutrophil collateral on an infected
+        /// cell records the right antigen with no caller change. Detach-
+        /// before-kill paths (brood burst, burn-out) have already dropped
+        /// the resident and must pass the class explicitly.
         /// </summary>
-        public bool KillHostCell(CoarseCoord c)
+        public bool KillHostCell(CoarseCoord c, PathogenClass? antigen = null)
         {
             if (!IsHostGround(c)) return false;
             var previous = host[c.Column, c.Row];
@@ -284,6 +311,7 @@ namespace ImmunologyTD.Grid
             infectionStartTime[c.Column, c.Row] = -1f;
             hostHealth[c.Column, c.Row] = 0f;
             debrisAmount[c.Column, c.Row] = FullDebris;
+            debrisAntigen[c.Column, c.Row] = antigen ?? resident?.Class;
             emptySince[c.Column, c.Row] = -1f;
             DeadCount++;
 
@@ -297,7 +325,7 @@ namespace ImmunologyTD.Grid
         /// Reaching zero kills the cell and leaves debris.
         /// </summary>
         /// <returns>True if this damage killed the cell.</returns>
-        public bool DamageHostCell(CoarseCoord c, float amount)
+        public bool DamageHostCell(CoarseCoord c, float amount, PathogenClass? antigen = null)
         {
             if (!IsHostGround(c) || amount <= 0f) return false;
             var state = host[c.Column, c.Row];
@@ -305,7 +333,7 @@ namespace ImmunologyTD.Grid
 
             hostHealth[c.Column, c.Row] -= amount;
             if (hostHealth[c.Column, c.Row] > 0f) return false;
-            return KillHostCell(c);
+            return KillHostCell(c, antigen);
         }
 
         /// <summary>
@@ -335,6 +363,7 @@ namespace ImmunologyTD.Grid
 
             host[c.Column, c.Row] = HostState.Empty;
             debrisAmount[c.Column, c.Row] = 0f;
+            debrisAntigen[c.Column, c.Row] = null;
             hostHealth[c.Column, c.Row] = 0f;
             intracellular[c.Column, c.Row] = null;
             infectionStartTime[c.Column, c.Row] = -1f;
