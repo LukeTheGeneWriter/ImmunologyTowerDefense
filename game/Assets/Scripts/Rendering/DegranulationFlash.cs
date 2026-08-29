@@ -71,6 +71,14 @@ namespace ImmunologyTD.Rendering
         /// tidy.</summary>
         public static readonly Color StressKillColor = new Color(0.95f, 0.40f, 0.80f);
 
+        /// <summary>Sprint 8: a dendritic cell and a helper-T cell pairing in
+        /// the lymph node with MATCHING barcodes -- the adaptive system just
+        /// learned something (GAME_DESIGN.md §5c). A clean bright green,
+        /// unlike every other burst colour: this one is the player's
+        /// long-game investment paying off, and it happens away from the
+        /// tissue board so it must read on its own.</summary>
+        public static readonly Color KnowledgeMatchColor = new Color(0.40f, 0.92f, 0.45f);
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;

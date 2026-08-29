@@ -95,6 +95,11 @@ namespace ImmunologyTD.Adaptive
         /// actual loss.</summary>
         public static float PairingSeconds = 1.5f;
 
+        /// <summary>A DC and a helper-T pair when within this many node
+        /// fine-tiles of each other (Chebyshev), same "radius not exact
+        /// tile" reasoning as SearchUnit contact.</summary>
+        public static int NodePairingContactFineTiles = 3;
+
         // -- The co-localisation cytokine field (GAME_DESIGN.md §5c step 4).
         //    A DIFFERENT signal from the infection cytokine: it exists only
         //    inside the node and pulls DCs and helper-T cells together so
@@ -135,6 +140,7 @@ namespace ImmunologyTD.Adaptive
             LymphocyteLifespanSeconds = 20f;
             LymphocyteFineTilesPerTick = 2;
             PairingSeconds = 1.5f;
+            NodePairingContactFineTiles = 3;
             NodeColocalisationSourceStrength = 18f;
             NodeLymphocyteSourceStrength = 6f;
             DcEmissionIntervalSeconds = 5f;
