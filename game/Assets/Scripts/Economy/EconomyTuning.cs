@@ -38,6 +38,13 @@ namespace ImmunologyTD.Economy
         public static int MacrophagePrice = 40;
         public static int NeutrophilPrice = 15;
 
+        /// <summary>Sprint 8: the two adaptive progenitors. Placeholder --
+        /// they share the 5 marrow slots with the innate towers, so price is
+        /// only half the cost; the real cost is the slot (GAME_DESIGN.md
+        /// §1c/§2a).</summary>
+        public static int DendriticCellPrice = 30;
+        public static int HelperTPrice = 25;
+
         // -- Lives (GAME_DESIGN.md §6c) --
 
         public static int StartingLives = 100;
@@ -71,6 +78,8 @@ namespace ImmunologyTD.Economy
             AtpPerKill = 3;
             MacrophagePrice = 40;
             NeutrophilPrice = 15;
+            DendriticCellPrice = 30;
+            HelperTPrice = 25;
             StartingLives = 100;
             LifeRegenRounds = 2;
             LifeRegenAmount = 1;
