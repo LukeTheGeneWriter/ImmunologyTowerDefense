@@ -157,27 +157,33 @@ rather than every dead cell regrowing on an independent clock. New
 - Anything from Sprints 1–10 changing behaviour, except neighbour-regrowth
   (scope D).
 
-## Stopping point (definition of done)
+## Stopping point (definition of done) — status 2026-08-29
 
 `[~]` = code done + harness-verified. `[x]` = verified from command output.
 
-- [ ] Open the game → a **shop** is visible in the frozen buy phase with
-      buy options for the barrier, host-cell upgrades, and crypts; every
-      one is priced, greys out when broke, and buying it spends ATP and
-      raises its level. **Nothing about the simulation changes.**
-- [ ] Clicking a **placed progenitor tower** offers an upgrade that
-      spends ATP and bumps that tower's level (no mechanical effect).
-- [ ] The HUD KNOWLEDGE block shows the **six-rung ladder per species**,
-      ticking rungs on as the % crosses their thresholds — and still
-      driving nothing.
-- [ ] Tissue **fills in from its healthy edges faster** than dead cells
-      regrow in isolation (neighbour-regrowth).
-- [ ] Everything from Sprints 1–10 still works — eight harnesses re-run
-      green.
-- [ ] Shop / ladder / regrowth verification green.
-- [ ] `GAME_DESIGN.md` §5 + host-cell-upgrades, `INTERFACE.md`,
-      `ENGINE_STATUS.md`, `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md`
-      updated. Clean Windows build, 0 exceptions on launch.
+- [~] A **shop** is drawn in the frozen buy phase with buy options for
+      the barrier, host-cell upgrades, and crypts; each priced, greying
+      out when broke, buying spends ATP and raises a level and **nothing
+      about the simulation changes**. (`RunShopLedger`; the OnGUI panel
+      itself is the build launch.)
+- [~] Clicking a **placed progenitor tower** offers an upgrade that
+      spends ATP and bumps the tower's level, `UnitLifecycleTuning`
+      untouched. (`RunProgenitorUpgrade`.)
+- [~] The HUD KNOWLEDGE block shows the **six-rung ladder per species**,
+      rungs ticking on as the % crosses their thresholds, driving
+      nothing. (`RunKnowledgeLadder`; the HUD lines are the build launch.)
+- [~] Tissue **fills in from its healthy edges faster** than isolated
+      dead cells regrow. (`RunNeighbourRegrowth`: surrounded 6.8s vs
+      isolated 20.0s.)
+- [x] Everything from Sprints 1–10 still works — eight prior harnesses
+      re-run green.
+- [x] `Sprint11Verification` — **26 passed, 0 failed**. 398 total across
+      nine harnesses.
+- [x] `GAME_DESIGN.md` §5 + §1d, `INTERFACE.md`, `ENGINE_STATUS.md`,
+      `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md` updated. Clean Windows
+      build (93,353,280 bytes, 0 errors), 0 exceptions on launch.
+
+**Handed to the Director for playtest.**
 
 ## Process note
 

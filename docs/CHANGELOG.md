@@ -12,6 +12,41 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 11 -- 2026-08-29
+Framework pass -- a **shop** and the **knowledge ladder**, both mostly
+placeholder.
+
+**The buy phase has a shop now.** During the frozen buy phase a panel
+offers: **mucus turnover** for the gut barrier, three **host-cell
+upgrades** (a dsRNA sensor, hardening against viral entry, bacterial-
+damage resistance), and **crypts**. Clicking a **placed progenitor
+tower** opens its own upgrade. Every one is priced (rising per level),
+greys out when you can't afford it, and buying it spends ATP and raises a
+level -- **and changes nothing about the simulation yet.** The design for
+each (especially the dsRNA sensor: a ~20% chance for an infected cell to
+self-destruct and release a dendritic-cell-recruiting "eat this debris"
+signal) is written up in `GAME_DESIGN.md §1d` for the sprint that builds
+it.
+
+**The knowledge ladder is on screen.** The KNOWLEDGE readout is now
+per-species with the six rungs -- **Cytotoxic T cells (10%), Neutralizing
+antibodies (20%), Memory T cells (30%), Fc receptor (45%), Complement
+(60%), Secretory IgA (70%)** -- ticking on as that species' % crosses
+each threshold. Still drives nothing; each capability is its own later
+sprint. Roster confirmed in `GAME_DESIGN.md §5`.
+
+**One real change: tissue heals inward.** An empty cell regrows faster
+the more healthy neighbours it has (`TissueTuning.NeighbourRegrowthBonus`),
+so a cleared pocket fills in from its intact edges instead of every dead
+cell regrowing on its own 20s clock -- a cell ringed by healthy tissue
+comes back in ~7s.
+
+Verified: a new `Sprint11Verification` harness, **26 assertions** (shop
+spend/refuse/price-scaling, the per-tower upgrade placeholder leaving the
+real tuning untouched, ladder thresholds + monotonicity, and the
+regrowth A/B -- surrounded 6.8s vs isolated 20.0s). All nine harnesses
+green -- **398 total, 0 failed**. Clean Windows build, 0 exceptions.
+
 ## Sprint 10 -- 2026-08-29
 Small follow-up after the Sprint 9 playtest ("the new rhythm works
 well!"): **dendritic cells now spread across the lanes instead of

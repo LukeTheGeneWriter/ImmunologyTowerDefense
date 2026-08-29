@@ -520,3 +520,51 @@ What's flagged, none scoped:
   `RoundController.DespawnAllFieldedUnits()` as one piece of the reset;
   it still needs a fresh `RoundController` (breach baseline) + `RoundClock.
   Reset()` + `InvasionTally.Reset()` + despawning loose pathogens.
+
+## Opened / updated by Sprint 11 (2026-08-29) — the shop + ladder framework
+
+The shop, per-tower upgrades, and the knowledge ladder are on screen but
+drive nothing. Each purchase's real mechanic (design in GAME_DESIGN.md
+§1d / §5 / §6b):
+
+- **Barrier: mucus turnover (§6b).** Raise the shed rate — return a
+  fraction of gut-wall residents to the lumen each round to be excreted.
+  Categorically "flushing not fighting"; sequences before secretory IgA.
+- **Host: dsRNA sensor → immunogenic apoptosis.** An infected upgraded
+  cell has a ~20% chance to self-destruct (cell + resident, clean), and
+  releases a **DC-recruiting "eat this debris" cytokine** — a *third*
+  cytokine field, distinct from the recruitment and co-localisation
+  signals. This is the piece that most needs a new field. Other sensor
+  variants (dsDNA/LPS/flagellin) follow.
+- **Host: reduced viral entry / bacterial resistance.** Per-cell (or
+  global-while-owned) scalars on `VirusEntryChancePerTick` /
+  `LargeBacteriumHostDamagePerStep`.
+- **Crypts.** Placeable; faster regrowth in a radius — the spatial
+  version of Sprint 11's neighbour-regrowth. Ties to §6's crypt model.
+- **Progenitor upgrades (§6d).** The wiring exists (`UnitLifecycleTuning`
+  is per-tower mutable, a `SearchUnit` holds a live ref). Sprint 11's
+  `UpgradeTower` just needs to actually write a field: bump `KillLimit`,
+  cut `DegranulationBurstMultiplier`, raise `StressSenseChancePerTick`,
+  etc. — one write per upgrade kind. Probably wants distinct upgrade
+  *kinds* per slot rather than one opaque level.
+
+- **The §5 knowledge-ladder capabilities.** All six are unbuilt:
+  - **CTL (~10%)** — a new unit; the quiet precise-kill path
+    (`TissueGrid.ReleaseIntracellular` is reserved for exactly this).
+  - **Neutralizing antibodies (~20%)** — an adhesion multiplier for a
+    known species; cheapest to build.
+  - **Memory T cells (~30%)** — on re-encounter, spawn a CTL burst; needs
+    the CTL unit + a "seen this species before" flag.
+  - **Fc receptor (~45%)** — antibody entities that stick to innate
+    cells / opsonise pathogens.
+  - **Complement (~60%)** — passive damage tick to an antibody-coated
+    pathogen, no cell needed.
+  - **Secretory IgA (~70%)** — antibody acting in the lumen before
+    adhesion; the only lumen-side capability.
+  - The **~90% capstone** (antibody-coated pathogens as chemotactic
+    beacons) is what Fc receptor grows into.
+
+- **Shop prices vs. the persistent-army economy** (still the open Sprint 9
+  question). `ShopTuning` prices are blind placeholders.
+- **`ShopLedger` has no round-boundary / restart handling** — it just
+  persists for the run (correct for now).

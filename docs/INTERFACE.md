@@ -1417,6 +1417,74 @@ the build launch. `MapVerification` 4c repinned to `AdhesionChanceAtWall`
 - `AdaptiveVerification` grew 3 assertions (34 → 37): an A/B on lane
   spread / shared-lane ticks with repulsion on vs. off.
 
+## Sprint 11 changes — placeholder shop, knowledge ladder, inward regrowth
+
+Framework pass — the shop and the ladder drive nothing; only regrowth is
+a real change.
+
+### `ImmunologyTD.Economy` — the shop
+
+- **`enum ShopItem`** — `BarrierMucusTurnover`, `HostDsRnaSensor`,
+  `HostReducedViralEntry`, `HostBacterialResistance`, `Crypt`.
+- **`ShopLedger`** (plain reference type, per run) — `int LevelOf(ShopItem)`,
+  `bool Owns(ShopItem)`, `int NextPrice(ShopItem)`, `bool CanBuy(ShopItem,
+  AtpWallet)`, `bool TryBuy(ShopItem, AtpWallet)` (spends + increments;
+  false and no change if unaffordable / null wallet), `void Reset()`,
+  `int Revision`. **No effect beyond the ledger + wallet.**
+- **`ShopTuning`** (mutable statics, `ResetToDefaults()`) — a base price
+  per item, `PriceGrowthPerLevel` 0.6 (`PriceFor(item, level) = base ·
+  (1 + growth·level)`), `ProgenitorUpgradeBasePrice` 35 /
+  `ProgenitorUpgradePrice(level)`. All placeholder.
+
+### `BoneMarrowManager` — per-tower upgrade
+
+- `Slot.UpgradeLevel` (int). `OnSlotClicked` on a **placed** slot now
+  opens an upgrade panel (`pendingUpgradeIndex`) instead of no-op.
+- **`bool UpgradeTower(int index)`** — spends
+  `ShopTuning.ProgenitorUpgradePrice(currentLevel)`, bumps the level.
+  Refused on an empty slot / when broke. **Does not touch
+  `UnitLifecycleTuning`** — §6d's real path is unchanged, just not called.
+- **`int GetUpgradeLevel(int index)`**. Slot label shows "+N".
+
+### `ImmunologyTD.Adaptive.KnowledgeLadder` + `KnowledgeCapability`
+
+- **`enum KnowledgeCapability`** — `CytotoxicTCells`,
+  `NeutralizingAntibodies`, `MemoryTCells`, `FcReceptor`, `Complement`,
+  `SecretoryIgA`.
+- **`KnowledgeLadder`** (static) — `readonly struct Rung { KnowledgeCapability
+  Capability; float ThresholdPercent; string ShortName }`, `Rung[] Rungs`
+  (ascending: 10/20/30/45/60/70), `bool IsUnlocked(cap, pct)`,
+  `int UnlockedCount(pct)`, `IEnumerable<Rung> All()`. **Display-only.**
+
+### `HudOverlay`
+
+- `Bind(...)` gained a trailing optional `ShopLedger shop`.
+- The KNOWLEDGE line is now a block: `BuildKnowledgeHeader()` +
+  `BuildLadderLine(species, label)` per class (`% [x]CTL [x]NeutAb …`).
+- **`DrawShopPanel()`** — left-side IMGUI panel, drawn only while
+  `rounds.Phase == RoundPhase.Building`. Five `ShopItem` rows, priced,
+  grey-out when broke, wired to `ShopLedger.TryBuy`. Debug panel height
+  324 → 392.
+
+### `TissueGrid` / `TissueTuning` — neighbour-accelerated regrowth (real)
+
+- **`TissueTuning.NeighbourRegrowthBonus`** (new, 0.5; 0 = old behaviour).
+- `TissueGrid.Tick`'s `Empty → Healthy` branch: `effectiveRegen =
+  HostRegenerationSeconds / (1 + NeighbourRegrowthBonus ·
+  HealthyNeighbourCount(c))` — a new private von-Neumann `Healthy`
+  counter. Tissue heals inward from intact edges.
+
+### `Assets/Editor/Sprint11Verification.cs` (new)
+
+`Sprint11Verification.RunAll` — **26 assertions**: `ShopLedger` spend /
+refuse / null-wallet / price scaling / `Reset`; `BoneMarrowManager.
+UpgradeTower` placeholder (spends, levels, leaves `UnitLifecycleTuning`
+untouched, refused when broke / on an empty slot); `KnowledgeLadder`
+thresholds at the boundary, ordering, `UnlockedCount` monotonicity;
+neighbour-regrowth A/B (surrounded 6.8s vs isolated 20.0s, and identical
+at bonus 0). The OnGUI panels themselves are left to the build launch.
+`TissueVerification`'s regrow sub-test pins `NeighbourRegrowthBonus` to 0.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

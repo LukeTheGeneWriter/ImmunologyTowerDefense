@@ -370,6 +370,53 @@ plausible upgrade or pathogen trait later (a pathogen that induces strong
 "don't eat me" signalling would clog tissue with unclearable debris).
 **Not scoped, not costed, not in Sprint 4 or 5.** See `BACKLOG.md`.
 
+## 1d. Host-cell upgrades — design (Director, 2026-08-29), placeholder in Sprint 11
+
+Bought in the buy-phase shop. **Sprint 11 shipped the shop framework
+only** — purchasing spends ATP and raises a level, nothing about the
+simulation changes. The design each will implement:
+
+### Pattern-recognition receptor → immunogenic apoptosis
+
+Upgrade host cells to sense a pathogen molecular signature. The Director's
+worked example: **a dsRNA sensor**. A cell so upgraded, once infected by
+the matching class (an **RNA virus** for dsRNA), has a **~20% chance to
+self-destruct** — a clean apoptotic death, cell + resident, releasing
+**a strong "eat this debris" cytokine that recruits *dendritic cells
+specifically***. This is:
+
+- **intrinsic antiviral defence** — the cell kills itself and the virus
+  with it, denying the infection before it buds or bursts;
+- **immunogenic cell death** — the debris it leaves is a loud call to the
+  adaptive-sampling loop, not a quiet corpse. It actively *feeds*
+  knowledge accrual (§5a).
+
+It implies a **third cytokine signal**, distinct from the §7/§9
+recruitment cytokine (chemotaxis for innate cells toward infection) and
+the §5c co-localisation signal (DC↔helper-T in the node): a
+**DC-attractant** in the tissue. Other sensor variants (dsDNA, LPS, flagellin)
+are the obvious follow-ons, each keyed to a class.
+
+### Reduced viral entry
+
+Lower the per-tick chance (`InvasionTuning.VirusEntryChancePerTick`) that
+a free virion sitting on an upgraded `Healthy` cell gets inside it — the
+cell is harder to infect, so a viral front advances more slowly through
+upgraded tissue.
+
+### Bacterial-damage resistance
+
+A large bacterium grazing an upgraded cell does less host-cell damage per
+step (`InvasionTuning.LargeBacteriumHostDamagePerStep`) — upgraded tissue
+survives a bacterial crawl-through longer.
+
+### Crypts
+
+Placeable stem-cell niches (§6's crypt-based recovery). Tissue within a
+radius of a crypt regrows faster — a spatial version of Sprint 11's
+neighbour-accelerated regrowth, giving the player a reason to care *where*
+combat happens. Repeatable buy (more crypts = more coverage).
+
 ## 2. Tower / unit lifespan model — LOCKED
 
 Adopts the Bloons division between a persistent tower and a transient thing
@@ -644,22 +691,27 @@ the abstraction's main payoff: antigenic change becomes a single legible
 number dropping, and the game never has to represent phylogenetics, drift
 versus shift, or epitope-level specificity.
 
-### Threshold ladder
+### Threshold ladder — **roster confirmed (Director, 2026-08-29)**
 
-Director-specified rungs are marked **(Director)**. The remainder are
-proposals filling the range; each has a real mechanism behind it and is
-mechanically distinct from its neighbours rather than a scaled version of
-the same effect.
+The Director confirmed the six-rung roster below (thresholds still
+placeholder, mechanically distinct from each other). Sprint 11 built it
+as **data + a HUD readout only** (`KnowledgeLadder` /
+`KnowledgeCapability`) — crossing a threshold changes the display and
+nothing else. Each capability's real mechanic is its own later sprint.
 
-| Knowledge | Capability | Mechanism |
+| Knowledge | Capability | Mechanic (Director's note) |
 |---|---|---|
-| ~10% **(Director)** | Cytotoxic T cells kill only infected cells — no collateral loss of healthy neighbours, and/or accelerated regrowth into the vacated coordinate | MHC-I restricted recognition |
-| ~20% | **Neutralization.** Reduced probability that this pathogen successfully adheres to a villus | Early low-affinity antibody blocking adhesins |
-| ~30% | **Recall speed.** Shortened lymph node activation delay (see `BACKLOG.md`) on re-encounter | Memory responses are faster than primary ones |
-| ~45% | **Weak opsonization.** Innate cells with the Fc receptor upgrade gain a phagocytosis rate bonus, but no specific sensing | Opsonization is real at moderate titres |
-| ~60% | **Complement fixation.** Antibody-coated pathogens take passive damage over time with no immune cell present | Classical complement pathway |
-| ~70% | **Secretory IgA.** Antibody exported across the epithelium into the lumen, acting on pathogens at depth 0 before adhesion is possible | Transcytosis of dimeric IgA — the signature adaptive mechanism of small-intestinal mucosa |
-| ~90% **(Director)** | **Specific sensing.** Antibody-coated pathogens become chemotactic beacons for suitably upgraded innate cells | Fc receptor engagement |
+| ~10% | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the *quiet* version of §4b's stress-sense kill). MHC-I restricted recognition. |
+| ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). |
+| ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
+| ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
+| ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. |
+| ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. |
+
+The **~90% "specific sensing" capstone** (antibody-coated pathogens
+become chemotactic beacons) is not in the Director's six — treat it as the
+end state that Fc receptor grows into, still the capstone the balance
+should protect (see below).
 
 ### Why the 90% rung is the game's capstone
 

@@ -1,10 +1,11 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 10** (a small follow-up: DC patrol
-lane-repulsion). The bulk of the current state is **Sprint 9** (the
-reworked round model — a frozen buy phase, a persistent battlefield,
-food-item delivery). Sprint 0's
+reflects the state after **Sprint 11** (a framework pass: a placeholder
+buy-phase shop, the knowledge ladder as data + HUD, and one real change —
+neighbour-accelerated regrowth). Recent structural state is **Sprint 9**
+(the reworked round model — a frozen buy phase, a persistent battlefield,
+food-item delivery) and **Sprint 10** (DC patrol lane-repulsion). Sprint 0's
 engine/platform decision section is preserved below since it is still
 accurate. Earlier sprints' histories are in `docs/CHANGELOG.md`; this file
 only carries forward what is still true.
@@ -650,6 +651,49 @@ its live `allDcs` list as the cohort (`DendriticCell.Initialize` gained an
 optional `IReadOnlyList<DendriticCell> cohort`); `DendriticCell.DebugPlaceForTest`
 is a new test seam.
 
+### Sprint 11 addition — placeholder shop, knowledge ladder, inward regrowth
+
+Design: `GAME_DESIGN.md` §1d (host-cell upgrades), §5 (ladder roster
+confirmed), §6b (mucus turnover). Full signatures in `INTERFACE.md`
+("Sprint 11 changes"). Framework pass — the shop and the ladder drive
+nothing; only regrowth is a real change.
+
+**1. `ImmunologyTD.Economy.ShopLedger` + `ShopTuning` + `ShopItem`.**
+Per-run purchase ledger. `enum ShopItem { BarrierMucusTurnover,
+HostDsRnaSensor, HostReducedViralEntry, HostBacterialResistance, Crypt }`.
+`ShopLedger.TryBuy(item, wallet)` spends `ShopTuning.PriceFor(item, level)`
+(`base · (1 + PriceGrowthPerLevel·level)`, `PriceGrowthPerLevel` 0.6) and
+increments the level — **no side effect beyond the ledger + wallet**.
+`LevelOf` / `Owns` / `NextPrice` / `CanBuy` / `Reset` / `Revision`.
+`ShopTuning` is mutable statics + `ResetToDefaults()`, all placeholder.
+
+**2. Per-tower progenitor upgrade (`BoneMarrowManager`).** Clicking a
+**placed** slot (was a no-op) opens an upgrade panel. `Slot.UpgradeLevel`,
+`bool UpgradeTower(int)` (spends `ShopTuning.ProgenitorUpgradePrice(level)`,
+bumps the level), `int GetUpgradeLevel(int)`. The tower's
+`UnitLifecycleTuning` is **not** touched — §6d's real-upgrade wiring
+exists; this just doesn't call it. The slot label shows "+N".
+
+**3. `ImmunologyTD.Adaptive.KnowledgeLadder` + `KnowledgeCapability`.**
+The six §5 rungs as `readonly struct Rung { KnowledgeCapability; float
+ThresholdPercent; string ShortName }`, an ordered `Rungs[]`,
+`IsUnlocked(cap, pct)`, `UnlockedCount(pct)`. Thresholds 10/20/30/45/60/70,
+still placeholder. Display-only.
+
+**4. `HudOverlay`.** `Bind` gained an optional `ShopLedger`. The KNOWLEDGE
+block is now per-species (`% [x]CTL [x]NeutAb [ ]MemT …`); a **SHOP panel**
+(left side, `Building` phase only) lists the five `ShopItem` rows, priced,
+grey-out when broke, wired to `ShopLedger.TryBuy`. Debug panel grew to
+392px.
+
+**5. Neighbour-accelerated regrowth (`TissueGrid` / `TissueTuning`) — the
+one real change.** An `Empty` host-ground cell's regrow time is
+`HostRegenerationSeconds / (1 + TissueTuning.NeighbourRegrowthBonus ·
+healthyVonNeumannNeighbours)`, so tissue heals inward from its intact
+edges. `NeighbourRegrowthBonus` 0.5 (0 restores the old per-cell clock).
+Measured: a cell ringed by 4 healthy neighbours regrows in ~6.8s vs the
+20s base. `TissueVerification`'s regrow sub-test pins the bonus to 0.
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -689,18 +733,21 @@ All run by the **head session**. Numbers copied from actual output.
 
 | Harness | Result |
 |---|---|
+| `Sprint11Verification.RunAll` (**new**, Sprint 11) | **26 passed, 0 failed** |
 | `RoundVerification.RunAll` (Sprint 9) | 29 passed, 0 failed |
-| `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10) | **37 passed, 0 failed** |
+| `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10) | 37 passed, 0 failed |
 | `EconomyVerification.RunAll` (Sprint 7) | 47 passed, 0 failed |
 | `TissueVerification.RunAll` (Sprint 5, grown Sprint 6) | 73 passed, 0 failed |
 | `MapVerification.RunAll` (Sprint 4) | 71 passed, 0 failed |
 | `LifecycleVerification.RunAll` (Sprint 3) | 79 passed, 0 failed |
 | `CombatVerification.RunAll` (Sprint 2) | 36 passed, 0 failed |
 
-**372 assertions, 0 failed** (Sprint 10 added 3 to `AdaptiveVerification`
-for DC patrol lane-repulsion — an A/B showing repulsion widens the mean
-pairwise lane spread of three co-spawned DCs from ~6 to ~12 and cuts
-their shared-lane ticks), on a clean working tree after every commit.
+**398 assertions, 0 failed** (Sprint 11 added 26 in `Sprint11Verification`
+— `ShopLedger` spend / refuse / price scaling, the per-tower upgrade
+placeholder leaving `UnitLifecycleTuning` untouched, `KnowledgeLadder`
+thresholds + monotonicity, and the regrowth A/B: a cell ringed by healthy
+tissue regrows in 6.8s vs an isolated one's 20.0s), on a clean working
+tree after every commit.
 
 `RoundVerification` drives `RoundClock` (opens frozen; `Advance` is a
 no-op while frozen, accumulates while running; re-freezing holds the
@@ -819,9 +866,9 @@ standing instruction is mechanics first. Logged in `BACKLOG.md`.
 **Sprint 5 note:** not re-measured — no cytokine code changed — and the
 table above still stands.
 
-### Windows build (Sprint 10)
+### Windows build (Sprint 11)
 
-`BuildScript.BuildWindows()` — **Succeeded, 93,347,136 bytes, 0 errors.**
+`BuildScript.BuildWindows()` — **Succeeded, 93,353,280 bytes, 0 errors.**
 Launched headlessly for ~20s: **0 exceptions / 0 errors** — the bootstrap
 diagnostic prints clean (25×10 layout). The game opens in the **frozen**
 buy phase, so a passive launch sits genuinely still — the round-model
@@ -831,11 +878,19 @@ exercised here only in the sense that nothing moves.
 
 ### What was NOT verified
 
-- **Nobody has played the new round rhythm.** A frozen buy phase, a
+- **The shop / upgrade / ladder UI on screen.** `Sprint11Verification`
+  drives `ShopLedger`, `UpgradeTower`, `KnowledgeLadder` and the regrowth
+  directly; nobody has clicked the shop panel, opened a tower's upgrade
+  panel, or watched a ladder rung tick on in a running build. Whether the
+  panels fit / read well is a Director eyeball.
+- **Whether "placeholder" reads as broken.** Every shop purchase and the
+  progenitor upgrade take ATP and change a number and *nothing else*.
+  That's intended (framework pass) but could feel like a bug to a
+  playtester — flagged.
+- **Nobody has played the Sprint 9 round rhythm.** A frozen buy phase, a
   contaminated food item transiting the lumen and dropping its bursts at
   the wall, a battlefield that persists into the next round, the tagline
-  — that whole loop is the question this sprint exists to answer and it
-  needs a human at the keyboard. So does whether the doubled difficulty
+  — carried forward, still unplayed. So is whether the doubled difficulty
   (16-batch round 1, adhesion 0.30) makes round 1 *engage* without
   overwhelming, and whether ATP now accumulates too fast with a
   persistent army.
@@ -981,6 +1036,26 @@ exercised here only in the sense that nothing moves.
   tissue healing too.** Intended ("freeze time"), but it means debris
   doesn't dissipate and cells don't regrow while you shop — a long buy
   phase is genuinely paused, not just spawn-paused.
+- **(New, Sprint 11) Every shop purchase and the progenitor upgrade are
+  placeholders.** `ShopLedger` levels and `Slot.UpgradeLevel` rise and
+  spend ATP; **nothing reads them**. The intended mechanics are in
+  `GAME_DESIGN.md` §1d / §5 / §6b. Prices (`ShopTuning`,
+  `PriceGrowthPerLevel` 0.6) are placeholder.
+- **(New, Sprint 11) The knowledge ladder unlocks nothing.**
+  `KnowledgeLadder` is data + a HUD readout; crossing a threshold changes
+  only the display. All six capabilities (CTL / NeutAb / MemT / FcR /
+  Compl / IgA) are unbuilt. Thresholds are §5's placeholder values.
+- **(New, Sprint 11) `ShopLedger` / `ShopTuning` are per-run / process
+  statics** like the other ledgers/tunings — a harness that pokes
+  `ShopTuning` must `ResetToDefaults()`. No `ShopLedger` on the round
+  boundary or a run restart yet (it just persists for the run, which is
+  correct).
+- **(New, Sprint 11) Neighbour-accelerated regrowth uses the *current*
+  healthy-neighbour count each sweep**, so a cell's effective regrow time
+  changes as its neighbours die/regrow around it. Intended (it's why
+  tissue "fills in"), but it means the regrow clock isn't a fixed
+  countdown — a pocket that loses its healthy border mid-heal slows back
+  down.
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell

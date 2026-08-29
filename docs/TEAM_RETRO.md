@@ -751,3 +751,31 @@ The decisive signal was **mean pairwise lane spread**: 12.4 with
 repulsion vs 6.2 without, on an 18-max scale. Kept both, asserting the
 direction of each plus a loose absolute — but if you're A/B-testing a
 spreading behaviour, measure the spread, not the collisions.
+
+### Sprint 11 — head session (2026-08-29, placeholder shop + knowledge ladder)
+
+Framework pass: a shop and the §5 ladder, both mostly display-only, plus
+one real mechanic (neighbour-accelerated regrowth). Broad but shallow —
+the placeholder ledgers (`ShopLedger`, `Slot.UpgradeLevel`) are ~20 lines
+each; the value is in `GAME_DESIGN.md §1d` capturing the Director's
+dsRNA-sensor design (a sensed cell has a ~20% chance to self-destruct and
+release a DC-recruiting cytokine -- which implies a *third* cytokine
+field, worth flagging loudly).
+
+**A tuning change broke a harness assertion again -- same shape as Sprint
+9.** Neighbour-regrowth (an Empty cell regrows faster with more Healthy
+neighbours) failed `TissueVerification`'s "hasn't regrown before the
+20s period" -- the test cell had 4 healthy neighbours so it regrew in
+~7s. Fix: pin `NeighbourRegrowthBonus = 0` in that sub-test (it's about
+the base per-cell clock) and put the neighbour A/B in the new harness.
+The pattern holds: **any default that a harness assumes, a later sprint
+will move -- either pin it in the test or assert the direction, not the
+absolute.**
+
+**"Placeholder" as a first-class state.** The Director explicitly wants
+buy options visible and clickable *before* they do anything. `ShopLedger.
+TryBuy` returning true + spending ATP + bumping a level, with a code
+comment that says "no side effect beyond the ledger + wallet", is the
+whole contract. The harness asserts the *negative* -- `UpgradeTower`
+leaves `UnitLifecycleTuning.KillLimit` unchanged -- so a future sprint
+that wires the real effect will trip that assertion and know to update it.
