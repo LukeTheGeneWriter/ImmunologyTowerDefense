@@ -1,11 +1,12 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 12** (two playtest fixes: cytokine
-sensing on-by-default + a buyable sharpen, and the DC patrol movement
-rework). The prior framework pass was **Sprint 11** (a placeholder shop,
-the knowledge ladder as data + HUD, neighbour-accelerated regrowth).
-Recent structural state is **Sprint 9**
+reflects the state after **Sprint 13** (the sprite / visual-identity pass
+— procedurally-drawn shape sprites replace the flat white quad for every
+entity). Sprint 12 was two playtest fixes (cytokine sensing on-by-default
++ a buyable sharpen; the DC patrol movement rework); Sprint 11 was a
+framework pass (placeholder shop, knowledge ladder as data, neighbour
+regrowth). Recent structural state is **Sprint 9**
 (the reworked round model — a frozen buy phase, a persistent battlefield,
 food-item delivery) and **Sprint 10** (DC patrol lane-repulsion). Sprint 0's
 engine/platform decision section is preserved below since it is still
@@ -735,6 +736,62 @@ Measured: three DCs from one lane now share a lane on **2 of 250** ticks
 lone swept DC covers tissue axis **7..17** where a random walk covers
 12..14.
 
+### Sprint 13 additions — the sprite / visual-identity pass
+
+Design: `docs/SPRITE_DESIGN.md` (written by a dispatched design agent — a
+first for this project) + `docs/UI_STYLE_GUIDE.md` (rewritten to "what's
+on screen now"). Signatures in `INTERFACE.md` ("Sprint 13 changes").
+
+**1. `game/Assets/Scripts/Rendering/SpriteShapes.cs` (new, from the design
+agent).** ~20 procedurally-drawn 64×64 shape sprites, generated once at
+first access and cached in lazy statics (the `RuntimeSprites` pattern),
+drawn **white with the silhouette in the alpha channel** so the existing
+per-instance `SpriteRenderer.color` multiply still produces every hue and
+state tint. Raster primitives: `FillDisc` / `FillRing` / `FillCapsule` /
+`FillLobed` / `FillStar` / `FillRounded` + `InnerShade` / `RimShade` /
+`Stipple` / `Multiply`, 4× supersampled coverage. Shapes: `Macrophage`
+(amoeboid), `Neutrophil` (lobed nucleus), `DendriteStar` /
+`DendriteStarLoaded`, `Lymphocyte`, `LargeBacterium` (rod), `Virion`
+(dot), `FoodBolus`, `HostCell`, `HostCellInfectedViral` (opaque inclusion
+disc) / `HostCellInfectedBacterial` (purulent stipple), `Debris`,
+`EmptyPit`, `SlotNiche`, `EpithelialBar`, `MarrowRegion`, `LymphNodeBean`,
+and the five flash silhouettes. `RuntimeSprites.SquareSprite` kept as the
+fallback.
+
+**2. Call-site swaps** — each an isolated `sr.sprite = SpriteShapes.X`
+with **no** `sortingOrder` / `localScale`-magnitude / `color`-hook
+change:
+- `UnitProfile` gains `[NonSerialized] Sprite Shape`; `GameBootstrap.Awake`
+  assigns `SpriteShapes.Macrophage` / `.Neutrophil`; `SearchUnit` reads
+  `profile.Shape` (fallback to the square) + a subtle one-time
+  per-instance random spin and ±8% non-uniform scale jitter.
+- `PathogenAgent` — sprite + colour by `Class` (virion dot + the new
+  `BoardRenderer.VirionColor` cold purple / bacterium rod), in
+  `Initialize` and `ApplyRestColorForCurrentClass`. `sr.enabled =
+  !IsIntracellular` untouched (§4a no-sprite rule).
+- `PathogenSpawner` food item → `FoodBolus` + random rotation.
+- `DendriticCell` → `DendriteStar` / `DendriteStarLoaded` (on `HasCargo`);
+  `Lymphocyte` → `Lymphocyte`.
+- `BoardRenderer.Refresh` picks the host-state sprite per cell (Healthy /
+  viral-infected / bacterial-infected / Dead / Empty) alongside the
+  colour it already computes; `GameBootstrap.BuildBoardVisual` seeds every
+  cell as `HostCell`. New `CellJitter(col,row)` — a deterministic ±3%
+  per-cell value multiplier for the histology mottle.
+- `BoneMarrowManager` slot → `SlotNiche`; `GutInterfaceRenderer` bar →
+  `EpithelialBar` (its `Refresh` scale/colour maths untouched);
+  marrow / lymph backdrops → `MarrowRegion` / `LymphNodeBean`.
+
+**3. `DegranulationFlash`.** `ShapeFor(color)` picks a silhouette + a
+per-instance `durationSeconds` / `startScale` / `endScale` keyed off the
+five `static readonly` burst colours, so **every `Play(...)` call site is
+unchanged**. `const DurationSeconds` stays as the external reference; the
+per-instance fields default to the old values. New `static int
+MaxConcurrent` (24) + `static int active` — `Play` drops a request past
+the cap (`GAME_DESIGN.md` §8).
+
+**4. `HudOverlay`** — F9 fires all five flashes across the tissue band
+for visual QA (no headless coverage of rendering).
+
 ### Notable bug found and fixed in Sprint 2: `PrefabPool` didn't initialize outside Play Mode
 
 `PrefabPool.Awake()` builds the underlying `ObjectPool<GameObject>`. The
@@ -766,15 +823,26 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 9)
+## Build status (Sprint 13)
 
 All run by the **head session**. Numbers copied from actual output.
+
+**Sprint 13 is rendering-only** — the ten harnesses below all re-run
+**green, 410 total**, untouched. `BuildScript.BuildWindows()` —
+**Succeeded, 93,367,104 bytes, 0 errors**; headless launch **0
+exceptions** (the new `SpriteShapes` procedural generation now runs
+during `GameBootstrap.Awake` and the bootstrap completes clean). **Not
+verified: how it looks** — rendering has no headless coverage, so the
+four host states reading apart, agent legibility at ~14–22 px, the
+distinct flash shapes, and the palette nudges are all the Director's
+screenshot (F9 in a build previews the flashes). The scripted screenshot
+tooling did not cooperate this sprint; the handoff is the build.
 
 ### Headless verification
 
 | Harness | Result |
 |---|---|
-| `Sprint12Verification.RunAll` (**new**, Sprint 12) | **9 passed, 0 failed** |
+| `Sprint12Verification.RunAll` (Sprint 12) | 9 passed, 0 failed |
 | `Sprint11Verification.RunAll` (Sprint 11) | 26 passed, 0 failed |
 | `RoundVerification.RunAll` (Sprint 9) | 29 passed, 0 failed |
 | `AdaptiveVerification.RunAll` (Sprint 8, +3 Sprint 10, +3 Sprint 12) | **40 passed, 0 failed** |
@@ -1116,6 +1184,31 @@ exercised here only in the sense that nothing moves.
   static — a harness that pokes either must restore it
   (`Sprint12Verification` does; `CytokineVerification` never touches
   `CytokineToggle`).
+- **(New, Sprint 13) The sprites are unverified visually.** No headless
+  check covers rendering; the procedural texture pixels aren't asserted.
+  `SpriteShapes.cs` came from a dispatched agent and "compiles + launches
+  clean" but the actual shapes / legibility / palette are the Director's
+  screenshot. `docs/SPRITE_DESIGN.md` §6 also lists open questions the
+  Director hasn't ruled on (per-cell mottle amount, flash timing values,
+  whether the marrow slot should show the placed unit's shape).
+- **(New, Sprint 13) `SpriteShapes` generation is one-time but not
+  cheap** — ~20 textures × 64×64, several with an O(n²) rim pass and
+  per-pixel closures, run lazily on first access. First touch is in
+  `GameBootstrap.Awake` (macrophage/neutrophil) and the rest on first
+  spawn of each entity — a small startup / first-of-kind hitch, not a
+  per-frame cost. `SpriteShapes.Prewarm()` exists to move it all to a
+  chosen point but isn't called.
+- **(New, Sprint 13) `DegranulationFlash.ShapeFor` matches on the burst
+  colour** (`Same()` within 0.001 per channel). If two events are ever
+  given near-identical colours they'd get the same shape/timing — the
+  five are currently far apart. A `Shape` enum param would be more
+  robust; the colour match keeps every `Play(...)` call site unchanged.
+- **(New, Sprint 13) `DegranulationFlash.active` is a process-global
+  counter.** It only decrements when a flash runs to completion in
+  `Update` — which they always do (flashes aren't despawned externally,
+  and Sprint 9's freeze deliberately doesn't gate them). If that ever
+  changes, `active` drifts and the cap gets conservative;
+  `Mathf.Max(0, …)` floors it.
 - **(Sprint 5) A 1-cell dead gap is hoppable** by a transient free virus
   particle; ≥2 cells / a full lane is a hard wall. Consistent with §1a's
   "slipping past one or two cells." `TissueVerification` uses a 3-cell

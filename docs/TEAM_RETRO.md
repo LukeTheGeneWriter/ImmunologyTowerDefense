@@ -811,3 +811,39 @@ assertions (`coOn < coOff`) to pass on 3 forced-together DCs. A harness
 that asserts "A beats B" can be green while the effect is far too weak to
 see. Where it matters, assert a magnitude floor too (the sweep test does:
 "reaches within 2 of each band edge").
+
+### Sprint 13 — head session + dispatched design agent (2026-08-29, the sprite pass)
+
+**First dispatched agent this project has used** (all of Sprints 6–12
+were inline). A `general-purpose` agent with a design brief pointing at
+`UI_STYLE_GUIDE.md` / `GAME_DESIGN.md` §7/§4a / `handoff` §8 delivered
+`docs/SPRITE_DESIGN.md` (a genuinely good spec — direction, per-entity,
+migration plan with line numbers) plus an uncompiled prototype
+`SpriteShapes.cs`. It worked well: the agent had no Unity to compile
+against but followed the project's lazy-static-cache style closely enough
+that the prototype compiled first try after review. **Brief a design
+agent to produce a SPEC + optional uncompiled prototype, not to wire
+anything in** — the head integrates.
+
+**"White sprite, silhouette in alpha" is the key trick** that made this a
+pure `sr.sprite =` swap. Every entity's colour and every state tint
+(cargo/paired/infected/heat/flash) is already a `SpriteRenderer.color`
+multiply; a white+alpha shape multiplies to exactly the same result the
+flat white quad did, plus a silhouette. Zero call-site colour changes.
+
+**RGB brightening is a no-op on a white+alpha sprite.** The agent's
+`HostCellInfected` did `InnerShade(..., 1.15f)` to "swell" the centre —
+but the sprite is white, `1 * 1.15` clamps to `1`, and the hue comes from
+the tint applied later. Any "brighter / darker" interior detail has to be
+carried by the *alpha* silhouette (a crisp opaque disc, a stipple), not
+by RGB. Fixed by splitting into `HostCellInfectedViral` (opaque inclusion
+disc) and `HostCellInfectedBacterial` (stipple).
+
+**Rendering still has no headless verification** and the scripted
+screenshot tooling fought back again (DPI, windowed-launch timing, `$Pid`
+is a read-only PowerShell automatic variable). The check that *is*
+headless: `GameBootstrap.Awake` now triggers `SpriteShapes` generation,
+so "bootstrap completes with 0 exceptions" proves the raster code runs.
+Everything else is the Director's screenshot — consistent with every
+rendering change since Sprint 2. Added an F9 key that fires all five
+flashes so at least that's one keypress to check.
