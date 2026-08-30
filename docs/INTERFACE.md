@@ -1633,6 +1633,94 @@ removed `ReturnToTissue`; `DriveOneShuttle` drives until a node visit +
 return. `RunDcLaneSpread` / `RunDcPatrolSweep` unchanged. Full sweep green
 (410), Windows build + headless launch clean.
 
+## Sprint 15 changes — the compartment visual pass (`docs/COMPARTMENT_DESIGN.md`)
+
+Rendering-only. No gameplay, tuning, or harness surface changes. Two new
+cosmetic static hooks; three new renderer MonoBehaviours; `SpriteShapes`
+additions.
+
+### `ImmunologyTD.Rendering.SpriteShapes`
+
+- **3 new private primitives:** `AxisGradient(buf, bool alongX, float
+  aStart, float aEnd)`, `EdgeGradient(buf, int edge, float featherPx)`,
+  `RadialGradient(buf, float cx, float cy, float rInner, float rOuter,
+  float aInner, float aOuter)` — all write/scale the **alpha** channel,
+  O(n)/pixel, no `Coverage` supersampling.
+- **9 new `Sprite` accessors:** `ChymeField`, `MucusBand`, `FlowMote`
+  (lumen); `PlasmaField`, `VesselWallBar`, `OrganHalo`, `Erythrocyte`
+  (base); `BirthPuff` (marrow); `NodeColocGlow` (node). All white+alpha,
+  64×64, lazy-cached, tinted per-instance.
+- **Revised in place:** `MarrowRegion` (bolder struts, 2 `FillCapsule`
+  sinusoids, lower stipple), `LymphNodeBean` (medullary-notch
+  `InnerShade` + a third germinal centre), `EpithelialBar` (5 goblet
+  `InnerShade` flecks).
+- `Prewarm()` includes all 9 and **is now called** from
+  `GameBootstrap.Awake`.
+
+### `ImmunologyTD.Units.BoneMarrowManager`
+
+- **`static System.Action<Vector3> OnCellEmitted`** — fired from `Emit`
+  (after `slot.Children.Add`) and `EmitAdaptive` (after
+  `slot.AdaptiveChildren.Add`) with `slot.WorldPosition`. Cosmetic,
+  process-global, null in harnesses.
+
+### `ImmunologyTD.Pathogens.PathogenAgent`
+
+- **`static System.Action<Vector3> OnReachedBase`** — fired from
+  `ReachBase()` with `board.CoarseToWorldCenter(CurrentCoarse)` before the
+  despawn. Cosmetic, process-global, null in harnesses. `SimulationTick`
+  behaviour and `ReachedBase` tally are unchanged.
+
+### `ImmunologyTD.Rendering.LumenChannelRenderer` (new MonoBehaviour)
+
+`Bind(BoardConfig board)`. Builds a `ChymeField` quad + a `MucusBand`
+strip over `board.BandWorldRect(BoardBand.Lumen)` and a `PrefabPool` of
+40 `FlowMote` quads (pre-warmed). `Update()` (early-returns on
+`RoundClock.Frozen`) drifts the motes along the axis-frame flow direction
+and applies a `Mathf.Sin` ±`peristalsisAmplitude` (0.06, `[SerializeField]`;
+0 = static) cross-section squeeze + in-phase mote speed. Wired from
+`GameBootstrap.BuildLumenChannel()`.
+
+### `ImmunologyTD.Rendering.BaseCompartmentRenderer` (new MonoBehaviour)
+
+`Bind(BoardConfig board)`. Builds a `PlasmaField` quad + a `VesselWallBar`
+strip over the base band; pools `Erythrocyte` (24, drift outer→wall),
+`BirthPuff` (cap 12, spawned by `OnCellEmitted`), and a red `EffeBloom`
+breach flash (cap 6, spawned by `OnReachedBase`, expand+fade ~0.55 s).
+`Update()` freezes drifts on `RoundClock.Frozen` (breach flashes still
+finish). Assigns both static hooks in `Bind`, nulls them in `OnDestroy`.
+Wired from `GameBootstrap.BuildBaseCompartment()`.
+
+### `ImmunologyTD.Rendering.LymphNodeFieldRenderer` (new MonoBehaviour)
+
+`Bind(LymphNode node)`. One `NodeColocGlow` quad; `Update()` (0.15 s
+cadence, `RoundClock`-gated) repositions it to the value-weighted centroid
+of `node.Coloc` (`CoarseValueAt` over `node.NodeBoard`) and sets alpha
+`= clamp01(peak / ref) * 0.35`, `ref = NodeColocalisationSourceStrength +
+4 * NodeLymphocyteSourceStrength`. Wired from
+`GameBootstrap.BuildAdaptiveDirector`.
+
+### `ImmunologyTD.Rendering.BoardRenderer`
+
+- `Refresh()` inner loop: `if (views[col, row] == null) continue;` —
+  `GameBootstrap.BuildBoardVisual` now leaves base/lumen `views` entries
+  null (only `BandOf == Tissue` gets a `SpriteRenderer`). `Bind`'s
+  array fills are unchanged and harmless for the null cells.
+
+### `GameBootstrap`
+
+- New `BuildLumenChannel()` / `BuildBaseCompartment()` (called after
+  `BuildBoardVisual`); `BuildOrganHalo(name, center, size)` helper; the
+  marrow / lymph backdrop builders gain a halo and move `sortingOrder
+  1 → 2`; marrow tint `0.34,0.22,0.18`. `SpriteShapes.Prewarm()` call
+  added at the top of `Awake`.
+
+### Verification
+
+No new harness — rendering isn't headlessly testable. All ten existing
+harnesses re-run green (410); Windows build clean; headless launch 0
+exceptions.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

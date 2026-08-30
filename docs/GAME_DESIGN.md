@@ -110,6 +110,16 @@ identified, and it is what `docs/INTERFACE.md` open question 1 has been
 flagging since Sprint 1. This layout resolves it: **right-to-left is the
 threat axis, and the 40 rows are lanes.**
 
+**Rendered distinctly — Sprint 15 (Director, 2026-08-30).** The three
+bands are no longer the same host-cell grid in three tints. The **lumen**
+is drawn as an open fluid channel (chyme field, a mucus layer on the gut
+wall, drifting particulate, a slow peristaltic squeeze); the **base** as
+the bloodstream it is per §1 (oxblood plasma, an endothelial vessel wall
+at the tissue seam, erythrocytes streaming in, the marrow and lymph node
+seated in it as organs) — and a pathogen reaching it now triggers an
+acute breach flash instead of a silent despawn. Only the tissue band
+keeps a per-cell renderer. Spec: `docs/COMPARTMENT_DESIGN.md`.
+
 ### Scale note
 
 At the existing 7×7 fine sub-lattice and 0.12s tick, a 50-cell-wide tissue

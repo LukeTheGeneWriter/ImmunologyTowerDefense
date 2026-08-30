@@ -881,3 +881,50 @@ named `ReturnToTissue` moved to `PatrolTissue && !HasCargo` (same
 meaning: "done, pacing again"), and `DriveOneShuttle` now drives until it
 observes a node visit *and* the return. Same 40 assertions, same
 coverage, no new test — the mechanic got simpler, not bigger.
+
+### Sprint 15 — head session + dispatched design agent (2026-08-30, the compartment visual pass)
+
+**Second dispatched design agent, same recipe as Sprint 13, same
+result.** Brief pointed at `GAME_DESIGN.md §1/§1a`, `SPRITE_DESIGN.md`,
+the renderers, and the two Director decisions (base = literal
+vascular/blood; lumen motion = agent's call). It delivered
+`docs/COMPARTMENT_DESIGN.md` — direction paragraph per compartment,
+per-compartment RGB, a 9-commit migration plan with line numbers, a
+first-class performance section, and 10 open questions — plus an
+uncompiled `SpriteShapesCompartments.PROTOTYPE.cs`. The prototype's guesses
+at the private primitive signatures were close enough that folding it into
+`SpriteShapes.cs` was mechanical. **The recipe holds: spec + optional
+uncompiled prototype, head integrates.**
+
+**The visual fix and the perf fix were the same fix.** The lumen and base
+bands were 120 of 250 `SpriteRenderer`s on the 25×10 board, each hit by
+`BoardRenderer.Refresh` every 0.15 s — and they were the *least*
+interesting cells on screen (flat tint, no host state). Replacing them
+with a handful of field quads + three small pooled mote sets removed ~110
+always-resident renderers and the recolour loop over them, and *that's*
+what made room to add drifting particulate, erythrocytes, birth-puffs and
+a breach flash without a net cost. A visual pass that subtracts renderers
+is the good kind.
+
+**Cosmetic `static Action<Vector3>` hooks kept the sim files clean.**
+`BoneMarrowManager.OnCellEmitted` and `PathogenAgent.OnReachedBase` are
+one line each at the event site, null in every harness, assigned and
+nulled by the one renderer that listens. No new field on a sim class, no
+`deltaTime` plumbing, nothing for a `SimulationTick` test to care about —
+the same `EconomyHooks.PayForKill` shape the project already uses for
+"the sim did a thing, rendering wants to know."
+
+**Rendering still has no headless coverage** — the one automatable signal
+is "`GameBootstrap.Awake` generates ~31 procedural rasters (now via a
+`Prewarm()` that's finally called) and the bootstrap completes with 0
+exceptions." Everything else — does the lumen read as a channel, does the
+base read as blood, does the peristalsis strobe at high speed-up, does the
+co-loc haze sit where the T cells are — is the Director's screenshot,
+same as every rendering sprint since Sprint 2.
+
+**Deferred the food-bolus wake on purpose.** The Director asked for a
+subtle channel disturbance as the contaminated bolus transits the lumen.
+Building it means giving `LumenChannelRenderer` a live reference to a
+`GameObject` that `PathogenSpawner` owns and recycles, for an effect
+that's "barely-there" by design. Not worth the coupling this pass —
+noted in `BACKLOG` as a fast-follow if the bolus reads as disconnected.

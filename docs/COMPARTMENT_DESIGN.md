@@ -1,8 +1,14 @@
 # Compartment Visual Design Spec
 
-Status: **first pass, 2026-08-30**, written by a dispatched Design agent for
-Sprint 15. Companion to `docs/SPRITE_DESIGN.md` (the Sprint 13 entity pass,
-already implemented) and `docs/UI_STYLE_GUIDE.md` ("what's on screen now").
+Status: **implemented in Sprint 15** (2026-08-30). Written by a dispatched
+Design agent; the head integrated it. Deviations from this spec as
+shipped: the food-bolus channel wake (§7 Q2) was **deferred** to BACKLOG
+(needs a live ref to the food GameObject for a barely-visible effect); the
+co-localisation haze (§2.3, §7 Q3) shipped as the **single blob** tracking
+the field centroid, not the 3×3 grid; peristalsis (§7 Q4) is
+**whole-channel** at ±6%. Everything else landed as written. Companion to
+`docs/SPRITE_DESIGN.md` (the Sprint 13 entity pass) and
+`docs/UI_STYLE_GUIDE.md` ("what's on screen now").
 This spec extends the same procedural `SpriteShapes` system to the three
 compartments Sprint 13 left as flat tinted quads or minimal silhouettes:
 the **lumen**, the **base (blood)**, and the interiors of the **lymph node**
