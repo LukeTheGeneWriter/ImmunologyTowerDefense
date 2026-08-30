@@ -138,6 +138,10 @@ namespace ImmunologyTD.Rendering
             {
                 for (int row = 0; row < rows; row++)
                 {
+                    // Sprint 15: base/lumen cells have no SpriteRenderer now
+                    // (drawn by the compartment renderers instead).
+                    if (views[col, row] == null) continue;
+
                     var coord = new CoarseCoord(col, row);
                     var hostState = isHostGround[col, row] ? tissueGrid.GetHostState(coord) : HostState.Empty;
                     var resident = isHostGround[col, row] && hostState == HostState.Infected

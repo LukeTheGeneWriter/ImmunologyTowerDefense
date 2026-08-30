@@ -34,7 +34,7 @@ namespace ImmunologyTD.Rendering
         /// genuinely means "about to go."</summary>
         public static int FullAlarmCount = 8;
 
-        private static readonly Color WallColor = new Color(0.55f, 0.47f, 0.40f); // quiet epithelium
+        private static readonly Color WallColor = new Color(0.50f, 0.46f, 0.37f); // Sprint 15: quiet epithelium, nudged toward the lumen mucus tint so wall + mucus read continuous
         private static readonly Color AlarmColor = new Color(0.95f, 0.30f, 0.20f); // colonised, about to fail
 
         private BoardConfig board;
