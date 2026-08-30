@@ -1,12 +1,14 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 13** (the sprite / visual-identity pass
-— procedurally-drawn shape sprites replace the flat white quad for every
-entity). Sprint 12 was two playtest fixes (cytokine sensing on-by-default
-+ a buyable sharpen; the DC patrol movement rework); Sprint 11 was a
-framework pass (placeholder shop, knowledge ladder as data, neighbour
-regrowth). Recent structural state is **Sprint 9**
+reflects the state after **Sprint 14** (the DC-pacing rework — the
+dendritic-cell shuttle collapsed from four states to two so a DC paces
+the tissue band its entire life). Sprint 13 was the sprite /
+visual-identity pass (procedurally-drawn shape sprites replace the flat
+white quad for every entity); Sprint 12 was two playtest fixes (cytokine
+sensing on-by-default + a buyable sharpen; a first DC patrol movement
+fix); Sprint 11 was a framework pass (placeholder shop, knowledge ladder
+as data, neighbour regrowth). Recent structural state is **Sprint 9**
 (the reworked round model — a frozen buy phase, a persistent battlefield,
 food-item delivery) and **Sprint 10** (DC patrol lane-repulsion). Sprint 0's
 engine/platform decision section is preserved below since it is still
@@ -502,7 +504,9 @@ knowledge % unlocks nothing yet; §5's threshold ladder is next.**
   placeholder: `MatchMaxHammingDistance` 2, `KnowledgePerMatch` 3,
   `KnowledgeMax` 100, per-class antigens (≥4 bits apart),
   `DcPresentationsPerCargo` 4, `DcDebrisSamplePerBite` 0.34,
-  `DcFineTilesPerTick` 2, `DcAxisWalkBiasSharpness` 1.6,
+  `DcFineTilesPerTick` 3 (Sprint 14, was 2), `DcLaneRepelStrength` 0.8,
+  `DcLaneRepelAxisRange` 12, `DcPatrolSweepBias` 1.8 (Sprint 14, was 1.0;
+  `DcAxisWalkBiasSharpness` removed Sprint 14),
   `LymphocyteLifespanSeconds` 20, `LymphocyteFineTilesPerTick` 2,
   `PairingSeconds` 1.5, `NodePairingContactFineTiles` 3,
   `NodeColocalisationSourceStrength` 18, `NodeLymphocyteSourceStrength` 6,
@@ -537,18 +541,20 @@ progenitor re-emits a fresh tag, which is §5c's barcode turnover. Tween in
 `Update()`; `NodeTick` driven by `LymphNode.Step`.
 
 **5. `DendriticCell` (MonoBehaviour agent, implements `INodeVisitor`).**
-State machine `PatrolTissue → TravelToNode → InNode → ReturnToTissue`.
-Patrol is a plain random walk (no debris homing — deferred `BACKLOG.md`
-item); on a `Dead` cell with an antigen it **samples** (picks up the
+State machine `PatrolTissue → InNode` (Sprint 14 — was a four-state
+`PatrolTissue → TravelToNode → InNode → ReturnToTissue`; see the Sprint
+14 section below). The DC paces the tissue band its whole tissue life via
+`RepelledPatrolStep` (fine-grained lane repulsion + a base↔lumen sweep);
+on a `Dead` cell with an antigen an empty DC **samples** (picks up the
 antigen, eats one `DcDebrisSamplePerBite` — so it competes with
-efferocytosis, §1c). Travel and return are **axis-frame** softmax biased
-walks (`dir * AxisIndex`, never a world direction — same rule as pathogen
-advance). In the node it wanders the co-localisation gradient;
-`OnPairingResolved` spends one presentation whether or not it taught; at
-zero the cargo is spent and it walks back **empty** (it does not die —
-travel time is the cost; §5a's open "dies or returns empty" resolved this
-way). `Update()` tween deliberately slides across the tissue↔node gap so
-"the DC went to the node" reads.
+efferocytosis, §1c) and its sweep heading pins toward the base. Reaching
+the `Base` band with cargo it enters the node, wanders the co-localisation
+gradient there; `OnPairingResolved` spends one presentation whether or not
+it taught; at zero the cargo is spent and `LeaveNode` drops it back at the
+tissue base edge **empty** (it does not die — the round trip is the cost;
+§5a's open "dies or returns empty" resolved this way) to resume pacing.
+`Update()` tween deliberately slides across the tissue↔node gap so "the DC
+went to the node" reads.
 
 **6. `AdaptiveDirector` (MonoBehaviour).** Owns the DC pool, the
 lymphocyte pool and the `LymphNode`, runs the whole arena on one
@@ -823,9 +829,60 @@ that was a DPI-scaling mismatch in the screenshot *capture tooling*, not
 the game), but the fix is real, cheap, and strictly more correct than
 relying on a single frame-0 aspect read, so it's kept.
 
-## Build status (Sprint 13)
+### Sprint 14 additions — the DC-pacing rework (four states → two)
+
+Design: `GAME_DESIGN.md` §5a ("Fixed again — Sprint 14").
+Signatures in `INTERFACE.md` ("Sprint 14 changes").
+
+**Why.** Third pass at the playtest note "DCs don't oscillate, don't
+spread into lanes." The Sprint 12 fix was correct but only lived in the
+`PatrolTissue` state — and in a dense round (debris on every dead cell) a
+DC picked up cargo within ~2 ticks, then spent the rest of its life in
+`TravelToNode` / `InNode` / `ReturnToTissue`, none of which paced or
+repelled. So the mechanic almost never ran where a player could see it.
+
+**1. `DendriticCellState` → `{ PatrolTissue, InNode }`.** `TravelToNode`
+and `ReturnToTissue` deleted, along with `TickTravel` / `TickReturn` /
+`BiasedAxisStep` (the straight axis-frame dashes). `SimulationTick`'s
+switch is two cases.
+
+**2. `TickPatrol` runs the DC's whole tissue life.** It sets
+`patrolHeading` *before* stepping: `-1` (toward the base) whenever
+`HasCargo`, otherwise it oscillates — `+1` until the lumen-edge axis
+index, `-1` until the base-edge axis index, flipping at each. Then it
+takes `DcFineTilesPerTick` `RepelledPatrolStep`s (unchanged: fine-grained
+cross-axis softmax repulsion vs. the other non-`InNode` DCs, plus the
+`DcPatrolSweepBias * axisDir * patrolHeading` sweep term). Reaching the
+`Base` band with cargo → `EnterNode`. Empty on a `Dead` cell with a
+debris antigen → sample (as before), which just flips the heading toward
+the base; no state change.
+
+**3. `LeaveNode`** (was the `ReturnToTissue` transition) drops the DC at
+a random lane on the tissue base edge, `HasCargo = false`,
+`patrolHeading = 1`, `State = PatrolTissue`.
+
+**4. `AdaptiveTuning`:** `DcFineTilesPerTick` 2 → 3, `DcPatrolSweepBias`
+1.0 → 1.8 (both so a full base↔lumen lap reads in a ~30 s round);
+`DcAxisWalkBiasSharpness` removed (it only fed the deleted dashes).
+
+**5. `AdaptiveVerification`** (still 40, no new count): `RunShuttleEndToEnd`
+asserts the DC is pacing again (`PatrolTissue && !HasCargo`) instead of
+the removed `ReturnToTissue`; `DriveOneShuttle` seeds debris two tiles
+off the base edge and drives until the DC has visited the node and come
+back to an empty patrol. `RunDcLaneSpread` / `RunDcPatrolSweep` unchanged
+and still green — repulsion A/B **16 co-lane ticks vs. 167**, mean spread
+**15.4 vs. 4.1**; swept axis span **6..18** vs. **10..12** for a plain
+walk.
+
+## Build status (Sprint 13 / Sprint 14)
 
 All run by the **head session**. Numbers copied from actual output.
+
+**Sprint 14** touched only the DC shuttle: the ten harnesses re-run
+**green (Adaptive 40, 410 total, 0 failed)**; `BuildScript.BuildWindows()`
+**Succeeded, 0 errors** (`Assembly-CSharp.dll` rebuilt); headless launch
+**0 exceptions**, bootstrap diagnostic clean. How the pacing *looks* in
+motion is the Director's screenshot.
 
 **Sprint 13 is rendering-only** — the ten harnesses below all re-run
 **green, 410 total**, untouched. `BuildScript.BuildWindows()` —

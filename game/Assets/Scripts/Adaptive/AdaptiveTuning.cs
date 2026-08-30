@@ -76,38 +76,34 @@ namespace ImmunologyTD.Adaptive
         /// have sampled"). ~3 samples drains a full pile.</summary>
         public static float DcDebrisSamplePerBite = 0.34f;
 
-        /// <summary>DC fine-tiles-per-tick. Between the macrophage (1) and
-        /// the neutrophil (3) -- a DC migrates, but it is not fast.</summary>
-        public static int DcFineTilesPerTick = 2;
+        /// <summary>DC fine-tiles-per-tick. **Sprint 14** raised this 2 -> 3
+        /// (neutrophil speed): a DC now spends its whole tissue life pacing
+        /// the band, so the pace has to be fast enough that the
+        /// oscillation reads inside a ~30s round.</summary>
+        public static int DcFineTilesPerTick = 3;
 
-        /// <summary>Softmax sharpness of the DC's axis-frame biased walk when
-        /// travelling to the node (toward the base) and returning (into
-        /// tissue). Higher = straighter. Expressed in the axis frame, never
-        /// a hardcoded direction -- same rule as pathogen advance.</summary>
-        public static float DcAxisWalkBiasSharpness = 1.6f;
-
-        /// <summary>While patrolling, a DC biases its random walk **away from
+        /// <summary>While in tissue a DC biases its random walk **away from
         /// other DCs, along the CROSS (lane) axis only** (Director,
         /// 2026-08-29) -- the threat axis is base↔lumen, so repelling along
         /// the perpendicular keeps DCs spread evenly across the lanes.
-        /// Higher = spreads harder. 0 disables it. **Sprint 12** lowered
-        /// this 1.4 -> 0.8: the repulsion now works at FINE-tile granularity
-        /// (it fired only ~1 step in 7 before, at coarse-cell boundaries),
-        /// so the same visible spread needs a gentler per-step push.</summary>
+        /// Higher = spreads harder. 0 disables it. Works at FINE-tile
+        /// granularity every step (fixed Sprint 12) and now runs the DC's
+        /// whole tissue life, not just a brief patrol phase (Sprint 14).</summary>
         public static float DcLaneRepelStrength = 0.8f;
 
         /// <summary>Only other DCs within this many coarse cells along the
-        /// THREAT axis count toward a patrolling DC's crowding -- so DCs at
-        /// opposite ends of the tissue band don't push on each other.</summary>
+        /// THREAT axis count toward a DC's crowding -- so DCs at opposite
+        /// ends of the tissue band don't push on each other.</summary>
         public static int DcLaneRepelAxisRange = 12;
 
-        /// <summary>**Sprint 12:** while patrolling, a DC also biases its
-        /// THREAT-axis steps toward its current patrol heading, flipping
-        /// heading at the tissue-band edges -- so it *paces the full depth
-        /// of the band back and forth* instead of loitering near where it
-        /// spawned. Higher = straighter sweep. 0 = a plain random walk in
-        /// the threat axis (lane-repulsion only).</summary>
-        public static float DcPatrolSweepBias = 1.0f;
+        /// <summary>A DC biases its THREAT-axis steps toward its current
+        /// patrol heading. **Sprint 14:** the heading oscillates between the
+        /// tissue-band edges the *entire time the DC is in tissue* (not just
+        /// a short patrol state) -- it forces toward the base only while
+        /// carrying antigen (to deliver), otherwise it paces base↔lumen and
+        /// flips at each edge. Raised 1.0 -> 1.8 so the oscillation is
+        /// unmistakable. 0 = a plain random walk in the threat axis.</summary>
+        public static float DcPatrolSweepBias = 1.8f;
 
         // -- The helper-T cell / lymph node (GAME_DESIGN.md §5c) --
 
@@ -165,11 +161,10 @@ namespace ImmunologyTD.Adaptive
             LargeBacteriumAntigen = 0b11110000;
             DcPresentationsPerCargo = 4;
             DcDebrisSamplePerBite = 0.34f;
-            DcFineTilesPerTick = 2;
-            DcAxisWalkBiasSharpness = 1.6f;
+            DcFineTilesPerTick = 3;
             DcLaneRepelStrength = 0.8f;
             DcLaneRepelAxisRange = 12;
-            DcPatrolSweepBias = 1.0f;
+            DcPatrolSweepBias = 1.8f;
             LymphocyteLifespanSeconds = 20f;
             LymphocyteFineTilesPerTick = 2;
             PairingSeconds = 1.5f;

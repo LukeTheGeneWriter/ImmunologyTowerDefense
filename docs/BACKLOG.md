@@ -604,15 +604,17 @@ drive nothing. Each purchase's real mechanic (design in GAME_DESIGN.md
 - **The sensing upgrade is player-wide (one global static), not
   per-tower.** If per-tower cytokine sensing is ever wanted it moves onto
   `UnitLifecycleTuning` like the §6d numbers.
-- **~~DC patrol wasn't spreading / sweeping~~ — fixed Sprint 12.** The
-  Sprint 10 lane-repulsion compared coarse indices (fired ~1/7 of steps);
-  now fine-grained + a threat-axis band sweep. `DcLaneRepelStrength` /
-  `DcPatrolSweepBias` want a playtest tuning pass.
-- **DCs still spend little time patrolling** — with 16-pathogen rounds,
-  debris is everywhere, so a DC samples within a couple of ticks and
-  spends most of its life shuttling. If the patrol behaviour still reads
-  as under-used after Sprint 12, consider letting a DC sample several
-  piles before heading to the node (a cargo capacity > 1).
+- **~~DC patrol wasn't spreading / sweeping~~ — fixed Sprint 12, then
+  Sprint 14.** Sprint 12 made the lane-repulsion + sweep fine-grained;
+  Sprint 14 made them run the DC's *whole* tissue life (see next bullet).
+  `DcLaneRepelStrength` / `DcPatrolSweepBias` / `DcFineTilesPerTick` still
+  want a playtest tuning pass now that the pacing is actually visible.
+- **~~DCs still spend little time patrolling~~ — fixed Sprint 14.** Was:
+  in a dense round a DC sampled within ~2 ticks and spent the rest of its
+  life in the travel/node/return states (no pace, no repulsion). Sprint
+  14 collapsed the shuttle to two states so pacing *is* the DC's life.
+  The "cargo capacity > 1" idea is no longer needed for legibility, but
+  is still open as a balance lever if a DC should carry more per trip.
 
 ## Opened / updated by Sprint 13 (2026-08-29) — the sprite pass shipped
 
@@ -643,3 +645,26 @@ left / flagged (from `docs/SPRITE_DESIGN.md` §6 and the implementation):
   network-requiring, conscious step (`TEAM_RETRO.md` Sprint 1).
 - **Authored art / an asset pipeline** -- deferred; the procedural
   approach is the fit until a real artist joins (`SPRITE_DESIGN.md` §4).
+
+## Opened / updated by Sprint 14 (2026-08-30) — the DC-pacing rework shipped
+
+The dendritic-cell shuttle collapsed from four states to two so a DC
+paces the tissue band its whole tissue life (both the oscillation and the
+lane-repulsion used to be confined to a patrol state it rarely occupied).
+
+- **Playtest the pacing.** Harness numbers are strong (co-lane 16 vs.
+  167, spread 15.4 vs. 4.1, swept span 6..18 vs. 10..12) but nobody has
+  watched DCs pace a live round. If a full base↔lumen lap is still too
+  slow or too fast to read, `DcFineTilesPerTick` (3) and
+  `DcPatrolSweepBias` (1.8) are the dials.
+- **A loaded DC still paces on its way to the node** rather than
+  beelining — it just pins its heading toward the base. If antigen
+  delivery now feels too leisurely, a `HasCargo` DC could take a larger
+  step or a straighter path without bringing back a whole state.
+- **`EnterNode` fires on reaching the `Base` band, not a node mouth.**
+  With the travel state gone there is no explicit "walk to the node
+  entrance" — the tween still slides across the gap so it reads, but if
+  the node should have a spatial approach that is a new mechanic.
+- **`DcAxisWalkBiasSharpness` is gone.** If a future stress-sensor unit
+  wants an axis-frame biased walk toward a fixed end, it needs its own
+  tunable — don't assume this one still exists.

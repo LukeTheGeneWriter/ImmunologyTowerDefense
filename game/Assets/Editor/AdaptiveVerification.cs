@@ -221,14 +221,14 @@ public static class AdaptiveVerification
         AdaptiveTuning.ResetToDefaults();
         AdaptiveTuning.DcPresentationsPerCargo = 1;         // one pairing spends the cargo
         AdaptiveTuning.LymphocyteLifespanSeconds = 100000f; // no aging mid-test
-        AdaptiveTuning.DcAxisWalkBiasSharpness = 8f;        // beeline to the base
         AdaptiveTuning.NodeColocalisationSourceStrength = 60f;
         AdaptiveTuning.MatchMaxHammingDistance = teaches ? 8 : -1;
 
-        // Fill the whole tissue band with debris of the target species, so
-        // the DC samples on its very first patrol tick wherever it spawned
-        // -- makes the sample deterministic without touching the DC's walk.
-        for (int ai = rig.Board.TissueBaseEdgeAxisIndex; ai <= rig.Board.TissueLumenEdgeAxisIndex; ai++)
+        // Fill the tissue band -- but NOT the two cells at the base edge --
+        // with debris of the target species, so the DC samples early on its
+        // pace outward, then has clean ground at the base to enter the node
+        // (and doesn't instantly re-sample after leaving it).
+        for (int ai = rig.Board.TissueBaseEdgeAxisIndex + 2; ai <= rig.Board.TissueLumenEdgeAxisIndex; ai++)
             for (int cross = 0; cross < rig.Board.CrossLength; cross++)
                 rig.Grid.KillHostCell(rig.Board.CoarseFromAxis(ai, cross), species);
 
@@ -237,10 +237,14 @@ public static class AdaptiveVerification
         rig.Director.EmitLymphocyte(0, null); // one resident waiting in the node
 
         float dt = BoardConfig.TickIntervalSeconds;
+        bool visitedNode = false;
         for (int step = 0; step < 4000; step++)
         {
             rig.Director.Tick(dt);
-            if (dc.State == DendriticCellState.ReturnToTissue) break;
+            if (dc.State == DendriticCellState.InNode) visitedNode = true;
+            // Sprint 14: "done" = it went to the node and is back pacing
+            // tissue with its cargo spent.
+            if (visitedNode && dc.State == DendriticCellState.PatrolTissue && !dc.HasCargo) break;
         }
         return dc;
     }
@@ -250,8 +254,8 @@ public static class AdaptiveVerification
         // -- matching pairing raises knowledge by exactly one increment --
         var rigA = BuildShuttleRig();
         var dcA = DriveOneShuttle(rigA, PathogenClass.IntracellularVirus, teaches: true);
-        Check("shuttle: DC finished a pairing and headed back to tissue",
-            dcA.State == DendriticCellState.ReturnToTissue && !dcA.HasCargo);
+        Check("shuttle: DC visited the node, spent its cargo, and is pacing tissue again",
+            dcA.State == DendriticCellState.PatrolTissue && !dcA.HasCargo);
         Check("shuttle: a MATCHING pairing raised virus knowledge by exactly KnowledgePerMatch",
             Mathf.Approximately(rigA.Knowledge.Get(PathogenClass.IntracellularVirus), AdaptiveTuning.KnowledgePerMatch));
         Check("shuttle: it taught NOTHING about the other species",
@@ -262,8 +266,8 @@ public static class AdaptiveVerification
         // -- non-matching pairing: freeze happened, cargo spent, taught nothing --
         var rigB = BuildShuttleRig();
         var dcB = DriveOneShuttle(rigB, PathogenClass.LargeBacterium, teaches: false);
-        Check("shuttle (no match): DC still completed its pairing cycle and headed back",
-            dcB.State == DendriticCellState.ReturnToTissue && !dcB.HasCargo);
+        Check("shuttle (no match): DC still completed its pairing cycle and is pacing again",
+            dcB.State == DendriticCellState.PatrolTissue && !dcB.HasCargo);
         Check("shuttle (no match): knowledge stayed at 0",
             rigB.Knowledge.Get(PathogenClass.LargeBacterium) == 0f);
         rigB.Dispose();

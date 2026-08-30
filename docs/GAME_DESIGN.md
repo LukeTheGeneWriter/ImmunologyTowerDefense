@@ -805,6 +805,19 @@ full depth of the tissue band, flipping at the edges**
 (`DcPatrolSweepBias`), so it genuinely paces the band and covers ground
 rather than loitering near where it spawned.
 
+**Fixed again — Sprint 14.** Still not visible: the oscillation and the
+lane-repulsion both lived only in the *patrol* state, and with debris
+everywhere in a dense round a DC sampled cargo within ~2 ticks and then
+spent the rest of its life in the travel / node / return states, which
+had neither. The four-state shuttle (`PatrolTissue → TravelToNode →
+InNode → ReturnToTissue`) collapsed to **two** (`PatrolTissue`,
+`InNode`): a DC now paces the band its **entire tissue life** — repelling
+its neighbours across the lanes the whole time — and simply biases toward
+the base while carrying antigen, entering the node when it reaches the
+base band and resuming the pace afterward. Sweep and step rate bumped
+(`DcPatrolSweepBias` 1.0→1.8, `DcFineTilesPerTick` 2→3) so a full
+base↔lumen lap is legible inside a ~30 s round.
+
 ## 5b. ATP income — LOCKED for now (Director, 2026-08-21)
 
 Two sources:

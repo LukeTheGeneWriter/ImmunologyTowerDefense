@@ -847,3 +847,37 @@ so "bootstrap completes with 0 exceptions" proves the raster code runs.
 Everything else is the Director's screenshot — consistent with every
 rendering change since Sprint 2. Added an F9 key that fires all five
 flashes so at least that's one keypress to check.
+
+### Sprint 14 — head session (2026-08-30, the DC-pacing rework)
+
+**Third go at the same playtest note.** Sprint 10 gave DCs lane-repulsion;
+Sprint 12 found it was comparing coarse indices and fixed the granularity
+plus added a sweep; the harness numbers were great both times and the
+Director still couldn't see it in play. Sprint 14 was the actual cause:
+**the behaviour was in the right place, the DC just wasn't there.** Both
+the oscillation and the repulsion lived only in `PatrolTissue`, and a
+dense round puts debris on every dead cell, so a DC picked up cargo in
+~2 ticks and spent the rest of its life in `TravelToNode` / `InNode` /
+`ReturnToTissue` — none of which paced or repelled.
+
+**Lesson: when a harness-green mechanic keeps reading as absent in play,
+check how much wall-clock the entity actually spends in the state the
+mechanic lives in — not just whether the mechanic is correct.** The
+Sprint 12 sweep test placed a DC in `PatrolTissue` and never let it
+leave, so it proved the mechanic and hid the real problem. The fix
+wasn't a stronger mechanic, it was deleting the three states that
+weren't pacing so patrol *is* the whole tissue life.
+
+**Collapsing states is cheaper than it looks when they were mostly
+transport.** `TravelToNode` and `ReturnToTissue` existed only to move the
+DC between the tissue band and the node in a straight line. Folding
+"bias toward the base while carrying cargo" into the one patrol walk and
+entering the node on reaching the `Base` band removed ~60 lines, two enum
+values, and three methods, and the `Update()` tween across the
+tissue↔node gap still sells "it went to the node" with no travel state.
+
+**`AdaptiveVerification` didn't grow.** The two shuttle assertions that
+named `ReturnToTissue` moved to `PatrolTissue && !HasCargo` (same
+meaning: "done, pacing again"), and `DriveOneShuttle` now drives until it
+observes a node visit *and* the return. Same 40 assertions, same
+coverage, no new test — the mechanic got simpler, not bigger.

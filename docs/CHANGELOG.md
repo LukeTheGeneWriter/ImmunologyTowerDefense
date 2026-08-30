@@ -12,6 +12,33 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 14 -- 2026-08-30
+The dendritic cells pace now.
+
+Third pass at the same playtest note ("they don't oscillate, they don't
+spread into lanes"). The mechanic was right but almost never ran: a DC's
+oscillation and its lane-repulsion only existed in the *patrol* state,
+and in a dense round -- debris on every dead cell -- a DC picked up cargo
+within about two ticks and then spent the rest of its life in the
+travel-to-node / in-node / return-to-tissue states, none of which paced
+or repelled.
+
+- **Four states → two.** `PatrolTissue` and `InNode`; the `TravelToNode`
+  and `ReturnToTissue` beeline states (and their straight biased dashes)
+  are gone. A DC now paces the tissue band base↔lumen for its **whole
+  tissue life**, repelling the other DCs across the lanes the entire
+  time. Carrying antigen just pins its heading toward the base; it drops
+  into the node on reaching the base band and resumes pacing when the
+  cargo is spent.
+- **Tuning:** `DcPatrolSweepBias` 1.0 → 1.8 and `DcFineTilesPerTick`
+  2 → 3, so a full base↔lumen lap reads inside a ~30 s round. Removed the
+  now-unused `DcAxisWalkBiasSharpness`.
+- Verified: all ten harnesses green (**Adaptive 40**, 410 total, 0
+  failed), Windows player build clean, headless launch clean. The
+  repulsion A/B reads 16 co-lane ticks vs. 167 and mean spread 15.4 vs.
+  4.1; the sweep spans the full tissue band (axis 6..18) vs. 10..12 for a
+  plain walk. How it *looks* in motion is the Director's screenshot.
+
 ## Sprint 13 -- 2026-08-29
 The board has a face now. Everything was a flat tinted square; a
 dispatched design agent wrote the visual-identity spec
