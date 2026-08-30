@@ -1,11 +1,14 @@
 # Engine Status
 
 Rewritten at the end of every sprint, not just appended to. This version
-reflects the state after **Sprint 14** (the DC-pacing rework — the
-dendritic-cell shuttle collapsed from four states to two so a DC paces
-the tissue band its entire life). Sprint 13 was the sprite /
-visual-identity pass (procedurally-drawn shape sprites replace the flat
-white quad for every entity); Sprint 12 was two playtest fixes (cytokine
+reflects the state after **Sprint 15** (the compartment visual pass — the
+lumen and base bands leave the per-cell grid and are drawn as an open
+fluid channel and a bloodstream; the lymph node and bone marrow gain
+interiors). Sprint 14 was the DC-pacing rework (the shuttle collapsed
+from four states to two so a DC paces the tissue band its entire life);
+Sprint 13 was the entity sprite / visual-identity pass
+(procedurally-drawn shape sprites replace the flat white quad for every
+entity); Sprint 12 was two playtest fixes (cytokine
 sensing on-by-default + a buyable sharpen; a first DC patrol movement
 fix); Sprint 11 was a framework pass (placeholder shop, knowledge ladder
 as data, neighbour regrowth). Recent structural state is **Sprint 9**
@@ -874,9 +877,87 @@ and still green — repulsion A/B **16 co-lane ticks vs. 167**, mean spread
 **15.4 vs. 4.1**; swept axis span **6..18** vs. **10..12** for a plain
 walk.
 
-## Build status (Sprint 13 / Sprint 14)
+### Sprint 15 additions — the compartment visual pass
+
+Design: `docs/COMPARTMENT_DESIGN.md` (a dispatched design agent, like
+Sprint 13's `SPRITE_DESIGN.md`) + `docs/UI_STYLE_GUIDE.md` (updated).
+Signatures in `INTERFACE.md` ("Sprint 15 changes"). **Rendering-only — no
+simulation, tuning, or harness surface changed.**
+
+**1. `SpriteShapes` grew** by 3 alpha primitives (`AxisGradient`,
+`EdgeGradient`, `RadialGradient` — O(n)/pixel, no `Coverage`
+supersampling) and 9 accessors (`ChymeField`, `MucusBand`, `FlowMote`,
+`PlasmaField`, `VesselWallBar`, `OrganHalo`, `Erythrocyte`, `BirthPuff`,
+`NodeColocGlow`); `MarrowRegion` / `LymphNodeBean` / `EpithelialBar`
+revised in place. `Prewarm()` covers them and is now **called** from
+`GameBootstrap.Awake` (BACKLOG item) — ~31 rasters at one boot point.
+
+**2. `LumenChannelRenderer` (new).** Draws the lumen band as an open
+channel: a `ChymeField` quad + a `MucusBand` strip at the gut-wall seam +
+a `PrefabPool` of ~40 `FlowMote` quads drifting along the flow. Flow and
+cross directions are derived from the axis frame
+(`LumenEntryCrossIndex` / `FlowCrossStep` / `CoarseFromAxis`), no
+hardcoded world direction. `Update()` early-returns on `RoundClock.Frozen`;
+a `Mathf.Sin` phase drives a ±6% cross-section squeeze + in-phase mote
+speed (Option B; `peristalsisAmplitude = 0` → Option A).
+
+**3. `BaseCompartmentRenderer` (new).** Draws the base band as
+bloodstream: a `PlasmaField` quad (alpha lifts toward the wall), a
+`VesselWallBar` strip at `TissueBaseEdgeAxisIndex`, a `PrefabPool` of ~24
+`Erythrocyte` streamers drifting outer-edge → wall, a `BirthPuff` pool
+(cap 12) fed by `BoneMarrowManager.OnCellEmitted`, and a breach-flash
+pool (cap 6, `EffeBloom` tinted red) fed by `PathogenAgent.OnReachedBase`.
+Drifting elements freeze with `RoundClock.Frozen`; an in-flight breach
+flash finishes. Both hooks are cleared in `OnDestroy`.
+
+**4. Two new cosmetic static hooks.** `BoneMarrowManager.OnCellEmitted`
+(`Action<Vector3>`, fired in `Emit` / `EmitAdaptive` with the slot world
+position) and `PathogenAgent.OnReachedBase` (`Action<Vector3>`, fired in
+`ReachBase()` with the arrival cell centre). Null in harnesses,
+process-global — same shape as `EconomyHooks.PayForKill`.
+
+**5. `LymphNodeFieldRenderer` (new).** One `NodeColocGlow` quad whose
+position tracks the value-weighted centroid of `LymphNode.Coloc` and
+whose alpha rises with the field peak (ref = central source + 4×
+per-lymphocyte source; `≤35%` alpha). Re-samples every 0.15 s; holds on
+`RoundClock.Frozen`. Wired from `GameBootstrap.BuildAdaptiveDirector`.
+
+**6. Base + lumen leave the per-cell grid.** `GameBootstrap.BuildBoardVisual`
+only creates a `SpriteRenderer` for `BandOf == Tissue` cells now (the
+`views` array stays full-size, non-tissue entries `null`);
+`BoardRenderer.Refresh` skips null views. Host cells only ever exist in
+the tissue band (`TissueGrid.IsHostGround`), so the host layer is
+unaffected. **−110 always-resident renderers at 25×10** (the base+lumen
+grid was 120 of 250 cells; +10 field/wall/halo/glow quads), and
+`Refresh` stops touching 120 cells every 0.15 s. On the 100×40 Map 01
+aspiration the delta is ≈ **−1,990**. This retires the scale note in
+`BoardRenderer`'s class comment (open since Sprint 4).
+
+**7. Backdrop layer + tint.** Marrow / lymph backdrops moved
+`sortingOrder 1 → 2`; an `OrganHalo` quad sits at 1 behind each. Marrow
+retinted `0.30,0.24,0.16 → 0.34,0.22,0.18` (red marrow).
+`GutInterfaceRenderer.WallColor` nudged `0.55,0.47,0.40 → 0.50,0.46,0.37`
+toward the mucus tint. No `GutInterface` maths touched.
+
+**Not done (deferred to BACKLOG):** the food-bolus channel wake (would
+need `LumenChannelRenderer` to hold a ref to the food GameObject for a
+barely-visible effect); the 3×3 co-loc haze grid (single blob shipped).
+
+## Build status (Sprint 13 / Sprint 14 / Sprint 15)
 
 All run by the **head session**. Numbers copied from actual output.
+
+**Sprint 15** is rendering-only: the ten harnesses re-run **green (410
+total, 0 failed)**; `BuildScript.BuildWindows()` **Succeeded, 0 errors,
+93,378,880 bytes**; headless launch **0 exceptions** — the ~31 procedural
+rasters (incl. the 9 new compartment shapes) generate during
+`GameBootstrap.Awake` via `Prewarm()` and the bootstrap completes clean,
+both compartment renderers + the node-field renderer bind without
+throwing. **Not verified: how it looks** — rendering has no headless
+coverage, so the lumen reading as a flowing channel, the base reading as
+blood with the organs seated in it, the peristalsis not strobing at the
+speed-up control, the co-loc haze tracking the T-cell cluster, and every
+palette choice are the Director's screenshot / playtest.
 
 **Sprint 14** touched only the DC shuttle: the ten harnesses re-run
 **green (Adaptive 40, 410 total, 0 failed)**; `BuildScript.BuildWindows()`

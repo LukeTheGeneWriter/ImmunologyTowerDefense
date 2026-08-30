@@ -140,6 +140,10 @@ namespace ImmunologyTD.Bootstrap
             // Sprint 13: the procedural shape sprites for each unit kind
             // (runtime-generated, so not settable in the serialized profile
             // initializer -- see UnitProfile.Shape).
+            // Sprint 15: generate every shape up front (BACKLOG item) -- the
+            // compartment renderers below add ~9 more rasters, and one known
+            // boot cost beats a first-of-kind hitch mid-round.
+            ImmunologyTD.Rendering.SpriteShapes.Prewarm();
             macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
             neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
             tissueGrid = new TissueGrid(board);
@@ -175,6 +179,8 @@ namespace ImmunologyTD.Bootstrap
 
             BuildCamera(layout.Bounds);
             BuildBoardVisual();
+            BuildLumenChannel();
+            BuildBaseCompartment();
             BuildGutInterfaceVisual();
             BuildBoneMarrowBackdrop(layout);
             BuildLymphNodeBackdrop(layout);
@@ -337,9 +343,19 @@ namespace ImmunologyTD.Bootstrap
             {
                 for (int row = 0; row < board.Rows; row++)
                 {
+                    var coord = new CoarseCoord(col, row);
+                    // Sprint 15: only the tissue band gets a per-cell
+                    // SpriteRenderer now -- the base and lumen bands are drawn
+                    // by BaseCompartmentRenderer / LumenChannelRenderer, which
+                    // removes ~half the grid's renderers (and BoardRenderer
+                    // stops recolouring them every 0.15 s). Host cells only
+                    // ever exist in the tissue band (TissueGrid.IsHostGround),
+                    // so nothing on the host layer is lost.
+                    if (board.BandOf(coord) != BoardBand.Tissue) { views[col, row] = null; continue; }
+
                     var cellGo = new GameObject($"Cell_{col}_{row}");
                     cellGo.transform.SetParent(container, false);
-                    cellGo.transform.position = board.CoarseToWorldCenter(new CoarseCoord(col, row));
+                    cellGo.transform.position = board.CoarseToWorldCenter(coord);
                     cellGo.transform.localScale = new Vector3(size, size, 1f);
                     var sr = cellGo.AddComponent<SpriteRenderer>();
                     sr.sprite = ImmunologyTD.Rendering.SpriteShapes.HostCell; // Sprint 13 -- BoardRenderer overrides per host state
@@ -359,15 +375,51 @@ namespace ImmunologyTD.Bootstrap
             renderer.Bind(board, gutInterface);
         }
 
+        /// <summary>Sprint 15: the lumen stops being tinted host-cell quads
+        /// and becomes an open channel -- a chyme field, a mucus wall layer,
+        /// and drifting particulate (docs/COMPARTMENT_DESIGN.md §2.1).</summary>
+        private void BuildLumenChannel()
+        {
+            var go = new GameObject("LumenChannelRenderer");
+            go.AddComponent<LumenChannelRenderer>().Bind(board);
+        }
+
+        /// <summary>Sprint 15: the base band becomes the bloodstream --
+        /// plasma field, endothelial vessel wall, erythrocyte streamers,
+        /// marrow birth-puffs, and an acute breach flash
+        /// (docs/COMPARTMENT_DESIGN.md §2.2).</summary>
+        private void BuildBaseCompartment()
+        {
+            var go = new GameObject("BaseCompartmentRenderer");
+            go.AddComponent<BaseCompartmentRenderer>().Bind(board);
+        }
+
+        /// <summary>Sprint 15: a soft dark-plasma halo behind a base-band
+        /// organ so it reads as suspended in the bloodstream rather than
+        /// floating on the camera clear colour (docs/COMPARTMENT_DESIGN.md
+        /// §2.2). Sits at sortingOrder 1, behind the backdrop at 2.</summary>
+        private void BuildOrganHalo(string name, Vector3 center, Vector2 backdropSize)
+        {
+            var go = new GameObject(name);
+            go.transform.position = center;
+            go.transform.localScale = new Vector3(backdropSize.x * 1.5f, backdropSize.y * 1.5f, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.OrganHalo;
+            sr.color = new Color(0.20f, 0.06f, 0.09f); // deeper plasma
+            sr.sortingOrder = 1;
+        }
+
         private void BuildBoneMarrowBackdrop(Layout layout)
         {
+            BuildOrganHalo("BoneMarrowHalo", layout.MarrowBackdropCenter, layout.MarrowBackdropSize);
+
             var go = new GameObject("BoneMarrowBackdrop");
             go.transform.position = layout.MarrowBackdropCenter;
             go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 -- trabecular texture
-            sr.color = new Color(0.30f, 0.24f, 0.16f); // bone-marrow brown, distinct from the base band's blue-violet
-            sr.sortingOrder = 1;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 texture, Sprint 15 revision
+            sr.color = new Color(0.34f, 0.22f, 0.18f); // Sprint 15: red marrow -- belongs to the blood it sits in
+            sr.sortingOrder = 2; // Sprint 15: above the organ halo
 
             var labelGo = new GameObject("BoneMarrowLabel");
             var label = labelGo.AddComponent<CompartmentLabel>();
@@ -377,13 +429,15 @@ namespace ImmunologyTD.Bootstrap
 
         private void BuildLymphNodeBackdrop(Layout layout)
         {
+            BuildOrganHalo("LymphNodeHalo", layout.LymphCenter, layout.LymphSize);
+
             var go = new GameObject("LymphNode");
             go.transform.position = layout.LymphCenter;
             go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 -- bean silhouette + follicles
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 silhouette, Sprint 15 revision
             sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
-            sr.sortingOrder = 1;
+            sr.sortingOrder = 2; // Sprint 15: above the organ halo
 
             var labelGo = new GameObject("LymphNodeLabel");
             var label = labelGo.AddComponent<CompartmentLabel>();
@@ -448,6 +502,10 @@ namespace ImmunologyTD.Bootstrap
                 layout.LymphSize.x * 0.86f,
                 layout.LymphSize.y * 0.86f);
             var node = new LymphNode(knowledge, rect);
+
+            // Sprint 15: the co-localisation field made visible.
+            new GameObject("LymphNodeFieldRenderer")
+                .AddComponent<ImmunologyTD.Rendering.LymphNodeFieldRenderer>().Bind(node);
 
             var dcPool = BuildAgentPool<DendriticCell>("DendriticCell");
             var lymphocytePool = BuildAgentPool<Lymphocyte>("Lymphocyte");

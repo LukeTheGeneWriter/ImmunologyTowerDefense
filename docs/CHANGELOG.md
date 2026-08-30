@@ -12,6 +12,44 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 15 -- 2026-08-30
+The compartments look like what they are now.
+
+A dispatched design agent wrote `docs/COMPARTMENT_DESIGN.md`; this sprint
+implements it. The lumen and base bands were the tissue cell-grid in a
+different tint -- now they're drawn as what they represent.
+
+- **Lumen** -- a `LumenChannelRenderer`: a brown chyme field, a
+  translucent mucus layer smeared along the gut wall, and ~40 pooled
+  particulate motes drifting down the flow, with a slow ~+/-6%
+  peristaltic squeeze. A pathogen riding it now reads as a twig in a
+  current behind a membrane.
+- **Base** -- a `BaseCompartmentRenderer`: a deep-oxblood plasma field
+  lifting toward a soft endothelial **vessel wall** at the tissue seam
+  (the line immune cells already cross to reach the fight), ~24 pooled
+  erythrocytes streaming in from the outer edge, and the marrow + lymph
+  node seated in dark **plasma halos** so they read as organs suspended
+  in blood. Leans into the sepsis framing: a pathogen reaching here is
+  arriving *in your blood* -- and now there's an acute **red breach
+  flash** at the arrival lane instead of a silent despawn.
+- **Bone marrow** -- bolder trabecular struts, sinusoid channels, a red
+  retint, and a pale **birth-puff** mote on every real emission (one per
+  cell actually made, via `BoneMarrowManager.OnCellEmitted`).
+- **Lymph node** -- a medullary notch, a third follicle zone, and a
+  faint cyan **co-localisation haze** rendered live from the real
+  `LymphNode.Coloc` field, tracking where the helper-T cells gather --
+  the gradient a dendritic cell climbs, made visible.
+- **Perf:** the base and lumen bands left the per-cell `SpriteRenderer`
+  grid entirely -- **-110 always-resident renderers at 25x10** (~-1,990
+  on the 100x40 Map 01 aspiration), and `BoardRenderer.Refresh` stops
+  recolouring ~120 cells every 0.15 s. Retires the scale note open in
+  `BoardRenderer` since Sprint 4. Three pre-warmed pools;
+  `SpriteShapes.Prewarm()` is finally called (BACKLOG item).
+- Verified: all ten harnesses green (**410, 0 failed** -- rendering has
+  no headless coverage), Windows build clean, headless launch 0
+  exceptions (the ~31 procedural rasters generate during `Awake`). How
+  it *looks* in motion is the Director's screenshot.
+
 ## Sprint 14 -- 2026-08-30
 The dendritic cells pace now.
 

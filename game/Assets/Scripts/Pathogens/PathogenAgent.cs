@@ -145,6 +145,14 @@ namespace ImmunologyTD.Pathogens
         private Color restColor;
         private static readonly Color FlashColor = new Color(0.95f, 0.85f, 0.3f);
 
+        /// <summary>Sprint 15: fired with the world position at which a
+        /// pathogen crosses into the base band, so the base compartment
+        /// renderer can play an acute breach flash -- otherwise "reaching
+        /// the base" is a silent despawn (GAME_DESIGN.md §6c warns the life
+        /// pool reads as a cushion, not a threat). Cosmetic, process-global,
+        /// null in harnesses -- same pattern as EconomyHooks.PayForKill.</summary>
+        public static System.Action<Vector3> OnReachedBase;
+
         /// <summary>Reused every advance step so StepTissue allocates
         /// nothing (GAME_DESIGN.md section 8) -- same pattern as
         /// SearchUnit's candidateBuffer/weightBuffer.</summary>
@@ -909,6 +917,7 @@ namespace ImmunologyTD.Pathogens
         private void ReachBase()
         {
             if (tally != null) tally.ReachedBase++;
+            OnReachedBase?.Invoke(board.CoarseToWorldCenter(CurrentCoarse)); // Sprint 15: acute breach flash
             tissueGrid.ReleaseOccupant(CurrentCoarse);
             State = PathogenState.Cleared;
             onExit?.Invoke(this);

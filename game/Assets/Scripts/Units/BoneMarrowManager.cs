@@ -99,6 +99,13 @@ namespace ImmunologyTD.Units
         public static bool IsAdaptive(UnitKind k) =>
             k == UnitKind.DendriticCell || k == UnitKind.HelperT;
 
+        /// <summary>Sprint 15: fired with the emitting slot's world position
+        /// each time a progenitor emits a child, so the base compartment
+        /// renderer can bud a "cell born" mote in the marrow (one puff per
+        /// real emission, per the Director). Cosmetic, process-global,
+        /// null-safe in harnesses -- same pattern as EconomyHooks.PayForKill.</summary>
+        public static System.Action<Vector3> OnCellEmitted;
+
         /// <summary>Seconds between emissions from a placed tower. A
         /// judgment call, not specified by SPRINT_PLAN.md -- see
         /// docs/TEAM_RETRO.md. Chosen slower than PathogenSpawner's 2.5s
@@ -467,6 +474,7 @@ namespace ImmunologyTD.Units
             unit.Initialize(board, tissueGrid, cytokineField, profile, start,
                 slot.Tuning, slotIndex, slot.OnChildDespawned);
             slot.Children.Add(unit);
+            OnCellEmitted?.Invoke(slot.WorldPosition); // Sprint 15: marrow birth-puff
 
             EmittedCount++;
             LastEmittedStart = start;
@@ -485,6 +493,7 @@ namespace ImmunologyTD.Units
             if (go == null) return;
 
             slot.AdaptiveChildren.Add(go);
+            OnCellEmitted?.Invoke(slot.WorldPosition); // Sprint 15: marrow birth-puff
             EmittedCount++;
             LastEmittedKind = slot.Kind;
         }

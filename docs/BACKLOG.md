@@ -668,3 +668,47 @@ lane-repulsion used to be confined to a patrol state it rarely occupied).
 - **`DcAxisWalkBiasSharpness` is gone.** If a future stress-sensor unit
   wants an axis-frame biased walk toward a fixed end, it needs its own
   tunable — don't assume this one still exists.
+
+## Opened / updated by Sprint 15 (2026-08-30) — the compartment visual pass shipped
+
+The lumen, base, lymph-node interior and bone-marrow interior got real
+looks; the base + lumen bands left the per-cell `SpriteRenderer` grid.
+Spec: `docs/COMPARTMENT_DESIGN.md`. What's left / flagged:
+
+- **Visual QA is the Director's.** Nothing headless covers rendering. The
+  lumen reading as a flowing channel (not tinted cells), the base reading
+  as blood with the marrow + node seated *in* it, the peristalsis not
+  strobing when the speed-up control is run up, the co-localisation haze
+  actually tracking the T-cell cluster, and every RGB choice in
+  `COMPARTMENT_DESIGN.md §2` — all a screenshot / playtest check.
+- **~~Nothing shows a base breach~~ — a first pass shipped.** A red
+  `EffeBloom` flash expands at the arrival lane on
+  `PathogenAgent.OnReachedBase`. `GAME_DESIGN.md §6c` still wants the
+  *life-loss itself* to bite (the deferred emergency-granulopoiesis
+  mechanic) — the flash makes the moment legible, not consequential.
+- **Food-bolus channel wake — deferred.** The Director asked for a subtle
+  wake as the contaminated bolus transits the lumen (deflect nearby flow
+  motes / drag a short wake). Not built: it needs `LumenChannelRenderer`
+  to hold a reference to the food `GameObject` (spawned by
+  `PathogenSpawner`) for a barely-visible effect. Revisit if the bolus
+  reads as disconnected from the channel.
+- **Co-localisation haze is one blob, not a 3×3 grid.** It tracks the
+  field centroid and pulses alpha with the peak, which shows *where* and
+  *how much* but not the gradient's *shape*. `COMPARTMENT_DESIGN.md §7 Q3`
+  offered a 3×3 tint grid as the richer option — swap in if one blob
+  doesn't sell "the DC climbs the gradient."
+- **Selected-slot highlight** for the Sprint 16 upgrade UI — still just a
+  note (`COMPARTMENT_DESIGN.md §2.4`): a `bool selected` on the marrow
+  slot that rims the `SlotNiche`. Build it with the UI.
+- **Peristalsis is whole-channel, not a travelling band.** Cheaper and
+  reads fine at 25×10; `COMPARTMENT_DESIGN.md §7 Q4` notes a per-lane
+  phase offset as the more organic option if wanted.
+- **The compartment renderers assume a roughly horizontal threat axis**
+  for the wall-side / flip logic (they derive direction from the axis
+  frame but the mucus-strip and plasma-gradient flips are left/right).
+  A vertical-threat-axis map would need the strip orientation generalised
+  — same latent assumption `GutInterfaceRenderer` already carries.
+- **`BoardRenderer`'s `baseColors` / `isHostGround` arrays are still
+  full-size** and filled for every cell in `Bind`, including the now
+  render-less base/lumen cells. Cheap (one-time), left in place so a
+  future map that puts host cells in another band still works.
