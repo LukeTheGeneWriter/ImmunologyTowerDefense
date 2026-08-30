@@ -179,6 +179,8 @@ namespace ImmunologyTD.Bootstrap
 
             BuildCamera(layout.Bounds);
             BuildBoardVisual();
+            BuildLumenChannel();
+            BuildBaseCompartment();
             BuildGutInterfaceVisual();
             BuildBoneMarrowBackdrop(layout);
             BuildLymphNodeBackdrop(layout);
@@ -361,6 +363,25 @@ namespace ImmunologyTD.Bootstrap
             var go = new GameObject("GutInterfaceRenderer");
             var renderer = go.AddComponent<GutInterfaceRenderer>();
             renderer.Bind(board, gutInterface);
+        }
+
+        /// <summary>Sprint 15: the lumen stops being tinted host-cell quads
+        /// and becomes an open channel -- a chyme field, a mucus wall layer,
+        /// and drifting particulate (docs/COMPARTMENT_DESIGN.md §2.1).</summary>
+        private void BuildLumenChannel()
+        {
+            var go = new GameObject("LumenChannelRenderer");
+            go.AddComponent<LumenChannelRenderer>().Bind(board);
+        }
+
+        /// <summary>Sprint 15: the base band becomes the bloodstream --
+        /// plasma field, endothelial vessel wall, erythrocyte streamers,
+        /// marrow birth-puffs, and an acute breach flash
+        /// (docs/COMPARTMENT_DESIGN.md §2.2).</summary>
+        private void BuildBaseCompartment()
+        {
+            var go = new GameObject("BaseCompartmentRenderer");
+            go.AddComponent<BaseCompartmentRenderer>().Bind(board);
         }
 
         private void BuildBoneMarrowBackdrop(Layout layout)
