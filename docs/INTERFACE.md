@@ -1168,7 +1168,9 @@ yet.**
   Mutable: `MatchMaxHammingDistance` 2, `KnowledgePerMatch` 3,
   `KnowledgeMax` 100, `VirusAntigen`/`BacteriumAntigen`/`LargeBacteriumAntigen`
   (≥4 bits apart), `DcPresentationsPerCargo` 4, `DcDebrisSamplePerBite`
-  0.34, `DcFineTilesPerTick` 2, `DcAxisWalkBiasSharpness` 1.6,
+  0.34, `DcFineTilesPerTick` 3 · `DcLaneRepelStrength` 0.8 ·
+  `DcLaneRepelAxisRange` 12 · `DcPatrolSweepBias` 1.8 *(Sprint 14 moved
+  the first and last from 2 / 1.0 and removed `DcAxisWalkBiasSharpness`)*,
   `LymphocyteLifespanSeconds` 20, `LymphocyteFineTilesPerTick` 2,
   `PairingSeconds` 1.5, `NodePairingContactFineTiles` 3,
   `NodeColocalisationSourceStrength` 18, `NodeLymphocyteSourceStrength` 6,
@@ -1228,19 +1230,25 @@ unless frozen; driven by `LymphNode.Step`. `Update()` tweens only.
 ### `DendriticCell` (`ImmunologyTD.Adaptive`, MonoBehaviour agent, `INodeVisitor`)
 
 `Initialize(BoardConfig tissueBoard, TissueGrid, CytokineField, LymphNode,
-FineCoord tissueStart, System.Action<DendriticCell> onDespawn)`.
-`enum DendriticCellState { PatrolTissue, TravelToNode, InNode, ReturnToTissue }`.
+FineCoord tissueStart, System.Action<DendriticCell> onDespawn,
+IReadOnlyList<DendriticCell> cohort = null)`.
+`enum DendriticCellState { PatrolTissue, InNode }` **(Sprint 14 — was a
+four-state `PatrolTissue → TravelToNode → InNode → ReturnToTissue`)**.
 Public: `State`, `Current` (tissue fine), `NodePos`, `Cargo`, `CargoClass`,
 `HasCargo`, `Frozen`.
 
-- `void SimulationTick(float currentTime)` — dispatches by state. Patrol:
-  `Chemotaxis` random walk (cytokine off), then if standing on a `Dead`
-  cell with `GetDebrisAntigen` → sample (`Cargo = Antigen.ForClass(...)`,
-  `presentationsLeft = DcPresentationsPerCargo`, `ClearDebris` one bite) →
-  `TravelToNode`. Travel/return: softmax biased walk in the **axis frame**
-  (`dir * AxisIndex`, `DcAxisWalkBiasSharpness`), enter the node at the
-  base band / resume patrol at the tissue band. InNode: `Chemotaxis`
-  against `node.Coloc`; when `!HasCargo` → `node.Release` → `ReturnToTissue`.
+- `void SimulationTick(float currentTime)` — dispatches by state.
+  **Patrol** (the whole tissue life): set `patrolHeading` (−1 while
+  `HasCargo`, else oscillate, flipping at `TissueLumenEdgeAxisIndex` /
+  `TissueBaseEdgeAxisIndex`), take `DcFineTilesPerTick`
+  `RepelledPatrolStep`s (fine-grained cross-axis repulsion vs. the other
+  non-`InNode` DCs + a `DcPatrolSweepBias` threat-axis sweep). Then: with
+  cargo in the `Base` band → `EnterNode`; else empty on a `Dead` cell
+  with `GetDebrisAntigen` → sample (`Cargo = Antigen.ForClass(...)`,
+  `presentationsLeft = DcPresentationsPerCargo`, `ClearDebris` one bite),
+  no state change. **InNode:** `Chemotaxis` against `node.Coloc`; when
+  `!HasCargo` → `LeaveNode` (→ `node.Release`, drop at a random lane on
+  the tissue base edge, `State = PatrolTissue`).
 - `OnPairingResolved(bool)` — `presentationsLeft--`; at 0, `HasCargo = false`.
 - `void DespawnToPool()` / `void ResetForPool()`.
 
@@ -1585,6 +1593,45 @@ accessors: `Macrophage`, `Neutrophil`, `DendriteStar`,
 
 No new harness — rendering isn't headlessly testable. All ten existing
 harnesses re-run green (410); headless launch clean.
+
+## Sprint 14 changes — the DC-pacing rework (`GAME_DESIGN.md` §5a note)
+
+Design: `GAME_DESIGN.md` §5a ("Fixed again — Sprint 14"). No new public
+types; the `DendriticCell` state enum and its tick behaviour changed.
+
+### `ImmunologyTD.Adaptive.DendriticCell`
+
+- **`enum DendriticCellState { PatrolTissue, InNode }`** — was
+  `{ PatrolTissue, TravelToNode, InNode, ReturnToTissue }`. `TravelToNode`
+  and `ReturnToTissue` and their handlers (`TickTravel`, `TickReturn`,
+  `BiasedAxisStep`) are gone. Any external `== DendriticCellState.Travel…`
+  / `…ReturnToTissue` check must move to `PatrolTissue`.
+- **`TickPatrol(float)`** now runs the DC's entire tissue life: sets
+  `patrolHeading` (−1 while `HasCargo`, else oscillates between
+  `TissueLumenEdgeAxisIndex` and `TissueBaseEdgeAxisIndex`), steps
+  `DcFineTilesPerTick` × `RepelledPatrolStep`, then `EnterNode()` if it is
+  in the `Base` band with cargo, or samples debris if empty on a `Dead`
+  cell (no state change — it keeps pacing, heading back to the base).
+- **`LeaveNode()`** (called from `TickInNode` when `!HasCargo`) replaces
+  the old `ReturnToTissue` transition: `node.Release`, reposition to a
+  random lane on the tissue base edge, `HasCargo = false`,
+  `patrolHeading = 1`, `State = PatrolTissue`.
+- `RepelledPatrolStep` no longer owns the edge-flip (moved into
+  `TickPatrol`); still fine-grained cross-axis repulsion (skips
+  `o.State == InNode`) + the `DcPatrolSweepBias` sweep term.
+
+### `ImmunologyTD.Adaptive.AdaptiveTuning`
+
+- `DcFineTilesPerTick` **2 → 3**; `DcPatrolSweepBias` **1.0 → 1.8**;
+  `DcAxisWalkBiasSharpness` **removed** (field + `ResetToDefaults` line).
+
+### Verification
+
+`AdaptiveVerification` stays at **40** (no new assertions): `RunShuttleEndToEnd`
+asserts `PatrolTissue && !HasCargo` after a shuttle instead of the
+removed `ReturnToTissue`; `DriveOneShuttle` drives until a node visit +
+return. `RunDcLaneSpread` / `RunDcPatrolSweep` unchanged. Full sweep green
+(410), Windows build + headless launch clean.
 
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
