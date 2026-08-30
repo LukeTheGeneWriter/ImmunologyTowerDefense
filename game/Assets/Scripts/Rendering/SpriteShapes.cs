@@ -323,6 +323,12 @@ namespace ImmunologyTD.Rendering
                             }
                         }
                     }
+                    // Sprint 15: sparse brighter goblet-cell flecks -- the
+                    // mucus-secreting cells, tying the wall to the lumen mucus band.
+                    var grng = new System.Random(918);
+                    for (int i = 0; i < 5; i++)
+                        InnerShade(b, 6f + (float)grng.NextDouble() * 52f,
+                                      6f + (float)grng.NextDouble() * 52f, 4f, 1.20f);
                     epithelialBar = ToSprite(b);
                 }
                 return epithelialBar;
@@ -330,6 +336,11 @@ namespace ImmunologyTD.Rendering
         }
 
         private static Sprite marrowRegion;
+        /// <summary>Sprint 15: struts raised and multiplied so the sponge
+        /// reads at a glance (not only up close), two faint sinusoid
+        /// channels toward the blood-side edge (the route emitted cells and
+        /// birth-puff motes take), lighter stipple so the struts survive.
+        /// Retinted to red marrow in <c>GameBootstrap</c>.</summary>
         public static Sprite MarrowRegion
         {
             get
@@ -339,13 +350,24 @@ namespace ImmunologyTD.Rendering
                     var b = NewBuffer();
                     FillRounded(b, C, C, 31f, 4f);
                     var rng = new System.Random(7);
-                    for (int i = 0; i < 5; i++) // soft lighter trabecular struts
+                    for (int i = 0; i < 5; i++) // bold lighter trabecular struts
                     {
                         float ox = C + (float)(rng.NextDouble() - 0.5) * 44f;
                         float oy = C + (float)(rng.NextDouble() - 0.5) * 44f;
-                        InnerShade(b, ox, oy, 12f, 1.25f);
+                        InnerShade(b, ox, oy, 12f, 1.35f);
                     }
-                    Stipple(b, 55, 0.7f);
+                    for (int i = 0; i < 3; i++) // thinner secondary struts
+                    {
+                        float ox = C + (float)(rng.NextDouble() - 0.5) * 46f;
+                        float oy = C + (float)(rng.NextDouble() - 0.5) * 46f;
+                        InnerShade(b, ox, oy, 7f, 1.30f);
+                    }
+                    // sinusoid channels draining toward the wall-side (x = Res) edge
+                    FillCapsule(b, 40f, 20f, 62f, 26f, 2.4f);
+                    FillCapsule(b, 38f, 44f, 62f, 40f, 2.4f);
+                    InnerShade(b, 52f, 23f, 12f, 0.80f);
+                    InnerShade(b, 52f, 42f, 12f, 0.80f);
+                    Stipple(b, 55, 0.62f);
                     marrowRegion = ToSprite(b);
                 }
                 return marrowRegion;
@@ -353,6 +375,9 @@ namespace ImmunologyTD.Rendering
         }
 
         private static Sprite lymphNodeBean;
+        /// <summary>Sprint 15: keeps the Sprint 13 bean outline; adds a
+        /// darker medullary notch on the concave side (the hilum where
+        /// vessels enter) and a third germinal-centre zone.</summary>
         public static Sprite LymphNodeBean
         {
             get
@@ -363,10 +388,210 @@ namespace ImmunologyTD.Rendering
                     FillLobed(b, C, C, 26f, 2, 0.18f, 0.4f); // rounded bean
                     InnerShade(b, C - 9f, C + 5f, 8f, 1.18f); // follicles
                     InnerShade(b, C + 10f, C - 4f, 7f, 1.18f);
+                    InnerShade(b, C + 2f, C + 9f, 6f, 1.15f); // third germinal centre
+                    InnerShade(b, C - 2f, C - 10f, 9f, 0.72f); // medullary notch / hilum
                     RimShade(b, 1, 0.85f);
                     lymphNodeBean = ToSprite(b);
                 }
                 return lymphNodeBean;
+            }
+        }
+
+        // ---- Sprint 15: compartment fields, walls, and pooled motes -------
+        //   docs/COMPARTMENT_DESIGN.md. White RGB, detail in ALPHA, tinted
+        //   per-instance by the owning renderer. The three gradient
+        //   primitives they use are at the bottom of the primitives block.
+
+        private static Sprite chymeField;
+        /// <summary>Lumen channel backdrop -- one quad over the lumen band.
+        /// Alpha ramps down the flow axis + a light stipple so it is not a
+        /// flat wash. Tinted warm brown-olive by <c>LumenChannelRenderer</c>.</summary>
+        public static Sprite ChymeField
+        {
+            get
+            {
+                if (chymeField == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C, 31f, 2f);
+                    AxisGradient(b, alongX: false, aStart: 0.92f, aEnd: 0.55f);
+                    Stipple(b, 6011, 0.85f);
+                    chymeField = ToSprite(b);
+                }
+                return chymeField;
+            }
+        }
+
+        private static Sprite mucusBand;
+        /// <summary>The mucus / glycocalyx layer along the gut wall. Opaque
+        /// at one edge, feathering to transparent across ~65% of its depth.
+        /// Semi-transparent grey-green, set by the renderer.</summary>
+        public static Sprite MucusBand
+        {
+            get
+            {
+                if (mucusBand == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C, 31f, 2f);
+                    EdgeGradient(b, edge: 0, featherPx: 42f);
+                    Stipple(b, 6029, 0.90f);
+                    mucusBand = ToSprite(b);
+                }
+                return mucusBand;
+            }
+        }
+
+        private static Sprite flowMote;
+        /// <summary>Pooled lumen particulate -- fine chyme drifting down the
+        /// lanes. <c>LumenChannelRenderer</c> pools these and tweens them
+        /// along <c>BoardConfig.FlowCrossStep</c> while <c>!RoundClock.Frozen</c>.</summary>
+        public static Sprite FlowMote
+        {
+            get
+            {
+                if (flowMote == null)
+                {
+                    var b = NewBuffer();
+                    FillLobed(b, C, C, 6f, 3, 0.30f, 1.7f);
+                    Stipple(b, 6047, 0.70f);
+                    RimShade(b, 1, 0.70f);
+                    flowMote = ToSprite(b);
+                }
+                return flowMote;
+            }
+        }
+
+        private static Sprite plasmaField;
+        /// <summary>Base-band blood plasma -- one opaque quad over the base
+        /// band, alpha lifting toward the vessel wall + a light stipple.
+        /// Deep oxblood tint set by <c>BaseCompartmentRenderer</c>.</summary>
+        public static Sprite PlasmaField
+        {
+            get
+            {
+                if (plasmaField == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C, 31f, 2f);
+                    AxisGradient(b, alongX: true, aStart: 0.86f, aEnd: 1.0f);
+                    Stipple(b, 6067, 0.90f);
+                    plasmaField = ToSprite(b);
+                }
+                return plasmaField;
+            }
+        }
+
+        private static Sprite vesselWallBar;
+        /// <summary>The endothelial boundary at the base/tissue seam -- the
+        /// line immune cells cross to reach the fight. Smoother than
+        /// <see cref="EpithelialBar"/>: a few faint seams only. Muted
+        /// red-pink tint set by <c>BaseCompartmentRenderer</c>.</summary>
+        public static Sprite VesselWallBar
+        {
+            get
+            {
+                if (vesselWallBar == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C, 31f, 3f);
+                    for (int y = 0; y < Res; y++)
+                        for (int x = 0; x < Res; x++)
+                        {
+                            int idx = y * Res + x;
+                            if (b[idx].a <= 0f) continue;
+                            if (x % 18 == 0) { b[idx].r *= 0.82f; b[idx].g *= 0.82f; b[idx].b *= 0.82f; }
+                        }
+                    RimShade(b, 1, 0.85f);
+                    vesselWallBar = ToSprite(b);
+                }
+                return vesselWallBar;
+            }
+        }
+
+        private static Sprite organHalo;
+        /// <summary>Seats the marrow / lymph backdrops in the plasma: an
+        /// annulus of darker plasma (clear centre so the backdrop shows) with
+        /// a bright rim at the organ edge. <c>GameBootstrap</c> builds one per
+        /// organ, <c>sortingOrder 1</c>, behind the backdrops (which move to 2).</summary>
+        public static Sprite OrganHalo
+        {
+            get
+            {
+                if (organHalo == null)
+                {
+                    var b = NewBuffer();
+                    ForBox(0f, 0f, Res, Res, (x, y) =>
+                    {
+                        float d = Mathf.Sqrt((x + 0.5f - C) * (x + 0.5f - C) + (y + 0.5f - C) * (y + 0.5f - C));
+                        float a = d < 19f
+                            ? Mathf.Lerp(0f, 0.78f, Mathf.Clamp01((d - 8f) / 11f))
+                            : Mathf.Lerp(0.78f, 0f, Mathf.Clamp01((d - 19f) / 12f));
+                        b[y * Res + x].a = a;
+                    });
+                    FillRing(b, C, C, 21f, 19f); // bright rim where organ meets fluid
+                    organHalo = ToSprite(b);
+                }
+                return organHalo;
+            }
+        }
+
+        private static Sprite erythrocyte;
+        /// <summary>Pooled base-band blood-cell streamer -- a biconcave disc.
+        /// <c>BaseCompartmentRenderer</c> pools these, spawns them at the
+        /// outer edge and drifts them toward the vessel wall while
+        /// <c>!RoundClock.Frozen</c>. Bright arterial-red tint.</summary>
+        public static Sprite Erythrocyte
+        {
+            get
+            {
+                if (erythrocyte == null)
+                {
+                    var b = NewBuffer();
+                    FillDisc(b, C, C, 12f);
+                    InnerShade(b, C, C, 8f, 0.68f); // central dip -> biconcave read
+                    RimShade(b, 1, 0.80f);
+                    erythrocyte = ToSprite(b);
+                }
+                return erythrocyte;
+            }
+        }
+
+        private static Sprite birthPuff;
+        /// <summary>Pooled marrow "a cell was made" mote -- soft, rimless.
+        /// Budded near an occupied slot on <c>BoneMarrowManager.OnCellEmitted</c>,
+        /// drifts toward the blood-side edge fading, then recycles.</summary>
+        public static Sprite BirthPuff
+        {
+            get
+            {
+                if (birthPuff == null)
+                {
+                    var b = NewBuffer();
+                    RadialGradient(b, C, C, 0f, 12f, aInner: 1.0f, aOuter: 0.0f);
+                    birthPuff = ToSprite(b);
+                }
+                return birthPuff;
+            }
+        }
+
+        private static Sprite nodeColocGlow;
+        /// <summary>The lymph-node co-localisation field made visible
+        /// (GAME_DESIGN.md §5c). One soft blob over the node rect;
+        /// <c>LymphNodeFieldRenderer</c> rewrites <c>sr.color</c> from
+        /// <c>LymphNode.Coloc</c> so it brightens where the helper-T cells
+        /// have gathered and a DC visibly drifts up it.</summary>
+        public static Sprite NodeColocGlow
+        {
+            get
+            {
+                if (nodeColocGlow == null)
+                {
+                    var b = NewBuffer();
+                    RadialGradient(b, C, C, 4f, 31f, aInner: 0.90f, aOuter: 0.0f);
+                    nodeColocGlow = ToSprite(b);
+                }
+                return nodeColocGlow;
             }
         }
 
@@ -462,6 +687,9 @@ namespace ImmunologyTD.Rendering
             _ = HostCell; _ = HostCellInfectedViral; _ = HostCellInfectedBacterial; _ = Debris; _ = EmptyPit;
             _ = SlotNiche; _ = EpithelialBar; _ = MarrowRegion; _ = LymphNodeBean;
             _ = GranuleBurst; _ = BreachStar; _ = EffeBloom; _ = StressRing; _ = KnowledgeRing;
+            // Sprint 15 compartment shapes
+            _ = ChymeField; _ = MucusBand; _ = FlowMote; _ = PlasmaField; _ = VesselWallBar;
+            _ = OrganHalo; _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
         }
 
         // ================================================================
@@ -719,6 +947,74 @@ namespace ImmunologyTD.Rendering
             {
                 buf[i].r *= r; buf[i].g *= g; buf[i].b *= b; buf[i].a *= a;
             }
+        }
+
+        // ---- Sprint 15 gradient primitives -----------------------------
+        //   These WRITE / SCALE the alpha channel and are O(n) per pixel
+        //   (cheaper than the O(n^2) RimShade). No Coverage supersampling --
+        //   a gradient has no hard edge to alias. docs/COMPARTMENT_DESIGN.md §3.
+
+        /// <summary>Multiply every already-opaque pixel's alpha by a linear
+        /// ramp: <paramref name="aStart"/> at one edge to
+        /// <paramref name="aEnd"/> at the opposite edge, along X when
+        /// <paramref name="alongX"/>, else along Y. Call AFTER a fill.</summary>
+        private static void AxisGradient(Color[] buf, bool alongX, float aStart, float aEnd)
+        {
+            for (int y = 0; y < Res; y++)
+            {
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (buf[idx].a <= 0f) continue;
+                    float t = (alongX ? x : y) / (float)(Res - 1);
+                    buf[idx].a *= Mathf.Lerp(aStart, aEnd, t);
+                }
+            }
+        }
+
+        /// <summary>Feather alpha from full to zero within
+        /// <paramref name="featherPx"/> of ONE border (0=left,1=right,2=top,
+        /// 3=bottom). Pixels further from that border are untouched.</summary>
+        private static void EdgeGradient(Color[] buf, int edge, float featherPx)
+        {
+            featherPx = Mathf.Max(1f, featherPx);
+            for (int y = 0; y < Res; y++)
+            {
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (buf[idx].a <= 0f) continue;
+                    float d;
+                    switch (edge)
+                    {
+                        case 0: d = x; break;
+                        case 1: d = Res - 1 - x; break;
+                        case 2: d = y; break;
+                        default: d = Res - 1 - y; break;
+                    }
+                    if (d < featherPx) buf[idx].a *= d / featherPx;
+                }
+            }
+        }
+
+        /// <summary>Overwrite alpha with a smoothstep-eased lerp from
+        /// <paramref name="aInner"/> at <paramref name="rInner"/> to
+        /// <paramref name="aOuter"/> at <paramref name="rOuter"/> from
+        /// (cx,cy). Writes (not max-blends), so it works on an empty
+        /// buffer.</summary>
+        private static void RadialGradient(Color[] buf, float cx, float cy,
+            float rInner, float rOuter, float aInner, float aOuter)
+        {
+            float rIn = Mathf.Min(rInner, rOuter);
+            float rOut = Mathf.Max(rInner, rOuter);
+            ForBox(cx - rOut - 1f, cy - rOut - 1f, cx + rOut + 1f, cy + rOut + 1f, (x, y) =>
+            {
+                float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float t = rOut <= rIn ? 1f : Mathf.Clamp01((d - rIn) / (rOut - rIn));
+                t = t * t * (3f - 2f * t); // smoothstep
+                buf[y * Res + x].a = Mathf.Lerp(aInner, aOuter, t);
+            });
         }
 
         private static float Hash01(int x, int y, int seed)

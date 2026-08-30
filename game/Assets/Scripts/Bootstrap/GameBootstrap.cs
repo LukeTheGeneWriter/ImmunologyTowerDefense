@@ -140,6 +140,10 @@ namespace ImmunologyTD.Bootstrap
             // Sprint 13: the procedural shape sprites for each unit kind
             // (runtime-generated, so not settable in the serialized profile
             // initializer -- see UnitProfile.Shape).
+            // Sprint 15: generate every shape up front (BACKLOG item) -- the
+            // compartment renderers below add ~9 more rasters, and one known
+            // boot cost beats a first-of-kind hitch mid-round.
+            ImmunologyTD.Rendering.SpriteShapes.Prewarm();
             macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
             neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
             tissueGrid = new TissueGrid(board);
