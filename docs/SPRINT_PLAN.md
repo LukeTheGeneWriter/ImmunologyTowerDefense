@@ -71,14 +71,19 @@ against its own background.
 
 ## Stopping point (definition of done)
 
-- [ ] DCs move smoothly — no per-tick snap.
-- [ ] The lumen reads as gut: villi along the wall, velvety, not brown.
-- [ ] The contaminated bolus visibly contrasts with the channel it enters.
-- [ ] The vessel wall reads as cells; erythrocytes read as biconcave discs.
-- [ ] Ten harnesses green, `BootstrapSmoke` green.
-- [ ] Clean Windows build; headless launch 0 exceptions **(launch it — see
-      Sprint 16: batchmode being clean proved nothing about the player)**.
-- [ ] Docs updated.
+- [x] DCs move smoothly — no per-tick snap. (The lateral wander is
+      unchanged and deliberate — BACKLOG.)
+- [x] The lumen reads as gut: villi along the wall, velvety, not brown.
+      (Needed a second pass — the first fringe read as thorns.)
+- [x] The contaminated bolus visibly contrasts with the channel it enters
+      — it is now the only brown thing in the band.
+- [x] The vessel wall reads as cells; erythrocytes read as biconcave discs
+      (both verified magnified; see BACKLOG for how they read at board scale).
+- [x] Ten harnesses green (410, unedited), `BootstrapSmoke` green.
+- [x] Clean Windows build (94,052,952 bytes, 0 errors); headless launch 0
+      exceptions, 0 errors. Also driven interactively: the whole buy chain
+      works from a scripted click.
+- [x] Docs updated.
 - [ ] **The Director's eye.** Nothing here is headlessly testable.
 
 ## Process note

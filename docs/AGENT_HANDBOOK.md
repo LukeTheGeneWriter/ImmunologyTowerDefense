@@ -154,3 +154,41 @@ If a sprint *is* dispatched:
   questions come back to the head.
 - The head re-verifies everything at integration and runs the
   stopping-point checklist before it reaches the Director.
+
+## Driving the built game from a shell (agentic playtesting)
+
+Established Sprint 17, after the first dispatched play-test agent
+(`AGENT_PLAYTEST_01.md`) lost most of a session to mouse input that never
+reached the game. **The build is fully drivable; the missing piece is one
+call.**
+
+- **`SetProcessDPIAware()` first, before anything else.** This display
+  reports a virtualised ~1707×1067 logical space to `SetCursorPos` while
+  `CopyFromScreen` captures at physical 1920×1080. Without the DPI call
+  every click lands ~11% off target — near-misses, so the game looks like
+  it is ignoring synthetic input when it is actually being clicked
+  somewhere else. With it, screenshot pixels **are** cursor coordinates
+  and plain `SetCursorPos` + `mouse_event` (`0x0002` down / `0x0004` up)
+  works. Verified end to end: click a marrow slot → the picker floats at
+  it, click BUY → ATP drops and the upgrade panel swaps in.
+- **`SetForegroundWindow` before every input burst.** `Application.runInBackground`
+  is off, so an unfocused game is a *paused* game. `HWND_TOPMOST` keeps
+  the window visible for screenshots but does **not** give it input focus.
+- **Find the window by PID via `EnumWindows`**, not `FindWindow` by title
+  (returns null) and not `Process.MainWindowHandle` (observed returning 0
+  mid-session on a live process; `ShowWindow(hwnd, SW_RESTORE)` on the
+  PID-recovered handle fixed it).
+- **`SendKeys` works** for keys once focused — `Space` starts a round,
+  backtick toggles the debug readout.
+- **Run play-test agents on a quiet desktop.** The Sprint 17 run competed
+  for focus with another Claude Code session working in the same repo, and
+  the game window was obscured or defocused repeatedly. Do not dispatch a
+  play-tester against a build while doing windowed work on the same
+  machine.
+- **Screenshot, then crop and magnify before judging anything small.** A
+  64×64 procedural sprite drawn at ~20 px cannot be assessed from a
+  full-desktop capture. For sprites specifically, prefer
+  `SpriteShapeDump.DumpAll` (writes every shape to PNG, composited over
+  the board's dark ground) over hunting for them on the board — and
+  sample pixel values when a detail is subtle rather than squinting at a
+  thumbnail.

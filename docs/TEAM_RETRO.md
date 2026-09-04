@@ -990,3 +990,84 @@ upgrade rows, all placeholders. That was the plan (`GAME_DESIGN.md` §6d)
 and each row names its target field so wiring is one line — but the gap
 between what the interface implies and what the simulation does is now
 the widest it has been, and it is the obvious next sprint.
+
+### Sprint 17 — head session + the first dispatched play-test agent (2026-09-04, the cartoon pass + the DC jitter fix)
+
+**The jitter was in the rendering, not the movement — and the "obvious"
+suspect was the wrong one.** Everything about the DC's walk invites blame:
+it takes three independent weighted-random steps per tick, which genuinely
+zigzags. But the thing the Director saw was the *tween* free-running from a
+random phase against a tick on a shared accumulator, so every tick snapped
+the cell most of the way to its destination and then left it crawling.
+Worth remembering next time a "movement feels wrong" report arrives:
+separate what the simulation decided from what the renderer did with it,
+before touching the simulation. Fixing the walk first would have changed
+real behaviour to paper over a cosmetic bug.
+
+**A random number that exists to make something look better is worth
+re-reading.** The tween seed was there to stop the DC cohort gliding in
+lockstep. But they all tick together anyway — lockstep is the truth of the
+sim, and the seed was buying a cosmetic difference by making every cell's
+motion wrong. If synchronised gliding turns out to read badly, the honest
+fix is to stagger the tick.
+
+**"Cartoonify it" was a legibility bug in disguise.** The Director asked
+for the lumen to be prettier and less poo-inspired. The reason it mattered
+is that the contaminated bolus that delivers every round is *deliberately*
+ochre and lumpy, and Sprint 15 had painted the channel it travels down in
+the same browns — so the most important arriving object in the game was
+camouflaged. Taking the note at face value and only re-tinting would have
+produced a nicer-looking screen that solved nothing; the actual
+requirement was "the bolus must be the only brown thing in the band," and
+that is what the palette was built around.
+
+**Build the review tool before the third guess, not after.** Every sprite
+in this project is procedural, and the loop for judging one had been:
+change numbers, build the player, hunt for a 20 px shape on the board.
+`SpriteShapeDump` (all 33 shapes to PNG in one batchmode call, composited
+over the board's dark ground) took ten minutes and immediately caught that
+the first villus was a plain capsule — a row of which reads as a comb.
+Sampling the dumped pixels also settled "is that nucleus visible or am I
+imagining it" numerically instead of by squinting at a thumbnail.
+
+**But the dump only checks the shape; the board checks the field.** The
+villi passed the dump and still read as a row of thorns in the running
+game because they were too narrow and too far apart. Two different
+questions, two different checks — and only the second one needed a build.
+
+## The first agentic playtest — what it was worth, honestly
+
+A dispatched agent drove the Sprint 16 build with no prior context and
+wrote `docs/AGENT_PLAYTEST_01.md`.
+
+**What it got right, and what makes it worth repeating:** it confirmed the
+HUD, the Space control and the debug-readout default from a cold read of
+the spec, each tied to a named screenshot; it independently corroborated
+the DC jitter from the outside ("it sits in the same ~15-pixel patch for
+1.75 s instead of pacing"); and — the property that actually decides
+whether this is worth doing — **it refused to claim it had tested the buy
+UI** when it could not attribute the panel on screen to a click it made. An
+agent that over-claims is worse than no agent.
+
+**What went wrong was mine.** It lost most of the session to mouse clicks
+that never landed, and the cause was one missing `SetProcessDPIAware()`
+call: this display hands `SetCursorPos` a virtualised ~1707×1067 space
+while captures come back at 1920×1080, so every click missed by ~11%.
+Correcting the *coordinates* (which it did, cleverly, by deriving the
+scale factor empirically) fights the same virtualisation from the other
+end, which is why all four of its methods failed identically. I verified
+the fix afterwards and the whole buy chain drives first try. That recipe
+now lives in `AGENT_HANDBOOK.md` — **the brief should have contained it**,
+and the next play-test brief will.
+
+**The other thing that went wrong was scheduling.** The agent flagged
+"another Claude Code session stealing focus" — that was this session,
+editing rendering files while the tester played, on the same desktop, with
+`runInBackground` off so an unfocused game is a paused game. Do not
+dispatch a play-tester and then work in windows on the same machine.
+
+**The open question the dry run did not answer is whether it is
+efficient.** 17 minutes and ~228k tokens bought three verified checklist
+items and one confirmed bug, most of it spent fighting the pointer. With
+the input recipe in hand the next run should be much cheaper — that is the
+thing to measure before this becomes routine.

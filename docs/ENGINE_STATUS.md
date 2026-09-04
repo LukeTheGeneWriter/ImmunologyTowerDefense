@@ -1011,9 +1011,72 @@ in batchmode and no harness can assert what a panel looks like. **How it
 feels to use is the Director's playtest**, along with the Sprint 15
 compartment visuals, still unplayed.
 
-## Build status (Sprint 13 / Sprint 14 / Sprint 15 / Sprint 16)
+## Sprint 17 — the cartoon pass + the DC jitter fix
+
+**1. The DC jitter was a tween/tick desync.** `DendriticCell.Update` ran
+its visual tween on a timer seeded to a random phase at spawn and never
+re-aligned, while movement ticked on `AdaptiveDirector`'s shared
+accumulator. The two drifted apart immediately, so a tick landing late in
+the tween cycle snapped the cell most of the way to its new tile in one
+frame and then left it crawling — every tick, for its whole life.
+`SimulationTick` now resets the timer with the move it produces;
+`Lymphocyte.NodeTick` had the identical bug and the identical fix. The
+random seed is gone: every DC ticks on the same accumulator, so lockstep
+is what the simulation does, and faking a spread in the tween bought a
+cosmetic difference at the cost of every cell's motion being wrong.
+
+**The lateral wander is unchanged and deliberate** — `RepelledPatrolStep`
+takes three independent weighted-random steps per tick. Whether that
+should become directional persistence is a design question, deferred until
+the Director has seen the motion without the snapping.
+
+**2. The lumen and the vessel are cartooned.** The argument is legibility,
+not taste: the contaminated food bolus is ochre and lumpy by design, and
+Sprint 15 painted the channel it travels down in the same browns, so the
+round's delivery vehicle was camouflaged against its own background.
+
+- **Villi** (`SpriteShapes.Villus`, `LumenChannelRenderer.BuildVilli`) — a
+  fringe of tapered mucosal fingers along the gut wall, each swaying on
+  its own phase and lengthening with the peristaltic squeeze. Direction
+  from the axis frame, so they grow into the channel on any map.
+- Channel re-painted mucosal plum, mucus dropped from a 0.50 grey-green
+  film to a 0.20 pearly sheen **drawn over the villi so it glazes them**,
+  motes lightened and thinned 40 → 28. The bolus is untouched and is now
+  the only brown thing in the band.
+- **The vessel wall is a tiled row of endothelial cells**
+  (`SpriteShapes.EndothelialCell`) instead of one quad stretched the
+  length of the seam. That stretch was the structural reason the wall
+  could only ever be a smooth bar. Brighter wall and corpuscle tints, and
+  a deeper dip on the erythrocyte so it reads as a biconcave dish.
+
+**3. A sprite dumper** (`Assets/Editor/SpriteShapeDump.cs`) writes all 33
+procedural shapes to PNG, each also composited over the board's dark
+ground, so a shape can be reviewed without launching the game. It caught
+three things in its first use: the villus was a uniform capsule (a row of
+them read as a comb — redrawn as a tapered club), and the wall cell's
+nucleus and the erythrocyte's dip were too faint to survive being drawn at
+~25 px. Output is gitignored.
+
+**4. The villi needed a second pass after seeing them in the build.** At
+0.42 cells wide on a 0.78 pitch they read as a row of thorns; widened to
+0.72 on a 0.55 pitch so neighbours overlap, they read as a fringe. Worth
+recording as a general point: the sprite dump tells you whether a *shape*
+is right, and only the running board tells you whether a *field of them*
+is.
+
+## Build status (Sprints 13-17)
 
 All run by the **head session**. Numbers copied from actual output.
+
+**Sprint 17**: ten harnesses **green (410, 0 failed), unedited**;
+`BootstrapSmoke` **PASS**; `BuildScript.BuildWindows()` **Succeeded, 0
+errors, 94,052,952 bytes**; headless launch **0 exceptions, 0 errors**.
+Also driven interactively from a shell this time (see AGENT_HANDBOOK.md):
+click a marrow slot -> the picker floats at it with the slot rimmed; BUY a
+macrophage -> **ATP 100 -> 60**, the slot takes the kind colour, and the
+panel swaps in place to that niche's three roster rows. That is the first
+time the buy chain has been verified by anything other than the
+Director's hands.
 
 **Sprint 16** (the UI pass): the ten harnesses re-run **green (410 total,
 0 failed), unedited**, plus the new `BootstrapSmoke.RunAll` **PASS (0

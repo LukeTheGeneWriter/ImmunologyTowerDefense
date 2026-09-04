@@ -791,3 +791,45 @@ The buy panels and the upgrade framework landed well. Two items:
   `BaseCompartmentRenderer`, and `SpriteShapes` (`ChymeField`,
   `MucusBand`, `PlasmaField`, `VesselWallBar`, plus new villi shapes);
   `COMPARTMENT_DESIGN.md` is the spec to revise.
+
+## Opened / updated by Sprint 17 (2026-09-04) — the cartoon pass + the first agentic playtest
+
+- ~~**DC jitter**~~ **FIXED** (tween/tick desync). **But the lateral
+  wander remains** and is the open design question: `RepelledPatrolStep`
+  takes `DcFineTilesPerTick` (3) independent weighted-random von Neumann
+  steps per tick, so a DC visibly wobbles sideways while pacing. Options
+  if the Director wants it calmer: directional persistence (weight the
+  previous step), fewer-but-longer steps, or smoothing only the rendered
+  position while leaving the walk alone. Deliberately not chosen yet —
+  needs eyes on the un-snapped motion first.
+- **`Lymphocyte` had the same tween bug and the same fix**, but nobody has
+  looked at the node closely since. Worth a glance during the next
+  playtest: node motion should be smoother now too.
+- **The vessel-wall cells sit very close to the tissue palette.** They
+  read as a distinct wall when magnified, but at board scale a column of
+  pink rounded cells abuts a grid of pink rounded cells. If it reads as
+  mush on a real screen, push the wall warmer or add a thin dark seam
+  between wall and tissue.
+- **Erythrocytes are small and dim at board scale.** The biconcave dish is
+  right in the sprite dump; on the board they are ~8 px dots. Either scale
+  them up slightly or accept that they are texture rather than objects.
+- **`SpriteShapes.VesselWallBar` is now unused** — kept deliberately (a
+  future map may want a smooth vessel edge), but it is dead weight if that
+  never happens.
+- **Agentic playtesting: worth repeating, cost unknown.** The first run
+  (`docs/AGENT_PLAYTEST_01.md`) spent most of its session on input that
+  never landed; the recipe is now in `AGENT_HANDBOOK.md`. Open items for
+  the next run: **(a)** measure whether it is efficient with the input
+  problem removed; **(b)** run it on a quiet desktop — `runInBackground`
+  is off, so a defocused game is a paused game and concurrent windowed
+  work breaks the test; **(c)** consider whether the build should expose
+  keyboard shortcuts for the actions a playtest most needs (start round,
+  place a specific kind, open the shop), gated out of release — the agent
+  suggested this and it would make a play-test agent dramatically cheaper
+  than coordinate-clicking.
+- **Nothing verifies the UI beyond "it built".** Still true after Sprint
+  16 and 17: `BootstrapSmoke` proves no view class throws while
+  constructing. The interactive buy-chain check done by hand this sprint
+  (click slot → picker → BUY → upgrade panel, ATP 100→60) is exactly the
+  kind of thing a scripted play-mode test could assert if UI keeps
+  growing.

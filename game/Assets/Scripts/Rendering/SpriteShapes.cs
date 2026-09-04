@@ -717,7 +717,7 @@ namespace ImmunologyTD.Rendering
                     {
                         float t = i / 24f;
                         float y = Mathf.Lerp(12f, 46f, t);
-                        float r = Mathf.Lerp(6.5f, 12.5f, Mathf.SmoothStep(0f, 1f, t));
+                        float r = Mathf.Lerp(9f, 13.5f, Mathf.SmoothStep(0f, 1f, t));
                         FillDisc(b, C, y, r);
                     }
                     // Central core, slightly darker than the body.

@@ -47,9 +47,13 @@ namespace ImmunologyTD.Rendering
         /// pathogen adhered at the wall must stay readable in front of them
         /// (it draws at sorting order 20, they draw at 1, so it is only ever
         /// a question of how much they clutter the lane).</summary>
-        private const float VillusHeightCells = 1.15f;
-        private const float VillusWidthCells = 0.42f;
-        private const float VillusSpacingCells = 0.78f;
+        // Widened and packed after looking at the first build: at 0.42 cells
+        // wide on a 0.78 pitch they read as a row of thorns rather than a
+        // velvety fringe. Overlapping neighbours is the point -- the gaps
+        // between them were what made them look like spikes.
+        private const float VillusHeightCells = 1.05f;
+        private const float VillusWidthCells = 0.72f;
+        private const float VillusSpacingCells = 0.55f;
         private const float VillusSwayDegrees = 5f;
 
         /// <summary>±fraction the channel cross-section squeezes, and the
