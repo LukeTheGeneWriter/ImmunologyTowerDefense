@@ -555,14 +555,29 @@ namespace ImmunologyTD.Bootstrap
         /// included, so nothing renders unstyled without it.</summary>
         private void BuildUiRoot(Layout layout, BoneMarrowManager boneMarrow, RoundController rounds, AdaptiveDirector adaptive)
         {
-            var panelSettings = ScriptableObject.CreateInstance<UnityEngine.UIElements.PanelSettings>();
-            panelSettings.name = "ITD_PanelSettings";
-            panelSettings.scaleMode = UnityEngine.UIElements.PanelScaleMode.ScaleWithScreenSize;
-            panelSettings.referenceResolution = new Vector2Int(1920, 1080);
-            panelSettings.screenMatchMode = UnityEngine.UIElements.PanelScreenMatchMode.MatchWidthOrHeight;
-            panelSettings.match = 0.5f;
-            panelSettings.sortingOrder = 100;
-            panelSettings.clearColor = false;
+            // The one UI asset this project ships (Assets/Editor/UiAssetSetup.cs
+            // creates it, by script, not by hand). A PanelSettings created
+            // at runtime has no text settings, and in a *player build* UI
+            // Toolkit's text shaper then throws a NullReferenceException on
+            // every label every frame -- invisible in the Editor and in
+            // batchmode, which is why the headless launch of the build is
+            // part of the definition of done.
+            var panelSettings = Resources.Load<UnityEngine.UIElements.PanelSettings>("ITD_PanelSettings");
+            if (panelSettings == null)
+            {
+                Debug.LogWarning(
+                    "[GameBootstrap] Resources/ITD_PanelSettings not found -- falling back to a runtime-created " +
+                    "PanelSettings. The UI will render but text may throw in a player build. " +
+                    "Run UiAssetSetup.CreatePanelSettings to restore the asset.");
+                panelSettings = ScriptableObject.CreateInstance<UnityEngine.UIElements.PanelSettings>();
+                panelSettings.name = "ITD_PanelSettings";
+                panelSettings.scaleMode = UnityEngine.UIElements.PanelScaleMode.ScaleWithScreenSize;
+                panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+                panelSettings.screenMatchMode = UnityEngine.UIElements.PanelScreenMatchMode.MatchWidthOrHeight;
+                panelSettings.match = 0.5f;
+                panelSettings.sortingOrder = 100;
+                panelSettings.clearColor = false;
+            }
 
             var uiGo = new GameObject("UiRoot");
             uiGo.AddComponent<CytokineToggle>();   // the C debug toggle keeps its home on the UI object

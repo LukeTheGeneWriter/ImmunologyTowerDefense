@@ -25,10 +25,17 @@ namespace ImmunologyTD.UI
     /// SceneSetup builds the scene from a script) and a .uxml would be the
     /// first hand-authored asset a text diff can't review.
     ///
-    /// **themeStyleSheet is deliberately null** (§7's caveat). It costs one
-    /// boot warning and Unity's default control chrome, neither of which is
-    /// wanted -- every element here is explicitly styled against UiTheme,
-    /// including the font, which is why nothing renders unstyled without it.
+    /// **The one asset.** UI_DESIGN.md §7 planned for a null
+    /// `themeStyleSheet` and accepted the boot warning. That turned out to
+    /// be wrong for the wrong reason: a `PanelSettings` created at runtime
+    /// also has no *text settings*, and in a **player build** the text
+    /// shaper then throws a NullReferenceException on every label, every
+    /// frame -- while the Editor and batchmode stay perfectly quiet. So the
+    /// project ships exactly one UI asset,
+    /// `Assets/Resources/ITD_PanelSettings.asset`, created by script
+    /// (Assets/Editor/UiAssetSetup.cs) and loaded here. Everything else is
+    /// still code. Every element is styled explicitly regardless, so the
+    /// default theme it carries is a floor, not the look.
     ///
     /// **Picking:** the root and the dock containers are PickingMode.Ignore,
     /// so a click that is not on a panel falls straight through to the
