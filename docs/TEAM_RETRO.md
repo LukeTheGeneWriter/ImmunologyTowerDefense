@@ -928,3 +928,65 @@ Building it means giving `LumenChannelRenderer` a live reference to a
 `GameObject` that `PathogenSpawner` owns and recycles, for an effect
 that's "barely-there" by design. Not worth the coupling this pass —
 noted in `BACKLOG` as a fast-follow if the bolus reads as disconnected.
+
+### Sprint 16 — head session + dispatched design agent (2026-09-04, the UI pass)
+
+**The spec-then-implement pattern held for a third sprint, and this time
+the spec had to be overruled in three places.** A dispatched design agent
+wrote `docs/UI_DESIGN.md` (1,090 lines: palette, type scale, a per-kind
+upgrade roster with the field each row would write, a nine-commit
+migration plan) plus an uncompiled prototype sketch. The Director then
+made four calls, two of which contradicted the spec's recommendation:
+panels **float at the slot** rather than docking right, and buying stays
+open **during a round** rather than being buy-phase only. The third
+override was the head's: the spec argued for leaving `CompartmentLabel`
+in IMGUI one more sprint, and the Director's definition of done said no
+`OnGUI` anywhere — so it was ported. A spec that gets argued with is
+doing its job; the value was in having something concrete enough to
+disagree with.
+
+**The sprint was cheaper than the spec estimated, because the head
+audited the code before scoping.** The spec assumed live buying needed
+economy work. It didn't: `AtpPerKill` was already paid per kill as the
+kills happened, the marrow picker was already ungated, and only
+`HudOverlay.DrawShopPanel` checked the phase. The whole "design change"
+was deleting one condition and rewriting one line of HUD copy. Worth
+repeating: audit before estimating, especially when a spec says a feature
+is expensive.
+
+**A batchmode-clean build is not a working build — for UI Toolkit
+specifically.** The ten harnesses passed, the new bootstrap smoke passed,
+the Windows build succeeded with zero errors, and the built player then
+threw a `NullReferenceException` from `UITKTextHandle.ShapeText` on every
+label, every frame. A `PanelSettings` created with
+`ScriptableObject.CreateInstance` has no text settings, and only the
+player build cares. Nothing in the Editor, in batchmode, or in the smoke
+harness said a word. The fix is one asset
+(`Assets/Resources/ITD_PanelSettings.asset`, created by script) — but the
+lesson is the process one: **launching the build was the only check that
+would ever have caught this**, and it nearly got treated as a formality
+after four green signals. `UI_DESIGN.md` §7 pre-authorised "one tiny
+asset if it bites"; it bit, from an unexpected direction.
+
+**Deleting the presentation state out of the model was the change that
+made the rest easy.** `BoneMarrowManager` had two `int?` fields —
+`pendingChoiceIndex` and `pendingUpgradeIndex` — which encoded *which
+panel to draw* inside the simulation class, which is why the IMGUI panels
+had to live there. Replacing both with one `SelectedSlotIndex` and
+letting the UI decide what a selected empty slot versus a selected placed
+slot means moved ~90 lines of `OnGUI` out and cost nothing.
+
+**Kept a deliberately odd shim rather than editing a harness.**
+`UpgradeTower(int)` still exists at the old flat price alongside the new
+`UpgradeTower(slot, row, basePrice, cap)`, purely so
+`Sprint11Verification` compiles and passes unedited — including its
+assertion that an upgrade never touches `UnitLifecycleTuning`. Editing
+the harness to match the new API would have been tidier code and a worse
+test: the point of that assertion is that it was written before the code
+it now guards.
+
+**The UI is still promising things the game does not do.** Twelve named
+upgrade rows, all placeholders. That was the plan (`GAME_DESIGN.md` §6d)
+and each row names its target field so wiring is one line — but the gap
+between what the interface implies and what the simulation does is now
+the widest it has been, and it is the obvious next sprint.

@@ -925,6 +925,34 @@ anticlimactic (adhesion 0.12 → almost everything excreted).
   §2a's "round 1 buy-then-observe" risk is unaddressed but softer now (a
   persistent field means the screen is never empty).
 
+### Buying is LIVE — Sprint 16 (Director, 2026-09-04)
+
+**Every buy surface stays open while a round is running.** The shop, the
+tower picker and the progenitor upgrade panel are no longer gated on
+`Phase == Building`. In the Director's words: if you can't afford an
+upgrade, that forces you to pay attention and move fast when you finally
+can — buying one to survive a wave that would otherwise have overwhelmed
+you.
+
+The dynamic this creates already existed in the economy and was simply
+invisible: `EconomyTuning.AtpPerKill` is paid through
+`EconomyHooks.PayForKill` on every kill *as it happens*, so the balance
+climbs during a wave. Watching the number and spending it the instant it
+clears a price is now a real thing to do.
+
+**What this does NOT change:** the between-rounds buy phase still freezes
+time (`RoundClock.Frozen`, above) — live buying means the shop is *also*
+open while a round is Active, not that the freeze went away. Placing a
+tower mid-round works exactly as it does frozen (the emission timer
+resets and emission resumes on the next unfrozen `Update`). No prices, no
+income rates, and no round pacing changed with it.
+
+**Consequence to watch at the next tuning pass:** income per round is now
+spendable *within* that round, which makes ATP worth marginally more than
+it was and makes a rich mid-wave save meaningfully different from a poor
+one. If rounds start feeling trivially recoverable, this is the first
+lever to look at — not `AtpPerKill` itself.
+
 ## 5c. Antigen specificity — the 8-bit barcode — LOCKED (Director, 2026-08-21)
 
 §5a says knowledge is earned when a DC and a helper T cell meet. This

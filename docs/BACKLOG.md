@@ -125,10 +125,9 @@ design and wire real sprites:
 - **Art direction**: `docs/handoff-map01-intestine.md` §8 already has a
   working answer (histology palette, clinical register) for the first
   playable slice — start there.
-- **Likely paired with**: a real buy UI (the point at which installing
-  `com.unity.ugui` or committing to UI Toolkit is a conscious call — see
-  `TEAM_RETRO.md` Sprint 1), since the shop / picker / HUD are all IMGUI
-  placeholders too.
+- ~~**Likely paired with**: a real buy UI~~ — **settled in Sprint 16.**
+  The project committed to UI Toolkit, built from code, and every IMGUI
+  surface is gone.
 - **Probably wants a Design agent** dispatched for the actual asset
   design, with the head wiring them in — this project has never used one.
 
@@ -639,10 +638,9 @@ left / flagged (from `docs/SPRITE_DESIGN.md` §6 and the implementation):
 - **`DegranulationFlash.ShapeFor` matches on burst colour** rather than a
   `Shape` enum -- fine while the five colours are far apart, brittle if a
   sixth event lands near one.
-- **A real buy UI** (uGUI or UI Toolkit). The shop / marrow picker /
-  upgrade panel / HUD are all IMGUI placeholders. The natural companion
-  to a visual pass; its own sprint. Installing `com.unity.ugui` is a
-  network-requiring, conscious step (`TEAM_RETRO.md` Sprint 1).
+- ~~**A real buy UI** (uGUI or UI Toolkit).~~ **DONE — Sprint 16.** UI
+  Toolkit, built from code; no uGUI package was needed. One
+  `PanelSettings` asset ships (`docs/UI_DESIGN.md`, `ENGINE_STATUS.md`).
 - **Authored art / an asset pipeline** -- deferred; the procedural
   approach is the fit until a real artist joins (`SPRITE_DESIGN.md` §4).
 
@@ -697,7 +695,8 @@ Spec: `docs/COMPARTMENT_DESIGN.md`. What's left / flagged:
   *how much* but not the gradient's *shape*. `COMPARTMENT_DESIGN.md §7 Q3`
   offered a 3×3 tint grid as the richer option — swap in if one blob
   doesn't sell "the DC climbs the gradient."
-- **Selected-slot highlight** for the Sprint 16 upgrade UI — still just a
+- ~~**Selected-slot highlight**~~ **DONE, Sprint 16** -- a KnowledgeRing
+  rim renderer per slot, breathing on the selected one. Was: — still just a
   note (`COMPARTMENT_DESIGN.md §2.4`): a `bool selected` on the marrow
   slot that rims the `SlotNiche`. Build it with the UI.
 - **Peristalsis is whole-channel, not a travelling band.** Cheaper and
@@ -712,3 +711,47 @@ Spec: `docs/COMPARTMENT_DESIGN.md`. What's left / flagged:
   full-size** and filled for every cell in `Bind`, including the now
   render-less base/lumen cells. Cheap (one-time), left in place so a
   future map that puts host cells in another band still works.
+
+## Opened / updated by Sprint 16 (2026-09-04) — the UI pass shipped
+
+The front end is UI Toolkit, built from code. `docs/UI_DESIGN.md` is the
+spec; `docs/UI_STYLE_GUIDE.md` is what shipped.
+
+- **The upgrade rows are still placeholders.** Buying spends ATP and bumps
+  a level and the simulation does not change (`GAME_DESIGN.md` §6d). Every
+  row names the field it will write (`ProgenitorUpgradeCatalog.FieldLabel`,
+  visible in the debug readout) — **the wiring sprint is one line per
+  row.** This is now the biggest gap between what the UI promises and what
+  the game does, and it should be the next thing done.
+- **`FineTilesPerTick` must move onto `UnitLifecycleTuning`** before the
+  neutrophil "Rapid chemokinesis" row can be wired — it lives on the
+  shared `UnitProfile` today, so writing it would speed up every tower of
+  that kind. Additive and mechanical (`FromProfile` / `CopyFrom` /
+  `SearchUnit`'s read).
+- **Adaptive upgrades are global-per-kind.** The DC and helper-T rows cite
+  `AdaptiveTuning` statics, so wiring them affects every tower of that
+  kind, not the upgraded niche. Accepted for now (the Director's call);
+  the alternative is per-tower fields on the adaptive `Slot.Tuning` read
+  by `AdaptiveDirector` per agent.
+- **The fourth row per kind is unbuilt.** `UI_DESIGN.md` §5 lists a
+  candidate fourth for each; three shipped. Macrophage "Inflammasome
+  priming" is deliberately *not* one of them — it would buy away the weak
+  innate stress-sense roll the adaptive bridge depends on.
+- **Tuning the live-buy economy.** Income is now spendable inside the
+  round it is earned in (`GAME_DESIGN.md` §5d). If rounds start feeling
+  trivially recoverable, look here before touching `AtpPerKill`.
+- **No run restart, still.** `GAME OVER` is a terminal state with no
+  button on it. The HUD is the natural place for one now that there is a
+  HUD.
+- **UI has no automated coverage beyond "it built".** `BootstrapSmoke`
+  proves no view class throws while constructing. Nothing checks that the
+  floating panel lands on screen, that the click-away doesn't eat a
+  purchase, or that the shop is reachable during a round. If UI keeps
+  growing, a play-mode test harness becomes worth the setup.
+- **The click-away rule leans on frame ordering.** `UiController` clears
+  the selection on a click that is neither on a panel nor on a slot,
+  telling the two apart with `BoneMarrowManager.LastSelectionFrame`
+  (OnMouseDown runs before Update). Correct today; fragile if input
+  handling is ever moved to the new Input System or a fixed-step path.
+- **World labels are screen-space elements pinned per frame.** Fine at two
+  labels; if compartment annotation grows, batch the projection.

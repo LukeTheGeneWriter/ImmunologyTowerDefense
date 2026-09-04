@@ -154,19 +154,25 @@ when the Director needs it fast.
 
 ## Stopping point (definition of done)
 
-- [ ] The top-left stat dump is **gone** by default; backtick brings it
+- [x] The top-left stat dump is **gone** by default; backtick brings it
       back as a monospace instrument panel.
-- [ ] A minimal HUD reads ATP / round / lives and offers Start Round.
-- [ ] Clicking an empty marrow slot floats a picker at it; clicking a
+- [x] A minimal HUD reads ATP / round / lives and offers Start Round.
+- [x] Clicking an empty marrow slot floats a picker at it; clicking a
       placed one floats its upgrade panel with 3 real-named rows, cost,
       level dots and effect text.
-- [ ] The selected slot is rimmed on the board.
-- [ ] The shop is a right-docked UITK panel, buyable **during a round**.
-- [ ] No `OnGUI` left in the project.
-- [ ] All ten harnesses green (UI has no headless coverage — the one
-      automatable signal is a batchmode bootstrap with 0 exceptions).
-- [ ] Clean Windows build; headless launch 0 exceptions.
-- [ ] Docs updated (scope item 9).
+- [x] The selected slot is rimmed on the board.
+- [x] The shop is a right-docked UITK panel, buyable **during a round** --
+      collapsible, since it is now on screen during play.
+- [x] No `OnGUI` left in the project (CompartmentLabel ported too).
+- [x] All ten harnesses green, unedited (410 assertions), plus the new
+      `BootstrapSmoke.RunAll` — the batchmode-bootstrap-with-0-exceptions
+      signal this line asked for. UI still has no other headless coverage.
+- [x] Clean Windows build (94,050,392 bytes, 0 errors); headless launch
+      0 exceptions -- on the **second** attempt: the first build threw per
+      label per frame in the player because a runtime-created
+      PanelSettings has no text settings. Fixed by shipping one
+      `PanelSettings` asset. See TEAM_RETRO.md.
+- [x] Docs updated (scope item 9).
 - [ ] **How it feels to use.** No headless coverage of `Update()`; the
       handoff is the build. The Director's playtest — including the
       Sprint 15 compartment visuals, still unplayed.

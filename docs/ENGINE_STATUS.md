@@ -943,9 +943,97 @@ toward the mucus tint. No `GutInterface` maths touched.
 need `LumenChannelRenderer` to hold a ref to the food GameObject for a
 barely-visible effect); the 3×3 co-loc haze grid (single blob shipped).
 
-## Build status (Sprint 13 / Sprint 14 / Sprint 15)
+## Sprint 16 — the UI pass (`docs/UI_DESIGN.md`)
+
+**Every IMGUI surface in the project is gone.** The front end is UI
+Toolkit, assembled in C# in `Assets/Scripts/UI/` against a single
+`UiTheme`: no `.uxml`, no `.uss`, no UI Builder, and exactly one asset
+(`Assets/Resources/ITD_PanelSettings.asset`, created by script -- see the
+asset note below). **No package was added**: `com.unity.modules.uielements`
+was already in the manifest; `com.unity.ugui` is still absent.
+
+**1. The stat wall is behind a key.** The always-on UI is now a three-
+number HUD (ATP / round / lives) plus Start Round, top-right. Everything
+the old top-left dump showed moved verbatim into `DebugReadoutView` —
+bottom-left, monospace, **backtick to toggle, default OFF**. This is the
+Director's Sprint 15 note ("so many stats I can't get a feel for how the
+player will interact with the game") closed.
+
+**2. Buying is open during a round.** `HudOverlay.DrawShopPanel`'s
+`Phase != Building` gate is gone. This needed no economy or clock change:
+`EconomyTuning.AtpPerKill` was always paid live through
+`EconomyHooks.PayForKill`, so watching the balance climb mid-wave and
+buying the instant it clears a price already worked — the UI simply
+refused to show it. The between-rounds freeze (`RoundClock.Frozen`) is
+untouched. The shop collapses to a header strip while a round runs and
+reopens on one click.
+
+**3. The buy surfaces float at the slot.** Clicking a marrow slot selects
+it (`BoneMarrowManager.SelectedSlotIndex`); an empty slot floats the
+picker, a placed one floats that tower's roster, and the slot itself gets
+a breathing `Accent` rim (`SpriteShapes.KnowledgeRing`, sorting order 6 —
+the hook `COMPARTMENT_DESIGN.md` §2.4 left). `Esc`, the close button, a
+click on empty board, or a phase change all clear it.
+
+**4. Three named upgrade rows per progenitor kind**
+(`ProgenitorUpgradeCatalog`), each with its own price curve and level cap.
+**Still placeholders** — `GAME_DESIGN.md` §6d's rule holds: ATP is spent,
+a level is bumped, the simulation does not change. Each row names the
+exact field a wired effect would write, echoed into the debug readout
+while the panel is open, so the wiring sprint is one line per row. The one
+existing exception stays exceptional: `CytokineSensingUpgrade` really does
+push `Chemotaxis.SensingUpgradeLevel` (the bridge moved from
+`HudOverlay.Update` to `UiController.Update`, unchanged).
+
+**Deleted:** `HudOverlay.cs`, `CompartmentLabel.cs`, and
+`BoneMarrowManager`'s `OnGUI` / `DrawBuyButton` / `EnsureStyles` /
+`WorldToGui` and its two `pending*Index` fields.
+
+**One UI asset, found the hard way.** `UI_DESIGN.md` §7 planned to leave
+`themeStyleSheet` null and accept one boot warning. The real problem was
+not the theme: a `PanelSettings` created at runtime also carries no **text
+settings**, and in a **player build** UI Toolkit then throws a
+`NullReferenceException` in `UITKTextHandle.ShapeText` on every label,
+every frame -- while the Editor and batchmode stay completely quiet. The
+first headless launch of the Sprint 16 build caught it; nothing else
+would have. So the project now ships exactly one UI asset,
+`Assets/Resources/ITD_PanelSettings.asset`, created **by script**
+(`UiAssetSetup.CreatePanelSettings`) and loaded via `Resources.Load` with
+a warn-and-fall-back path if it goes missing. Everything else is still
+code. Unity also generates `Assets/UI Toolkit/UnityThemes/
+UnityDefaultRuntimeTheme.tss` on its own; the asset references it, and
+since every element is styled explicitly it is a floor, not the look.
+
+**New harness:** `BootstrapSmoke.RunAll` — boots `GameBootstrap` and fails
+on any logged error, which covers "no view class threw while building".
+That is the *only* automatable part of a UI pass: `Update()` doesn't run
+in batchmode and no harness can assert what a panel looks like. **How it
+feels to use is the Director's playtest**, along with the Sprint 15
+compartment visuals, still unplayed.
+
+## Build status (Sprint 13 / Sprint 14 / Sprint 15 / Sprint 16)
 
 All run by the **head session**. Numbers copied from actual output.
+
+**Sprint 16** (the UI pass): the ten harnesses re-run **green (410 total,
+0 failed), unedited**, plus the new `BootstrapSmoke.RunAll` **PASS (0
+errors)**; `BuildScript.BuildWindows()` **Succeeded, 0 errors,
+94,050,392 bytes**; headless launch **0 exceptions, 0 errors**.
+
+That last number took two goes, and the first one is the interesting
+result: with a runtime-created `PanelSettings` the build threw a
+`NullReferenceException` from `UITKTextHandle.ShapeText` on every label
+every frame, preceded by "ICU Data not available ... make sure the build
+contains at least one PanelSettings asset". **Batchmode, the smoke
+harness and the Editor were all silent about it.** Shipping
+`Assets/Resources/ITD_PanelSettings.asset` fixed it. Worth remembering:
+for UI Toolkit, "the harnesses pass" and "batchmode is clean" prove
+nothing about the player build -- only launching the build does.
+
+**Not verified: how it feels.** No headless coverage of `Update()`; the
+HUD reading at a glance, the floating panels landing where they should,
+the shop being reachable fast enough mid-round, and the rim being visible
+enough are the Director's playtest.
 
 **Sprint 15** is rendering-only: the ten harnesses re-run **green (410
 total, 0 failed)**; `BuildScript.BuildWindows()` **Succeeded, 0 errors,
@@ -1358,8 +1446,12 @@ exercised here only in the sense that nothing moves.
 - `Application.runInBackground` is unchecked (Unity default) — the game
   pauses when its window loses focus. Not a bug, but it means scripted
   input/screenshot verification needs the machine otherwise idle.
-- `UnityEngine.UI` is still not installed — HUD, marrow picker and
-  compartment labels are IMGUI.
+- `UnityEngine.UI` (uGUI) is still not installed, and as of Sprint 16 is
+  no longer wanted: the whole front end is UI Toolkit
+  (`com.unity.modules.uielements`, already in the manifest) built from
+  code. **No `OnGUI` remains anywhere in the project** — HUD, shop, marrow
+  picker, upgrade panel, debug readout and the compartment headings are
+  all UITK.
 - WebGL not re-verified (unchanged since Sprint 1).
 - Sprint 3's contact-rate reduction (~50% of Sprint 2's) and all Sprint 3
   lifecycle numbers are unchanged and still unvalidated.

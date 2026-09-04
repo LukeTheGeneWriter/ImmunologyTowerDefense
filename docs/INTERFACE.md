@@ -529,14 +529,18 @@ construction" below for why.
   same reasoning as Sprint 1's `Chemotaxis.ChooseNextStep` extraction — so
   `Assets/Editor/CombatVerification.cs` can assert it directly without a
   bound `SpriteRenderer[,]` array.
-- **`CompartmentLabel`** (new, MonoBehaviour) —
+- **`CompartmentLabel`** (new, MonoBehaviour) — **DELETED in Sprint 16**;
+  the headings are world-anchored UI Toolkit elements now
+  (`UI.WorldLabelView`). Historical description follows. —
   `Initialize(Vector3 worldPosition, string text, Vector2? sizeOverride =
   null)`. Small reusable IMGUI label anchored to a world-space point via
   `Camera.main.WorldToScreenPoint` every `OnGUI` call (no uGUI this
   project — see below). Used for the bone marrow strip's heading and the
   lymph node's caption, avoiding near-identical `OnGUI` boilerplate in two
   places.
-- **`HudOverlay`** (MonoBehaviour) — IMGUI (`OnGUI`) debug text.
+- **`HudOverlay`** (MonoBehaviour) — **DELETED in Sprint 16**; replaced by
+  `UI.UiController` + `UI.HudView` + `UI.DebugReadoutView`. Historical
+  description follows. IMGUI (`OnGUI`) debug text.
   `Bind(BoardConfig, int macrophageSpeed, int neutrophilSpeed)` — **lost
   the `macrophageCount`/`neutrophilCount` parameters this sprint**, since
   there's no longer a fixed starting unit count (`GameBootstrap` doesn't
@@ -1720,6 +1724,99 @@ of `node.Coloc` (`CoarseValueAt` over `node.NodeBoard`) and sets alpha
 No new harness — rendering isn't headlessly testable. All ten existing
 harnesses re-run green (410); Windows build clean; headless launch 0
 exceptions.
+
+## Sprint 16 changes — the UI pass (`docs/UI_DESIGN.md`)
+
+The whole front end moved from IMGUI to UI Toolkit, built from code. **No
+`OnGUI` remains in the project.** `HudOverlay.cs` and `CompartmentLabel.cs`
+are deleted; `BoneMarrowManager` no longer draws anything.
+
+### New namespace `ImmunologyTD.UI` (`Assets/Scripts/UI/`)
+
+- **`UiController`** (MonoBehaviour, on the `UiRoot` GameObject) —
+  `Bind(BoardConfig, AtpWallet, RoundController, PathogenSpawner,
+  BoneMarrowManager, KnowledgeLedger, AdaptiveDirector, ShopLedger,
+  GutInterface, InvasionTally, int macrophageSpeed, int neutrophilSpeed)`
+  then `Build()` (idempotent; also called from `OnEnable`).
+  `AddWorldLabel(Vector3, string)` adds a compartment heading (queued if
+  called before `Build`). Owns the `UIDocument`, every view, the backtick
+  and `Esc` keys, the click-away, the
+  `Chemotaxis.SensingUpgradeLevel` bridge (moved from `HudOverlay.Update`)
+  and the F9 flash preview. `Update()` **polls** — there are no events on
+  the model classes.
+- **`UiTheme`** (static) — palette, spacing unit `S = 4`, `Text` / `Panel`
+  / `Divider` / `FlatButton` / `TextButton` / `Dots` / `Show` factories,
+  and `UiFont` / `MonoFont` from `Font.CreateDynamicFontFromOSFont`.
+- **`BuyRow`** (class, in `UiTheme.cs`) — the row shared by the upgrade
+  panel, the picker and the shop. Structure built once;
+  `Refresh(levels, price, affordable)` early-outs unless something moved.
+  `cap: 0` hides the dots; `showLevelCount: true` prints `Lv N` instead
+  (the shop's items have no ceiling).
+- **`HudView`**, **`ShopView`**, **`UpgradePanelView`**,
+  **`TowerPickerView`**, **`DebugReadoutView`**, **`WorldLabelView`** —
+  one class per surface; each takes its parent `VisualElement` in the
+  constructor and exposes `Root` plus a `Refresh`.
+- **`ProgenitorUpgradeCatalog`** (static) — `Row { Name, Effect,
+  FieldLabel, BasePrice, Cap }`, `RowsFor(UnitKind)` (3 rows per kind),
+  `PickerBlurb(UnitKind)`, `DisplayName(UnitKind)`. `FieldLabel` is the
+  field a wired effect would write; it is shown only in the debug readout.
+
+### `ImmunologyTD.Units.BoneMarrowManager`
+
+- **New:** `int? SelectedSlotIndex` (get), `SelectSlot(int)`,
+  `ClearSelection()`, `int LastSelectionFrame`,
+  `Vector3 GetSlotWorldPosition(int)`, `Color GetKindColor(UnitKind)`,
+  `bool AdaptiveAvailable`, `bool CanAfford(int)`,
+  `int GetUpgradeLevel(int slot, int row)`,
+  `bool UpgradeTower(int slot, int row, int basePrice, int cap)`,
+  `const int UpgradeRowsPerTower = 3`.
+- **Changed:** `Slot.UpgradeLevel` (int) → `Slot.UpgradeLevels` (`int[]`,
+  allocated at `PlaceTower`). `GetUpgradeLevel(int)` now returns the
+  **sum** across rows. `OnSlotClicked` selects instead of setting a
+  presentation flag. Each slot gains a child rim `SpriteRenderer`
+  (`SpriteShapes.KnowledgeRing`, `sortingOrder` 6, `Accent`), enabled only
+  on the selected slot and alpha-breathed in `Update`.
+- **Removed:** `pendingChoiceIndex` / `pendingUpgradeIndex`, `OnGUI`,
+  `DrawBuyButton`, `WorldToGui`, `EnsureStyles`.
+- **Kept as a shim:** `UpgradeTower(int)` — pre-Sprint-16 signature at the
+  flat legacy price, so `Sprint11Verification` compiles and passes
+  unedited. It still never touches `UnitLifecycleTuning`.
+
+### `ImmunologyTD.Economy.ShopTuning`
+
+- **New overload** `ProgenitorUpgradePrice(int basePrice, int
+  currentLevel)`; the old `ProgenitorUpgradePrice(int)` delegates to it
+  with `ProgenitorUpgradeBasePrice`. Same `1 + 0.6 · level` curve.
+
+### `GameBootstrap`
+
+- `BuildHud(...)` → `BuildUiRoot(layout, boneMarrow, rounds, adaptive)`:
+  loads the `PanelSettings` asset (`ScaleWithScreenSize`, 1920×1080,
+  `match` 0.5, `sortingOrder` 100, `clearColor` false) and builds a
+  `UiRoot` GameObject
+  with `CytokineToggle` + `UIDocument` + `UiController`, then `Bind`,
+  `Build`, and the two `AddWorldLabel` calls. The marrow / lymph backdrop
+  builders no longer create labels.
+- **`Assets/Resources/ITD_PanelSettings.asset`** — the one UI asset,
+  created by `UiAssetSetup.CreatePanelSettings` (an Editor script, not by
+  hand) and loaded with `Resources.Load<PanelSettings>`. Required: a
+  runtime-created `PanelSettings` has no text settings and a player build
+  then throws in `UITKTextHandle.ShapeText` on every label. It references
+  Unity's generated `Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss`.
+  `GameBootstrap` warns and falls back to a runtime instance if it is
+  missing.
+
+### Verification
+
+- **New harness:** `BootstrapSmoke.RunAll` — boots `GameBootstrap` (Awake
+  by reflection, since edit-mode `AddComponent` doesn't call it) and fails
+  on any logged error. Covers "no view class threw while building", which
+  is the only automatable part of a UI pass.
+- All ten existing harnesses re-run green, unedited.
+- **A batchmode-clean UI is not a working UI.** The first Sprint 16 build
+  threw `NullReferenceException` per label per frame in the player and
+  said nothing in the Editor, batchmode or the smoke harness. Launching
+  the build is the only check that covers UI Toolkit text.
 
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 

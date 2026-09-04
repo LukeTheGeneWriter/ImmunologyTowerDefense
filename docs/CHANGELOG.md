@@ -12,6 +12,46 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 16 -- 2026-09-04
+The game has a real interface.
+
+A dispatched design agent wrote `docs/UI_DESIGN.md`; this sprint
+implements it, with four calls from the Director on top. Every IMGUI
+surface is gone -- HUD, shop, marrow picker, upgrade panel, debug dump and
+the compartment labels are all UI Toolkit now, built from code.
+
+- **The stat wall is behind a key.** What is always on screen is three
+  numbers -- ATP, round, lives -- and Start Round. Everything else moved,
+  verbatim, into a bottom-left instrument panel on **backtick**, default
+  off. This was the Director's Sprint 15 complaint: "it has so many stats
+  I can't get a feel for how the player will interact with the game."
+- **Buying is live.** The shop no longer closes when a round starts, and
+  the upgrade panels open mid-round. ATP was always paid per kill as the
+  kills happened -- watching the number climb and buying the instant you
+  can afford it is now a real thing to do, and the round does not pause
+  for it. The between-rounds freeze is unchanged. The shop collapses to a
+  header strip while a round runs.
+- **Clicking a marrow niche floats its panel at it** -- the picker for an
+  empty slot, that tower's upgrade roster for a placed one -- with a
+  breathing ring on the slot itself so you can see what you are editing.
+- **Three named upgrades per progenitor kind** ("Efferocytic capacity",
+  "Controlled degranulation", "TCR affinity maturation"...), each with
+  effect text, level dots, a real price curve and a level ceiling. They
+  are still placeholders -- ATP is spent, a level is bumped, the
+  simulation does not change -- but each one names the exact field a wired
+  effect would write, so the sprint that makes them real is one line per
+  row.
+- **Lives is a number, not a bar** -- teal, oxblood under 25%, one brief
+  flash when it drops.
+- **Everything is quieter.** Smoked-glass panels, hairline rules, one type
+  family, gold only for ATP, one slate-blue accent for "this is
+  interactive". The UI is meant to sit *under* the tissue in the visual
+  hierarchy, not compete with it.
+- **Caught in verification:** the first build threw a null reference on
+  every text label, every frame -- in the built player only, silent in the
+  Editor and in batchmode. UI Toolkit needs a real `PanelSettings` asset
+  for text; the project now ships exactly one, created by script.
+
 ## Sprint 15 -- 2026-08-30
 The compartments look like what they are now.
 
