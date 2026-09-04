@@ -755,3 +755,39 @@ spec; `docs/UI_STYLE_GUIDE.md` is what shipped.
   handling is ever moved to the new Input System or a fixed-step path.
 - **World labels are screen-space elements pinned per frame.** Fine at two
   labels; if compartment annotation grows, batch the projection.
+
+## Triaged from the Sprint 16 playtest (Director, 2026-09-04)
+
+The buy panels and the upgrade framework landed well. Two items:
+
+- **DC motion is super jittery.** Diagnosed, not yet fixed — there are two
+  separate causes and only one is a bug:
+  1. **The tween is desynced from the tick (the bug).**
+     `DendriticCell.Update` free-runs `tweenTimer`, seeded to a *random*
+     phase at spawn (`Random.Range(0, TickIntervalSeconds)`) and never
+     re-aligned. `SimulationTick` sets `tweenStart` to wherever the cell
+     currently is and `tweenEnd` to the new tile, but `t` carries on from
+     whatever the timer happens to hold — so if the timer is near the end
+     of its cycle the cell snaps almost the whole way instantly, then
+     crawls, every single tick. Fix is `tweenTimer = 0f` in
+     `SimulationTick` (the random seed can stay — it belongs on the *tick*
+     phase, not the tween phase, and `AdaptiveDirector` already staggers
+     ticks). `Lymphocyte` has the identical code and the identical bug;
+     it is just less visible inside the node.
+  2. **The patrol walk genuinely zigzags (a design choice, not a bug).**
+     `RepelledPatrolStep` takes `DcFineTilesPerTick` (3) independent
+     weighted-random von Neumann steps per tick; the cross-axis component
+     is close to a coin flip unless the lane-repulsion gradient is strong,
+     so the cell wobbles laterally even while net-pacing. If (1) alone
+     doesn't settle it, the options are directional persistence (weight
+     the previous step's direction), fewer-but-longer steps, or smoothing
+     the *rendered* position without touching the walk.
+- **Cartoonify the base band and the lumen** — the next visual pass. The
+  vessel should read as appealing rather than clinical, and the lumen
+  should be **velvety, with villi**, instead of the current brown chyme
+  field. The contaminated food boluses stay deliberately poo-ey, so the
+  lumen getting *less* so is what buys the contrast that makes an incoming
+  round read at a glance. Touches `LumenChannelRenderer`,
+  `BaseCompartmentRenderer`, and `SpriteShapes` (`ChymeField`,
+  `MucusBand`, `PlasmaField`, `VesselWallBar`, plus new villi shapes);
+  `COMPARTMENT_DESIGN.md` is the spec to revise.
