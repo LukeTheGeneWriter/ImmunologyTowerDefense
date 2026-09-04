@@ -16,9 +16,10 @@ namespace ImmunologyTD.Units
     /// stand-in, not a design decision). A small number of slots
     /// (BoneMarrowSlotCount) sit in their own visually distinct compartment
     /// below the tissue board (GAME_DESIGN.md section 1). An empty slot is
-    /// clickable (BoneMarrowSlot.OnMouseDown); clicking opens a two-button
-    /// IMGUI picker (Macrophage / Neutrophil -- no uGUI package this
-    /// project). Once placed, a slot is a persistent progenitor tower that
+    /// clickable (BoneMarrowSlot.OnMouseDown); clicking *selects* it
+    /// (Sprint 16: SelectedSlotIndex) and the UI layer floats a picker or an
+    /// upgrade panel at it -- this class no longer draws either.
+    /// Once placed, a slot is a persistent progenitor tower that
     /// periodically emits a unit of that kind from the blood-side edge
     /// (GAME_DESIGN.md section 2a's rung-1 uniform entry: "cells
     /// extravasate at random points along the vessel") -- no ATP cost this
@@ -89,9 +90,22 @@ namespace ImmunologyTD.Units
             /// no closure per unit (GAME_DESIGN.md section 8).</summary>
             public System.Action<SearchUnit> OnChildDespawned;
 
-            /// <summary>Sprint 11: placeholder per-tower upgrade level. Spends
-            /// ATP, bumps this, does nothing else yet (§6d).</summary>
-            public int UpgradeLevel;
+            /// <summary>Sprint 16: placeholder per-tower upgrade levels, one
+            /// entry per row of this kind's roster
+            /// (<c>ImmunologyTD.UI.ProgenitorUpgradeCatalog</c>). Sprint 11
+            /// had a single int here because there was a single unnamed
+            /// "upgrade"; the roster gives each row its own level and its own
+            /// price curve. Still §6d placeholders -- buying spends ATP,
+            /// bumps an entry, and touches nothing in the simulation.
+            /// Allocated at PlaceTower time, when the kind is known.</summary>
+            public int[] UpgradeLevels = System.Array.Empty<int>();
+
+            /// <summary>Sprint 16: the board-side half of the selection
+            /// (UI_DESIGN.md §4). A thin ring drawn over the niche, breathing
+            /// slowly, so the floating panel is visibly *about* this slot.
+            /// Built for every slot at Initialize and disabled; only ever one
+            /// is on at a time.</summary>
+            public SpriteRenderer Rim;
         }
 
         /// <summary>The two adaptive kinds emit their own agent types via
@@ -117,6 +131,23 @@ namespace ImmunologyTD.Units
         /// -- it is the second, independent cap.</summary>
         public const float EmissionIntervalSeconds = 4f;
 
+        /// <summary>How many upgrade rows every tower carries. The *content*
+        /// of those rows is the UI layer's
+        /// <c>ProgenitorUpgradeCatalog</c> (names, effect text, prices, per-
+        /// row caps); the model only needs to know how many counters to
+        /// allocate, and keeping the number here is what stops the manager
+        /// from having to reach up into the UI to place a tower. Every
+        /// kind's roster is three rows deep -- the Director's call this
+        /// sprint (docs/SPRINT_PLAN.md); the catalog asserts it matches.</summary>
+        public const int UpgradeRowsPerTower = 3;
+
+        /// <summary>The selection rim's tint -- UiTheme.Accent. Duplicated
+        /// as a literal rather than referenced because this is a *world*
+        /// renderer in the model layer and UiTheme is the screen-space
+        /// theme; a one-way dependency from UI to model is worth keeping
+        /// one-way for a single colour.</summary>
+        private static readonly Color SelectionRimColor = new Color(0.431f, 0.561f, 0.690f);
+
         private static readonly Color EmptySlotColor = new Color(0.62f, 0.56f, 0.42f); // pale bone-ish tan
 
         private BoardConfig board;
@@ -140,10 +171,22 @@ namespace ImmunologyTD.Units
         private AdaptiveDirector adaptive;
 
         private readonly List<Slot> slots = new List<Slot>();
-        private int? pendingChoiceIndex;
-        private int? pendingUpgradeIndex;
-        private GUIStyle labelStyle;
-        private GUIStyle buttonStyle;
+
+        /// <summary>Sprint 16: the one selection concept, replacing Sprint
+        /// 11's two `pending*Index` fields (UI_DESIGN.md §4). The manager
+        /// owns *which slot is selected*; the UI layer owns what that looks
+        /// like -- picker for an Empty slot, upgrade panel for a Placed one.
+        /// The old fields encoded the presentation decision in the model,
+        /// which is why the IMGUI panels had to live in here.</summary>
+        public int? SelectedSlotIndex { get; private set; }
+
+        /// <summary>The frame a slot click last changed the selection. The
+        /// UI reads it to tell "the player clicked past every panel and past
+        /// every slot, so clear the selection" from "the player just clicked
+        /// a slot" -- OnMouseDown runs before Update in the same frame, so
+        /// without the stamp a click on a slot would select and immediately
+        /// deselect it.</summary>
+        public int LastSelectionFrame { get; private set; } = -1;
 
         /// <summary>Testable hooks for headless verification (see
         /// Assets/Editor/LifecycleVerification.cs) -- the same reasoning as
@@ -206,10 +249,24 @@ namespace ImmunologyTD.Units
                 var comp = slotGo.AddComponent<BoneMarrowSlot>();
                 comp.Init(this, i);
 
+                // Sprint 16: the selection rim (UI_DESIGN.md §4, the hook
+                // COMPARTMENT_DESIGN.md §2.4 left). A child of the slot so it
+                // inherits its transform -- sortingOrder 6 puts it above the
+                // niches (5) and below the agents (10).
+                var rimGo = new GameObject("Rim");
+                rimGo.transform.SetParent(slotGo.transform, false);
+                rimGo.transform.localScale = Vector3.one * 1.28f;
+                var rim = rimGo.AddComponent<SpriteRenderer>();
+                rim.sprite = ImmunologyTD.Rendering.SpriteShapes.KnowledgeRing;
+                rim.sortingOrder = 6;
+                rim.color = SelectionRimColor;
+                rim.enabled = false;
+
                 slots.Add(new Slot
                 {
                     State = BoneMarrowSlotState.Empty,
                     Visual = sr,
+                    Rim = rim,
                     WorldPosition = slotWorldPositions[i],
                 });
             }
@@ -218,38 +275,111 @@ namespace ImmunologyTD.Units
         public void OnSlotClicked(int index)
         {
             if (index < 0 || index >= slots.Count) return;
-            if (slots[index].State == BoneMarrowSlotState.Empty)
-            {
-                pendingChoiceIndex = index;
-                pendingUpgradeIndex = null;
-            }
-            else
-            {
-                // Sprint 11: clicking a PLACED tower opens its upgrade panel.
-                pendingUpgradeIndex = index;
-                pendingChoiceIndex = null;
-            }
+            SelectSlot(index);
         }
 
-        /// <summary>Sprint 11: a placeholder per-tower upgrade (GAME_DESIGN.md
-        /// §6d says an upgrade is "a write to one tower's field" -- this
-        /// spends the ATP and bumps a level counter, but does **not** touch
-        /// the tower's <see cref="UnitLifecycleTuning"/> yet). Public for the
-        /// harness.</summary>
+        /// <summary>Selects a slot. What the UI shows for it is decided from
+        /// <see cref="GetSlotState"/>, not here.</summary>
+        public void SelectSlot(int index)
+        {
+            if (index < 0 || index >= slots.Count) return;
+            SetRim(SelectedSlotIndex, false);
+            SelectedSlotIndex = index;
+            SetRim(index, true);
+            LastSelectionFrame = Time.frameCount;
+        }
+
+        public void ClearSelection()
+        {
+            SetRim(SelectedSlotIndex, false);
+            SelectedSlotIndex = null;
+        }
+
+        private void SetRim(int? index, bool on)
+        {
+            if (!index.HasValue || index.Value < 0 || index.Value >= slots.Count) return;
+            var rim = slots[index.Value].Rim;
+            if (rim != null) rim.enabled = on;
+        }
+
+        /// <summary>Sprint 16: one row of the selected tower's roster
+        /// (<c>UI.ProgenitorUpgradeCatalog</c>). Still the §6d placeholder --
+        /// it spends the ATP and bumps that row's level and does **not**
+        /// touch <see cref="UnitLifecycleTuning"/>. The catalog lives in the
+        /// UI layer, so the price comes in from the caller rather than this
+        /// class reaching up into it.</summary>
+        public bool UpgradeTower(int index, int row, int basePrice, int cap)
+        {
+            if (index < 0 || index >= slots.Count) return false;
+            var slot = slots[index];
+            if (slot.State != BoneMarrowSlotState.Placed) return false;
+            if (row < 0 || row >= slot.UpgradeLevels.Length) return false;
+            if (cap > 0 && slot.UpgradeLevels[row] >= cap) return false;
+
+            int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(basePrice, slot.UpgradeLevels[row]);
+            if (wallet != null && !wallet.TrySpend(price)) return false;
+            slot.UpgradeLevels[row]++;
+            return true;
+        }
+
+        /// <summary>Pre-Sprint-16 single-upgrade signature, kept so
+        /// Assets/Editor/Sprint11Verification.cs stays green unedited. It
+        /// charges the flat legacy price (<see
+        /// cref="ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(int)"/>,
+        /// base 35) against the tower's total level and banks the level on
+        /// row 0 -- deliberately *not* the roster's row-0 price, so the
+        /// harness is still testing the thing it was written to test.</summary>
         public bool UpgradeTower(int index)
         {
             if (index < 0 || index >= slots.Count) return false;
             var slot = slots[index];
             if (slot.State != BoneMarrowSlotState.Placed) return false;
+            if (slot.UpgradeLevels.Length == 0) return false;
 
-            int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(slot.UpgradeLevel);
+            int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(GetUpgradeLevel(index));
             if (wallet != null && !wallet.TrySpend(price)) return false;
-            slot.UpgradeLevel++;
+            slot.UpgradeLevels[0]++;
             return true;
         }
 
-        public int GetUpgradeLevel(int index) =>
-            index >= 0 && index < slots.Count ? slots[index].UpgradeLevel : 0;
+        /// <summary>Total upgrades bought on this tower, across every row --
+        /// what the panel header's "niche level" dots count.</summary>
+        public int GetUpgradeLevel(int index)
+        {
+            if (index < 0 || index >= slots.Count) return 0;
+            var levels = slots[index].UpgradeLevels;
+            int total = 0;
+            for (int i = 0; i < levels.Length; i++) total += levels[i];
+            return total;
+        }
+
+        /// <summary>One row's level on one tower.</summary>
+        public int GetUpgradeLevel(int index, int row)
+        {
+            if (index < 0 || index >= slots.Count) return 0;
+            var levels = slots[index].UpgradeLevels;
+            return row >= 0 && row < levels.Length ? levels[row] : 0;
+        }
+
+        /// <summary>World position of a slot -- the anchor the floating
+        /// picker / upgrade panel is projected from (UI_DESIGN.md §4).</summary>
+        public Vector3 GetSlotWorldPosition(int index) =>
+            index >= 0 && index < slots.Count ? slots[index].WorldPosition : Vector3.zero;
+
+        /// <summary>The kind colour, for the UI's portrait tint. The panel
+        /// should not have to re-derive a colour the manager already
+        /// decided.</summary>
+        public Color GetKindColor(UnitKind kind) => ColorForKind(kind);
+
+        /// <summary>True when the adaptive kinds can be placed at all -- a
+        /// harness with no AdaptiveDirector refuses them, and the picker
+        /// hides the rows rather than offering a button that cannot work.</summary>
+        public bool AdaptiveAvailable => adaptive != null;
+
+        /// <summary>Whether the player can afford a price right now. The
+        /// wallet is private and nullable (harnesses place for free), so the
+        /// UI asks the manager rather than holding its own opinion.</summary>
+        public bool CanAfford(int price) => wallet == null || wallet.CanAfford(price);
 
         /// <summary>Places a tower -- public so both the IMGUI picker
         /// buttons and a headless verification harness call the same real
@@ -285,11 +415,10 @@ namespace ImmunologyTD.Units
             slot.Tuning = IsAdaptive(kind)
                 ? new UnitLifecycleTuning { MaxActiveChildren = AdaptiveCapFor(kind) }
                 : UnitLifecycleTuning.FromProfile(ProfileFor(kind));
+            slot.UpgradeLevels = new int[UpgradeRowsPerTower];
             int capturedIndex = index;
             slot.OnChildDespawned = unit => OnChildDespawned(capturedIndex, unit);
             slot.Visual.color = ColorForKind(kind);
-
-            if (pendingChoiceIndex == index) pendingChoiceIndex = null;
         }
 
         public BoneMarrowSlotState GetSlotState(int index) => slots[index].State;
@@ -529,103 +658,28 @@ namespace ImmunologyTD.Units
 
         private void Update()
         {
+            // Sprint 16: the selection rim breathes whether or not the clock
+            // is frozen -- it is chrome, not simulation, and with live buying
+            // (docs/SPRINT_PLAN.md) a slot can be selected mid-round.
+            BreatheSelectionRim();
+
             if (board == null) return;
             if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: towers don't emit during the frozen buy phase
             Tick(Time.deltaTime);
         }
 
-        private void OnGUI()
+        /// <summary>A slow alpha pulse on the one enabled rim, ~1.4 s round
+        /// trip. Cheap: it touches a single SpriteRenderer, and only while
+        /// something is selected.</summary>
+        private void BreatheSelectionRim()
         {
-            if (board == null || Camera.main == null) return;
-            EnsureStyles();
-
-            for (int i = 0; i < slots.Count; i++)
-            {
-                var slot = slots[i];
-                var screen = WorldToGui(slot.WorldPosition);
-                // Sprint 3: a placed tower shows "children alive / cap" so
-                // the max-active-children ceiling is observable in seconds of
-                // play rather than being something the player has to trust.
-                string label = slot.State == BoneMarrowSlotState.Empty
-                    ? "empty\n(click)"
-                    : $"{KindLabel(slot.Kind)}{(slot.UpgradeLevel > 0 ? $" +{slot.UpgradeLevel}" : "")}\n{GetActiveChildren(i)}/{slot.Tuning.MaxActiveChildren} alive";
-                GUI.Label(new Rect(screen.x - 45, screen.y - 40, 90, 40), label, labelStyle);
-            }
-
-            if (pendingChoiceIndex.HasValue)
-            {
-                var screen = WorldToGui(slots[pendingChoiceIndex.Value].WorldPosition);
-                bool adaptiveAvailable = adaptive != null;
-                float panelW = 210;
-                float panelH = adaptiveAvailable ? 152 : 92;
-                var panelRect = new Rect(screen.x - panelW / 2f, screen.y + 15, panelW, panelH);
-                GUI.Box(panelRect, "Place progenitor tower");
-
-                float y = panelRect.y + 28;
-                DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.Macrophage, "Macrophage"); y += 30;
-                DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.Neutrophil, "Neutrophil"); y += 30;
-                if (adaptiveAvailable)
-                {
-                    DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.DendriticCell, "Dendritic"); y += 30;
-                    DrawBuyButton(new Rect(panelRect.x + 10, y, panelW - 20, 26), UnitKind.HelperT, "Helper-T");
-                }
-            }
-
-            // Sprint 11: the per-tower upgrade panel (placeholder -- spends
-            // ATP, bumps the level, no mechanical effect yet).
-            if (pendingUpgradeIndex.HasValue)
-            {
-                int idx = pendingUpgradeIndex.Value;
-                var slot = slots[idx];
-                var screen = WorldToGui(slot.WorldPosition);
-                float panelW = 220, panelH = 84;
-                var panelRect = new Rect(screen.x - panelW / 2f, screen.y + 15, panelW, panelH);
-                GUI.Box(panelRect, $"{KindLabel(slot.Kind)}  --  upgrade Lv {slot.UpgradeLevel}");
-
-                int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(slot.UpgradeLevel);
-                bool affordable = wallet == null || wallet.CanAfford(price);
-                bool wasEnabled = GUI.enabled;
-                GUI.enabled = affordable;
-                if (GUI.Button(new Rect(panelRect.x + 10, panelRect.y + 28, panelW - 20, 24),
-                        $"Upgrade -> Lv {slot.UpgradeLevel + 1}   {price} ATP", buttonStyle) && affordable)
-                {
-                    UpgradeTower(idx);
-                }
-                GUI.enabled = wasEnabled;
-                if (GUI.Button(new Rect(panelRect.x + 10, panelRect.y + 54, panelW - 20, 22), "close", buttonStyle))
-                    pendingUpgradeIndex = null;
-            }
-        }
-
-        private void DrawBuyButton(Rect rect, UnitKind kind, string label)
-        {
-            int price = PriceFor(kind);
-            bool affordable = wallet == null || wallet.CanAfford(price);
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled = affordable;
-            if (GUI.Button(rect, $"{label}   {price} ATP", buttonStyle) && affordable)
-            {
-                PlaceTower(pendingChoiceIndex.Value, kind);
-            }
-            GUI.enabled = wasEnabled;
-        }
-
-        private Vector2 WorldToGui(Vector3 worldPos)
-        {
-            var screen = Camera.main.WorldToScreenPoint(worldPos);
-            return new Vector2(screen.x, Screen.height - screen.y);
-        }
-
-        private void EnsureStyles()
-        {
-            if (labelStyle != null) return;
-            labelStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 13,
-                alignment = TextAnchor.MiddleCenter,
-                normal = { textColor = Color.white }
-            };
-            buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 13 };
+            if (!SelectedSlotIndex.HasValue) return;
+            var rim = slots[SelectedSlotIndex.Value].Rim;
+            if (rim == null) return;
+            float t = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * (2f * Mathf.PI / 1.4f));
+            var c = SelectionRimColor;
+            c.a = Mathf.Lerp(0.55f, 1f, t);
+            rim.color = c;
         }
     }
 }

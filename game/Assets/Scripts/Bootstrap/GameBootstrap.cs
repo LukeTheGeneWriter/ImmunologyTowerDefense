@@ -196,7 +196,7 @@ namespace ImmunologyTD.Bootstrap
             var rounds = BuildRoundController(boneMarrow);
 
             BuildDegranulationFlashPool();
-            BuildHud(boneMarrow, rounds, adaptive);
+            BuildUiRoot(layout, boneMarrow, rounds, adaptive);
 
             Debug.Log(
                 $"[GameBootstrap] Map 01 -- {board.Columns}x{board.Rows} coarse cells; " +
@@ -420,11 +420,6 @@ namespace ImmunologyTD.Bootstrap
             sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 texture, Sprint 15 revision
             sr.color = new Color(0.34f, 0.22f, 0.18f); // Sprint 15: red marrow -- belongs to the blood it sits in
             sr.sortingOrder = 2; // Sprint 15: above the organ halo
-
-            var labelGo = new GameObject("BoneMarrowLabel");
-            var label = labelGo.AddComponent<CompartmentLabel>();
-            var labelPos = layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f + 0.9f, 0f);
-            label.Initialize(labelPos, "Bone Marrow -- click an empty slot to place a tower", new Vector2(440, 34));
         }
 
         private void BuildLymphNodeBackdrop(Layout layout)
@@ -439,9 +434,6 @@ namespace ImmunologyTD.Bootstrap
             sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
             sr.sortingOrder = 2; // Sprint 15: above the organ halo
 
-            var labelGo = new GameObject("LymphNodeLabel");
-            var label = labelGo.AddComponent<CompartmentLabel>();
-            label.Initialize(layout.LymphCenter, "Lymph Node\nantigen presentation", new Vector2(220, 46));
         }
 
         private GameObject BuildPathogenTemplate()
@@ -550,13 +542,53 @@ namespace ImmunologyTD.Bootstrap
             DegranulationFlash.Configure(pool);
         }
 
-        private void BuildHud(BoneMarrowManager boneMarrow, RoundController rounds, AdaptiveDirector adaptive)
+        /// <summary>Sprint 16: the UI Toolkit front end, replacing Sprint
+        /// 1-15's IMGUI HudOverlay (deleted). PanelSettings is a
+        /// ScriptableObject created here rather than an asset, for the same
+        /// reason the scene itself is built from code -- nothing in this
+        /// project is hand-authored in the Editor.
+        ///
+        /// `themeStyleSheet` is left null on purpose (docs/UI_DESIGN.md §7):
+        /// a .tss can only be produced by an editor importer, and the
+        /// default control chrome it would bring is not wanted. The cost is
+        /// one boot warning; every element is explicitly styled, font
+        /// included, so nothing renders unstyled without it.</summary>
+        private void BuildUiRoot(Layout layout, BoneMarrowManager boneMarrow, RoundController rounds, AdaptiveDirector adaptive)
         {
-            var hudGo = new GameObject("HUD");
-            hudGo.AddComponent<CytokineToggle>();
-            var overlay = hudGo.AddComponent<HudOverlay>();
-            overlay.Bind(board, macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick,
-                boneMarrow, gutInterface, tally, pathogenSpawner, wallet, rounds, knowledge, adaptive, shop);
+            var panelSettings = ScriptableObject.CreateInstance<UnityEngine.UIElements.PanelSettings>();
+            panelSettings.name = "ITD_PanelSettings";
+            panelSettings.scaleMode = UnityEngine.UIElements.PanelScaleMode.ScaleWithScreenSize;
+            panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+            panelSettings.screenMatchMode = UnityEngine.UIElements.PanelScreenMatchMode.MatchWidthOrHeight;
+            panelSettings.match = 0.5f;
+            panelSettings.sortingOrder = 100;
+            panelSettings.clearColor = false;
+
+            var uiGo = new GameObject("UiRoot");
+            uiGo.AddComponent<CytokineToggle>();   // the C debug toggle keeps its home on the UI object
+            var doc = uiGo.AddComponent<UnityEngine.UIElements.UIDocument>();
+            doc.panelSettings = panelSettings;
+
+            var ui = uiGo.AddComponent<ImmunologyTD.UI.UiController>();
+            ui.Bind(board, wallet, rounds, pathogenSpawner, boneMarrow, knowledge, adaptive, shop,
+                gutInterface, tally,
+                macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick);
+            // Built explicitly rather than left to OnEnable: AddComponent
+            // fires OnEnable before Bind has run, and in Editor batchmode it
+            // does not fire at all -- which is exactly where the headless
+            // bootstrap smoke needs the view tree to be constructed.
+            ui.Build();
+
+            // The compartment headings, world-anchored (UI_DESIGN.md §6).
+            // They used to be IMGUI CompartmentLabels created next to each
+            // backdrop; they are UITK elements now, so they are made here
+            // where the panel exists rather than there where the sprite is.
+            ui.AddWorldLabel(
+                layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f + 0.9f, 0f),
+                "Bone marrow");
+            ui.AddWorldLabel(
+                layout.LymphCenter + new Vector3(0f, layout.LymphSize.y * 0.5f + 0.9f, 0f),
+                "Lymph node");
         }
     }
 }

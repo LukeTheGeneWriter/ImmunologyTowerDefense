@@ -83,10 +83,19 @@ namespace ImmunologyTD.Economy
             return Mathf_RoundToInt(b * (1f + PriceGrowthPerLevel * lvl));
         }
 
-        public static int ProgenitorUpgradePrice(int currentLevel)
+        public static int ProgenitorUpgradePrice(int currentLevel) =>
+            ProgenitorUpgradePrice(ProgenitorUpgradeBasePrice, currentLevel);
+
+        /// <summary>Sprint 16: the same curve, but with the base price
+        /// supplied per row. Sprint 11 had one unnamed upgrade per tower at
+        /// one flat base price; the roster
+        /// (<c>UI.ProgenitorUpgradeCatalog</c>) gives each row its own base,
+        /// because "pseudopod reach" and "extended lifespan" should not cost
+        /// the same just because they hang off the same niche.</summary>
+        public static int ProgenitorUpgradePrice(int basePrice, int currentLevel)
         {
             int lvl = currentLevel < 0 ? 0 : currentLevel;
-            return Mathf_RoundToInt(ProgenitorUpgradeBasePrice * (1f + PriceGrowthPerLevel * lvl));
+            return Mathf_RoundToInt(basePrice * (1f + PriceGrowthPerLevel * lvl));
         }
 
         // Tiny local rounder so this file has no UnityEngine dependency —
