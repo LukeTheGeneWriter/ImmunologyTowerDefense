@@ -47,3 +47,6 @@ _to_delete/
 # Scratch logs from CLI/build runs
 unity_create_log.txt
 *_log.txt
+
+# Sprite raster dumps (Assets/Editor/SpriteShapeDump.cs) -- review artefacts, not sources
+_spritedump/

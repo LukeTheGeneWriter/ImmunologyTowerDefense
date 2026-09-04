@@ -12,6 +12,33 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 17 -- 2026-09-04
+The gut looks like a gut, and the dendritic cells stopped twitching.
+
+- **DC jitter, fixed.** They were snapping most of the way to each new
+  tile in a single frame and then crawling -- every tick, all their lives.
+  The visual tween had been running on its own clock, seeded to a random
+  phase at birth, while the movement ticked on a shared one; the two
+  drifted apart immediately. They now glide the whole way. (They still
+  wander sideways as they pace -- that part is the walk itself, and it is
+  left alone until you have seen the motion without the snapping.)
+- **The lumen is no longer poo-inspired.** The channel is a warm mucosal
+  plum, the mucus is a pearly sheen instead of a grey-green film, the
+  drifting particulate is lighter and thinner on the ground -- and the gut
+  wall has grown a fringe of **villi** that sway with the peristalsis.
+- **The contaminated food now stands out.** It kept its ochre, so it is
+  the only brown thing in the band. That was the actual point: the round's
+  delivery vehicle used to be camouflaged against the channel it arrived
+  in.
+- **The blood vessel reads as a vessel.** The endothelial wall is a row of
+  actual cells now rather than one stretched bar -- immune cells visibly
+  cross a boundary made of something. Corpuscles are brighter and properly
+  biconcave.
+- **First agentic playtest.** An agent was pointed at the Sprint 16 build
+  and asked to drive it and write up what it found
+  (`docs/AGENT_PLAYTEST_01.md`) -- a dry run of whether that is a useful
+  way to test this game at all.
+
 ## Sprint 16 -- 2026-09-04
 The game has a real interface.
 

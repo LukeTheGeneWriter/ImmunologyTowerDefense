@@ -1818,6 +1818,72 @@ are deleted; `BoneMarrowManager` no longer draws anything.
   said nothing in the Editor, batchmode or the smoke harness. Launching
   the build is the only check that covers UI Toolkit text.
 
+## Sprint 17 changes — the cartoon pass + the DC jitter fix
+
+Rendering and one motion bug. No gameplay, tuning, economy or harness
+surface changes; all ten harnesses pass unedited.
+
+### `ImmunologyTD.Adaptive.DendriticCell` / `Lymphocyte`
+
+- **Bug fix:** `SimulationTick` / `NodeTick` now reset `tweenTimer = 0f`
+  when they set `tweenStart` / `tweenEnd`. The timer previously free-ran
+  from a random phase seeded in `Initialize` while ticks fired on
+  `AdaptiveDirector`'s shared accumulator, so a tick landing late in the
+  tween cycle snapped the agent most of the way to its new tile in one
+  frame and then left it crawling — every tick. Visible as the Director's
+  "super jittery" DCs.
+- The `Random.Range(0, TickIntervalSeconds)` seed is gone from both
+  `Initialize`s. It existed to break visual lockstep, but every DC ticks
+  on the same accumulator, so lockstep is what the simulation does; the
+  place to stagger is the tick, not the tween.
+- No behaviour change to the walk itself. `RepelledPatrolStep` still takes
+  `DcFineTilesPerTick` independent weighted-random steps per tick, so
+  lateral wander is unchanged and deliberate.
+
+### `ImmunologyTD.Rendering.SpriteShapes`
+
+- **2 new `Sprite` accessors**, both in `Prewarm()`:
+  - **`Villus`** — a mucosal finger drawn pointing **+Y**, base at the
+    bottom edge, with a darker central lacteal core and a feathered tip.
+    The caller rotates each instance.
+  - **`EndothelialCell`** — a rounded wall cell with a nucleus, tiled
+    along the base/tissue seam.
+- **Revised:** `Erythrocyte` — larger disc (12→14 px), deeper central dip
+  (0.68→0.52) and a thicker rim, so it reads as a biconcave dish.
+- `VesselWallBar` is **unchanged but no longer used** by any renderer.
+  Left in place; it costs nothing and a future map may want a smooth
+  vessel edge.
+
+### `ImmunologyTD.Rendering.LumenChannelRenderer`
+
+- **New:** `BuildVilli(BoardConfig)` — builds the wall fringe once at
+  `Bind`. Count is `flowSpan / (VillusSpacingCells * cell)`; direction is
+  the axis-frame perpendicular pointing away from the tissue band, so no
+  world direction is hardcoded. Each villus keeps its base angle, sway
+  phase/frequency and base scale in a private `Villus` record.
+- `Update` sways each villus (±`VillusSwayDegrees`, own phase) and scales
+  it with the peristaltic squeeze, alongside the existing field-quad
+  squeeze and mote drift. Freezes with `RoundClock.Frozen` like the rest.
+- **Re-tint + re-layer:** chyme `0.36,0.22,0.24`; mucus `0.88,0.84,0.76`
+  at **0.20α** (was 0.50) and **sortingOrder 2** (was 1) so it glazes the
+  villi at 1; motes `0.60,0.52,0.40` at **sortingOrder 4** (was 2);
+  `MoteCount` 40 → **28**.
+
+### `ImmunologyTD.Rendering.BaseCompartmentRenderer`
+
+- **New:** `BuildVesselWall(BoardConfig, Vector3 seam)` — tiles
+  `EndothelialCell` along the seam at ~0.92 coarse cells' pitch with
+  per-cell size jitter, replacing the single stretched `VesselWallBar`
+  quad. Static; built once.
+- **Re-tint:** plasma `0.33,0.11,0.15`, wall `0.78,0.50,0.52`,
+  erythrocytes `0.72,0.20,0.22`.
+
+### Verification
+
+Ten harnesses green unedited (410), `BootstrapSmoke` green. Everything
+else here is the Director's eye — no rendering or motion change in this
+project has ever been headlessly testable.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

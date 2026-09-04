@@ -552,7 +552,7 @@ namespace ImmunologyTD.Rendering
                     // Sprint 17: a deeper, wider central dip and a darker rim
                     // -- the biconcave dish reads as a shape at a glance now
                     // rather than as a slightly uneven dot.
-                    InnerShade(b, C, C, 9f, 0.52f);
+                    InnerShade(b, C, C, 9f, 0.42f);
                     RimShade(b, 2, 0.72f);
                     erythrocyte = ToSprite(b);
                 }
@@ -706,7 +706,20 @@ namespace ImmunologyTD.Rendering
                 if (villus == null)
                 {
                     var b = NewBuffer();
-                    FillCapsule(b, C, 10f, C, 46f, 11f);
+                    // A club, not a capsule: narrow where it joins the wall,
+                    // swelling to a rounded tip. Drawn as a stack of discs
+                    // because the taper is the whole silhouette -- a uniform
+                    // capsule reads as a finger of anything, and a row of
+                    // them reads as a comb. (Checked with
+                    // Assets/Editor/SpriteShapeDump.cs, which is why this is
+                    // the second version of the shape.)
+                    for (int i = 0; i <= 24; i++)
+                    {
+                        float t = i / 24f;
+                        float y = Mathf.Lerp(12f, 46f, t);
+                        float r = Mathf.Lerp(6.5f, 12.5f, Mathf.SmoothStep(0f, 1f, t));
+                        FillDisc(b, C, y, r);
+                    }
                     // Central core, slightly darker than the body.
                     for (int y = 0; y < Res; y++)
                         for (int x = 0; x < Res; x++)
@@ -748,7 +761,7 @@ namespace ImmunologyTD.Rendering
                 {
                     var b = NewBuffer();
                     FillRounded(b, C, C, 27f, 16f);
-                    InnerShade(b, C, C, 9f, 0.86f);  // nucleus
+                    InnerShade(b, C, C, 10f, 0.55f);  // nucleus -- pushed dark enough to read at ~25 px (SpriteShapeDump)
                     RimShade(b, 2, 0.72f);
                     endothelialCell = ToSprite(b);
                 }

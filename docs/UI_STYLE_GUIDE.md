@@ -1,8 +1,9 @@
 # UI & Visual Style Guide
 
-Status: **updated after Sprint 16** (the UI pass), on top of Sprint 15
-(the compartment visual pass) and Sprint 13 (the entity sprite /
-visual-identity pass). This is "what is on screen now";
+Status: **updated after Sprint 17** (the cartoon pass on the lumen and the
+vessel), on top of Sprint 16 (the UI pass), Sprint 15 (the compartment
+visual pass) and Sprint 13 (the entity sprite / visual-identity pass).
+This is "what is on screen now";
 `docs/SPRITE_DESIGN.md` (entities), `docs/COMPARTMENT_DESIGN.md`
 (compartments) and `docs/UI_DESIGN.md` (the HUD and buy screens) are the
 specs it implements and the rationale for every choice. Rewritten (not
@@ -39,15 +40,15 @@ never load-bearing.
   ±3% per-cell colour jitter (`BoardRenderer.CellJitter`) on the host
   grid. Set once, zero per-frame cost.
 
-## Sorting order (z-layering, back to front) — Sprint 15 slotted new layers into the gaps
+## Sorting order (z-layering, back to front)
 
 | Order | What |
 |---|---|
 | 0 | **Tissue** host-cell grid (`BoardRenderer`, one `SpriteRenderer` per *tissue-band* cell only); base **plasma field**; lumen **chyme field** |
-| 1 | Base **vessel-wall bar**; **organ halos** (behind the backdrops); lumen **mucus band** |
-| 2 | Compartment backdrops (bone marrow, lymph node) — *was 1*; **flow motes**; **erythrocyte streamers** |
+| 1 | Base **vessel-wall cells** (*Sprint 17: a tiled row, was one stretched bar*); **organ halos** (behind the backdrops); lumen **villi** *(new, Sprint 17)* |
+| 2 | Compartment backdrops (bone marrow, lymph node); lumen **mucus sheen** (*Sprint 17: moved up from 1, so it glazes the villi*); **erythrocyte streamers** |
 | 3 | Gut-wall bar (`GutInterfaceRenderer`); node **co-localisation haze**; base **breach flash** |
-| 4 | Marrow **birth-puff motes** |
+| 4 | Marrow **birth-puff motes**; lumen **flow motes** (*Sprint 17: moved up from 2, so a mote at the seam isn't half-swallowed by the wall bar*) |
 | 5 | Bone-marrow slots |
 | 10 | Immune cells (`SearchUnit`) |
 | 12 | Lymphocytes (in the node) |
@@ -83,23 +84,30 @@ at 25×10 and stopped `BoardRenderer.Refresh` recolouring them every 0.15 s.
 | Lymph-node backdrop | `LymphNodeBean` | `0.34,0.40,0.28` lymphoid green | bean + **3** follicle zones + a medullary notch *(Sprint 15)* |
 | Gut-wall bar | `EpithelialBar` | **`0.50,0.46,0.37` quiet** *(nudged toward mucus, Sprint 15)* → `0.95,0.30,0.20` alarm | row-of-cells strip + goblet flecks; thicken+heat animation unchanged |
 
-### Compartment fields & motes (Sprint 15 — `docs/COMPARTMENT_DESIGN.md`)
+### Compartment fields & motes (Sprint 15, **re-painted Sprint 17** — `docs/COMPARTMENT_DESIGN.md`)
+
+The Sprint 17 pass is a legibility fix, not decoration: the contaminated
+food bolus is ochre and lumpy on purpose, and Sprint 15 painted the
+channel it travels down in the same browns. **The bolus is now the only
+brown thing in the lumen.**
 
 | Element | `SpriteShapes` | Colour (0–1 RGB) | Notes |
 |---|---|---|---|
-| Lumen chyme field | `ChymeField` | `0.22,0.17,0.10` brown-olive | one quad over the lumen band, alpha fades down-flow; ±6% peristaltic squeeze |
-| Lumen mucus band | `MucusBand` | `0.40,0.40,0.30` @ 0.5α | strip hugging the gut wall, feathers into the channel |
-| Flow mote | `FlowMote` | `0.42,0.34,0.22` ochre ±8% | ~40 pooled, drift down-flow, recycle at the excretion edge |
-| Base plasma field | `PlasmaField` | `0.30,0.10,0.13` oxblood | one quad over the base band, alpha lifts toward the wall |
-| Vessel wall bar | `VesselWallBar` | `0.66,0.44,0.46` muted red-pink | thin strip at the base/tissue seam (where `SearchUnit`s spawn) |
+| Lumen chyme field | `ChymeField` | **`0.36,0.22,0.24` mucosal plum** *(was brown-olive)* | one quad over the lumen band, alpha fades down-flow; ±6% peristaltic squeeze |
+| Lumen **villus** | **`Villus`** *(new)* | **`0.80,0.50,0.47` coral ±7%** | fringe along the gut wall, ~0.42×1.15 cells, spaced ~0.78, sways ±5° on its own phase |
+| Lumen mucus sheen | `MucusBand` | **`0.88,0.84,0.76` pearly @ 0.20α** *(was grey-green @ 0.5)* | glazes the villi — that glaze is the "velvety" read |
+| Flow mote | `FlowMote` | **`0.60,0.52,0.40` pale cream ±8%** | **~28** pooled *(was ~40)*, drift down-flow, recycle at the excretion edge |
+| Base plasma field | `PlasmaField` | `0.33,0.11,0.15` oxblood | one quad over the base band, alpha lifts toward the wall |
+| **Vessel wall cell** | **`EndothelialCell`** *(new)* | **`0.78,0.50,0.52` warm pink ±6%** | a tiled row at the base/tissue seam, ~0.92 cells apart — replaces the single stretched `VesselWallBar` quad (the sprite stays, unused) |
 | Organ halo | `OrganHalo` | `0.20,0.06,0.09` deep plasma | dark ring + bright rim behind the marrow / lymph backdrops |
-| Erythrocyte | `Erythrocyte` | `0.55,0.16,0.18` arterial red @ 0.9α | ~24 pooled, drift outer-edge → wall |
+| Erythrocyte | `Erythrocyte` | **`0.72,0.20,0.22` arterial red** @ 0.9α | ~24 pooled, drift outer-edge → wall; deeper central dip so it reads as a biconcave dish |
 | Birth puff | `BirthPuff` | `0.70,0.62,0.50` pale marrow | one per real emission (`BoneMarrowManager.OnCellEmitted`), fades over 1.5 s |
 | Base breach flash | `EffeBloom` | `0.86,0.10,0.12` red | expanding fade at the arrival lane on `PathogenAgent.OnReachedBase`, ~0.55 s |
 | Node co-loc haze | `NodeColocGlow` | `0.55,0.85,0.85` cyan-white, ≤35%α | tracks the value-weighted centroid of `LymphNode.Coloc` |
 
-All Sprint 15 field/mote elements freeze with `RoundClock.Frozen` (except an
-in-flight breach flash, which finishes — it's sub-second).
+All compartment field/mote elements -- villi included -- freeze with
+`RoundClock.Frozen` (except an in-flight breach flash, which finishes --
+it is sub-second).
 
 Cytokine heat tint (`1.00,0.55,0.05`, up to 65% blend) is applied by
 `BoardRenderer` **after** sprite/colour selection, unchanged.
