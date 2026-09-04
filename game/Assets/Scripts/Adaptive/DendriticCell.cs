@@ -127,7 +127,7 @@ namespace ImmunologyTD.Adaptive
 
             tweenStart = tweenEnd = tissueBoard.FineToWorld(Current);
             transform.position = tweenStart;
-            tweenTimer = Random.Range(0f, BoardConfig.TickIntervalSeconds);
+            tweenTimer = 0f;   // Sprint 17: the glide starts with the tick, not at a random phase
         }
 
         // -- INodeVisitor --
@@ -142,6 +142,23 @@ namespace ImmunologyTD.Adaptive
         {
             if (tissueBoard == null) return;
             tweenStart = transform.position;
+            // Sprint 17: restart the glide with the tick that produced it.
+            // Before this the timer free-ran from a random phase seeded at
+            // spawn while the tick fired on AdaptiveDirector's shared
+            // accumulator, so the two drifted apart: a tick landing late in
+            // the tween cycle snapped the cell most of the way to its new
+            // tile in a single frame and then left it crawling -- every
+            // tick, for its whole life. That was the Director's "super
+            // jittery" DCs.
+            //
+            // The random seed is gone with it. It existed to stop the
+            // cohort gliding in visual lockstep, but every DC ticks on the
+            // same accumulator anyway, so lockstep is what the simulation
+            // actually does -- faking a spread in the *tween* bought a
+            // cosmetic difference at the cost of every cell's motion being
+            // wrong. If the synchronised gliding reads badly, stagger the
+            // tick itself in AdaptiveDirector, not the tween here.
+            tweenTimer = 0f;
 
             switch (State)
             {

@@ -26,10 +26,15 @@ namespace ImmunologyTD.Rendering
     /// </summary>
     public class BaseCompartmentRenderer : MonoBehaviour
     {
-        // Tint -- COMPARTMENT_DESIGN.md §2.2, palette-checked there.
-        private static readonly Color PlasmaColor   = new Color(0.30f, 0.10f, 0.13f);
-        private static readonly Color WallColor     = new Color(0.66f, 0.44f, 0.46f);
-        private static readonly Color ErythroColor  = new Color(0.55f, 0.16f, 0.18f);
+        // Tint -- COMPARTMENT_DESIGN.md §2.2. **Sprint 17 (the Director's
+        // cartoon pass).** The plasma keeps its oxblood -- the sepsis framing
+        // depends on the base reading as blood you do not want anything
+        // arriving in -- but the things *in* the vessel brighten. A wall of
+        // warm pink cells and saturated corpuscles reads as a living vessel;
+        // the muted pair before it read as a diagram of one.
+        private static readonly Color PlasmaColor   = new Color(0.33f, 0.11f, 0.15f);
+        private static readonly Color WallColor     = new Color(0.78f, 0.50f, 0.52f);
+        private static readonly Color ErythroColor  = new Color(0.72f, 0.20f, 0.22f);
         private static readonly Color PuffColor     = new Color(0.70f, 0.62f, 0.50f);
         private static readonly Color BreachColor   = new Color(0.86f, 0.10f, 0.12f);
 
@@ -85,11 +90,15 @@ namespace ImmunologyTD.Rendering
             plasma.position = center;
             plasma.localScale = new Vector3(wallOnRight ? baseRect.width : -baseRect.width, baseRect.height, 1f);
 
-            // Vessel wall -- a thin strip at the base/tissue seam.
+            // Vessel wall -- Sprint 17: a row of endothelial *cells* instead
+            // of one stretched bar. Sprint 15 scaled a single quad the whole
+            // length of the seam, so any detail drawn into the sprite was
+            // stretched with it and the wall could only ever be a smooth
+            // line. Tiling keeps each cell's aspect at any board size, which
+            // is what lets the boundary read as the thing immune cells
+            // squeeze *between*.
             Vector3 seam = (lastBase + firstTissue) * 0.5f;
-            var wall = MakeQuad("VesselWall", SpriteShapes.VesselWallBar, WallColor, 1);
-            wall.position = new Vector3(seam.x, center.y, 0f);
-            wall.localScale = new Vector3(board.CoarseCellWorldSize * 0.85f, baseRect.height, 1f);
+            BuildVesselWall(board, seam);
 
             erythroPool = MakePool("Erythrocyte", SpriteShapes.Erythrocyte, 2, 32);
             puffPool = MakePool("BirthPuff", SpriteShapes.BirthPuff, 4, 16);
@@ -190,6 +199,34 @@ namespace ImmunologyTD.Rendering
             Vector3 outerCenter = new Vector3(baseRect.center.x, baseRect.center.y, 0f)
                                   - inwardDir * (inwardSpan * 0.5f);
             return outerCenter + inwardDir * (alongInward01 * inwardSpan) + perpDir * lateralOffset;
+        }
+
+        /// <summary>Tiles <see cref="SpriteShapes.EndothelialCell"/> along the
+        /// base/tissue seam. Static geometry, built once: ~11 renderers on
+        /// the 25x10 test board, ~44 on the 100x40 Map 01 aspiration. The
+        /// alternating size jitter is what stops it reading as a zip.</summary>
+        private void BuildVesselWall(BoardConfig board, Vector3 seam)
+        {
+            float cell = board.CoarseCellWorldSize;
+            float thickness = cell * 0.85f;
+            float pitch = cell * 0.92f;
+            int count = Mathf.Max(1, Mathf.RoundToInt(baseRect.height / pitch));
+            float step = baseRect.height / count;
+
+            for (int i = 0; i < count; i++)
+            {
+                float y = baseRect.yMin + (i + 0.5f) * step;
+                var go = new GameObject($"VesselWallCell_{i}");
+                go.transform.SetParent(transform, false);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = SpriteShapes.EndothelialCell;
+                float shade = 1f + Random.Range(-0.06f, 0.06f);
+                sr.color = new Color(WallColor.r * shade, WallColor.g * shade, WallColor.b * shade, 1f);
+                sr.sortingOrder = 1;
+                go.transform.position = new Vector3(seam.x, y, 0f);
+                go.transform.localScale = new Vector3(
+                    thickness * Random.Range(0.92f, 1.06f), step * 1.06f, 1f);
+            }
         }
 
         private Transform MakeQuad(string name, Sprite sprite, Color color, int order)

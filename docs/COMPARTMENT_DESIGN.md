@@ -826,3 +826,88 @@ Sprint 4 degenerate-band bug).
     `Prewarm()` in `GameBootstrap.Awake` (commit 1) to move the whole
     one-time cost to a single known point. Any objection to that
     unrelated-but-adjacent cleanup riding along?
+
+---
+
+# Sprint 17 revision — the cartoon pass (Director, 2026-09-04)
+
+Sprint 15 built everything above and it shipped. The Director's note after
+the first playtest of it:
+
+> "Our next step would be to cartoonify the blood vessel a bit so it's
+> visually appealing. Same thing for the lumen. It can look more velvety
+> and feature villi instead of just being poo-inspired. That would also
+> help contrast with the contaminated food sources flowing by (those can
+> be poo-ey)."
+
+That last sentence is the actual argument, and it is a *legibility*
+argument, not a taste one. §2.1 painted the lumen brown-olive with ochre
+particulate — and the contaminated food bolus that delivers every round is
+ochre and lumpy by design (`GAME_DESIGN.md` §5d). The channel and the
+threat travelling down it were in one colour family, so the thing the
+player most needs to notice arriving was camouflaged against its own
+background.
+
+## What changed
+
+### Lumen (§2.1 amended)
+
+| Element | Sprint 15 | Sprint 17 |
+|---|---|---|
+| Chyme field | `0.22,0.17,0.10` brown-olive | **`0.36,0.22,0.24` mucosal plum** |
+| Mucus band | `0.40,0.40,0.30` grey-green @ 0.50 α, order 1 | **`0.88,0.84,0.76` pearly @ 0.20 α, order 2** — a sheen, not a film |
+| Flow motes | ochre `0.42,0.34,0.22`, 40 of them, order 2 | **`0.60,0.52,0.40` pale cream, 28, order 4** |
+| — | — | **Villi (new)** — `0.80,0.50,0.47` coral, order 1 |
+| Food bolus | ochre `0.55,0.47,0.28` | **unchanged — now the only brown thing in the band** |
+
+**Villi** (`SpriteShapes.Villus`, `LumenChannelRenderer.BuildVilli`) are a
+fringe of mucosal fingers along the gut wall: one `SpriteRenderer` each,
+~0.42 cells wide × ~1.15 cells tall with per-instance height jitter,
+spaced ~0.78 cells along the flow, each swaying ±5° on its own phase and
+lengthening with the peristaltic squeeze. Direction comes from the axis
+frame (the perpendicular pointing away from the tissue band), so a map
+with the lumen on the other side still grows them into the channel.
+
+Height is deliberately under the mucus depth: villi are decoration, and a
+pathogen adhered at the wall has to stay readable. They draw *under* the
+mucus sheen (1 vs 2) so the sheen glazes them — that glaze is what makes
+the wall read as wet and velvety rather than as a row of pink fingers.
+
+Lumen sorting order within the band is now **0** chyme, **1** villi,
+**2** mucus sheen, **4** motes (above the gut-wall bar at 3, so a mote
+that drifts to the seam is never half-swallowed by it).
+
+### Base / vessel (§2.2 amended)
+
+| Element | Sprint 15 | Sprint 17 |
+|---|---|---|
+| Plasma field | `0.30,0.10,0.13` | `0.33,0.11,0.15` — marginally richer; the oxblood stays, the sepsis framing depends on it |
+| Vessel wall | one `VesselWallBar` quad stretched the length of the seam, `0.66,0.44,0.46` | **a tiled row of `EndothelialCell` sprites**, `0.78,0.50,0.52` |
+| Erythrocytes | `0.55,0.16,0.18`, shallow dip | `0.72,0.20,0.22`, **deeper dip + darker rim** — a biconcave dish that reads at a glance |
+
+The wall change is the structural one. A single quad stretched across the
+seam stretches any detail drawn into it, so that wall could only ever be a
+smooth bar — §2.2 said "smoother than `EpithelialBar`: a few faint seams
+only" and that was a consequence of the geometry, not a choice. Tiling
+one cell sprite per ~0.92 coarse cells keeps the aspect at any board size,
+which is what lets the boundary read as *cells* — the things an immune
+cell squeezes between on its way out of the vessel.
+
+`VesselWallBar` is left in `SpriteShapes` (unused by the renderer now) —
+it costs nothing and a future map may want a smooth vessel somewhere.
+
+### Cost
+
+Villi: ~13 renderers at 25×10, ~51 at 100×40. Wall cells: ~11 and ~44.
+Motes: −12. Net ≈ **+12 renderers at 25×10**, all static except the villi
+rotation, against the ~110 per-cell renderers this band gave up in Sprint
+15. The villi sway loop is one `Quaternion.Euler` and one scale write per
+villus per frame, and it early-returns with everything else while
+`RoundClock.Frozen`.
+
+### Still not verified by anything automated
+
+Same as every rendering pass: `BootstrapSmoke` proves the shapes generate
+and the renderers bind without throwing. Whether the lumen now looks
+velvety, whether the villi read as villi rather than as teeth, and whether
+the bolus pops against them are the Director's eye.

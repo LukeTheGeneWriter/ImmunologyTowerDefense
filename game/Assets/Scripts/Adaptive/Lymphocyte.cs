@@ -75,7 +75,7 @@ namespace ImmunologyTD.Adaptive
 
             tweenStart = tweenEnd = node.NodeToWorld(Node);
             transform.position = tweenStart;
-            tweenTimer = Random.Range(0f, BoardConfig.TickIntervalSeconds);
+            tweenTimer = 0f;   // Sprint 17: the glide starts with the tick, not at a random phase
         }
 
         /// <summary>One logical node tick: wander unless frozen. Called by
@@ -85,6 +85,7 @@ namespace ImmunologyTD.Adaptive
             if (node == null) return;
 
             tweenStart = transform.position;
+            tweenTimer = 0f;   // Sprint 17 -- same tween/tick desync as DendriticCell; see there
             if (!Frozen)
             {
                 Node = Chemotaxis.ChooseNextStep(

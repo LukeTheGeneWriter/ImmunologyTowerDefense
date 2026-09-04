@@ -548,9 +548,12 @@ namespace ImmunologyTD.Rendering
                 if (erythrocyte == null)
                 {
                     var b = NewBuffer();
-                    FillDisc(b, C, C, 12f);
-                    InnerShade(b, C, C, 8f, 0.68f); // central dip -> biconcave read
-                    RimShade(b, 1, 0.80f);
+                    FillDisc(b, C, C, 14f);
+                    // Sprint 17: a deeper, wider central dip and a darker rim
+                    // -- the biconcave dish reads as a shape at a glance now
+                    // rather than as a slightly uneven dot.
+                    InnerShade(b, C, C, 9f, 0.52f);
+                    RimShade(b, 2, 0.72f);
                     erythrocyte = ToSprite(b);
                 }
                 return erythrocyte;
@@ -678,6 +681,81 @@ namespace ImmunologyTD.Rendering
             }
         }
 
+        // ---- Sprint 17: the cartoon pass on the gut wall and the vessel ---
+        //   The lumen was drawn as a brown chyme channel, which put it in
+        //   the same visual family as the thing flowing down it (the
+        //   contaminated food bolus is deliberately ochre and lumpy). Lining
+        //   the wall with villi and warming the channel separates the two:
+        //   the gut reads as living tissue, and the food that arrives in it
+        //   reads as the foreign lump it is.
+
+        private static Sprite villus;
+        /// <summary>One intestinal villus -- the finger of mucosa that makes
+        /// a gut lumen look like a gut and not a pipe. Drawn pointing **+Y**
+        /// with its base at the bottom edge; <c>LumenChannelRenderer</c>
+        /// rotates each instance so it projects from the wall into the
+        /// channel, and sways it with the peristalsis phase.
+        ///
+        /// The darker central seam is the lacteal / capillary core -- it is
+        /// what stops a row of these reading as a row of identical blobs,
+        /// and it costs one loop.</summary>
+        public static Sprite Villus
+        {
+            get
+            {
+                if (villus == null)
+                {
+                    var b = NewBuffer();
+                    FillCapsule(b, C, 10f, C, 46f, 11f);
+                    // Central core, slightly darker than the body.
+                    for (int y = 0; y < Res; y++)
+                        for (int x = 0; x < Res; x++)
+                        {
+                            int idx = y * Res + x;
+                            if (b[idx].a <= 0f) continue;
+                            float dx = Mathf.Abs(x + 0.5f - C);
+                            if (dx < 3f && y > 12 && y < 44)
+                            {
+                                float k = Mathf.Lerp(0.84f, 1f, dx / 3f);
+                                b[idx].r *= k; b[idx].g *= k; b[idx].b *= k;
+                            }
+                        }
+                    RimShade(b, 1, 0.76f);
+                    // Velvet: the tip feathers a little, the base stays solid
+                    // where it meets the wall.
+                    AxisGradient(b, alongX: false, aStart: 1f, aEnd: 0.90f);
+                    villus = ToSprite(b);
+                }
+                return villus;
+            }
+        }
+
+        private static Sprite endothelialCell;
+        /// <summary>One cell of the vessel wall, tiled along the base/tissue
+        /// seam by <c>BaseCompartmentRenderer</c>.
+        ///
+        /// Sprint 15 drew that wall as a single quad stretched the whole
+        /// length of the seam, which meant any detail drawn into it was
+        /// stretched with it -- so it could only ever be a smooth bar. A
+        /// tiled cell keeps its aspect at any board size, which is what lets
+        /// the wall read as *cells* (the thing immune cells squeeze
+        /// between) rather than as a painted line.</summary>
+        public static Sprite EndothelialCell
+        {
+            get
+            {
+                if (endothelialCell == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C, 27f, 16f);
+                    InnerShade(b, C, C, 9f, 0.86f);  // nucleus
+                    RimShade(b, 2, 0.72f);
+                    endothelialCell = ToSprite(b);
+                }
+                return endothelialCell;
+            }
+        }
+
         /// <summary>Optional: touch every accessor so all generation happens
         /// at a chosen point (e.g. bootstrap) rather than on first use.</summary>
         public static void Prewarm()
@@ -690,6 +768,8 @@ namespace ImmunologyTD.Rendering
             // Sprint 15 compartment shapes
             _ = ChymeField; _ = MucusBand; _ = FlowMote; _ = PlasmaField; _ = VesselWallBar;
             _ = OrganHalo; _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
+            // Sprint 17 cartoon pass
+            _ = Villus; _ = EndothelialCell;
         }
 
         // ================================================================
