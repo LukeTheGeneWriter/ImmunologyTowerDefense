@@ -1,78 +1,82 @@
-# Session Handoff — 2026-08-21 (Sprint 4 built and verified, awaiting playtest)
+# Session Handoff — 2026-10-03 (second dev machine stood up, Unity upgraded)
 
 A checkpoint written by the head session. **This is a living file —
 overwrite it at the next checkpoint rather than accumulating dated copies.**
 Not one of `WORKFLOW.md` §3's canonical docs; if it contradicts
 `SPRINT_PLAN.md`, `ENGINE_STATUS.md`, or `INTERFACE.md`, those win.
 
-## Status: Sprint 4 is code-complete, verified, and documented
+Written to be read cold by a session on **either** machine.
 
-Map 01's geometry and the invasion loop are built. All verification was run
-by the head session — see `ENGINE_STATUS.md` → "Build status (Sprint 4)".
-**The remaining step is the Director's playtest.**
+## First: which machine are you on?
 
-## Both dispatched agents so far have hit their usage limits mid-sprint
+The project now has two first-class dev machines, both the Director's
+(`CLAUDE.md` → "The essentials"):
 
-Sprint 3's agent committed working code but no docs. **Sprint 4's agent
-committed nothing at all** — ~1,600 lines of uncommitted, non-compiling
-working tree, no verification harness, no docs. The head session repaired
-it, wrote `MapVerification.cs` (71 assertions), found a serious bug, and
-wrote every doc.
+| | Windows | Linux (CachyOS) |
+|---|---|---|
+| Clone | `C:\Users\lukef\ImmunologyTowerDefense` | `~/Projects/Biotech/ImmunologyTowerDefense` |
+| Shell | PowerShell | fish (scripts are bash, run directly) |
+| Unity | `C:\Program Files\Unity\Hub\Editor\6000.6.4f1\Editor\Unity.exe` | `~/Unity/Hub/Editor/6000.6.4f1/Editor/Unity` |
+| Run harnesses | `Unity.exe -batchmode -quit -projectPath game -executeMethod <X>`, then grep the log | `tools/unity.sh verify` |
+| Serve WebGL | `powershell -ExecutionPolicy Bypass -File tools\serve_webgl.ps1` | `tools/serve_webgl.py` |
 
-**The standing instruction for the next brief** (recorded in
-`TEAM_RETRO.md`): tell the agent to **commit after each scope item**, even
-if incomplete. "Write docs as you go" was already in Sprint 4's brief and
-still produced nothing, because the agent batched the commit too.
+**`git pull` before doing anything.** GitHub is the only sync point; the
+other machine may have pushed since you last looked.
 
-## The two things the Director should look at
+## What happened this session (commit `3b8cec1`)
 
-1. **Does the invasion loop read?** Watch one spot on the gut wall: pathogens
-   should visibly pile up there, then all burst into the tissue at once.
-   That build-then-burst is the sprint's whole question and **nobody has
-   actually watched it happen** — the counters and the harness prove it
-   occurs, but the sight of it is unverified.
-2. **Does anything reach the base?** In a 60s unattended run nothing crossed
-   the 50-cell tissue band. Expected at a 1s step interval, but it means the
-   endzone is unproven live and the pacing is worth a look.
+No gameplay changed. This was infrastructure only:
 
-## Findings recorded rather than fixed (mechanics-first instruction)
+1. **Linux machine set up.** Cloned, Unity Hub (AUR `unityhub`), .NET SDK,
+   Microsoft VS Code (`visual-studio-code-bin` — the Arch `code` package is
+   Code-OSS, which can't install the C# Dev Kit / Unity extensions),
+   with C# Dev Kit + Unity extensions installed.
+2. **Linux tooling added.** `tools/unity.sh` (one Editor launch per
+   `-executeMethod`, logs to `game/Logs/<Method>.log`, pass/fail by log
+   grep — never the exit code; shorthands `verify` and `webgl`) and
+   `tools/serve_webgl.py` (gzip `Content-Encoding`, same as the `.ps1`).
+3. **Unity upgraded `6000.5.8f1` → `6000.6.4f1`.** The Hub doesn't offer
+   `6000.5.8f1` on Linux; the Director chose to upgrade rather than pin.
+   Tested on a throwaway copy first: **all 410 assertions + BootstrapSmoke
+   green, no compile warnings.** The diff is Unity bookkeeping only
+   (`multiplayer.center` 1.0.1 → 2.0.1, new built-in `tetgen` module, a
+   reordered ProjectAuditor key, `ProjectVersion.txt`).
 
-- **Cytokine sensing is much weaker at map scale.** 30×5: OFF ~3, ON
-  converges to 0 within a minute. 100×40: OFF flat at ~47, ON only trends
-  45.29 → 37.38 over 2.5 minutes. Not a regression — the 1/r field is steep
-  at 3 cells and flat at 47 — but Sprint 1 built the entire upgrade ladder
-  on this mechanic feeling transformative, so it needs an answer eventually.
-- **The 8.35 ms frame cost at 4,000 cells is vsync-capped**, so it is an
-  upper bound, not a measurement. Re-measure with vsync off before Sprint 5
-  adds host-cell state rendering.
-- **The base band is visually crowded** — marrow slots, lymph node, and HUD
-  overprint. Plausibly the first real job for a dispatched Design agent,
-  which this project has never used.
+## Open items from the move
 
-## The bug worth knowing about
+- **The Windows machine is not upgraded yet.** Before opening the project
+  there: install `6000.6.4f1` via the Hub (with "Web Build Support"),
+  then `git pull`. Opening it in `6000.5.8f1` would try to *downgrade* the
+  project — don't.
+- **No player build has been made on `6000.6.4f1` yet**, on either
+  machine. Harnesses are green, but a WebGL (and on Windows, a desktop)
+  build + headless launch should be the first verification on the new
+  editor. First WebGL build on Linux will be the slow full IL2CPP →
+  Emscripten pass (30+ min; quiet logs aren't a hang).
+- **Windows-only harness tooling stays Windows-only.** The agentic
+  playtest in `AGENT_PLAYTEST_01.md` drove input via Win32
+  (`SetCursorPos`, DPI awareness); none of that ports to Linux/Wayland as
+  is. Run agentic playtests from the Windows machine until someone builds
+  a Linux equivalent.
+- `tools/unity.sh` was exercised against the harnesses but **not yet with
+  `webgl`** — treat the first Linux build as also testing the script.
 
-The scene asset still carried Sprint 1's serialized `columns: 30`, which
-overrode Map 01's `columns = 100` default. Because the outer bands clamp
-against axis length, the shortfall landed entirely on the middle: **25 base
-+ 5 lumen + 0 tissue.** The build ran, rendered, and logged nothing while
-being completely unplayable. Fixed, plus `GameBootstrap.WarnOnDegenerateBands`.
+## Where the game itself stands
 
-**`MapVerification` could not have caught it** — it builds boards via
-`ConfigureForTest` and never loads the scene. Worth remembering when the
-next "the harness is green so it works" moment arrives.
+Unchanged since 2026-09-04 — see `SPRINT_PLAN.md` (Sprint 17) and
+`CHANGELOG.md`:
 
-## Next up: Sprint 5
+- **Sprint 17 is code-complete; only the Director's playtest remains**
+  (smooth DCs, villi/velvety lumen, cartoon vessel, bolus contrast).
+  Nothing in it is headlessly testable.
+- **The obvious Sprint 18** is wiring the upgrade rows to the simulation —
+  they are still `GAME_DESIGN.md` §6d placeholders, the widest gap in the
+  game. Also waiting on the Director's eye: the DC's lateral zigzag walk
+  (a design question, deliberately left alone — `BACKLOG.md`).
 
-Already scoped in `SPRINT_PLAN.md`'s split: the tissue state model —
-host cells as healthy/infected/dead with two-layer lattice occupancy
-(`GAME_DESIGN.md` §1c), which then unlocks §1b step 4's class-specific
-advance (viral diffusion that dies without a host, intracellular bacteria
-entering and leaving cells), plus debris and the real 100-life pool.
-`TissueGrid` still holds exactly one pathogen per coarse slot with no
-host-cell concept — that is the rewrite.
+## For whichever session picks this up
 
-Also now designed and waiting: debris rules and the antigen-presentation
-spectrum (`GAME_DESIGN.md` §1c) — macrophages clear debris and present it
-inefficiently, dendritic cells shuttle it efficiently, passive drainage
-into the lymph node is a knowledge sink, and "don't eat me" signals are
-flagged in `BACKLOG.md` as the eventual tuning lever.
+Read `CLAUDE.md` and `WORKFLOW.md` first as always, then the living docs
+it lists. Suggested opening move: pull, build WebGL on `6000.6.4f1`, serve
+it, and hand the Director the URL for the Sprint 17 playtest — that
+settles both the upgrade and the sprint in one sitting.
