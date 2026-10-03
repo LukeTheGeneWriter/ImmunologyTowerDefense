@@ -48,9 +48,11 @@ Tradeoff accepted knowingly: Unity's WebGL builds are heavier than Godot's
 
 ## Local dev environment
 
-Unity Hub, the Unity Editor (`6000.5.8f1` at `C:\Program
-Files\Unity\Hub\Editor\6000.5.8f1\Editor\Unity.exe`), the Unity CLI, and an
-activated Personal license are installed on the Director's machine. As of
+Unity Hub, the Unity Editor (`6000.6.4f1` -- upgraded from `6000.5.8f1` on
+2026-10-03 -- at `C:\Program
+Files\Unity\Hub\Editor\6000.6.4f1\Editor\Unity.exe`), the Unity CLI, and an
+activated Personal license are installed on the Director's machine. A second,
+Linux (CachyOS) dev environment exists too -- see `CLAUDE.md`. As of
 `WORKFLOW.md`'s 2026-08-19 rewrite, this is where the head session and
 dispatched Code agents run natively with real shell access — no device
 bridge, no sandbox. **Still no interactive Editor GUI session used for

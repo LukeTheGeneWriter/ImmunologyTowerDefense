@@ -24,9 +24,12 @@ Last distilled: end of **Sprint 11** (2026-08-29), covering Sprints 1–11.
 - **A quiet WebGL build log usually isn't stuck** — first WebGL builds are
   30+ min (IL2CPP → Emscripten → wasm) and go quiet early. Check log mtime
   / `Library/Bee` before assuming a crash.
-- **Local WebGL testing needs `tools/serve_webgl.ps1`** — `file://` can't
-  load Unity's fetch loader and `python -m http.server` doesn't send
-  `Content-Encoding: gzip`.
+- **Local WebGL testing needs `tools/serve_webgl.ps1`** (Windows) or
+  `tools/serve_webgl.py` (Linux) — `file://` can't load Unity's fetch
+  loader and `python -m http.server` doesn't send `Content-Encoding: gzip`.
+- **On Linux, run batchmode methods through `tools/unity.sh`** (e.g.
+  `tools/unity.sh verify`) — it already does the log-grep check above
+  instead of trusting the exit code.
 - **`.meta` files must be committed** for every new script and folder
   (Unity generates them on import). Add them in the same commit as the
   `.cs` — a run that imports the project generates any that are missing.
