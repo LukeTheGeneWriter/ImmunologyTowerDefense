@@ -188,11 +188,10 @@ namespace ImmunologyTD.Rendering
             if (wall.MCellLevel <= 0) k = 0.55f;
             else if (wall.PendingAntigen > 0) k = 0.85f + 0.15f * Mathf.Sin(pulse * 5f);
             else k = 0.95f;
-            // Daylight shows "unbought" as half-transparent rather than
-            // darkened -- on a light ground, darker reads as louder.
-            var c = Palette.Daylight
-                ? new Color(MCellColor.r, MCellColor.g, MCellColor.b, wall.MCellLevel <= 0 ? 0.5f : Mathf.Lerp(0.75f, 1f, k))
-                : new Color(MCellColor.r * k, MCellColor.g * k, MCellColor.b * k, 1f);
+            // "Unbought" is half-transparent rather than darkened -- on a
+            // light ground, darker reads as louder (Sprint 20).
+            var c = new Color(MCellColor.r, MCellColor.g, MCellColor.b,
+                wall.MCellLevel <= 0 ? 0.5f : Mathf.Lerp(0.75f, 1f, k));
             for (int i = 0; i < mCells.Count; i++) mCells[i].color = c;
         }
 

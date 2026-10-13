@@ -136,21 +136,12 @@ namespace ImmunologyTD.Rendering
                 if (largeBacterium == null)
                 {
                     var b = NewBuffer();
-                    if (Palette.Daylight)
-                    {
-                        // Sprint 20 (ART_DIRECTION.md §3.3): a chunky 2:1
-                        // bean, not a 4:1 rod -- a thin rod vanishes at
-                        // board scale. Germ-green tint + thick outline.
-                        FillCapsule(b, 19f, C, 45f, C, 13f);
-                        InnerShade(b, C - 4f, C + 4f, 8f, 1.15f);   // a soft highlight, not a face
-                        largeBacterium = Finish(b, 6);
-                    }
-                    else
-                    {
-                        FillCapsule(b, 16f, C, 48f, C, 8f); // horizontal rod, caller rotates per instance
-                        RimShade(b, 2, 0.50f);
-                        largeBacterium = ToSprite(b);
-                    }
+                    // Sprint 20 (ART_DIRECTION.md §3.3): a chunky 2:1
+                    // bean, not a 4:1 rod -- a thin rod vanishes at
+                    // board scale. Germ-green tint + thick outline.
+                    FillCapsule(b, 19f, C, 45f, C, 13f);
+                    InnerShade(b, C - 4f, C + 4f, 8f, 1.15f);   // a soft highlight, not a face
+                    largeBacterium = Finish(b, 6);
                 }
                 return largeBacterium;
             }
@@ -164,27 +155,18 @@ namespace ImmunologyTD.Rendering
                 if (virion == null)
                 {
                     var b = NewBuffer();
-                    if (Palette.Daylight)
+                    // Sprint 20 (ART_DIRECTION.md §3.3): the cartoon
+                    // corona -- a ball with 8 short knobbed spokes. Short
+                    // on purpose: long thin arms belong to the DC alone.
+                    FillDisc(b, C, C, 15f);
+                    for (int i = 0; i < 8; i++)
                     {
-                        // Sprint 20 (ART_DIRECTION.md §3.3): the cartoon
-                        // corona -- a ball with 8 short knobbed spokes. Short
-                        // on purpose: long thin arms belong to the DC alone.
-                        FillDisc(b, C, C, 15f);
-                        for (int i = 0; i < 8; i++)
-                        {
-                            float a = i * Mathf.PI / 4f + 0.2f;
-                            float ex = C + Mathf.Cos(a) * 22f, ey = C + Mathf.Sin(a) * 22f;
-                            FillCapsule(b, C, C, ex, ey, 2.2f);
-                            FillDisc(b, ex, ey, 4.5f);
-                        }
-                        virion = Finish(b, 6);
+                        float a = i * Mathf.PI / 4f + 0.2f;
+                        float ex = C + Mathf.Cos(a) * 22f, ey = C + Mathf.Sin(a) * 22f;
+                        FillCapsule(b, C, C, ex, ey, 2.2f);
+                        FillDisc(b, ex, ey, 4.5f);
                     }
-                    else
-                    {
-                        FillDisc(b, C, C, 13f); // small -- ~60% of the bacterium footprint
-                        RimShade(b, 1, 0.50f);
-                        virion = ToSprite(b);
-                    }
+                    virion = Finish(b, 6);
                 }
                 return virion;
             }
@@ -273,8 +255,7 @@ namespace ImmunologyTD.Rendering
                 {
                     var b = NewBuffer();
                     FillRounded(b, C, C, 30f, 8f);
-                    if (Palette.Daylight) ValueStipple(b, 24601, 0.38f, 0.85f);  // Sprint 20: softer, and opaque
-                    else Stipple(b, 24601, 0.62f);         // purulent
+                    ValueStipple(b, 24601, 0.38f, 0.85f);  // purulent, but soft and opaque (Sprint 20)
                     RimShade(b, 2, 0.70f);
                     hostCellInfectedBacterial = ToSprite(b);
                 }
@@ -299,8 +280,7 @@ namespace ImmunologyTD.Rendering
                         float rr = 5f + (float)rng.NextDouble() * 6f;
                         FillDisc(b, ox, oy, rr);
                     }
-                    if (Palette.Daylight) ValueStipple(b, 1337, 0.5f, 0.8f);
-                    else Stipple(b, 1337, 0.5f);
+                    ValueStipple(b, 1337, 0.5f, 0.8f);
                     RimShade(b, 2, 0.55f);
                     debris = Finish(b, 2);
                 }
@@ -320,8 +300,7 @@ namespace ImmunologyTD.Rendering
                 {
                     var b = NewBuffer();
                     FillDisc(b, C, C, 30f);
-                    // Daylight: an opaque dark-rose scar, not a hole in the render.
-                    if (!Palette.Daylight) Multiply(b, 1f, 1f, 1f, 0.18f);
+                    // Opaque (Sprint 20): a dark-rose scar, not a hole in the render.
                     emptyPit = ToSprite(b);
                 }
                 return emptyPit;
@@ -411,7 +390,6 @@ namespace ImmunologyTD.Rendering
                     FillCapsule(b, 38f, 44f, 62f, 40f, 2.4f);
                     InnerShade(b, 52f, 23f, 12f, 0.80f);
                     InnerShade(b, 52f, 42f, 12f, 0.80f);
-                    if (!Palette.Daylight) Stipple(b, 55, 0.62f);   // Sprint 20: Daylight declutters
                     marrowRegion = ToSprite(b);
                 }
                 return marrowRegion;
@@ -459,7 +437,7 @@ namespace ImmunologyTD.Rendering
                     var b = NewBuffer();
                     FillRounded(b, C, C, 31f, 2f);
                     AxisGradient(b, alongX: false, aStart: 0.92f, aEnd: 0.55f);
-                    if (!Palette.Daylight) Stipple(b, 6011, 0.85f);   // Sprint 20: Daylight grounds are flat
+                    // Flat, unstippled (Sprint 20 -- grounds are calm).
                     chymeField = ToSprite(b);
                 }
                 return chymeField;
@@ -519,7 +497,7 @@ namespace ImmunologyTD.Rendering
                     var b = NewBuffer();
                     FillRounded(b, C, C, 31f, 2f);
                     AxisGradient(b, alongX: true, aStart: 0.86f, aEnd: 1.0f);
-                    if (!Palette.Daylight) Stipple(b, 6067, 0.90f);   // Sprint 20: Daylight grounds are flat
+                    // Flat, unstippled (Sprint 20 -- grounds are calm).
                     plasmaField = ToSprite(b);
                 }
                 return plasmaField;
@@ -967,18 +945,6 @@ namespace ImmunologyTD.Rendering
             }
         }
 
-        /// <summary>Sprint 20: drop every cached sprite so the next access
-        /// rebuilds it under the current <see cref="Palette.Current"/> look
-        /// (Daylight bakes outlines and swaps a few silhouettes). Called only
-        /// by <see cref="Palette.ToggleAndReload"/> -- reflection over this
-        /// class's own private static Sprite fields, once, on a key press.</summary>
-        public static void ClearCache()
-        {
-            foreach (var f in typeof(SpriteShapes).GetFields(
-                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static))
-                if (f.FieldType == typeof(Sprite)) f.SetValue(null, null);
-        }
-
         /// <summary>Optional: touch every accessor so all generation happens
         /// at a chosen point (e.g. bootstrap) rather than on first use.</summary>
         public static void Prewarm()
@@ -1028,19 +994,17 @@ namespace ImmunologyTD.Rendering
             return Sprite.Create(tex, new Rect(0, 0, Res, Res), new Vector2(0.5f, 0.5f), Res);
         }
 
-        /// <summary>Sprint 20: finish a unit / structure sprite. In the
-        /// Daylight look (<see cref="Palette.Outlines"/>) it gets a dark
+        /// <summary>Sprint 20: finish a unit / structure sprite with a dark
         /// outline <paramref name="strokePx"/> wide, drawn OUTSIDE the
         /// silhouette (<see cref="OuterStroke"/>). To make room inside the
         /// 64 px texture the shape is first shrunk by exactly the stroke
         /// width, so the outlined sprite has the same outer extent as before
         /// and no caller's scale changes. Edge-anchored shapes (villus,
         /// dome, crypt -- their base sits on the texture edge) pass
-        /// <paramref name="shrink"/> false so the base stays put. Classic is
-        /// a plain ToSprite.</summary>
+        /// <paramref name="shrink"/> false so the base stays put.</summary>
         private static Sprite Finish(Color[] buf, int strokePx, bool shrink = true)
         {
-            if (Palette.Outlines && strokePx > 0)
+            if (strokePx > 0)
             {
                 if (shrink) Shrink(buf, (C - strokePx - 0.5f) / C);
                 OuterStroke(buf, strokePx, 0.18f);

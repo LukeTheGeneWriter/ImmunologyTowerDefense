@@ -143,11 +143,9 @@ namespace ImmunologyTD.Bootstrap
             // Sprint 15: generate every shape up front (BACKLOG item) -- the
             // compartment renderers below add ~9 more rasters, and one known
             // boot cost beats a first-of-kind hitch mid-round.
-            // Sprint 20: the look (Classic / Daylight, F10) must be known
-            // before any sprite is rasterised -- Daylight bakes outlines in.
-            // Unit colours come from the palette too, overriding whatever the
-            // scene serialised (a stale serialized field beats a C# default).
-            ImmunologyTD.Rendering.Palette.Load();
+            // Unit colours come from the palette (Sprint 20), overriding
+            // whatever the scene serialised -- a stale serialized field beats
+            // a C# default.
             macrophageProfile.Color = ImmunologyTD.Rendering.Palette.Macrophage;
             neutrophilProfile.Color = ImmunologyTD.Rendering.Palette.Neutrophil;
             ImmunologyTD.Rendering.SpriteShapes.Prewarm();
@@ -388,13 +386,12 @@ namespace ImmunologyTD.Bootstrap
             renderer.Bind(board, gutInterface);
         }
 
-        /// <summary>Sprint 20 (Daylight only, ART_DIRECTION.md §3.2): a flat
+        /// <summary>Sprint 20 (ART_DIRECTION.md §3.2): a flat
         /// quad under the tissue grid, so the gaps between the rounded host
         /// cells read as pink mortar rather than the camera clear showing
-        /// through as black lines. +1 renderer. Classic keeps the old seams.</summary>
+        /// through as black lines. +1 renderer.</summary>
         private void BuildTissueUnderlay()
         {
-            if (!ImmunologyTD.Rendering.Palette.Daylight) return;
             var rect = board.BandWorldRect(BoardBand.Tissue);
             if (rect.width <= 0f) return;
             var go = new GameObject("TissueUnderlay");

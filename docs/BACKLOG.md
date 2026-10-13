@@ -901,9 +901,7 @@ The buy panels and the upgrade framework landed well. Two items:
 
 ## Opened / updated by Sprint 20 (2026-10-14) — palette + looks
 
-- **Pick a look.** After the Director's A/B, delete the losing column
-  from `Palette.cs` (and the Classic branches in `SpriteShapes`), and
-  drop F10 or keep it as a debug key.
+- **~~Pick a look~~ — Daylight chosen (2026-10-14); Classic retired Sprint 21.**
 - **ART_DIRECTION #8 — DC antigen dot.** A child renderer tinted the
   colour of the pathogen whose antigen a DC carries. It shows *what* is
   being taught. In Daylight the loaded DC is only slightly lighter (the

@@ -239,11 +239,6 @@ namespace ImmunologyTD.UI
 
             if (Input.GetKeyDown(KeyCode.Escape)) ClearSelection();
 
-            // Sprint 20: F10 flips Classic <-> Daylight (ART_DIRECTION.md),
-            // persists the choice and reloads -- a side-by-side tool for the
-            // Director's decision, so it restarts the run.
-            if (Input.GetKeyDown(KeyCode.F10)) ImmunologyTD.Rendering.Palette.ToggleAndReload();
-
             // Sprint 13's flash preview, moved off HudOverlay unchanged: one
             // frame that fires all five effect flashes across the tissue
             // band for a visual QA of the shapes.

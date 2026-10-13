@@ -2,20 +2,18 @@ using UnityEngine;
 using ImmunologyTD.Rendering;
 
 /// <summary>
-/// Sprint 20 verification: the palette and the Classic / Daylight looks
-/// (docs/ART_DIRECTION.md).
+/// Sprint 20 verification, revised Sprint 21 when the Director picked
+/// Daylight and Classic was retired (docs/ART_DIRECTION.md).
 ///
-///  1. Classic IS the shipped look: spot-checks against the pre-Sprint-20
-///     literals, so the A/B toggle compares against the real thing.
-///  2. The five FX colours are pairwise distinct in both looks --
+///  1. The old public colour statics forward to the palette.
+///  2. The five FX colours are pairwise distinct --
 ///     DegranulationFlash.ShapeFor picks a flash's shape by exact colour.
-///  3. Daylight fixes the legibility problem the art pass measured: in
-///     Classic the bacterium and virion are ~1.1:1 against the lumen; in
-///     Daylight their outline is far above that, and their fill differs
-///     from the lumen in hue.
-///  4. Daylight sprites carry a dark outline with the SAME outer extent as
-///     Classic (the shape shrinks to make room), and Classic sprites
-///     have none.
+///  3. The legibility fix the art pass measured: under the old (Classic)
+///     palette the bacterium and virion were 1.13:1 and 1.04:1 against the
+///     lumen. Now their outlines are far above that, and their fill differs
+///     from the lumen in saturation and hue.
+///  4. Sprites carry a dark outline at the pre-outline outer extent (the
+///     shape shrinks to make room; the macrophage was 30.0 px).
 ///
 /// Run (Linux): tools/unity.sh Sprint20Verification.RunAll
 /// </summary>
@@ -29,16 +27,12 @@ public static class Sprint20Verification
         passed = 0;
         failed = 0;
         Debug.Log("[Sprint20Verification] Starting ...");
-        var saved = Palette.Current;
 
-        RunClassicIsShipped();
-        RunFxDistinct(Look.Classic);
-        RunFxDistinct(Look.Daylight);
+        RunForwarding();
+        RunFxDistinct();
         RunContrast();
         RunOutlines();
 
-        Palette.Current = saved;
-        SpriteShapes.ClearCache();
         Debug.Log($"[Sprint20Verification] Done. {passed} passed, {failed} failed.");
     }
 
@@ -51,30 +45,21 @@ public static class Sprint20Verification
     private static bool Eq(Color a, Color b) =>
         Mathf.Abs(a.r - b.r) < 1e-4f && Mathf.Abs(a.g - b.g) < 1e-4f && Mathf.Abs(a.b - b.b) < 1e-4f;
 
-    private static void RunClassicIsShipped()
+    private static void RunForwarding()
     {
-        Palette.Current = Look.Classic;
-        Check("Classic macrophage is the shipped blue", Eq(Palette.Macrophage, new Color(0.30f, 0.40f, 0.80f)));
-        Check("Classic DC is the shipped magenta", Eq(Palette.Dendritic, new Color(0.72f, 0.30f, 0.68f)));
-        Check("Classic bacterium is the shipped maroon", Eq(Palette.Bacterium, new Color(0.42f, 0.12f, 0.16f)));
-        Check("Classic chyme is the shipped plum", Eq(Palette.Chyme, new Color(0.36f, 0.22f, 0.24f)));
-        Check("Classic knowledge flash is the shipped green", Eq(Palette.FxKnowledge, new Color(0.40f, 0.92f, 0.45f)));
-        Check("Classic camera clear is the shipped near-black", Eq(Palette.CameraClear, new Color(0.05f, 0.05f, 0.07f)));
-        Check("Classic has no outlines and no size floor", !Palette.Outlines && !Palette.PathogenSizeFloor);
-        Check("the routed statics read the palette (BoardRenderer.PathogenColor)", Eq(BoardRenderer.PathogenColor, Palette.Bacterium));
-        Check("...and DegranulationFlash.KnowledgeMatchColor", Eq(DegranulationFlash.KnowledgeMatchColor, Palette.FxKnowledge));
+        Check("BoardRenderer.PathogenColor reads the palette", Eq(BoardRenderer.PathogenColor, Palette.Bacterium));
+        Check("DegranulationFlash.KnowledgeMatchColor reads the palette", Eq(DegranulationFlash.KnowledgeMatchColor, Palette.FxKnowledge));
     }
 
-    private static void RunFxDistinct(Look look)
+    private static void RunFxDistinct()
     {
-        Palette.Current = look;
         var fx = new[] { Palette.FxDegranulation, Palette.FxBreach, Palette.FxEfferocytosis, Palette.FxStressKill, Palette.FxKnowledge };
         bool distinct = true;
         for (int i = 0; i < fx.Length; i++)
             for (int j = i + 1; j < fx.Length; j++)
                 if (Mathf.Abs(fx[i].r - fx[j].r) < 0.01f && Mathf.Abs(fx[i].g - fx[j].g) < 0.01f && Mathf.Abs(fx[i].b - fx[j].b) < 0.01f)
                     distinct = false;
-        Check($"{look}: the five FX colours are pairwise distinct (ShapeFor matches by colour)", distinct);
+        Check("the five FX colours are pairwise distinct (ShapeFor matches by colour)", distinct);
     }
 
     private static float Lum(Color c)
@@ -93,51 +78,38 @@ public static class Sprint20Verification
 
     private static void RunContrast()
     {
-        Palette.Current = Look.Classic;
-        float cb = Contrast(Palette.Bacterium, Palette.Chyme), cv = Contrast(Palette.Virion, Palette.Chyme);
+        // The retired Classic values, kept only as the baseline the fix is measured against.
+        var oldChyme = new Color(0.36f, 0.22f, 0.24f);
+        float cb = Contrast(new Color(0.42f, 0.12f, 0.16f), oldChyme), cv = Contrast(new Color(0.40f, 0.16f, 0.34f), oldChyme);
 
-        Palette.Current = Look.Daylight;
         float db = Contrast(Outline(Palette.Bacterium), Palette.Chyme);
         float dv = Contrast(Outline(Palette.Virion), Palette.Chyme);
         float dbol = Contrast(Outline(Palette.FoodBolus), Palette.Chyme);
-        Debug.Log($"[Sprint20Verification] pathogen vs lumen: Classic bacterium {cb:F2}, virion {cv:F2}; Daylight outline bacterium {db:F1}, virion {dv:F1}, bolus {dbol:F1}");
-        Check("Classic reproduces the measured problem (both pathogens < 1.3:1 on the lumen)", cb < 1.3f && cv < 1.3f);
-        Check("Daylight: the bacterium's outline is >= 7:1 on the lumen", db >= 7f);
-        Check("Daylight: the virion's outline is >= 7:1 on the lumen", dv >= 7f);
-        Check("Daylight: the bolus's outline is >= 7:1 on the lumen", dbol >= 7f);
+        Debug.Log($"[Sprint20Verification] pathogen vs lumen: was bacterium {cb:F2}, virion {cv:F2}; now outline bacterium {db:F1}, virion {dv:F1}, bolus {dbol:F1}");
+        Check("the baseline reproduces the measured problem (< 1.3:1)", cb < 1.3f && cv < 1.3f);
+        Check("the bacterium's outline is >= 7:1 on the lumen", db >= 7f);
+        Check("the virion's outline is >= 7:1 on the lumen", dv >= 7f);
+        Check("the bolus's outline is >= 7:1 on the lumen", dbol >= 7f);
 
         Color.RGBToHSV(Palette.Bacterium, out float hb, out float sb, out _);
-        Color.RGBToHSV(Palette.Virion, out float hv, out float sv, out _);
+        Color.RGBToHSV(Palette.Virion, out _, out float sv, out _);
         Color.RGBToHSV(Palette.Chyme, out _, out float sc, out _);
-        Check("Daylight pathogens are far more saturated than the lumen", sb - sc > 0.5f && sv - sc > 0.5f);
-        Check("Daylight bacterium is green (the germ convention, D2)", hb > 0.2f && hb < 0.4f);
+        Check("pathogens are far more saturated than the lumen", sb - sc > 0.5f && sv - sc > 0.5f);
+        Check("the bacterium is green (the germ convention, D2)", hb > 0.2f && hb < 0.4f);
     }
 
     private static void RunOutlines()
     {
-        Palette.Current = Look.Classic;
-        SpriteShapes.ClearCache();
-        var classic = Measure(SpriteShapes.Macrophage);
-        var classicNeu = Measure(SpriteShapes.Neutrophil);
-
-        Palette.Current = Look.Daylight;
-        SpriteShapes.ClearCache();
-        var day = Measure(SpriteShapes.Macrophage);
-        var dayNeu = Measure(SpriteShapes.Neutrophil);
+        var mac = Measure(SpriteShapes.Macrophage);
+        var neu = Measure(SpriteShapes.Neutrophil);
         var vir = Measure(SpriteShapes.Virion);
-
-        Debug.Log($"[Sprint20Verification] macrophage extent {classic.extent:F1} -> {day.extent:F1}, edge value {classic.edgeValue:F2} -> {day.edgeValue:F2}");
-        Check("Classic macrophage has no dark outline (edge value > 0.4)", classic.edgeValue > 0.4f);
-        Check("Daylight macrophage has a dark outline (edge value < 0.25)", day.edgeValue < 0.25f);
-        Check("Daylight neutrophil has a dark outline", dayNeu.edgeValue < 0.25f);
-        Check("Daylight virion has a dark outline", vir.edgeValue < 0.25f);
-        Check("outlining keeps the macrophage's outer extent (shape shrinks to make room)",
-            Mathf.Abs(day.extent - classic.extent) <= 2.5f);
-        Check("...and the neutrophil's", Mathf.Abs(dayNeu.extent - classicNeu.extent) <= 2.5f);
-        Check("nothing clips the texture edge", day.extent < 31.5f && vir.extent < 31.5f);
-        SpriteShapes.ClearCache();
+        Debug.Log($"[Sprint20Verification] macrophage extent {mac.extent:F1}, edge value {mac.edgeValue:F2}");
+        Check("the macrophage has a dark outline (edge value < 0.25)", mac.edgeValue < 0.25f);
+        Check("the neutrophil has a dark outline", neu.edgeValue < 0.25f);
+        Check("the virion has a dark outline", vir.edgeValue < 0.25f);
+        Check("outlining kept the macrophage's pre-outline extent (30.0 px)", Mathf.Abs(mac.extent - 30f) <= 2.5f);
+        Check("nothing clips the texture edge", mac.extent < 31.5f && vir.extent < 31.5f && neu.extent < 31.5f);
     }
-
     /// <summary>Outer extent (max distance from centre of a pixel with
     /// alpha > 0.5) and the mean RGB value of the outermost opaque ring.</summary>
     private static (float extent, float edgeValue) Measure(Sprite s)
