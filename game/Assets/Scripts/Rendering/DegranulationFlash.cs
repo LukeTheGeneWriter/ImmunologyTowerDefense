@@ -54,19 +54,19 @@ namespace ImmunologyTD.Rendering
         /// <summary>Hot granule yellow-white, deliberately unlike anything
         /// else on the board (host pink, pathogen maroon, macrophage blue,
         /// neutrophil amber, marrow tan, lymph green).</summary>
-        public static readonly Color GranuleBurstColor = new Color(1f, 0.97f, 0.72f);
+        public static Color GranuleBurstColor => Palette.FxDegranulation;
 
         /// <summary>Sprint 4: a gut-wall breach burst. Hot pathogen red,
         /// deliberately unlike the neutrophil's granule yellow -- the two
         /// events must never be confused for one another, since one is the
         /// player winning and the other is the player losing ground.</summary>
-        public static readonly Color BreachBurstColor = new Color(1f, 0.35f, 0.22f);
+        public static Color BreachBurstColor => Palette.FxBreach;
 
         /// <summary>Sprint 5: a macrophage finishing off a debris pile
         /// (efferocytosis). A calm blue-green -- the player RECOVERING
         /// ground, so it must read as unlike both the granule burst and the
         /// breach. Deliberately gentler than either.</summary>
-        public static readonly Color EfferocytosisColor = new Color(0.45f, 0.80f, 0.68f);
+        public static Color EfferocytosisColor => Palette.FxEfferocytosis;
 
         /// <summary>Sprint 6: an immune cell recognising an infected cell on
         /// contact and killing it LOUDLY (GAME_DESIGN.md §4b's stress-sense
@@ -74,7 +74,7 @@ namespace ImmunologyTD.Rendering
         /// red, and efferocytosis blue-green -- and this one is played
         /// bigger, because a necrotic kill is meant to read as violent, not
         /// tidy.</summary>
-        public static readonly Color StressKillColor = new Color(0.95f, 0.40f, 0.80f);
+        public static Color StressKillColor => Palette.FxStressKill;
 
         /// <summary>Sprint 8: a dendritic cell and a helper-T cell pairing in
         /// the lymph node with MATCHING barcodes -- the adaptive system just
@@ -82,7 +82,7 @@ namespace ImmunologyTD.Rendering
         /// unlike every other burst colour: this one is the player's
         /// long-game investment paying off, and it happens away from the
         /// tissue board so it must read on its own.</summary>
-        public static readonly Color KnowledgeMatchColor = new Color(0.40f, 0.92f, 0.45f);
+        public static Color KnowledgeMatchColor => Palette.FxKnowledge;
 
         private Color burstColor = GranuleBurstColor;
 

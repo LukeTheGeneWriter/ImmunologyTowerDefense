@@ -49,7 +49,7 @@ namespace ImmunologyTD.Rendering
                     FillLobed(b, C, C, 26f, 4, 0.16f, 0.3f);   // broad ruffled membrane
                     InnerShade(b, C + 3f, C - 2f, 10f, 0.70f); // off-centre nucleus
                     RimShade(b, 2, 0.55f);
-                    macrophage = ToSprite(b);
+                    macrophage = Finish(b, 5);
                 }
                 return macrophage;
             }
@@ -68,7 +68,7 @@ namespace ImmunologyTD.Rendering
                     InnerShade(b, C + 6f, C + 4f, 6f, 0.60f);  // nucleus
                     InnerShade(b, C, C - 7f, 6f, 0.60f);
                     RimShade(b, 2, 0.60f);
-                    neutrophil = ToSprite(b);
+                    neutrophil = Finish(b, 6);
                 }
                 return neutrophil;
             }
@@ -85,7 +85,7 @@ namespace ImmunologyTD.Rendering
                     FillStar(b, C, C, 11f, 30f, 9, 0f);
                     FillDisc(b, C, C, 10f); // solid core
                     RimShade(b, 1, 0.60f);
-                    dendriteStar = ToSprite(b);
+                    dendriteStar = Finish(b, 5);
                 }
                 return dendriteStar;
             }
@@ -105,7 +105,7 @@ namespace ImmunologyTD.Rendering
                     FillDisc(b, C, C, 10f);
                     RimShade(b, 1, 0.60f);
                     FillDisc(b, C, C, 7f); // redraw core at full white, no rim
-                    dendriteStarLoaded = ToSprite(b);
+                    dendriteStarLoaded = Finish(b, 5);
                 }
                 return dendriteStarLoaded;
             }
@@ -122,7 +122,7 @@ namespace ImmunologyTD.Rendering
                     FillDisc(b, C, C, 24f);
                     InnerShade(b, C, C, 17f, 0.72f); // big nucleus, thin cytoplasm rim
                     RimShade(b, 1, 0.78f);
-                    lymphocyte = ToSprite(b);
+                    lymphocyte = Finish(b, 5);
                 }
                 return lymphocyte;
             }
@@ -136,9 +136,21 @@ namespace ImmunologyTD.Rendering
                 if (largeBacterium == null)
                 {
                     var b = NewBuffer();
-                    FillCapsule(b, 16f, C, 48f, C, 8f); // horizontal rod, caller rotates per instance
-                    RimShade(b, 2, 0.50f);
-                    largeBacterium = ToSprite(b);
+                    if (Palette.Daylight)
+                    {
+                        // Sprint 20 (ART_DIRECTION.md §3.3): a chunky 2:1
+                        // bean, not a 4:1 rod -- a thin rod vanishes at
+                        // board scale. Germ-green tint + thick outline.
+                        FillCapsule(b, 19f, C, 45f, C, 13f);
+                        InnerShade(b, C - 4f, C + 4f, 8f, 1.15f);   // a soft highlight, not a face
+                        largeBacterium = Finish(b, 6);
+                    }
+                    else
+                    {
+                        FillCapsule(b, 16f, C, 48f, C, 8f); // horizontal rod, caller rotates per instance
+                        RimShade(b, 2, 0.50f);
+                        largeBacterium = ToSprite(b);
+                    }
                 }
                 return largeBacterium;
             }
@@ -152,9 +164,27 @@ namespace ImmunologyTD.Rendering
                 if (virion == null)
                 {
                     var b = NewBuffer();
-                    FillDisc(b, C, C, 13f); // small -- ~60% of the bacterium footprint
-                    RimShade(b, 1, 0.50f);
-                    virion = ToSprite(b);
+                    if (Palette.Daylight)
+                    {
+                        // Sprint 20 (ART_DIRECTION.md §3.3): the cartoon
+                        // corona -- a ball with 8 short knobbed spokes. Short
+                        // on purpose: long thin arms belong to the DC alone.
+                        FillDisc(b, C, C, 15f);
+                        for (int i = 0; i < 8; i++)
+                        {
+                            float a = i * Mathf.PI / 4f + 0.2f;
+                            float ex = C + Mathf.Cos(a) * 22f, ey = C + Mathf.Sin(a) * 22f;
+                            FillCapsule(b, C, C, ex, ey, 2.2f);
+                            FillDisc(b, ex, ey, 4.5f);
+                        }
+                        virion = Finish(b, 6);
+                    }
+                    else
+                    {
+                        FillDisc(b, C, C, 13f); // small -- ~60% of the bacterium footprint
+                        RimShade(b, 1, 0.50f);
+                        virion = ToSprite(b);
+                    }
                 }
                 return virion;
             }
@@ -182,7 +212,7 @@ namespace ImmunologyTD.Rendering
                     FillDisc(b, C + 2f, C - 11f, 15f);
                     ValueStipple(b, 4242, 0.35f, 0.72f);
                     RimShade(b, 3, 0.62f);
-                    foodBolus = ToSprite(b);
+                    foodBolus = Finish(b, 5);
                 }
                 return foodBolus;
             }
@@ -243,7 +273,8 @@ namespace ImmunologyTD.Rendering
                 {
                     var b = NewBuffer();
                     FillRounded(b, C, C, 30f, 8f);
-                    Stipple(b, 24601, 0.62f);         // purulent
+                    if (Palette.Daylight) ValueStipple(b, 24601, 0.38f, 0.85f);  // Sprint 20: softer, and opaque
+                    else Stipple(b, 24601, 0.62f);         // purulent
                     RimShade(b, 2, 0.70f);
                     hostCellInfectedBacterial = ToSprite(b);
                 }
@@ -268,9 +299,10 @@ namespace ImmunologyTD.Rendering
                         float rr = 5f + (float)rng.NextDouble() * 6f;
                         FillDisc(b, ox, oy, rr);
                     }
-                    Stipple(b, 1337, 0.5f);
+                    if (Palette.Daylight) ValueStipple(b, 1337, 0.5f, 0.8f);
+                    else Stipple(b, 1337, 0.5f);
                     RimShade(b, 2, 0.55f);
-                    debris = ToSprite(b);
+                    debris = Finish(b, 2);
                 }
                 return debris;
             }
@@ -288,7 +320,8 @@ namespace ImmunologyTD.Rendering
                 {
                     var b = NewBuffer();
                     FillDisc(b, C, C, 30f);
-                    Multiply(b, 1f, 1f, 1f, 0.18f);
+                    // Daylight: an opaque dark-rose scar, not a hole in the render.
+                    if (!Palette.Daylight) Multiply(b, 1f, 1f, 1f, 0.18f);
                     emptyPit = ToSprite(b);
                 }
                 return emptyPit;
@@ -306,7 +339,7 @@ namespace ImmunologyTD.Rendering
                     FillRounded(b, C, C, 30f, 6f);
                     InnerShade(b, C, C, 24f, 0.62f); // recessed
                     RimShade(b, 2, 0.80f);
-                    slotNiche = ToSprite(b);
+                    slotNiche = Finish(b, 5);
                 }
                 return slotNiche;
             }
@@ -378,7 +411,7 @@ namespace ImmunologyTD.Rendering
                     FillCapsule(b, 38f, 44f, 62f, 40f, 2.4f);
                     InnerShade(b, 52f, 23f, 12f, 0.80f);
                     InnerShade(b, 52f, 42f, 12f, 0.80f);
-                    Stipple(b, 55, 0.62f);
+                    if (!Palette.Daylight) Stipple(b, 55, 0.62f);   // Sprint 20: Daylight declutters
                     marrowRegion = ToSprite(b);
                 }
                 return marrowRegion;
@@ -402,7 +435,7 @@ namespace ImmunologyTD.Rendering
                     InnerShade(b, C + 2f, C + 9f, 6f, 1.15f); // third germinal centre
                     InnerShade(b, C - 2f, C - 10f, 9f, 0.72f); // medullary notch / hilum
                     RimShade(b, 1, 0.85f);
-                    lymphNodeBean = ToSprite(b);
+                    lymphNodeBean = Finish(b, 2);
                 }
                 return lymphNodeBean;
             }
@@ -426,7 +459,7 @@ namespace ImmunologyTD.Rendering
                     var b = NewBuffer();
                     FillRounded(b, C, C, 31f, 2f);
                     AxisGradient(b, alongX: false, aStart: 0.92f, aEnd: 0.55f);
-                    Stipple(b, 6011, 0.85f);
+                    if (!Palette.Daylight) Stipple(b, 6011, 0.85f);   // Sprint 20: Daylight grounds are flat
                     chymeField = ToSprite(b);
                 }
                 return chymeField;
@@ -486,7 +519,7 @@ namespace ImmunologyTD.Rendering
                     var b = NewBuffer();
                     FillRounded(b, C, C, 31f, 2f);
                     AxisGradient(b, alongX: true, aStart: 0.86f, aEnd: 1.0f);
-                    Stipple(b, 6067, 0.90f);
+                    if (!Palette.Daylight) Stipple(b, 6067, 0.90f);   // Sprint 20: Daylight grounds are flat
                     plasmaField = ToSprite(b);
                 }
                 return plasmaField;
@@ -565,7 +598,7 @@ namespace ImmunologyTD.Rendering
                     // rather than as a slightly uneven dot.
                     InnerShade(b, C, C, 9f, 0.42f);
                     RimShade(b, 2, 0.72f);
-                    erythrocyte = ToSprite(b);
+                    erythrocyte = Finish(b, 4);
                 }
                 return erythrocyte;
             }
@@ -794,7 +827,7 @@ namespace ImmunologyTD.Rendering
                     float fuzz = 0.42f * (1f - near / 2.8f) * (0.7f + 0.3f * Hash01(x, y, 77));
                     if (fuzz > b[idx].a) { b[idx].a = fuzz; b[idx].r = 0.95f; b[idx].g = 0.95f; b[idx].b = 0.95f; }
                 }
-            return ToSprite(b);
+            return Finish(b, 3, shrink: false);
         }
 
         private static Sprite peyerDome;
@@ -821,7 +854,7 @@ namespace ImmunologyTD.Rendering
                         Blend(b, x, y, cov);
                     });
                     InteriorShade(b, 3, 0.80f);
-                    peyerDome = ToSprite(b);
+                    peyerDome = Finish(b, 2, shrink: false);
                 }
                 return peyerDome;
             }
@@ -881,7 +914,7 @@ namespace ImmunologyTD.Rendering
                             { b[idx].a *= 0.35f; b[idx].r *= 0.7f; b[idx].g *= 0.7f; b[idx].b *= 0.7f; }
                         }
                     RimShade(b, 2, 0.70f);
-                    crypt = ToSprite(b);
+                    crypt = Finish(b, 5, shrink: false);
                 }
                 return crypt;
             }
@@ -928,10 +961,22 @@ namespace ImmunologyTD.Rendering
                     FillRounded(b, C, C, 27f, 16f);
                     InnerShade(b, C, C, 10f, 0.55f);  // nucleus -- pushed dark enough to read at ~25 px (SpriteShapeDump)
                     RimShade(b, 2, 0.72f);
-                    endothelialCell = ToSprite(b);
+                    endothelialCell = Finish(b, 3);
                 }
                 return endothelialCell;
             }
+        }
+
+        /// <summary>Sprint 20: drop every cached sprite so the next access
+        /// rebuilds it under the current <see cref="Palette.Current"/> look
+        /// (Daylight bakes outlines and swaps a few silhouettes). Called only
+        /// by <see cref="Palette.ToggleAndReload"/> -- reflection over this
+        /// class's own private static Sprite fields, once, on a key press.</summary>
+        public static void ClearCache()
+        {
+            foreach (var f in typeof(SpriteShapes).GetFields(
+                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static))
+                if (f.FieldType == typeof(Sprite)) f.SetValue(null, null);
         }
 
         /// <summary>Optional: touch every accessor so all generation happens
@@ -981,6 +1026,86 @@ namespace ImmunologyTD.Rendering
             tex.SetPixels(buf);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, Res, Res), new Vector2(0.5f, 0.5f), Res);
+        }
+
+        /// <summary>Sprint 20: finish a unit / structure sprite. In the
+        /// Daylight look (<see cref="Palette.Outlines"/>) it gets a dark
+        /// outline <paramref name="strokePx"/> wide, drawn OUTSIDE the
+        /// silhouette (<see cref="OuterStroke"/>). To make room inside the
+        /// 64 px texture the shape is first shrunk by exactly the stroke
+        /// width, so the outlined sprite has the same outer extent as before
+        /// and no caller's scale changes. Edge-anchored shapes (villus,
+        /// dome, crypt -- their base sits on the texture edge) pass
+        /// <paramref name="shrink"/> false so the base stays put. Classic is
+        /// a plain ToSprite.</summary>
+        private static Sprite Finish(Color[] buf, int strokePx, bool shrink = true)
+        {
+            if (Palette.Outlines && strokePx > 0)
+            {
+                if (shrink) Shrink(buf, (C - strokePx - 0.5f) / C);
+                OuterStroke(buf, strokePx, 0.18f);
+            }
+            return ToSprite(buf);
+        }
+
+        /// <summary>Scale the whole buffer about its centre by
+        /// <paramref name="f"/> (&lt;1 = smaller), bilinear.</summary>
+        private static void Shrink(Color[] buf, float f)
+        {
+            var src = (Color[])buf.Clone();
+            for (int y = 0; y < Res; y++)
+                for (int x = 0; x < Res; x++)
+                {
+                    float sx = C + (x + 0.5f - C) / f - 0.5f;
+                    float sy = C + (y + 0.5f - C) / f - 0.5f;
+                    buf[y * Res + x] = Sample(src, sx, sy);
+                }
+        }
+
+        private static Color Sample(Color[] src, float x, float y)
+        {
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+            float fx = x - x0, fy = y - y0;
+            Color Px(int px, int py) =>
+                px < 0 || px >= Res || py < 0 || py >= Res ? new Color(1f, 1f, 1f, 0f) : src[py * Res + px];
+            var a = Color.Lerp(Px(x0, y0), Px(x0 + 1, y0), fx);
+            var b = Color.Lerp(Px(x0, y0 + 1), Px(x0 + 1, y0 + 1), fx);
+            return Color.Lerp(a, b, fy);
+        }
+
+        /// <summary>Sprint 20 (ART_DIRECTION.md §3.1): dilate the silhouette
+        /// outward by <paramref name="px"/> and fill that ring at
+        /// <paramref name="value"/>. Under the per-renderer multiply tint
+        /// this becomes a dark line in the sprite's OWN hue (blue → navy) --
+        /// coloured line art, the BTD / Kingdom Rush convention -- at zero
+        /// extra renderers. Anti-aliased on its outer edge.</summary>
+        private static void OuterStroke(Color[] buf, int px, float value)
+        {
+            var src = (Color[])buf.Clone();
+            int reach = px + 1;
+            for (int y = 0; y < Res; y++)
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (src[idx].a >= 0.5f) continue;
+                    float near = float.MaxValue;
+                    for (int dy = -reach; dy <= reach; dy++)
+                    {
+                        int ny = y + dy;
+                        if (ny < 0 || ny >= Res) continue;
+                        for (int dx = -reach; dx <= reach; dx++)
+                        {
+                            int nx = x + dx;
+                            if (nx < 0 || nx >= Res || src[ny * Res + nx].a < 0.5f) continue;
+                            float d = dx * dx + dy * dy;
+                            if (d < near) near = d;
+                        }
+                    }
+                    if (near == float.MaxValue) continue;
+                    float a = Mathf.Clamp01(px + 0.5f - Mathf.Sqrt(near) + 0.5f);
+                    if (a <= 0f) continue;
+                    buf[idx] = new Color(value, value, value, Mathf.Max(a, src[idx].a));
+                }
         }
 
         private static void Blend(Color[] buf, int x, int y, float alpha)

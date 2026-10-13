@@ -143,7 +143,7 @@ namespace ImmunologyTD.Pathogens
         private SpriteRenderer sr;
         private float contactFlashTimer;
         private Color restColor;
-        private static readonly Color FlashColor = new Color(0.95f, 0.85f, 0.3f);
+        private static Color FlashColor => Palette.PathogenHit;
 
         /// <summary>Sprint 15: fired with the world position at which a
         /// pathogen crosses into the base band, so the base compartment
@@ -294,6 +294,7 @@ namespace ImmunologyTD.Pathogens
             sr.sprite = Class == PathogenClass.IntracellularVirus
                 ? ImmunologyTD.Rendering.SpriteShapes.Virion
                 : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
+            ApplyVisualScale();
             sr.enabled = true;
 
             SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
@@ -382,6 +383,21 @@ namespace ImmunologyTD.Pathogens
             this.tally = tally;
             this.onExit = onExit;
             this.onSpawnNear = onSpawnNear;
+        }
+
+        /// <summary>Sprint 20 (Director D5): in the Daylight look pathogens
+        /// draw at a minimum on-screen size -- ~0.6 of a coarse cell for a
+        /// virion, ~0.55 for a bacterium -- instead of true biological scale
+        /// (a virion was ~5 px at the 100x40 board). Purely visual: the
+        /// fine-tile position, contact radius and footprint are unchanged.
+        /// Classic keeps the old 3.5-fine-tile quad.</summary>
+        private void ApplyVisualScale()
+        {
+            float fine = BoardConfig.FineTileWorldSize;
+            float worldSize = !ImmunologyTD.Rendering.Palette.PathogenSizeFloor
+                ? fine * 3.5f
+                : fine * (Class == PathogenClass.IntracellularVirus ? 5.0f : 4.7f);
+            transform.localScale = new Vector3(worldSize, worldSize, 1f);
         }
 
         private void EnsureSprite()
@@ -984,6 +1000,7 @@ namespace ImmunologyTD.Pathogens
             sr.sprite = Class == PathogenClass.IntracellularVirus
                 ? ImmunologyTD.Rendering.SpriteShapes.Virion
                 : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
+            ApplyVisualScale();
         }
 
         /// <summary>

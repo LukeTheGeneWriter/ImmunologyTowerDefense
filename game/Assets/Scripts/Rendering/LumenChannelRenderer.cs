@@ -33,14 +33,14 @@ namespace ImmunologyTD.Rendering
         // pale cream, and the wall grows villi. The bolus keeps its ochre and
         // is now the only brown thing in the band, which is exactly the
         // contrast an incoming round should have.
-        private static readonly Color ChymeColor  = new Color(0.36f, 0.22f, 0.24f);
-        private static readonly Color MucusColor  = new Color(0.88f, 0.84f, 0.76f);
-        private static readonly Color MoteColor   = new Color(0.60f, 0.52f, 0.40f);
-        private static readonly Color VillusColor = new Color(0.80f, 0.50f, 0.47f);
+        private static Color ChymeColor => Palette.Chyme;
+        private static Color MucusColor => Palette.Mucus;
+        private static Color MoteColor => Palette.FlowMote;
+        private static Color VillusColor => Palette.Villus;
         /// <summary>Sprint 19 (LUMEN_REFERENCE.md P2): the back row of the
         /// "velvet pile" -- darker, translucent, so depth reads without
         /// lifting the background value behind pathogens.</summary>
-        private static readonly Color BackVillusColor = new Color(0.62f, 0.40f, 0.42f, 0.70f);
+        private static Color BackVillusColor => Palette.VillusBack;
 
         private const int MoteCount = 28;           // Sprint 17: was 40 -- a cleaner channel
         private const float MucusDepthCells = 1.6f;
@@ -156,7 +156,7 @@ namespace ImmunologyTD.Rendering
             // drawn OVER the villi (order 2) so it glazes them -- that glaze
             // is what makes the wall read as wet and velvety instead of as a
             // row of pink fingers.
-            mucusQuad = MakeQuad("LumenMucus", SpriteShapes.MucusBand, WithAlpha(MucusColor, 0.20f), 2);
+            mucusQuad = MakeQuad("LumenMucus", SpriteShapes.MucusBand, MucusColor, 2);
             mucusQuad.position = new Vector3(
                 wallX + (wallOnLeft ? 1f : -1f) * stripDepth * 0.5f, lumenRect.center.y, 0f);
             mucusQuad.localScale = mucusBaseScale =
@@ -187,7 +187,7 @@ namespace ImmunologyTD.Rendering
                 go.transform.SetParent(transform, false);
                 var sr = go.GetComponent<SpriteRenderer>();
                 float shade = 1f + Random.Range(-0.08f, 0.08f);
-                sr.color = new Color(MoteColor.r * shade, MoteColor.g * shade, MoteColor.b * shade, 1f);
+                sr.color = new Color(MoteColor.r * shade, MoteColor.g * shade, MoteColor.b * shade, MoteColor.a);
                 float s = cell * Random.Range(0.14f, 0.26f);
                 go.transform.localScale = new Vector3(s, s, 1f);
                 go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));

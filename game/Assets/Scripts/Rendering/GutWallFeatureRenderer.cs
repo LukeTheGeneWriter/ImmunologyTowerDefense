@@ -32,11 +32,11 @@ namespace ImmunologyTD.Rendering
     /// </summary>
     public class GutWallFeatureRenderer : MonoBehaviour
     {
-        private static readonly Color DomeColor     = new Color(0.86f, 0.58f, 0.55f);
-        private static readonly Color MCellColor    = new Color(0.78f, 0.74f, 0.82f);
-        private static readonly Color FollicleColor = new Color(0.32f, 0.72f, 0.70f);
-        private static readonly Color CryptColor    = new Color(0.86f, 0.68f, 0.70f);
-        private static readonly Color PanethColor   = new Color(0.95f, 0.60f, 0.66f);
+        private static Color DomeColor => Palette.PeyerDome;
+        private static Color MCellColor => Palette.MCell;
+        private static Color FollicleColor => Palette.Follicle;
+        private static Color CryptColor => Palette.CryptPocket;
+        private static Color PanethColor => Palette.Paneth;
 
         private const float DomeHeightCells = 0.55f;   // visible bulge -- under the ±8% squeeze cap's spirit
         private const int MCellCount = 3;
@@ -121,7 +121,7 @@ namespace ImmunologyTD.Rendering
             // reaching FollicleDepthCells deep, plus a few resting lymphocytes.
             float depth = GutWallTuning.FollicleDepthCells * cell;
             Vector3 fc = seam - intoChannel * (depth * 0.5f);
-            var haze = MakeSprite("Follicle", SpriteShapes.NodeColocGlow, WithAlpha(FollicleColor, 0.30f), 2);
+            var haze = MakeSprite("Follicle", SpriteShapes.NodeColocGlow, WithAlpha(FollicleColor, Palette.FollicleAlpha), 2);
             haze.transform.position = fc;
             haze.transform.rotation = Quaternion.Euler(0f, 0f, angle);
             haze.transform.localScale = new Vector3(width * 1.15f, depth * 1.2f, 1f);
@@ -188,7 +188,11 @@ namespace ImmunologyTD.Rendering
             if (wall.MCellLevel <= 0) k = 0.55f;
             else if (wall.PendingAntigen > 0) k = 0.85f + 0.15f * Mathf.Sin(pulse * 5f);
             else k = 0.95f;
-            var c = new Color(MCellColor.r * k, MCellColor.g * k, MCellColor.b * k, 1f);
+            // Daylight shows "unbought" as half-transparent rather than
+            // darkened -- on a light ground, darker reads as louder.
+            var c = Palette.Daylight
+                ? new Color(MCellColor.r, MCellColor.g, MCellColor.b, wall.MCellLevel <= 0 ? 0.5f : Mathf.Lerp(0.75f, 1f, k))
+                : new Color(MCellColor.r * k, MCellColor.g * k, MCellColor.b * k, 1f);
             for (int i = 0; i < mCells.Count; i++) mCells[i].color = c;
         }
 

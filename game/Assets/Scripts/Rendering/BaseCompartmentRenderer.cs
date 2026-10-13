@@ -32,11 +32,11 @@ namespace ImmunologyTD.Rendering
         // arriving in -- but the things *in* the vessel brighten. A wall of
         // warm pink cells and saturated corpuscles reads as a living vessel;
         // the muted pair before it read as a diagram of one.
-        private static readonly Color PlasmaColor   = new Color(0.33f, 0.11f, 0.15f);
-        private static readonly Color WallColor     = new Color(0.78f, 0.50f, 0.52f);
-        private static readonly Color ErythroColor  = new Color(0.72f, 0.20f, 0.22f);
-        private static readonly Color PuffColor     = new Color(0.70f, 0.62f, 0.50f);
-        private static readonly Color BreachColor   = new Color(0.86f, 0.10f, 0.12f);
+        private static Color PlasmaColor => Palette.Plasma;
+        private static Color WallColor => Palette.VesselWall;
+        private static Color ErythroColor => Palette.Erythrocyte;
+        private static Color PuffColor => Palette.BirthPuff;
+        private static Color BreachColor => Palette.BreachFlash;
 
         private const int ErythrocyteCount = 24;
         private const int BirthPuffCap = 12;
@@ -111,7 +111,7 @@ namespace ImmunologyTD.Rendering
                 go.transform.SetParent(transform, false);
                 var sr = go.GetComponent<SpriteRenderer>();
                 float shade = 1f + Random.Range(-0.1f, 0.1f);
-                sr.color = new Color(ErythroColor.r * shade, ErythroColor.g * shade, ErythroColor.b * shade, 0.9f);
+                sr.color = new Color(ErythroColor.r * shade, ErythroColor.g * shade, ErythroColor.b * shade, ErythroColor.a);
                 float s = cell * Random.Range(0.18f, 0.30f);
                 go.transform.localScale = new Vector3(s, s, 1f);
                 go.transform.position = OuterEdgePoint(Random.value);

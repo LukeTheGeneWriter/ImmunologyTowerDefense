@@ -345,7 +345,7 @@ namespace ImmunologyTD.Pathogens
             foodVisual = new GameObject("ContaminatedFoodItem");
             var sr = foodVisual.AddComponent<SpriteRenderer>();
             sr.sprite = ImmunologyTD.Rendering.SpriteShapes.FoodBolus; // Sprint 13: lumpy stippled bolus
-            sr.color = new Color(0.55f, 0.47f, 0.28f); // dull spoiled-food ochre, unlike any pathogen
+            sr.color = ImmunologyTD.Rendering.Palette.FoodBolus; // spoiled-food ochre, unlike any pathogen
             sr.sortingOrder = 22; // above pathogens (20)
             float s = board.CoarseCellWorldSize * 1.4f;
             foodVisual.transform.localRotation = Quaternion.Euler(0f, 0f, Random.value * 360f);

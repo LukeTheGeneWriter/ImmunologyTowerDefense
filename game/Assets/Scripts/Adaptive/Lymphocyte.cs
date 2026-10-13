@@ -55,8 +55,8 @@ namespace ImmunologyTD.Adaptive
         /// pairing will teach anything (§5c step 5: the freeze is the cost).</summary>
         public bool Frozen { get; set; }
 
-        private static readonly Color RestColor = new Color(0.32f, 0.72f, 0.70f);   // helper-T teal
-        private static readonly Color PairedColor = new Color(0.82f, 0.94f, 0.92f); // near-white while paired
+        private static Color RestColor => Palette.HelperT;   // helper-T teal
+        private static Color PairedColor => Palette.HelperTPaired; // near-white while paired
 
         private Vector3 tweenStart;
         private Vector3 tweenEnd;

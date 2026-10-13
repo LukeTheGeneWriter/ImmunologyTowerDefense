@@ -97,8 +97,8 @@ namespace ImmunologyTD.Adaptive
         /// loaded DC heads to the node.</summary>
         private int patrolHeading = 1;
 
-        private static readonly Color EmptyColor = new Color(0.72f, 0.30f, 0.68f);  // dendritic magenta
-        private static readonly Color CargoColor = new Color(0.98f, 0.62f, 0.98f);  // brighter -- carrying antigen
+        private static Color EmptyColor => Palette.Dendritic;  // dendritic magenta
+        private static Color CargoColor => Palette.DendriticLoaded;  // brighter -- carrying antigen
 
         private Vector3 tweenStart;
         private Vector3 tweenEnd;

@@ -34,14 +34,14 @@ namespace ImmunologyTD.Rendering
         private bool[,] isHostGround;
         private float refreshTimer;
 
-        public static readonly Color HostColor = new Color(0.80f, 0.62f, 0.66f); // eosin-ish pink, a HEALTHY host cell
-        public static readonly Color PathogenColor = new Color(0.42f, 0.12f, 0.16f); // dark maroon -- pathogens visible as themselves
+        public static Color HostColor => Palette.HostHealthy; // eosin-ish pink, a HEALTHY host cell
+        public static Color PathogenColor => Palette.Bacterium; // dark maroon -- pathogens visible as themselves
 
         /// <summary>Sprint 13: a free (extracellular) virus particle. A
         /// colder purple-maroon -- same "foreign dark-red/violet" family as
         /// PathogenColor but distinct enough that "virus" (small cold dot)
         /// and "bacterium" (maroon rod) read apart at a glance.</summary>
-        public static readonly Color VirionColor = new Color(0.40f, 0.16f, 0.34f);
+        public static Color VirionColor => Palette.Virion;
 
         /// <summary>An INFECTED host cell (GAME_DESIGN.md section 1c). A
         /// bruised violet: recognisably still tissue (same value as
@@ -50,7 +50,7 @@ namespace ImmunologyTD.Rendering
         /// Note the cytokine heat tint also lands here -- infection is the
         /// main thing that secretes -- so in practice an infected cell reads
         /// as violet shading toward orange as it ramps.</summary>
-        public static readonly Color InfectedHostColor = new Color(0.54f, 0.36f, 0.60f);
+        public static Color InfectedHostColor => Palette.HostInfectedViral;
 
         /// <summary>An `Infected` host cell whose resident is an intracellular
         /// BACTERIUM rather than a virus (GAME_DESIGN.md §4b). A sickly
@@ -58,32 +58,32 @@ namespace ImmunologyTD.Rendering
         /// not healthy pink -- so the Director can see which kind of
         /// infection a cell is carrying, and see a bacterium duck in and
         /// burst back out. The cytokine heat tint lands here too.</summary>
-        public static readonly Color InfectedByBacteriumColor = new Color(0.62f, 0.60f, 0.26f);
+        public static Color InfectedByBacteriumColor => Palette.HostInfectedBact;
 
         /// <summary>DEBRIS: a dead host cell. Desaturated grey-brown, darker
         /// and colder than living tissue -- necrotic, not merely empty. It
         /// has to be told apart from bare ground at a glance, which is why
         /// it is browner AND lighter than EmptyGroundColor rather than just
         /// darker than tissue.</summary>
-        public static readonly Color DebrisColor = new Color(0.38f, 0.34f, 0.28f);
+        public static Color DebrisColor => Palette.Debris;
 
         /// <summary>Bare `Empty` ground -- cleaned, cell-free, regrowing.
         /// Very dark and neutral: a hole in the tissue, and visibly the
         /// absence of something rather than a substance in its own
         /// right.</summary>
-        public static readonly Color EmptyGroundColor = new Color(0.13f, 0.11f, 0.12f);
+        public static Color EmptyGroundColor => Palette.EmptyGround;
 
         /// <summary>The base band: the player's blood/production compartment
         /// and the endzone. A cold desaturated blue-violet, deliberately far
         /// from tissue pink and from the warm lumen so the three bands
         /// separate at a glance even on a small screenshot.</summary>
-        public static readonly Color BaseBandColor = new Color(0.20f, 0.21f, 0.34f);
+        public static Color BaseBandColor => Palette.BaseBand;
 
         /// <summary>The lumen channel: dark, warm, organic -- gut contents,
         /// not tissue.</summary>
-        public static readonly Color LumenBandColor = new Color(0.19f, 0.16f, 0.11f);
+        public static Color LumenBandColor => Palette.LumenBand;
 
-        private static readonly Color HotColor = new Color(1.00f, 0.55f, 0.05f); // warm glow, cytokine signal
+        private static Color HotColor => Palette.CytokineHot; // warm glow, cytokine signal
 
         /// <summary>How far the tint can push toward HotColor at full
         /// (normalized 1.0) field strength.</summary>

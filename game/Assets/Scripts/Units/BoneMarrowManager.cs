@@ -153,9 +153,9 @@ namespace ImmunologyTD.Units
         /// renderer in the model layer and UiTheme is the screen-space
         /// theme; a one-way dependency from UI to model is worth keeping
         /// one-way for a single colour.</summary>
-        private static readonly Color SelectionRimColor = new Color(0.431f, 0.561f, 0.690f);
+        private static Color SelectionRimColor => Palette.SelectionRim;
 
-        private static readonly Color EmptySlotColor = new Color(0.62f, 0.56f, 0.42f); // pale bone-ish tan
+        private static Color EmptySlotColor => Palette.MarrowSlotEmpty; // pale bone-ish tan
 
         private BoardConfig board;
         private TissueGrid tissueGrid;
@@ -544,8 +544,8 @@ namespace ImmunologyTD.Units
             {
                 case UnitKind.Macrophage: return macrophageProfile.Color;
                 case UnitKind.Neutrophil: return neutrophilProfile.Color;
-                case UnitKind.DendriticCell: return new Color(0.72f, 0.30f, 0.68f); // dendritic magenta
-                default: return new Color(0.32f, 0.72f, 0.70f);                     // helper-T teal
+                case UnitKind.DendriticCell: return Palette.Dendritic;
+                default: return Palette.HelperT;
             }
         }
 

@@ -143,6 +143,13 @@ namespace ImmunologyTD.Bootstrap
             // Sprint 15: generate every shape up front (BACKLOG item) -- the
             // compartment renderers below add ~9 more rasters, and one known
             // boot cost beats a first-of-kind hitch mid-round.
+            // Sprint 20: the look (Classic / Daylight, F10) must be known
+            // before any sprite is rasterised -- Daylight bakes outlines in.
+            // Unit colours come from the palette too, overriding whatever the
+            // scene serialised (a stale serialized field beats a C# default).
+            ImmunologyTD.Rendering.Palette.Load();
+            macrophageProfile.Color = ImmunologyTD.Rendering.Palette.Macrophage;
+            neutrophilProfile.Color = ImmunologyTD.Rendering.Palette.Neutrophil;
             ImmunologyTD.Rendering.SpriteShapes.Prewarm();
             macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
             neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
@@ -185,6 +192,7 @@ namespace ImmunologyTD.Bootstrap
             BuildCamera(layout.Bounds);
             BuildBoardVisual();
             BuildLumenChannel();
+            BuildTissueUnderlay();
             BuildBaseCompartment();
             BuildGutInterfaceVisual();
             BuildBoneMarrowBackdrop(layout);
@@ -294,7 +302,7 @@ namespace ImmunologyTD.Bootstrap
             var camGo = new GameObject("MainCamera");
             mainCamera = camGo.AddComponent<Camera>();
             mainCamera.orthographic = true;
-            mainCamera.backgroundColor = new Color(0.05f, 0.05f, 0.07f);
+            mainCamera.backgroundColor = ImmunologyTD.Rendering.Palette.CameraClear;
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             camGo.tag = "MainCamera";
 
@@ -380,6 +388,24 @@ namespace ImmunologyTD.Bootstrap
             renderer.Bind(board, gutInterface);
         }
 
+        /// <summary>Sprint 20 (Daylight only, ART_DIRECTION.md §3.2): a flat
+        /// quad under the tissue grid, so the gaps between the rounded host
+        /// cells read as pink mortar rather than the camera clear showing
+        /// through as black lines. +1 renderer. Classic keeps the old seams.</summary>
+        private void BuildTissueUnderlay()
+        {
+            if (!ImmunologyTD.Rendering.Palette.Daylight) return;
+            var rect = board.BandWorldRect(BoardBand.Tissue);
+            if (rect.width <= 0f) return;
+            var go = new GameObject("TissueUnderlay");
+            go.transform.position = new Vector3(rect.center.x, rect.center.y, 0f);
+            go.transform.localScale = new Vector3(rect.width, rect.height, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = ImmunologyTD.Rendering.RuntimeSprites.SquareSprite;
+            sr.color = ImmunologyTD.Rendering.Palette.TissueUnderlay;
+            sr.sortingOrder = -1;
+        }
+
         /// <summary>Sprint 15: the lumen stops being tinted host-cell quads
         /// and becomes an open channel -- a chyme field, a mucus wall layer,
         /// and drifting particulate (docs/COMPARTMENT_DESIGN.md §2.1).</summary>
@@ -413,7 +439,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.localScale = new Vector3(backdropSize.x * 1.5f, backdropSize.y * 1.5f, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = ImmunologyTD.Rendering.SpriteShapes.OrganHalo;
-            sr.color = new Color(0.20f, 0.06f, 0.09f); // deeper plasma
+            sr.color = ImmunologyTD.Rendering.Palette.OrganHalo; // Classic: deeper plasma; Daylight: a soft drop shadow
             sr.sortingOrder = 1;
         }
 
@@ -426,7 +452,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 texture, Sprint 15 revision
-            sr.color = new Color(0.34f, 0.22f, 0.18f); // Sprint 15: red marrow -- belongs to the blood it sits in
+            sr.color = ImmunologyTD.Rendering.Palette.MarrowBackdrop;
             sr.sortingOrder = 2; // Sprint 15: above the organ halo
         }
 
@@ -439,7 +465,7 @@ namespace ImmunologyTD.Bootstrap
             go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 silhouette, Sprint 15 revision
-            sr.color = new Color(0.34f, 0.40f, 0.28f); // pale lymphoid green
+            sr.color = ImmunologyTD.Rendering.Palette.NodeBackdrop;
             sr.sortingOrder = 2; // Sprint 15: above the organ halo
 
         }

@@ -19,7 +19,7 @@ namespace ImmunologyTD.Rendering
     /// </summary>
     public class LymphNodeFieldRenderer : MonoBehaviour
     {
-        private static readonly Color GlowColor = new Color(0.55f, 0.85f, 0.85f); // cool cyan-white
+        private static Color GlowColor => Palette.NodeColocGlow; // cool cyan-white
         private const float MaxAlpha = 0.35f;
         private const float RefreshInterval = 0.15f;
 
