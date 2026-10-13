@@ -876,3 +876,25 @@ The buy panels and the upgrade framework landed well. Two items:
   `FieldLabel` text and `ProgenitorUpgrades`' consts. The labels are
   debug-only; if they drift it costs a confused debug readout, not a bug.
   Generate the label from the consts if that ever bites.
+
+## Opened / updated by Sprint 19 (2026-10-13) — peristalsis + gut-wall anatomy
+
+- **~~Bolus motion~~ — peristalsis, Sprint 19.** Watch for whether
+  bursts now arriving in surge-driven clumps feel different at the wall.
+  They can: three pathogens dropped in one push stick close together.
+- **Leukocyte rolling and extravasation** — still queued (see the Sprint
+  18 section). Now the natural next sprint.
+- **Peyer's patch, refine:** DCs don't seek the follicle (an attractant
+  would make the upgrade stronger and more legible); M cells as an
+  *entry* route for some pathogens; local follicle lymphocytes and the
+  IgA link. See GAME_DESIGN §1d.
+- **Crypt placement is automatic** (a fixed spread along the wall). If
+  the Director wants a choice, add a click-a-wall-lane placement mode.
+- **No hover radius on crypts.** LUMEN_REFERENCE P4 suggests a faint ring
+  on hover/selection; there's no selection for shop items yet.
+- **LUMEN_REFERENCE P5 (capillary loops), P7 (commensals), P8 (mucus
+  edge)** — not done. P7 needs a readability check against real
+  bacteria first.
+- **The shop's "real effect" dot now marks three rows** (sensing, crypt,
+  M cells). The other four shop rows (mucus turnover, dsRNA sensor, viral
+  entry, bacterial resistance) are still placeholders.

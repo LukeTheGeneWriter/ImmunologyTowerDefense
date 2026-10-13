@@ -12,6 +12,30 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 19 -- 2026-10-13
+The gut moves now, and it has anatomy.
+
+- **Peristalsis.** The contaminated food is shoved down the gut in
+  surges by waves of contraction, then nearly stops until the next wave.
+  The wall visibly squeezes behind it, and the villi just behind it
+  stretch and lean downstream as the wave passes. It takes the same 30
+  seconds to cross as before, so rounds aren't any longer or shorter.
+- **The bolus is solid and rounded.** It was see-through (its texture
+  punched holes in itself) and read as spiky. Now it's an opaque, lumpy
+  mass with grubby flecks.
+- **Velvet-pile villi.** Every villus is redrawn the way textbook
+  diagrams draw one: a bright rim of epithelium, a darker core with the
+  lacteal running up it, pale goblet cells and a fuzzy brush-border edge.
+  A second, darker row behind gives the fringe depth.
+- **A Peyer's patch.** Partway down the wall the villi stop, and a low
+  dome with M cells sits over a lymphoid follicle. Buy **M-cell sampling**
+  and the dome starts sampling pathogens drifting past. The M cells light
+  up, and any DC patrolling the follicle collects that antigen. That's
+  knowledge without waiting for tissue to die.
+- **Crypts are real.** Each one you buy appears at the gut wall as a
+  little pocket with pink Paneth granules, and dead ground nearby regrows
+  about three times faster.
+
 ## Sprint 18 -- 2026-10-13
 The upgrade buttons do something now.
 

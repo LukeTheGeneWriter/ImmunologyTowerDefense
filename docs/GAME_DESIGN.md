@@ -130,6 +130,18 @@ coarse cell. The numbers are workable as stated; they are recorded here so
 a later change to fine subdivision or unit speed is understood to move
 them.
 
+### Peristalsis — the bolus moves in surges (Director, 2026-10-13, Sprint 19)
+
+The contaminated food bolus no longer crawls down the lumen at a constant
+rate. A peristaltic wave pushes it forward over ~35% of each 7.5 s cycle
+and it barely drifts between waves. The profile's mean speed is exactly
+the old constant speed, and the period divides the transit evenly, so the
+total transit (`FoodItemTransitSeconds`, 30 s) and round pacing are
+unchanged. The lumen's drawn squeeze runs on the same clock, so the wall
+visibly contracts behind the bolus as it surges. Burst timing still keys
+off the bolus's lane position, so pathogens now drop in clumps that
+follow the surges.
+
 ## 1b. Invasion, breach, and pathogen advance — LOCKED (Director, 2026-08-21)
 
 How a pathogen gets from the lumen into the tissue, and how it moves once
@@ -426,6 +438,48 @@ Placeable stem-cell niches (§6's crypt-based recovery). Tissue within a
 radius of a crypt regrows faster — a spatial version of Sprint 11's
 neighbour-accelerated regrowth, giving the player a reason to care *where*
 combat happens. Repeatable buy (more crypts = more coverage).
+
+**Built Sprint 19 — snapped to the wall (Director, 2026-10-13).** Real
+crypts are invaginations of the epithelium and never sit free in the
+tissue, so each crypt sits at the gut wall and its reach (3 cells,
+Chebyshev) extends into the tissue. Empty ground in reach regrows 3×
+faster. Coverage is spatial, not stacking. The player doesn't choose
+where a crypt goes yet: each purchase takes the next lane of a fixed,
+well-spread sequence that avoids the Peyer's patch. If players want to
+choose, the natural extension is a click-a-wall-lane placement mode,
+still snapped to the wall.
+
+### Peyer's patch and M-cell sampling — built Sprint 19 (Director, 2026-10-13)
+
+A fixed stretch of the gut wall, about 4 lanes at ~60% of the way down
+the flow, is a **Peyer's patch**: no villi, a low dome of epithelium,
+M cells on the dome, and a lymphoid follicle in the tissue beneath. It is
+**always drawn**, a landmark the Director called "important
+immunologically".
+
+Its function, **M-cell sampling, is a shop upgrade, not a default**
+(Director: "M cell functionality as an upgrade not straight out of the
+box"). Once bought, a pathogen drifting over the dome or sitting at the
+wall there may be sampled, at a rate that scales with the level. M cells
+transcytose *antigen*, so the pathogen itself is unharmed and still a
+threat. The antigen waits in the dome (up to 3 parcels) until a
+cargo-less DC patrolling the follicle collects it as cargo.
+
+Why it matters: until now the **only** route to knowledge (§5a) was
+debris, so the player learned about a pathogen only after it had killed
+tissue. The patch is the first route that teaches from the *lumen side*,
+before damage. That is what Peyer's patches are for in reality, and it
+starts §5c's adaptive loop earlier. Sequenced as an upgrade, it is a
+choice between spending ATP on fighting now and on learning sooner.
+
+**Refine later (flagged, not built):**
+- DCs don't seek the follicle; they collect only when their patrol
+  crosses it. Making the follicle a DC attractant is the obvious next lever.
+- M cells are also a real *entry* route: Salmonella and others exploit
+  them. A pathogen class that breaches preferentially at the dome would
+  make the patch a two-edged structure.
+- A dedicated follicle lymphocyte population (local priming, IgA class
+  switching) ties to the ~70% secretory-IgA rung (§5).
 
 ## 2. Tower / unit lifespan model — LOCKED
 

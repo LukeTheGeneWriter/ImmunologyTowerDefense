@@ -1066,6 +1066,23 @@ recording as a general point: the sprite dump tells you whether a *shape*
 is right, and only the running board tells you whether a *field of them*
 is.
 
+## Sprint 19 — peristalsis and gut-wall anatomy
+
+- **Peristalsis** (`Pathogens/Peristalsis`): the bolus position is a
+  closed-form function of elapsed time (a surge profile with mean 1 and
+  period transit/4), so transit time is unchanged and motion is
+  frame-rate independent. The lumen renderer reads the same clock off the
+  bolus, so the drawn squeeze matches the simulated push.
+- **Gut-wall structures** (`Grid/GutWallFeatures`, model;
+  `Rendering/GutWallFeatureRenderer`, drawing). The Peyer's patch is a
+  fixed lane range; M-cell sampling (a shop upgrade) queues antigen that a
+  follicle DC collects as cargo. Crypts (shop, repeatable) sit at the wall
+  and divide the regrow time of nearby Empty cells. Reached through the
+  null-safe `GutWallFeatures.Current`, so earlier harnesses are untouched.
+- **Shop**: crypt and M-cell rows are real effects now (3 of 7 rows).
+- **Sprites**: villus redraw + variant, opaque/rounded bolus, dome, M cell,
+  crypt, Paneth granules. All checked magnified via `SpriteShapeDump`.
+
 ## Sprint 18 — the upgrades go live
 
 - **`Units/ProgenitorUpgrades`** (new, static) — `Apply(kind, row, level,

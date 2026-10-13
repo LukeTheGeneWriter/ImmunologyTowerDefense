@@ -1927,6 +1927,59 @@ project has ever been headlessly testable.
 - `Sprint18Verification.RunAll` — 28 checks. Sprint11's placeholder
   assertion reworded (the shim now writes row 0).
 
+## Sprint 19 changes — peristalsis, Peyer's patch, crypts
+
+### `ImmunologyTD.Pathogens.Peristalsis` (new, static)
+- Tuning: `WavesPerTransit` 4, `PushFraction` 0.35, `DriftSpeed` 0.15;
+  `ResetToDefaults()`. `Period` = `FoodItemTransitSeconds / WavesPerTransit`.
+- Pure functions of elapsed seconds: `SpeedFactor(t)` (mean 1),
+  `Contraction(t)` (0..1), `Travel01(t)` (closed-form integral; exactly 1
+  at the transit time).
+- Cosmetic hook, written only by `PathogenSpawner`: `BolusActive`,
+  `BolusWorldPosition`, `BolusElapsed`.
+
+### `ImmunologyTD.Pathogens.PathogenSpawner`
+- Food rounds advance by `Peristalsis.Travel01` instead of a fixed-rate
+  timer. `foodCrossIndex` (which drives bursts) stays whole; the visual
+  lerps between lanes. Public surface unchanged.
+- `Tick` now also runs M-cell sampling over `Live` (Lumen / AtInterface
+  agents) when `GutWallFeatures.Current.MCellLevel > 0`.
+
+### `ImmunologyTD.Grid.GutWallTuning` (new, static) / `GutWallFeatures` (new)
+- Tuning: `PatchWidthLanes` 4, `PatchCenter01` 0.6, `FollicleDepthCells`
+  3, `MCellSampleChancePerSecond` 0.08 (× level), `MCellAntigenCapacity`
+  3, `CryptRegrowthBonus` 2 (divisor 1 + 2), `CryptRadiusCells` 3.
+- `GutWallFeatures(BoardConfig)`; **`static GutWallFeatures Current`**
+  (null-safe hook; null = Sprint 18 behaviour).
+- Patch: `PatchCrossStart` / `PatchCrossEnd` (inclusive), `IsPatchLane`,
+  `IsOverDome(CoarseCoord)`, `IsInFollicle(CoarseCoord)`,
+  `int MCellLevel { get; set; }`, `PendingAntigen`, `AntigenSampled`,
+  `AntigenCollected`,
+  `bool TrySample(CoarseCoord at, PathogenClass, float deltaTime, float roll01)`,
+  `bool TryTakeAntigen(CoarseCoord dcAt, out PathogenClass)`.
+- Crypts: `SetCryptCount(int)` (stable van der Corput lanes, off the
+  patch), `CryptLanes`, `CryptVersion`, `float RegrowthMultiplier(CoarseCoord)`.
+
+### Consumers
+- `TissueGrid.Tick`: Empty-cell regrow time is also divided by
+  `GutWallFeatures.Current.RegrowthMultiplier(c)`.
+- `DendriticCell` patrol: a cargo-less DC first tries
+  `TryTakeAntigen` (follicle), then the old debris sampling.
+- `ShopItem.MCellSampling` (new, **appended**), `ShopTuning.MCellSamplingBasePrice` 40.
+- `UiController.Update` bridges `ShopLedger` →
+  `GutWallFeatures.SetCryptCount` / `MCellLevel`, next to the Sprint 12
+  sensing bridge.
+
+### Rendering
+- `SpriteShapes`: **new** `VillusAlt`, `PeyerDome`, `MCell`, `Crypt`,
+  `GranuleCluster`; `Villus` and `FoodBolus` redrawn.
+- **New** `GutWallFeatureRenderer.Bind(BoardConfig, GutWallFeatures)`.
+- `LumenChannelRenderer`: chyme at order −1, back-row villi at 0; no
+  villi on patch lanes; the squeeze is driven by `Peristalsis`.
+
+### Verification
+- `Sprint19Verification.RunAll`: 28 checks.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

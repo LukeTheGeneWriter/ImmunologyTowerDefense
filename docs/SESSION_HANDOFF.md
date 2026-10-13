@@ -61,12 +61,12 @@ No gameplay changed. This was infrastructure only:
 
 ## Where the game itself stands (updated 2026-10-13)
 
-- **Sprint 17 playtested**: DCs are smooth (Director).
-- **Sprint 18 shipped**: all 12 upgrade rows are live and per-tower; see
-  `SPRINT_PLAN.md`. `docs/LUMEN_REFERENCE.md` holds design research for
-  the next lumen pass.
-- **Queued by the Director:** bolus motion next, then leukocyte rolling
-  and extravasation from the vessel (`BACKLOG.md`, Sprint 18 section).
+- **Sprint 18 shipped**: all 12 upgrade rows are live, per-tower.
+- **Sprint 19 shipped, awaiting the Director's playtest**: peristaltic
+  bolus (opaque, rounded), velvet-pile villi, Peyer's patch + buyable
+  M-cell sampling, real crypts. See `SPRINT_PLAN.md`.
+- **Queued next:** leukocyte rolling and extravasation from the vessel
+  (`BACKLOG.md`, Sprint 18 section), plus Peyer's patch refinements.
 
 ## For whichever session picks this up
 

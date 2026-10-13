@@ -44,10 +44,11 @@ never load-bearing.
 
 | Order | What |
 |---|---|
-| 0 | **Tissue** host-cell grid (`BoardRenderer`, one `SpriteRenderer` per *tissue-band* cell only); base **plasma field**; lumen **chyme field** |
-| 1 | Base **vessel-wall cells** (*Sprint 17: a tiled row, was one stretched bar*); **organ halos** (behind the backdrops); lumen **villi** *(new, Sprint 17)* |
-| 2 | Compartment backdrops (bone marrow, lymph node); lumen **mucus sheen** (*Sprint 17: moved up from 1, so it glazes the villi*); **erythrocyte streamers** |
-| 3 | Gut-wall bar (`GutInterfaceRenderer`); node **co-localisation haze**; base **breach flash** |
+| −1 | Lumen **chyme field** (*Sprint 19: moved down from 0 to make room for the back row of villi*) |
+| 0 | **Tissue** host-cell grid (`BoardRenderer`, one `SpriteRenderer` per *tissue-band* cell only); base **plasma field**; lumen **back-row villi** *(new, Sprint 19)* |
+| 1 | Base **vessel-wall cells** (*Sprint 17: a tiled row, was one stretched bar*); **organ halos** (behind the backdrops); lumen **front-row villi** *(Sprint 17)*; **Peyer's dome** *(Sprint 19)* |
+| 2 | Compartment backdrops (bone marrow, lymph node); lumen **mucus sheen** (*Sprint 17: moved up from 1, so it glazes the villi*); **erythrocyte streamers**; **Peyer's follicle** haze + resting lymphocytes, **crypt pockets** *(Sprint 19 — tissue side, translucent / outline only so host-cell states read through)* |
+| 3 | Gut-wall bar (`GutInterfaceRenderer`); node **co-localisation haze**; base **breach flash**; **M cells**, **Paneth granules** *(Sprint 19)* |
 | 4 | Marrow **birth-puff motes**; lumen **flow motes** (*Sprint 17: moved up from 2, so a mote at the seam isn't half-swallowed by the wall bar*) |
 | 5 | Bone-marrow slots |
 | 10 | Immune cells (`SearchUnit`) |
@@ -94,7 +95,13 @@ brown thing in the lumen.**
 | Element | `SpriteShapes` | Colour (0–1 RGB) | Notes |
 |---|---|---|---|
 | Lumen chyme field | `ChymeField` | **`0.36,0.22,0.24` mucosal plum** *(was brown-olive)* | one quad over the lumen band, alpha fades down-flow; ±6% peristaltic squeeze |
-| Lumen **villus** | **`Villus`** *(new)* | **`0.80,0.50,0.47` coral ±7%** | fringe along the gut wall, ~0.42×1.15 cells, spaced ~0.78, sways ±5° on its own phase |
+| Lumen **villus** | **`Villus` / `VillusAlt`** *(Sprint 19 redraw)* | **`0.80,0.50,0.47` coral ±7%** | fringe along the gut wall, sways ±5° on its own phase. Sprint 19: lit epithelial rim (0.9) around a darker lamina-propria core (~0.76), lacteal stripe, two goblet-cell flecks (1.0), soft brush-border fuzz; two variants so the row doesn't repeat. Gap at the Peyer's patch. Villi just behind the bolus stretch +28% and lean 14° downstream at peak contraction |
+| Lumen **back-row villus** *(Sprint 19)* | `Villus` / `VillusAlt` | **`0.62,0.40,0.42` @ 0.70α** | half-spacing offset, ~80% height, slower sway — the "velvet pile" depth cue; must stay darker than the front row |
+| **Food bolus** *(Sprint 19 redraw)* | `FoodBolus` | `0.55,0.47,0.28` ochre (unchanged) | **opaque** now (the old alpha stipple made it see-through) and rounded (shallow lobes + three lumps, not six deep spikes); grubby flecks in value. Glides between lanes in peristaltic surges |
+| **Peyer's dome** *(Sprint 19)* | `PeyerDome` | `0.86,0.58,0.55` | low hump of epithelium over a 4-lane villus-free stretch, ~0.55 cells high |
+| **M cell** *(Sprint 19)* | `MCell` | `0.78,0.74,0.82` lavender-grey | 3 on the dome, dark basal pocket; **×0.55 dim until the M-cell upgrade is bought**, pulsing while antigen waits for a DC |
+| **Follicle** *(Sprint 19)* | `NodeColocGlow` + `Lymphocyte` | `0.32,0.72,0.70` teal @ 0.30α / 0.55α | tissue under the dome, FollicleDepthCells deep — where DCs collect M-cell antigen |
+| **Crypt** *(Sprint 19)* | `Crypt` + `GranuleCluster` | pocket `0.86,0.68,0.70`; Paneth granules `0.95,0.60,0.66` rose | **drawn only once bought**; U-pocket opening at the wall into tissue, ~0.35×0.6 cells |
 | Lumen mucus sheen | `MucusBand` | **`0.88,0.84,0.76` pearly @ 0.20α** *(was grey-green @ 0.5)* | glazes the villi — that glaze is the "velvety" read |
 | Flow mote | `FlowMote` | **`0.60,0.52,0.40` pale cream ±8%** | **~28** pooled *(was ~40)*, drift down-flow, recycle at the excretion edge |
 | Base plasma field | `PlasmaField` | `0.33,0.11,0.15` oxblood | one quad over the base band, alpha lifts toward the wall |

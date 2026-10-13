@@ -1099,3 +1099,18 @@ thing to measure before this becomes routine.
   future briefs:** any agent that makes web requests is told explicitly
   not to put personal information in headers, URLs or payloads, and to
   use a generic project UA (repo URL only).
+
+### Sprint 19 — head session (2026-10-13)
+
+- **Asking the three forks up front paid off again.** The answer that
+  mattered most was one I hadn't offered: "M-cell functionality as an
+  upgrade, not out of the box". That changed the model (a level gate,
+  dim M cells until bought) and would have been a rework if guessed.
+- **Closed-form motion beat an accumulator.** Making the bolus position a
+  pure function of elapsed time (the integral of the surge profile) made
+  "transit time unchanged" a one-line assertion (exit at 30.05 s for 30 s)
+  and kept it frame-rate independent. The renderer reads the same
+  function, so the drawn squeeze and the simulated push can't drift.
+- **Look at sprites magnified before shipping.** `SpriteShapeDump` plus a
+  tinted 4× montage caught that the goblet flecks were invisible (rim
+  already at full value) before a build was spent on it.
