@@ -1128,3 +1128,17 @@ thing to measure before this becomes routine.
 - **Keep the old look runnable.** "Toggle first" made Classic a
   first-class palette column, and asserting Classic equals the shipped
   literals makes the A/B honest.
+
+### Sprint 21 — head session (2026-10-14)
+
+- **The spec was good enough to build straight from, and three of its
+  numbers were wrong in ways only a raster showed**: the 9-slice inset,
+  the marrow cavity size, and the cord count. Each was caught by dumping
+  the sprite and compositing it in PIL before a build. "Look at it
+  magnified" is now the most valuable habit in this project.
+- **Big UI rewrites compile-check cheaply through BootstrapSmoke**, which
+  constructs every view headlessly. The one compile error (a `Card`
+  colour clashing with a `Card()` factory) surfaced there in seconds.
+- **The research agent's web-request rule held.** The second design
+  agent fetched references with a generic User-Agent and committed no
+  images.

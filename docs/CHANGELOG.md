@@ -12,6 +12,36 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 21 -- 2026-10-14
+The frame around the game got the same treatment as the board.
+
+- **The board is a figure plate**: a rounded, ink-outlined panel with a
+  drop shadow, and tabs naming the bloodstream, tissue and gut lumen.
+- **All the permanent UI moved off the board** into the strips above
+  and below it, as light cream cards in a rounded, friendly typeface
+  (Nunito).
+  - **Top right:** the HUD, with a big START ROUND button or a wave
+    progress bar.
+  - **Bottom right:** the shop, now an always-open tray of tiles. Each
+    tile has an icon, a price chip (with a little bar showing how close
+    you are when you can't afford it yet) and a level badge. Hovering
+    explains it; items that don't do anything yet are hatched "planned".
+- **New: the knowledge HUD**, bottom left under the lymph node.
+  - One card per pathogen, showing how much your immune system knows
+    about it and the ladder of what that knowledge unlocks.
+  - When a dendritic cell teaches, a "+3%" flies from the lymph node to
+    the card.
+  - When you cross a rung, a ribbon announces it, marked "planned"
+    because none of those abilities exist yet.
+  - Click a card for the full ladder.
+- **The organs look like organs.**
+  - The bone marrow is spongy bone with marrow in its holes, and steel
+    build pads you place cells on. A placed cell stands on its pad.
+  - The lymph node has a capsule, follicles, and lymph vessels coming
+    in from the tissue side.
+  - It also fixes a bug where helper-T cells walked off the edge of the
+    old oval.
+
 ## Sprint 20 -- 2026-10-14
 Two looks, one key. Press **F10** to flip.
 

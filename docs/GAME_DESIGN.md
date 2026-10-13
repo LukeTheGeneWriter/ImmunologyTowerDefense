@@ -755,6 +755,17 @@ the abstraction's main payoff: antigenic change becomes a single legible
 number dropping, and the game never has to represent phylogenetics, drift
 versus shift, or epitope-level specificity.
 
+### The knowledge HUD and "planned" rungs (Sprint 21, Director 2026-10-14)
+
+Knowledge is now player-facing: the bottom-left strip shows each species'
+% and its ladder. **No rung's capability is built yet**, but the % is
+really earned. So a reached rung shows as *learned · planned*, with the
+UI's "designed, not built" hatch, rather than being hidden or shown as
+live. `KnowledgeLadder.Rung.Built` flips each to solid as its mechanic
+lands. The ~90% capstone (`KnowledgeLadder.CapstonePercent`) is a star at
+the end of every ladder, permanently planned for now: it names the
+campaign's goal.
+
 ### Threshold ladder — **roster confirmed (Director, 2026-08-29)**
 
 The Director confirmed the six-rung roster below (thresholds still

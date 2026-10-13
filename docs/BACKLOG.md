@@ -916,3 +916,20 @@ The buy panels and the upgrade framework landed well. Two items:
 - **Neutrophil trefoil nucleus can read as a face** at small sizes (the
   designer flagged it). Fine unless the Director says otherwise (D4 was
   "no faces").
+
+## Opened / updated by Sprint 21 (2026-10-14) — cosmetic pass
+
+- **The two bacterial classes look identical on the board** (the
+  knowledge cards made it obvious: they tell them apart, the board can't).
+  Give the intracellular bacterium its own silhouette or tint.
+- **Medullary cords still fan a little like an arrow** at magnification.
+  Check at board scale; if it reads as a direction cue, drop them to two
+  or curve them.
+- **Spec items not built:** the PvZ lane-tone rows, and a crypt
+  regrowth-radius ring on hover. There is no selection for shop items yet.
+- **Knowledge HUD can't be verified headlessly beyond its watcher.**
+  Token flight, ribbons and the expanded card need the Director's eye (or
+  a scripted play-mode test).
+- **`docs/UI_DESIGN.md` §1/§2/§6 describe the Sprint 16 dark glass.**
+  `COSMETIC_PASS_SPEC.md` and the UI_STYLE_GUIDE Sprint 21 section
+  supersede them; fold them in if UI_DESIGN is revised again.

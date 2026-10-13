@@ -1066,6 +1066,21 @@ recording as a general point: the sprite dump tells you whether a *shape*
 is right, and only the running board tells you whether a *field of them*
 is.
 
+## Sprint 21 — cosmetic pass (organs, shop, frame, knowledge HUD)
+
+- Classic look retired; `Palette` has one value per entry.
+- UI is light cards in the screen gutters. `FitCamera` guarantees the
+  gutters (pure `CameraHalfHeight`). The bundled Nunito font loads from
+  `Resources`.
+- `KnowledgeView` polls `KnowledgeLedger` through the pure
+  `KnowledgeWatcher` and animates on pre-built elements, with no
+  per-frame allocation.
+- Organs are `OrganShapes` canvases built once at boot (~1.3 MB of
+  textures). The plate frame is one 9-sliced renderer at order 40.
+- **Watch:** UI hover and pulse states write a few style properties per
+  frame on 7 shop tiles and 3 knowledge cards. Cheap, but if UITK layout
+  cost ever shows in a profile, gate those writes on change.
+
 ## Sprint 20 — one palette, two looks
 
 - **`Rendering/Palette.cs`** owns every world colour, Classic (shipped)

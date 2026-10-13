@@ -159,6 +159,43 @@ players. Selected in `ShapeFor(color)` keyed off the burst colour.
 
 **F9** in a build fires all five at once for a look.
 
+## Sprint 21 — light cards, gutters, organs (`docs/COSMETIC_PASS_SPEC.md`)
+
+The spec is the detailed reference. In short:
+
+- **UI is light cream cards on the dark desk.** Tokens are in `UiTheme`:
+  `CardFill`, `TileFill`, `Ink`/`Edge`, `InkDim`, `Accent` + `AccentLip`,
+  `Gold`, `ChipDim`, `Bad`, `Heart`, `Hatch`. Every surface has a 3 px ink
+  edge and a thicker bottom edge as its lift. The font is **Nunito**
+  Regular / Bold / Black (`Assets/Resources/Fonts/`, OFL licence beside
+  it). **Symbols are sprites** (`SpriteShapes.Icon*`), never font glyphs.
+- **Docks.**
+  - Top-right: the HUD (ATP, lives, round, START ROUND or wave progress).
+  - Bottom-right: the shop tray, always open, one tile per item.
+  - Bottom-left: the knowledge strip.
+  - Top-left: the debug readout.
+  - Over the board, on demand only: the picker, the upgrade panel, the
+    expanded knowledge card, tooltips.
+  - `FitCamera` reserves ≥15% of the screen height above and below the board.
+- **"Hatched = designed, not built."** One rule across the UI: placeholder
+  shop items and reached-but-unbuilt knowledge rungs carry the diagonal
+  hatch (`UiTheme.ApplyHatch`, `PlannedPill`).
+- **Board frame**: a 9-sliced `PlateFrame` at order 40 with an ink edge
+  and drop shadow; corners in the desk colour. Three band tabs sit on its
+  top edge (BLOODSTREAM / TISSUE / GUT LUMEN ↓).
+- **Organs** are `OrganShapes` canvases, not 64 px sprites.
+
+| Order | Organ layer |
+|---|---|
+| 1 | organ drop shadows (`OrganShadow` @0.40), node lymphatics (`Lymph`) |
+| 2 | marrow space (`MarrowSpace`), node body (`NodeBody`) |
+| 3 | bone (`Bone`), node follicles (`NodeFollicle`) |
+| 4 | node co-localisation haze (was 3) |
+| 5 | build pads (`BuildPad`, `PadSteel`) |
+| 6 | select ring (`SelectRing`, white) |
+| 7 | pad glyph: "+" when empty, the unit's sprite when placed |
+| 40 | plate frame |
+
 ## HUD / panels — UI Toolkit, built from code (Sprint 16)
 
 **There is no `OnGUI` left in the project.** Every screen-space surface is

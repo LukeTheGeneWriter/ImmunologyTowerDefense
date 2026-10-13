@@ -2012,6 +2012,44 @@ project has ever been headlessly testable.
 - `GameBootstrap.BuildTissueUnderlay()`: Daylight only, order −1.
 - Verification: `Sprint20Verification.RunAll`, 24 checks.
 
+## Sprint 21 changes — cosmetic pass (`docs/COSMETIC_PASS_SPEC.md`)
+
+### Model (the only non-visual changes)
+- `KnowledgeLadder.Rung.Built` (bool, ctor's optional last param;
+  false for all six) and `KnowledgeLadder.CapstonePercent` = 90.
+- `BoneMarrowManager.Balance` (int; `int.MaxValue` with no wallet).
+  `Slot.Glyph` (SpriteRenderer). `PlaceTower` swaps the glyph and no
+  longer tints the pad.
+- `GameBootstrap.CameraHalfHeight(Rect, float aspect)` (public static,
+  pure) and `GameBootstrap.UiGutterFraction` = 0.15.
+
+### UI (`ImmunologyTD.UI`)
+- `UiTheme` rewritten (light tokens, Nunito, factories). The
+  `Text(s, px, c, bool bold, bool upper)` and `Panel()` shims remain.
+  `BuyRow.Refresh(levels, cost, balance)` now takes the balance.
+- **New:** `KnowledgeView` (internal), `KnowledgeWatcher` (public,
+  pure: `Prime`, `Poll` → `Events[]` of Match / Unlock / Loss),
+  `BandTabsView`.
+- `UiController.SetLymphNode(Vector3 world, float flashSize)`; new docks.
+- `ShopView.SetExpanded` / `OnPhaseChanged` are now no-ops (the tray
+  never collapses).
+- `ProgenitorUpgradeCatalog.SpriteFor(UnitKind)`.
+
+### Rendering
+- **New:** `OrganShapes` (`Canvas`, `BuildMarrow`, `BuildNode`) and
+  `SpriteShapes.Ui.cs` (`Icon*`, `HatchTile`, `BuildPad`, `SelectRing`,
+  `PlusGlyph`, `PlateFrame`, `PlateMarginWorld`). `SpriteShapes` is now
+  `partial`.
+- **Retired:** `SpriteShapes.SlotNiche / MarrowRegion / LymphNodeBean /
+  OrganHalo`, `Palette.MarrowBackdrop / NodeBackdrop / OrganHalo /
+  MarrowSlotEmpty` (→ `PadSteel`).
+- **New palette entries:** `Bone`, `MarrowSpace`, `PadSteel`, `NodeBody`,
+  `NodeFollicle`, `Lymph`, `OrganShadow`.
+
+### Verification
+- `Sprint21Verification.RunAll`: 22 checks. `SpriteShapeDump` also dumps
+  the organ canvases.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

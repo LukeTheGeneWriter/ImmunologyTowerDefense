@@ -1,57 +1,70 @@
-# Sprint Plan — Sprint 20: one palette, two looks
+# Sprint Plan — Sprint 21: organs, shop, board frame, knowledge HUD
 
 ## Recent sprints
 
-- **Sprint 18** — all 12 progenitor upgrade rows wired, per-tower.
-- **Sprint 19** — peristalsis, an opaque bolus, velvet-pile villi,
-  Peyer's patch + M-cell sampling, real crypts. Director: "Nice job!"
-- **Art direction research** (between 19 and 20) — `docs/ART_DIRECTION.md`
-  proposes retiring the dark "histology plate" look for a light,
-  outlined "daylight cartoon". Its headline finding was legibility, not
-  taste: against the plum lumen the bacterium was 1.13:1 and the virion
-  1.04:1, effectively invisible.
+- **Sprint 19** — peristalsis, velvet villi, Peyer's patch, crypts.
+- **Sprint 20** — one palette, two looks (Classic / Daylight) and F10.
+- **Sprint 21 opener** — the Director chose Daylight ("That looks great.
+  Excellent call on no faces." 2026-10-14) and **Classic was retired**.
 
-## Direction (Director, 2026-10-13)
+## Direction (Director, 2026-10-14)
 
-Asked to have the designer compare the look against broad-appeal TD
-games and cross-section diagrams for "something accurate but simple fun
-and bright with mass appeal". On the resulting decisions:
+> "The next cosmetic items should be the bone marrow and the lymph nodes,
+> the shop, the borders of the game board, and the pathogen knowledge HUD
+> which doesn't exist yet."
 
-- **D1 — toggle first, then decide.** Build both looks and an in-game
-  switch; choose after seeing them side by side in a real build.
-- **D2 — bacteria green** (knowledge flash moves to cyan).
-- **D3 — pale aqua lumen.**
-- **D5 — pathogen size floor** (visual only).
-- D4 (no faces) and D6 (rose blood) were not asked; the designer's
-  recommendations are taken, both reversible in `Palette.cs`.
+A dispatched Design agent wrote `docs/COSMETIC_PASS_SPEC.md`, with mocks
+in `docs/art/cosmetic_*.png`. The Director approved all five of its
+decisions:
+1. light cream UI cards instead of dark glass;
+2. all permanent UI in the gutters above and below the board, with the
+   shop as an always-open tray;
+3. reached-but-unbuilt knowledge rungs and placeholder shop items shown
+   honestly with a "planned" hatch;
+4. bundle Nunito (SIL OFL);
+5. the 90% capstone as a star on every ladder.
 
-## Scope (ART_DIRECTION.md §4 items #0–#7)
+## Scope (the spec's order)
 
-1. **`Rendering/Palette.cs`**: every world colour in one place, Classic
-   (= shipped) and Daylight values. All consumers rerouted.
-2. **F10**: flip the look, persist it, rebuild sprites, reload the scene.
-3. **Outlines**: `SpriteShapes.OuterStroke` + `Finish` on units,
-   pathogens, the bolus, structures. Daylight only.
-4. **Pathogen silhouettes + size floor**: a 2:1 bean bacterium, a corona
-   virion, drawn at ~0.55–0.6 of a cell. Daylight only.
-5. **Daylight grounds**: flat (unstippled) chyme, plasma and marrow; a
-   tissue underlay; an opaque empty-ground scar.
+1. **Tokens and sprites**: `UiTheme` rewritten for light cards; Nunito
+   Regular / Bold / Black; `SpriteShapes.Ui.cs` (icons, hatch, build pad,
+   select ring, plus glyph, 9-sliced plate frame).
+2. **Frame**: `FitCamera` reserves 15% strips; the plate frame; band
+   tabs; the dock reshuffle.
+3. **Restyle**: HUD, shop tray, tower picker, upgrade panel.
+4. **Knowledge HUD**: `KnowledgeView` + the pure `KnowledgeWatcher`;
+   `KnowledgeLadder.Rung.Built` and `CapstonePercent`.
+5. **Organs**: `OrganShapes` (spongy-bone marrow with cavities, a
+   structured lymph node with lymphatics), steel pads with glyphs, drop
+   shadows, tags.
+6. **Verify + docs**.
+
+## Deviations from the spec (all small, all noted in code)
+
+- **Plate frame**: window inset 16 px with a 32 px corner, not 48 / 40.
+  The spec's geometry put the corner arc across the 9-slice border and
+  collapsed the window.
+- **Marrow**: cavities are capped at the pad pitch, and the block keeps
+  0.30 pitch of end margin, not 0.15. As specified, the cavities merged
+  into one channel that broke through the bone.
+- **Medullary cords**: four thin cords, not three fat ones; the three
+  read as a big "<" arrow.
+- **Card lift**: a thicker bottom border instead of a shadow sibling
+  (same read, no extra elements).
 
 ## Not in scope
 
-- #8 the DC antigen dot (a child renderer showing what a DC carries).
-- #9 idle wobble / jiggle, lane-tone rows. #10 a UI re-check on the light
-  board. All in `BACKLOG.md`.
-- **Leukocyte rolling / extravasation**: still queued.
+- The two bacterial classes look the same on the board (the knowledge
+  cards made this obvious). `BACKLOG.md`.
+- Leukocyte rolling / extravasation; Peyer's patch refinements; a DC
+  antigen dot; idle wobble.
 
 ## Stopping point
 
-- [x] Classic is the shipped look, exactly (asserted).
-- [x] Daylight: pathogen outlines are 13.0:1 (bacterium) and 14.7:1
-      (virion) against the lumen, up from 1.13 and 1.04.
-- [x] FX colours pairwise distinct in both looks (`ShapeFor` safety).
-- [x] Outlined sprites keep their outer extent; checked magnified.
-- [x] 13 harnesses green (`Sprint20Verification`, 24 new checks).
-- [x] WebGL build (0 errors) served for the Director.
-- [ ] **The Director's eye**: play both looks (F10), then pick one, or a
-      mix. Whichever loses gets deleted from `Palette.cs` in a later sprint.
+- [x] All four items built per spec (with the deviations above).
+- [x] 14 harnesses green (`Sprint21Verification`, 22 new checks), no warnings.
+- [x] Organs and icons checked magnified (`SpriteShapeDump` now includes organs).
+- [x] WebGL build (9,204,833 bytes, 0 errors) served for the Director.
+- [ ] **The Director's eye**: the whole screen, especially the shop tray,
+      the knowledge strip mid-round (tokens, ribbons), and the organs at
+      real size. Nothing UI-side is headlessly visible.

@@ -61,12 +61,13 @@ No gameplay changed. This was infrastructure only:
 
 ## Where the game itself stands (updated 2026-10-14)
 
-- **Sprint 19 playtested**: "Nice job!"
-- **Sprint 20 shipped, awaiting the Director's A/B**: all colours in
-  `Rendering/Palette.cs`, two looks (Classic = shipped, Daylight =
-  `docs/ART_DIRECTION.md`), F10 to flip. Next is retiring the loser.
-- **Queued:** leukocyte rolling/extravasation; Peyer's patch refinements;
-  ART_DIRECTION #8–#10 (`BACKLOG.md`).
+- **Daylight look chosen; Classic retired** (Sprint 21 opener).
+- **Sprint 21 shipped, awaiting the Director's playtest**: cartoon
+  organs, light UI cards in the screen gutters, shop tray, plate frame
+  with band tabs, and the new knowledge HUD. See `SPRINT_PLAN.md` and
+  `docs/COSMETIC_PASS_SPEC.md`.
+- **Queued:** leukocyte rolling/extravasation, Peyer's patch refinements,
+  telling the two bacterial classes apart on the board (`BACKLOG.md`).
 
 ## For whichever session picks this up
 
