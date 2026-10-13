@@ -29,7 +29,7 @@ namespace ImmunologyTD.Rendering
     /// NOTE: written without a Unity compiler available on the authoring
     /// machine -- review at integration.
     /// </summary>
-    public static class SpriteShapes
+    public static partial class SpriteShapes
     {
         private const int Res = 64;
         private const float C = Res * 0.5f;
@@ -961,6 +961,10 @@ namespace ImmunologyTD.Rendering
             _ = Villus; _ = EndothelialCell;
             // Sprint 19 gut-wall structures
             _ = VillusAlt; _ = PeyerDome; _ = MCell; _ = Crypt; _ = GranuleCluster;
+            // Sprint 21 UI + marrow
+            _ = IconWaves; _ = IconDroplet; _ = IconBlock; _ = IconBolt; _ = IconHeart; _ = IconStar;
+            _ = IconArrowDown; _ = IconPlay; _ = IconClose; _ = HatchTile; _ = BuildPad; _ = SelectRing;
+            _ = PlusGlyph; _ = PlateFrame;
         }
 
         // ================================================================
@@ -1002,12 +1006,12 @@ namespace ImmunologyTD.Rendering
         /// and no caller's scale changes. Edge-anchored shapes (villus,
         /// dome, crypt -- their base sits on the texture edge) pass
         /// <paramref name="shrink"/> false so the base stays put.</summary>
-        private static Sprite Finish(Color[] buf, int strokePx, bool shrink = true)
+        private static Sprite Finish(Color[] buf, int strokePx, bool shrink = true, float strokeValue = 0.18f)
         {
             if (strokePx > 0)
             {
                 if (shrink) Shrink(buf, (C - strokePx - 0.5f) / C);
-                OuterStroke(buf, strokePx, 0.18f);
+                OuterStroke(buf, strokePx, strokeValue);
             }
             return ToSprite(buf);
         }

@@ -31,16 +31,30 @@ namespace ImmunologyTD.Adaptive
             public readonly KnowledgeCapability Capability;
             public readonly float ThresholdPercent;
             public readonly string ShortName;
+            /// <summary>Sprint 21: whether the capability's mechanic exists.
+            /// The knowledge % is really earned either way; the HUD shows an
+            /// unlocked-but-unbuilt rung as "learned · planned" with the
+            /// hatch rather than a solid pip, so it never promises an effect
+            /// the game doesn't have (COSMETIC_PASS_SPEC.md §4.4). Flipping
+            /// this to true when a capability lands is the whole UI change.</summary>
+            public readonly bool Built;
 
-            public Rung(KnowledgeCapability capability, float thresholdPercent, string shortName)
+            public Rung(KnowledgeCapability capability, float thresholdPercent, string shortName, bool built = false)
             {
                 Capability = capability;
                 ThresholdPercent = thresholdPercent;
                 ShortName = shortName;
+                Built = built;
             }
         }
 
-        /// <summary>The rungs, ascending by threshold.</summary>
+        /// <summary>Sprint 21: the ~90% capstone (GAME_DESIGN.md §5) --
+        /// antibody-coated pathogens become chemotactic beacons. Not a Rung
+        /// (it has no KnowledgeCapability yet); the HUD draws it as a star at
+        /// the end of every ladder, permanently "planned" for now.</summary>
+        public const float CapstonePercent = 90f;
+
+        /// <summary>The rungs, ascending by threshold. None is built yet.</summary>
         public static readonly Rung[] Rungs =
         {
             new Rung(KnowledgeCapability.CytotoxicTCells,        10f, "CTL"),

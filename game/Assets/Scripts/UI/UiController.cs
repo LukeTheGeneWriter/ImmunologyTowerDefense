@@ -70,6 +70,8 @@ namespace ImmunologyTD.UI
         private UpgradePanelView upgrade;
         private TowerPickerView picker;
         private DebugReadoutView debug;
+        private KnowledgeView knowledgeView;
+        private BandTabsView bandTabs;
         private readonly System.Collections.Generic.List<WorldLabelView> worldLabels =
             new System.Collections.Generic.List<WorldLabelView>();
         private readonly System.Collections.Generic.List<(Vector3 pos, string text)> pendingLabels =
@@ -128,20 +130,32 @@ namespace ImmunologyTD.UI
             root.pickingMode = PickingMode.Ignore;
             UiTheme.ApplyFont(root);
 
+            // Sprint 21 (COSMETIC_PASS_SPEC.md §2.3): every permanent
+            // surface lives in the gutters above and below the board, so
+            // nothing permanent covers it -- HUD top-right, knowledge
+            // bottom-left (under the lymph node), the shop tray
+            // bottom-right, the debug readout top-left. Only on-demand
+            // surfaces float over the board (picker, upgrade panel,
+            // expanded knowledge card, tooltips).
             var topRight = Dock(root, Align.FlexEnd, Justify.FlexStart);
+            var topLeft = Dock(root, Align.FlexStart, Justify.FlexStart);
             var bottomLeft = Dock(root, Align.FlexStart, Justify.FlexEnd);
+            var bottomRight = Dock(root, Align.FlexEnd, Justify.FlexEnd);
+            var tabLayer = Dock(root, Align.FlexStart, Justify.FlexStart);
             floatLayer = Dock(root, Align.FlexStart, Justify.FlexStart);
 
-            // The HUD and the shop share the right column so the shop hangs
-            // directly under the HUD rather than floating free of it.
             hud = new HudView(topRight, StartRound);
-            shopView = new ShopView(topRight);
+            shopView = new ShopView(bottomRight);
             shopView.Bind(shop, wallet);
+            knowledgeView = new KnowledgeView(bottomLeft, floatLayer);
+            if (pendingNode.HasValue) knowledgeView.Bind(knowledge, pendingNode.Value.world, pendingNode.Value.flash);
+            else knowledgeView.Bind(knowledge, Vector3.zero, 1f);
+            bandTabs = new BandTabsView(tabLayer, board);
 
             upgrade = new UpgradePanelView(floatLayer, ClearSelection);
             picker = new TowerPickerView(floatLayer, ClearSelection);
 
-            debug = new DebugReadoutView(bottomLeft);
+            debug = new DebugReadoutView(topLeft);
             debug.Bind(board, macrophageSpeed, neutrophilSpeed, marrow, gutInterface, tally,
                        spawner, knowledge, adaptive);
 
@@ -150,6 +164,16 @@ namespace ImmunologyTD.UI
             pendingLabels.Clear();
 
             built = true;
+        }
+
+        private (Vector3 world, float flash)? pendingNode;
+
+        /// <summary>Sprint 21: where the lymph node is, for the knowledge
+        /// HUD's "+3%" tokens (they fly from it) and its unlock ring.</summary>
+        public void SetLymphNode(Vector3 world, float flashSize)
+        {
+            pendingNode = (world, flashSize);
+            if (built && knowledgeView != null) knowledgeView.Bind(knowledge, world, flashSize);
         }
 
         /// <summary>Adds a compartment heading pinned to a board position.
@@ -207,16 +231,17 @@ namespace ImmunologyTD.UI
 
             hud.Refresh(wallet, rounds, spawner);
             shopView.Refresh();
+            knowledgeView.Refresh(root.panel);
+            bandTabs.Refresh(root.panel);
 
             if (rounds != null && rounds.Phase != lastPhase)
             {
-                // Live buying (SPRINT_PLAN.md decision 3) means the shop
-                // stays reachable in Active -- collapsed, not gone. The
-                // selection is cleared on a phase change either way: a panel
-                // left floating over a slot from the previous phase is
-                // stale, not useful.
-                shopView.OnPhaseChanged(rounds.Phase == RoundPhase.Building);
+                // The selection is cleared on a phase change: a panel left
+                // floating over a slot from the previous phase is stale. The
+                // shop tray never collapses (Sprint 21); an expanded
+                // knowledge card closes when a round starts.
                 marrow?.ClearSelection();
+                if (rounds.Phase == RoundPhase.Active) knowledgeView.CloseExpanded();
                 lastPhase = rounds.Phase;
             }
 
@@ -237,7 +262,7 @@ namespace ImmunologyTD.UI
                 UiTheme.Show(debug.Root, debugVisible);
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape)) ClearSelection();
+            if (Input.GetKeyDown(KeyCode.Escape)) { ClearSelection(); knowledgeView?.CloseExpanded(); }
 
             // Sprint 13's flash preview, moved off HudOverlay unchanged: one
             // frame that fires all five effect flashes across the tissue
@@ -266,6 +291,7 @@ namespace ImmunologyTD.UI
         {
             var p = ScreenToPanel(screenPos);
             return Over(hud.Root, p) || Over(shopView.Root, p)
+                || Over(knowledgeView.Root, p) || Over(knowledgeView.Expanded, p)
                 || Over(upgrade.Root, p) || Over(picker.Root, p)
                 || (debugVisible && Over(debug.Root, p));
         }

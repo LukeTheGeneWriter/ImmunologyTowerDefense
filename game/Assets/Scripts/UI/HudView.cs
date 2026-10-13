@@ -2,162 +2,199 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using ImmunologyTD.Economy;
 using ImmunologyTD.Pathogens;
+using ImmunologyTD.Rendering;
 using ImmunologyTD.Rounds;
 
 namespace ImmunologyTD.UI
 {
     /// <summary>
-    /// The minimal player HUD (docs/UI_DESIGN.md §2): ATP, round, lives,
-    /// and the one control the player needs -- start the round. Top-right.
+    /// The minimal HUD (UI_DESIGN.md §2), **Sprint 21: one cream card in the
+    /// top gutter** (docs/COSMETIC_PASS_SPEC.md §2.7). ATP with a bolt,
+    /// lives with a heart, the round number, and on the right the phase's
+    /// one action:
+    ///  - Building: a chunky START ROUND n button (Space also works);
+    ///  - Active: the wave's progress -- "WAVE b / t", how many are in play,
+    ///    and a bar;
+    ///  - Defeat: GAME OVER.
+    /// A caption line under it says the phase's rule (time frozen, or
+    /// buying stays open).
     ///
-    /// This is the direct answer to the Director's Sprint 15 note ("it has
-    /// so many stats I can't get a feel for how the player will interact
-    /// with the game"). Everything that used to sit in the top-left dump is
-    /// now in DebugReadoutView, behind a key, off by default. The rule for
-    /// what earns a place here: a *readout* only qualifies if the player
-    /// makes a decision from it every few seconds. ATP (can I buy?), lives
-    /// (am I losing?), round (how deep am I?) qualify; population counts,
-    /// per-band pathogen tallies, the knowledge ladder and the frame cost
-    /// do not.
-    ///
-    /// Built once. Refresh() only rewrites Label text and the lives colour,
-    /// and rebuilds the lower block on an actual phase change -- the views
-    /// poll every frame (there are no model events), so nothing here may
-    /// allocate per frame.
+    /// Lives flash red on a loss and stay red with a pulsing heart below a
+    /// quarter. Polls; writes only on change.
     /// </summary>
     internal sealed class HudView
     {
         public readonly VisualElement Root;
 
-        private readonly Label atpValue, roundValue, livesValue;
-        private readonly VisualElement lowerBlock;
+        private readonly Label atpValue, roundValue, livesValue, caption;
+        private readonly VisualElement heart;
+        private readonly Button startButton;
+        private readonly VisualElement waveBlock, waveFill;
+        private readonly Label waveLabel, inPlayLabel, gameOver;
+        private readonly System.Action onStartRound;
 
         private RoundPhase builtForPhase = (RoundPhase)(-1);
-        private Label batchLabel;
-        private int lastLives = int.MinValue;
-        private int livesFlashFrames;
+        private int lastLives = int.MinValue, lastAtp = int.MinValue, lastRound = int.MinValue;
+        private int lastEmitted = -1, lastTarget = -1, lastLive = -1;
+        private float livesFlash, heartClock;
 
         public HudView(VisualElement parent, System.Action onStartRound)
         {
-            Root = UiTheme.Panel();
-            Root.style.minWidth = 300;
+            this.onStartRound = onStartRound;
+
+            Root = UiTheme.Card(8);
+            Root.style.width = 600;
+            Root.style.marginTop = 14;
+            Root.style.marginRight = 24;
             parent.Add(Root);
 
-            var stats = new VisualElement();
-            stats.style.flexDirection = FlexDirection.Row;
-            stats.style.justifyContent = Justify.SpaceBetween;
-            stats.Add(Stat("ATP", out atpValue, UiTheme.Atp));
-            stats.Add(Stat("ROUND", out roundValue, UiTheme.Ink));
-            stats.Add(Stat("LIVES", out livesValue, UiTheme.LivesOk));
-            Root.Add(stats);
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            Root.Add(row);
 
-            Root.Add(UiTheme.Divider());
+            row.Add(Stat(SpriteShapes.IconBolt, UiTheme.Gold, "ATP", out atpValue, out _));
+            row.Add(Stat(SpriteShapes.IconHeart, UiTheme.Heart, "LIVES", out livesValue, out heart));
+            row.Add(Stat(null, Color.clear, "ROUND", out roundValue, out _));
 
-            lowerBlock = new VisualElement();
-            Root.Add(lowerBlock);
+            var right = new VisualElement();
+            right.style.flexGrow = 1;
+            right.style.alignItems = Align.FlexEnd;
+            row.Add(right);
 
-            this.onStartRound = onStartRound;
+            startButton = UiTheme.ChunkyButton("START ROUND 1", () => onStartRound?.Invoke(), SpriteShapes.IconPlay, 16);
+            startButton.style.height = 48;
+            startButton.style.minWidth = 210;
+            right.Add(startButton);
+
+            waveBlock = new VisualElement();
+            waveBlock.style.width = 210;
+            waveLabel = UiTheme.Text("WAVE 0 / 0", 16, UiTheme.Ink, Weight.Black);
+            inPlayLabel = UiTheme.Text("0 in play", 11, UiTheme.InkDim, Weight.Bold);
+            var track = new VisualElement();
+            track.style.height = 16;
+            track.style.marginTop = 3;
+            track.style.backgroundColor = UiTheme.TileDim;
+            UiTheme.SetBorderWidth(track, 2);
+            UiTheme.SetBorderColor(track, UiTheme.Edge);
+            UiTheme.SetRadius(track, 8);
+            track.style.overflow = Overflow.Hidden;
+            waveFill = new VisualElement();
+            waveFill.style.height = Length.Percent(100);
+            waveFill.style.width = 0;
+            waveFill.style.backgroundColor = UiTheme.Accent;
+            track.Add(waveFill);
+            waveBlock.Add(waveLabel);
+            waveBlock.Add(inPlayLabel);
+            waveBlock.Add(track);
+            right.Add(waveBlock);
+
+            gameOver = UiTheme.Text("GAME OVER", 30, UiTheme.Bad, Weight.Black);
+            right.Add(gameOver);
+
+            caption = UiTheme.Text("", 11, UiTheme.InkDim, Weight.Bold);
+            caption.style.marginTop = 4;
+            caption.style.whiteSpace = WhiteSpace.Normal;
+            Root.Add(caption);
         }
 
-        private readonly System.Action onStartRound;
-
-        private static VisualElement Stat(string label, out Label value, Color valueColor)
+        private static VisualElement Stat(Sprite icon, Color tint, string label, out Label value, out VisualElement iconEl)
         {
             var col = new VisualElement();
+            col.style.flexDirection = FlexDirection.Row;
             col.style.alignItems = Align.Center;
-            col.style.flexGrow = 1;
-            col.Add(UiTheme.Text(label, 10, UiTheme.InkDim, bold: true, upper: true));
-            value = UiTheme.Text("0", 26, valueColor, bold: true);
-            value.style.marginTop = UiTheme.S / 2;
-            col.Add(value);
+            col.style.marginRight = 22;
+            iconEl = null;
+            if (icon != null)
+            {
+                iconEl = UiTheme.Icon(icon, tint, 30);
+                iconEl.style.marginRight = 4;
+                col.Add(iconEl);
+            }
+            var stack = new VisualElement();
+            stack.style.alignItems = Align.Center;
+            value = UiTheme.Text("0", 30, UiTheme.Ink, Weight.Black);
+            stack.Add(value);
+            var cap = UiTheme.Text(label, 10, UiTheme.InkDim, Weight.Black, upper: true);
+            cap.style.marginTop = -4;
+            stack.Add(cap);
+            col.Add(stack);
             return col;
         }
 
         public void Refresh(AtpWallet wallet, RoundController rounds, PathogenSpawner spawner)
         {
             if (wallet == null || rounds == null) return;
+            float dt = Time.unscaledDeltaTime;
 
-            atpValue.text = wallet.Balance.ToString();
+            if (wallet.Balance != lastAtp) { atpValue.text = wallet.Balance.ToString(); lastAtp = wallet.Balance; }
 
-            int shownRound = Mathf.Max(1,
-                rounds.Phase == RoundPhase.Building ? rounds.RoundNumber + 1 : rounds.RoundNumber);
-            roundValue.text = shownRound.ToString();
+            int shownRound = Mathf.Max(1, rounds.Phase == RoundPhase.Building ? rounds.RoundNumber + 1 : rounds.RoundNumber);
+            if (shownRound != lastRound)
+            {
+                roundValue.text = shownRound.ToString();
+                UiTheme.SetButtonText(startButton, $"START ROUND {rounds.RoundNumber + 1}");
+                lastRound = shownRound;
+            }
 
             int lives = rounds.Lives;
             if (lives != lastLives)
             {
-                // The HUD is otherwise motionless, so one brief flash on a
-                // decrement is enough to make a life loss impossible to miss
-                // without any moving chrome.
-                if (lastLives != int.MinValue && lives < lastLives) livesFlashFrames = 9;
+                if (lastLives != int.MinValue && lives < lastLives) livesFlash = 0.15f;
                 livesValue.text = lives.ToString();
                 lastLives = lives;
             }
             bool low = lives < rounds.MaxLives * 0.25f;
-            if (livesFlashFrames > 0) livesFlashFrames--;
-            livesValue.style.color = livesFlashFrames > 0
-                ? UiTheme.Ink
-                : (low ? UiTheme.LivesLow : UiTheme.LivesOk);
+            if (livesFlash > 0f) livesFlash -= dt;
+            livesValue.style.color = (livesFlash > 0f || low) ? UiTheme.Bad : UiTheme.Ink;
+            if (heart != null)
+            {
+                if (low) { heartClock += dt; UiTheme.SetScale(heart, 1f + 0.12f * Mathf.Abs(Mathf.Sin(heartClock * 4f))); }
+                else UiTheme.SetScale(heart, 1f);
+            }
 
             if (rounds.Phase != builtForPhase)
             {
-                RebuildLower(rounds);
+                ApplyPhase(rounds);
                 builtForPhase = rounds.Phase;
             }
-            else if (rounds.Phase == RoundPhase.Active && batchLabel != null && spawner != null)
+
+            if (rounds.Phase == RoundPhase.Active && spawner != null)
             {
-                batchLabel.text = $"batch {spawner.BatchEmitted} / {spawner.BatchTarget} · {spawner.LiveCount} in play";
+                int e = spawner.BatchEmitted, t = spawner.BatchTarget, l = spawner.LiveCount;
+                if (e != lastEmitted || t != lastTarget || l != lastLive)
+                {
+                    waveLabel.text = $"WAVE {e} / {t}";
+                    inPlayLabel.text = $"{l} in play";
+                    waveFill.style.width = Length.Percent(t > 0 ? 100f * e / t : 0f);
+                    lastEmitted = e; lastTarget = t; lastLive = l;
+                }
             }
         }
 
-        private void RebuildLower(RoundController rounds)
+        private void ApplyPhase(RoundController rounds)
         {
-            lowerBlock.Clear();
-            batchLabel = null;
+            UiTheme.Show(startButton, rounds.Phase == RoundPhase.Building);
+            UiTheme.Show(waveBlock, rounds.Phase == RoundPhase.Active);
+            UiTheme.Show(gameOver, rounds.Phase == RoundPhase.Defeat);
+            lastEmitted = lastTarget = lastLive = -1;
 
             switch (rounds.Phase)
             {
                 case RoundPhase.Building:
                 {
-                    lowerBlock.Add(UiTheme.Text("BUY PHASE · TIME IS FROZEN", 10, UiTheme.InkDim, bold: true, upper: true));
                     string tag = RoundScript.ForRound(rounds.RoundNumber + 1).Tagline;
-                    if (!string.IsNullOrEmpty(tag))
-                    {
-                        var t = UiTheme.Text($"“{tag}”", 11, UiTheme.InkDim);
-                        t.style.whiteSpace = WhiteSpace.Normal;
-                        t.style.marginTop = UiTheme.S;
-                        lowerBlock.Add(t);
-                    }
-                    var start = UiTheme.FlatButton($"Start Round {rounds.RoundNumber + 1}   (Space)", onStartRound);
-                    start.style.marginTop = 2 * UiTheme.S;
-                    lowerBlock.Add(start);
+                    caption.text = (string.IsNullOrEmpty(tag) ? "" : $"“{tag}”  ·  ") + "buy phase, time is frozen  ·  Space";
                     break;
                 }
-
                 case RoundPhase.Active:
-                {
-                    lowerBlock.Add(UiTheme.Text("ROUND IN PROGRESS", 10, UiTheme.InkDim, bold: true, upper: true));
-                    batchLabel = UiTheme.Text("batch – / –", 11, UiTheme.InkDim);
-                    batchLabel.style.marginTop = UiTheme.S;
-                    lowerBlock.Add(batchLabel);
-                    // Sprint 16 (Director): buying stays open mid-round and
-                    // the clock does not stop for it. Saying so once, here,
-                    // is what turns "I couldn't afford it" into "I have to
-                    // watch the number and move."
-                    var live = UiTheme.Text("Buying stays open — the round does not pause.", 11, UiTheme.InkDim);
-                    live.style.whiteSpace = WhiteSpace.Normal;
-                    live.style.marginTop = UiTheme.S;
-                    lowerBlock.Add(live);
+                    // Sprint 16 (Director): buying stays open and the clock
+                    // does not stop for it -- said once, here.
+                    caption.text = "Buying stays open — the round does not pause.";
                     break;
-                }
-
                 case RoundPhase.Defeat:
-                {
-                    var over = UiTheme.Text("GAME OVER", 26, UiTheme.Defeat, bold: true);
-                    lowerBlock.Add(over);
-                    lowerBlock.Add(UiTheme.Text($"{rounds.RoundsCleared} round(s) cleared.", 11, UiTheme.InkDim));
+                    caption.text = $"{rounds.RoundsCleared} round(s) cleared.";
                     break;
-                }
             }
         }
     }

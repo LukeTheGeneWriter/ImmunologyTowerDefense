@@ -404,6 +404,10 @@ namespace ImmunologyTD.Units
         /// UI asks the manager rather than holding its own opinion.</summary>
         public bool CanAfford(int price) => wallet == null || wallet.CanAfford(price);
 
+        /// <summary>Sprint 21: the balance, for the UI's "how close am I"
+        /// price chips. int.MaxValue with no wallet (harness: free).</summary>
+        public int Balance => wallet == null ? int.MaxValue : wallet.Balance;
+
         /// <summary>Places a tower -- public so both the IMGUI picker
         /// buttons and a headless verification harness call the same real
         /// placement path. No-ops on an already-placed slot (no upgrade/

@@ -123,6 +123,18 @@ namespace ImmunologyTD.UI
             }
         }
 
+        /// <summary>The unit's own board sprite -- portraits stay in sync with the units.</summary>
+        public static UnityEngine.Sprite SpriteFor(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.Macrophage: return ImmunologyTD.Rendering.SpriteShapes.Macrophage;
+                case UnitKind.Neutrophil: return ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
+                case UnitKind.DendriticCell: return ImmunologyTD.Rendering.SpriteShapes.DendriteStar;
+                default: return ImmunologyTD.Rendering.SpriteShapes.Lymphocyte;
+            }
+        }
+
         public static string DisplayName(UnitKind kind)
         {
             switch (kind)

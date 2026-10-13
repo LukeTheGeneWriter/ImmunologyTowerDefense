@@ -1,85 +1,82 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using ImmunologyTD.Rendering;
 
 namespace ImmunologyTD.UI
 {
+    internal enum Weight { Regular, Bold, Black }
+
     /// <summary>
-    /// The whole visual language of the front-end, in one place
-    /// (docs/UI_DESIGN.md §1). Palette, type scale, spacing unit, and the
-    /// handful of element factories every view is assembled from.
+    /// The whole visual language of the front end, in one place.
     ///
-    /// **Direction: "the chart clipped to the specimen, not a cockpit."**
-    /// The board is a stained histology section and the mobile agents are
-    /// the only saturated things on it, so the UI has to be quieter than
-    /// both -- flat translucent glass, hairline rules, one type family at a
-    /// few sizes, 3 px corners, no glow / bevel / gradient. Colour is spent
-    /// only where meaning has to survive a glance: ATP gold, lives teal
-    /// (oxblood when low), one slate-blue accent for "this is interactive."
-    /// Everything else is off-white ink and taupe dim-ink.
+    /// **Sprint 21: light cards on a dark desk** (docs/COSMETIC_PASS_SPEC.md
+    /// §2, Director 2026-10-14). Sprint 16's dark smoked glass was built for
+    /// the dark "histology plate" board; on the daylight board a near-black
+    /// slab was the loudest value contrast on screen, louder than any
+    /// pathogen. Now: the board is a light plate on a dark desk (the camera
+    /// clear), and the UI is light cream cards on the same desk -- paper is
+    /// light and inked, the desk is dark, units are fill + dark outline.
+    /// Everything chunky: 3 px ink edges, a thicker bottom edge as the
+    /// "lift" (UI Toolkit has no box-shadow), rounded corners, a rounded
+    /// typeface.
     ///
-    /// Colours are deliberately offset from the board palettes in
-    /// UI_STYLE_GUIDE.md rather than reused: the ATP gold is duller and
-    /// darker than neutrophil gold so a HUD numeral is never mistaken for a
-    /// unit, lives-low is the muted oxblood of base plasma rather than the
-    /// hot breach flash, and the accent is macrophage blue dragged most of
-    /// the way to slate.
+    /// **Font: Nunito** (SIL OFL, `Assets/Resources/Fonts/`, licence beside
+    /// it), Regular / Bold / Black as separate faces rather than faux-bold.
+    /// Falls back to an OS font if the asset is missing, never to a broken
+    /// boot. The debug readout keeps a monospace OS font -- it is an
+    /// instrument panel.
     ///
-    /// **Fonts are assigned explicitly, not inherited from a theme.**
-    /// PanelSettings.themeStyleSheet is null by choice (UI_DESIGN.md §7 --
-    /// a .tss is an editor-imported asset and this project builds its UI
-    /// from code), which means there is no default font either. Rather than
-    /// gamble on what an unstyled Label renders as, the root gets an OS
-    /// font here and every child inherits it.
+    /// **Symbols are sprites, never glyphs** (▶ ♥ ✕ are missing from the
+    /// shipped fonts): see <c>SpriteShapes.Icon*</c> and <see cref="Icon"/>.
     /// </summary>
     internal static class UiTheme
     {
-        // ---- palette (docs/UI_DESIGN.md §1) ----
-        public static readonly Color PanelBg   = new Color(0.059f, 0.055f, 0.067f, 0.86f);
-        public static readonly Color PanelBgSolid = new Color(0.059f, 0.055f, 0.067f, 0.94f);
-        public static readonly Color Ink       = new Color(0.914f, 0.898f, 0.855f);
-        public static readonly Color InkDim    = new Color(0.545f, 0.522f, 0.478f);
-        public static readonly Color Rule      = new Color(0.914f, 0.898f, 0.855f, 0.14f);
-        public static readonly Color Atp       = new Color(0.796f, 0.722f, 0.471f);
-        public static readonly Color LivesOk   = new Color(0.510f, 0.663f, 0.627f);
-        public static readonly Color LivesLow  = new Color(0.753f, 0.361f, 0.263f);
-        public static readonly Color Accent    = new Color(0.431f, 0.561f, 0.690f);
-        public static readonly Color AccentDim = new Color(0.431f, 0.561f, 0.690f, 0.35f);
-        public static readonly Color Defeat    = new Color(0.604f, 0.231f, 0.173f);
+        // ---- tokens (spec §2.2) ----
+        public static readonly Color CardFill  = new Color(0.99f, 0.96f, 0.90f);
+        public static readonly Color TileFill  = new Color(1f, 1f, 1f);
+        public static readonly Color TileDim   = new Color(0.91f, 0.88f, 0.85f);
+        public static readonly Color Ink       = new Color(0.20f, 0.12f, 0.16f);
+        public static readonly Color Edge      = Ink;
+        public static readonly Color InkDim    = new Color(0.48f, 0.39f, 0.41f);
+        public static readonly Color Rule      = new Color(0.20f, 0.12f, 0.16f, 0.15f);
+        public static readonly Color Accent    = new Color(0.13f, 0.58f, 0.88f);
+        public static readonly Color AccentLip = new Color(0.08f, 0.30f, 0.48f);
+        public static readonly Color AccentDim = new Color(0.13f, 0.58f, 0.88f, 0.35f);
+        public static readonly Color Gold      = new Color(1.00f, 0.78f, 0.22f);
+        public static readonly Color ChipDim   = new Color(0.84f, 0.80f, 0.78f);
+        public static readonly Color Bad       = new Color(0.80f, 0.16f, 0.16f);
+        public static readonly Color Heart     = new Color(0.90f, 0.22f, 0.32f);
+        public static readonly Color Hatch     = new Color(0.55f, 0.50f, 0.52f);
+        public static readonly Color PortraitBg = new Color(0.96f, 0.94f, 0.92f);
 
         /// <summary>Base spacing unit, px at the 1920x1080 reference.</summary>
         public const int S = 4;
 
-        private static Font uiFont;
-        private static Font monoFont;
+        // ---- fonts ----
+        private static Font regular, bold, black, mono;
+        private static bool fontsLoaded;
 
-        /// <summary>The interface sans. Created from an OS font because no
-        /// .ttf ships with the project and no theme supplies one.</summary>
-        public static Font UiFont
+        private static void LoadFonts()
         {
-            get
-            {
-                if (uiFont == null)
-                    uiFont = CreateOsFont(new[] { "Segoe UI", "Helvetica Neue", "Arial", "Liberation Sans" }, 14);
-                return uiFont;
-            }
+            if (fontsLoaded) return;
+            fontsLoaded = true;
+            regular = Resources.Load<Font>("Fonts/Nunito-Regular");
+            bold = Resources.Load<Font>("Fonts/Nunito-Bold");
+            black = Resources.Load<Font>("Fonts/Nunito-Black");
+            if (regular == null) regular = CreateOsFont(new[] { "Segoe UI", "Helvetica Neue", "Arial", "Liberation Sans" }, 14);
+            if (bold == null) bold = regular;
+            if (black == null) black = bold;
+            mono = CreateOsFont(new[] { "Consolas", "Menlo", "Courier New", "Liberation Mono" }, 12);
         }
 
-        /// <summary>The debug readout's face. It is an instrument panel and
-        /// is allowed to look like one (UI_DESIGN.md §1).</summary>
-        public static Font MonoFont
+        public static Font FontFor(Weight w)
         {
-            get
-            {
-                if (monoFont == null)
-                    monoFont = CreateOsFont(new[] { "Consolas", "Menlo", "Courier New", "Liberation Mono" }, 12);
-                return monoFont;
-            }
+            LoadFonts();
+            return w == Weight.Black ? black : w == Weight.Bold ? bold : regular;
         }
 
         private static Font CreateOsFont(string[] names, int size)
         {
-            // Never throw out of a style helper -- a missing OS font must
-            // degrade to "UITK picks something", not to a broken boot.
             try
             {
                 var f = Font.CreateDynamicFontFromOSFont(names, size);
@@ -94,103 +91,310 @@ namespace ImmunologyTD.UI
 
         public static void ApplyFont(VisualElement e, bool mono = false)
         {
-            var f = mono ? MonoFont : UiFont;
+            LoadFonts();
+            var f = mono ? UiTheme.mono : regular;
             if (f != null) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(f));
         }
 
-        // ---- element factories ----
+        public static void SetWeight(VisualElement e, Weight w)
+        {
+            var f = FontFor(w);
+            if (f != null) e.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(f));
+            e.style.unityFontStyleAndWeight = FontStyle.Normal;
+        }
 
-        /// <summary>One text run at a size and colour from the §1 type
-        /// scale. <paramref name="upper"/> also applies the 0.10em tracking
-        /// the uppercase label styles carry.</summary>
-        public static Label Text(string s, int px, Color c, bool bold = false, bool upper = false)
+        // ---- text ----
+
+        public static Label Text(string s, int px, Color c, Weight w = Weight.Regular, bool upper = false)
         {
             var l = new Label(upper ? (s ?? "").ToUpperInvariant() : s);
             l.style.fontSize = px;
             l.style.color = c;
-            l.style.unityFontStyleAndWeight = bold ? FontStyle.Bold : FontStyle.Normal;
-            if (upper) l.style.letterSpacing = px * 0.10f;
+            SetWeight(l, w);
+            if (upper) l.style.letterSpacing = px * 0.06f;
             l.style.marginTop = 0; l.style.marginBottom = 0;
             l.style.marginLeft = 0; l.style.marginRight = 0;
             l.style.paddingTop = 0; l.style.paddingBottom = 0;
+            l.style.paddingLeft = 0; l.style.paddingRight = 0;
+            l.pickingMode = PickingMode.Ignore;
             return l;
         }
 
-        /// <summary>A slab of smoked glass: the one panel treatment every
-        /// surface in the game uses.</summary>
-        public static VisualElement Panel(bool opaque = false)
+        /// <summary>Pre-Sprint-21 signature, kept for the debug readout.</summary>
+        public static Label Text(string s, int px, Color c, bool bold, bool upper = false) =>
+            Text(s, px, c, bold ? Weight.Bold : Weight.Regular, upper);
+
+        /// <summary>A white heading with an ink outline -- button labels, pills.</summary>
+        public static void Outline(Label l, float width = 1.5f)
+        {
+            l.style.unityTextOutlineWidth = width;
+            l.style.unityTextOutlineColor = Edge;
+        }
+
+        // ---- surfaces ----
+
+        /// <summary>The card every surface is built on: cream, a 3 px ink
+        /// edge, a 6 px bottom edge as its lift, radius 12.</summary>
+        public static VisualElement Card(int pad = 10)
         {
             var v = new VisualElement();
-            v.style.backgroundColor = opaque ? PanelBgSolid : PanelBg;
-            SetBorderWidth(v, 1);
-            SetBorderColor(v, Rule);
-            SetRadius(v, 3);
-            v.style.paddingTop = v.style.paddingBottom = 3 * S;
-            v.style.paddingLeft = v.style.paddingRight = 4 * S;
-            v.style.marginTop = v.style.marginRight = v.style.marginLeft = v.style.marginBottom = 3 * S;
+            v.style.backgroundColor = CardFill;
+            SetBorderWidth(v, 3);
+            v.style.borderBottomWidth = 6;
+            SetBorderColor(v, Edge);
+            SetRadius(v, 12);
+            v.style.paddingTop = v.style.paddingBottom = pad;
+            v.style.paddingLeft = v.style.paddingRight = pad + 2;
+            return v;
+        }
+
+        /// <summary>Pre-Sprint-21 name: the debug readout's panel.</summary>
+        public static VisualElement Panel(bool opaque = false) => Card();
+
+        public static VisualElement Tile()
+        {
+            var v = new VisualElement();
+            v.style.backgroundColor = TileFill;
+            SetBorderWidth(v, 3);
+            v.style.borderBottomWidth = 5;
+            SetBorderColor(v, Edge);
+            SetRadius(v, 10);
             return v;
         }
 
         public static VisualElement Divider()
         {
             var v = new VisualElement();
-            v.style.height = 1;
+            v.style.height = 2;
             v.style.backgroundColor = Rule;
             v.style.marginTop = v.style.marginBottom = 2 * S;
+            v.pickingMode = PickingMode.Ignore;
             return v;
         }
 
-        /// <summary>The one interactive treatment: flat, with a 2 px accent
-        /// bar down the left edge. No pill, no gradient, no rounding --
-        /// UI_DESIGN.md §1 rules those out explicitly.</summary>
-        public static Button FlatButton(string label, System.Action onClick, int px = 13)
+        /// <summary>A sprite shown as a UI element, tinted.</summary>
+        public static VisualElement Icon(Sprite sprite, Color tint, float size)
         {
-            var b = new Button(onClick) { text = label };
-            b.style.fontSize = px;
-            b.style.color = Ink;
-            b.style.backgroundColor = PanelBg;
-            SetBorderWidth(b, 0);
-            b.style.borderLeftWidth = 2;
-            b.style.borderLeftColor = Accent;
-            SetRadius(b, 0);
+            var v = new VisualElement();
+            v.style.width = size;
+            v.style.height = size;
+            v.style.flexShrink = 0;
+            v.style.backgroundImage = new StyleBackground(sprite);
+            v.style.unityBackgroundImageTintColor = tint;
+            v.pickingMode = PickingMode.Ignore;
+            return v;
+        }
+
+        /// <summary>An icon layered inside a box at an offset (fractions of
+        /// the box) and scale -- for composite icons and badges.</summary>
+        public static VisualElement Layer(VisualElement box, Sprite sprite, Color tint, float boxSize,
+                                          float scale = 1f, float dx = 0f, float dy = 0f)
+        {
+            float s = boxSize * scale;
+            var v = Icon(sprite, tint, s);
+            v.style.position = Position.Absolute;
+            v.style.left = (boxSize - s) * 0.5f + dx * boxSize;
+            v.style.top = (boxSize - s) * 0.5f + dy * boxSize;
+            box.Add(v);
+            return v;
+        }
+
+        /// <summary>A unit portrait: its sprite in a pale disc with an ink ring.</summary>
+        public static VisualElement Portrait(Sprite sprite, Color tint, float size, out VisualElement image)
+        {
+            var disc = new VisualElement();
+            disc.style.width = size; disc.style.height = size;
+            disc.style.flexShrink = 0;
+            disc.style.backgroundColor = PortraitBg;
+            SetBorderWidth(disc, 2);
+            SetBorderColor(disc, Edge);
+            SetRadius(disc, (int)(size * 0.5f));
+            disc.style.alignItems = Align.Center;
+            disc.style.justifyContent = Justify.Center;
+            image = Icon(sprite, tint, size * 0.82f);
+            disc.Add(image);
+            disc.pickingMode = PickingMode.Ignore;
+            return disc;
+        }
+
+        /// <summary>The price chip: a bolt and a number. Gold when
+        /// affordable, grey with a red number when not; an optional thin bar
+        /// along its bottom shows how close the balance is to the price.</summary>
+        public static VisualElement Chip(out Label price, out VisualElement progress)
+        {
+            var chip = new VisualElement();
+            chip.style.flexDirection = FlexDirection.Row;
+            chip.style.alignItems = Align.Center;
+            chip.style.justifyContent = Justify.Center;
+            chip.style.height = 22;
+            chip.style.paddingLeft = 4; chip.style.paddingRight = 8;
+            chip.style.backgroundColor = Gold;
+            SetBorderWidth(chip, 2);
+            SetBorderColor(chip, Edge);
+            SetRadius(chip, 10);
+            chip.style.overflow = Overflow.Hidden;
+            chip.Add(Icon(SpriteShapes.IconBolt, Gold, 16));
+            price = Text("0", 13, Ink, Weight.Black);
+            price.style.marginLeft = 2;
+            chip.Add(price);
+
+            progress = new VisualElement();
+            progress.style.position = Position.Absolute;
+            progress.style.left = 0; progress.style.bottom = 0;
+            progress.style.height = 2;
+            progress.style.backgroundColor = new Color(Ink.r, Ink.g, Ink.b, 0.45f);
+            progress.style.width = 0;
+            progress.pickingMode = PickingMode.Ignore;
+            chip.Add(progress);
+            chip.pickingMode = PickingMode.Ignore;
+            return chip;
+        }
+
+        public static void SetChip(VisualElement chip, Label price, VisualElement progress,
+                                   int cost, int balance)
+        {
+            bool ok = balance >= cost;
+            price.text = cost.ToString();
+            price.style.color = ok ? Ink : Bad;
+            chip.style.backgroundColor = ok ? Gold : ChipDim;
+            if (progress != null)
+                progress.style.width = ok ? Length.Percent(0) : Length.Percent(100f * Mathf.Clamp01(cost > 0 ? (float)balance / cost : 1f));
+        }
+
+        /// <summary>The chunky action button: accent fill, ink edge, a dark
+        /// "lip" as its bottom edge, white heavy text with an ink outline.</summary>
+        public static Button ChunkyButton(string label, System.Action onClick, Sprite icon = null, int px = 13)
+        {
+            var b = new Button(onClick) { text = "" };
+            b.style.flexDirection = FlexDirection.Row;
+            b.style.alignItems = Align.Center;
+            b.style.justifyContent = Justify.Center;
+            b.style.backgroundColor = Accent;
+            SetBorderWidth(b, 2);
+            b.style.borderBottomWidth = 5;
+            SetBorderColor(b, Edge);
+            b.style.borderBottomColor = AccentLip;
+            SetRadius(b, 10);
             b.style.paddingLeft = b.style.paddingRight = 3 * S;
-            b.style.paddingTop = b.style.paddingBottom = 2 * S;
-            b.style.marginLeft = b.style.marginRight = 0;
-            b.style.marginTop = b.style.marginBottom = 0;
-            b.style.unityTextAlign = TextAnchor.MiddleCenter;
-            return b;
-        }
-
-        /// <summary>The small text-only affordance used for "close" and the
-        /// shop's collapse header -- no accent bar, no chrome.</summary>
-        public static Button TextButton(string label, System.Action onClick, int px = 11)
-        {
-            var b = new Button(onClick) { text = label };
-            b.style.fontSize = px;
-            b.style.color = InkDim;
-            b.style.backgroundColor = Color.clear;
-            SetBorderWidth(b, 0);
-            SetRadius(b, 0);
-            b.style.paddingLeft = b.style.paddingRight = S;
             b.style.paddingTop = b.style.paddingBottom = S;
-            b.style.marginLeft = b.style.marginRight = 0;
-            b.style.marginTop = b.style.marginBottom = 0;
+            b.style.marginLeft = b.style.marginRight = b.style.marginTop = b.style.marginBottom = 0;
+            if (icon != null)
+            {
+                var i = Icon(icon, Color.white, px + 4);
+                i.style.marginRight = 6;
+                b.Add(i);
+            }
+            var t = Text(label, px, Color.white, Weight.Black);
+            Outline(t);
+            t.name = "label";
+            b.Add(t);
             return b;
         }
 
-        /// <summary>Level pips: filled per level owned, hollow per level
-        /// remaining. Text rather than elements -- it is a value readout,
-        /// not a control, and one Label is cheaper than N VisualElements
-        /// rebuilt on every purchase.</summary>
-        public static string Dots(int filled, int total)
+        public static void SetButtonText(Button b, string text)
         {
-            if (total <= 0) return string.Empty;
-            var sb = new System.Text.StringBuilder(total);
-            for (int i = 0; i < total; i++) sb.Append(i < filled ? '●' : '○');
-            return sb.ToString();
+            var l = b.Q<Label>("label");
+            if (l != null) l.text = text;
         }
 
-        public static void SetBorderWidth(VisualElement v, int w)
+        public static void SetButtonEnabled(Button b, bool enabled)
+        {
+            b.SetEnabled(enabled);
+            b.style.backgroundColor = enabled ? Accent : ChipDim;
+            b.style.borderBottomColor = enabled ? AccentLip : InkDim;
+            b.style.opacity = 1f;
+        }
+
+        /// <summary>A small round icon button (close).</summary>
+        public static Button IconButton(Sprite icon, System.Action onClick, float size = 26)
+        {
+            var b = new Button(onClick) { text = "" };
+            b.style.width = size; b.style.height = size;
+            b.style.backgroundColor = TileFill;
+            SetBorderWidth(b, 2);
+            SetBorderColor(b, Edge);
+            SetRadius(b, (int)(size * 0.5f));
+            b.style.paddingLeft = b.style.paddingRight = b.style.paddingTop = b.style.paddingBottom = 0;
+            b.style.marginLeft = b.style.marginRight = b.style.marginTop = b.style.marginBottom = 0;
+            b.style.alignItems = Align.Center;
+            b.style.justifyContent = Justify.Center;
+            b.Add(Icon(icon, Ink, size * 0.55f));
+            return b;
+        }
+
+        /// <summary>A label tag: a card-coloured lozenge, ink edge, heavy caps.</summary>
+        public static VisualElement Tag(string text, int px = 11)
+        {
+            var v = new VisualElement();
+            v.style.backgroundColor = CardFill;
+            SetBorderWidth(v, 2);
+            SetBorderColor(v, Edge);
+            SetRadius(v, 8);
+            v.style.paddingLeft = v.style.paddingRight = 6;
+            v.style.paddingTop = 1; v.style.paddingBottom = 1;
+            v.Add(Text(text, px, Ink, Weight.Black, upper: true));
+            v.pickingMode = PickingMode.Ignore;
+            return v;
+        }
+
+        /// <summary>The "designed, not built" hatch, as a tiled background
+        /// (spec §4.4) -- one rule across shop tiles, knowledge pips and ribbons.</summary>
+        public static void ApplyHatch(VisualElement v, float tile = 12f)
+        {
+            v.style.backgroundImage = new StyleBackground(SpriteShapes.HatchTile);
+            v.style.unityBackgroundImageTintColor = Hatch;
+            v.style.backgroundRepeat = new BackgroundRepeat(Repeat.Repeat, Repeat.Repeat);
+            v.style.backgroundSize = new BackgroundSize(tile, tile);
+        }
+
+        /// <summary>A small hatched pill with a caption ("PLANNED").</summary>
+        public static VisualElement PlannedPill(string text = "PLANNED", int px = 9)
+        {
+            var p = new VisualElement();
+            p.style.backgroundColor = TileFill;
+            SetBorderWidth(p, 2);
+            SetBorderColor(p, Edge);
+            SetRadius(p, 7);
+            p.style.paddingLeft = p.style.paddingRight = 5;
+            p.style.alignSelf = Align.Center;
+            ApplyHatch(p, 8f);
+            var t = Text(text, px, Ink, Weight.Black, upper: true);
+            p.Add(t);
+            p.pickingMode = PickingMode.Ignore;
+            return p;
+        }
+
+        // ---- level pips ----
+
+        /// <summary>Builds <paramref name="total"/> 12 px pips once.</summary>
+        public static VisualElement[] Pips(VisualElement host, int total, float size = 12f)
+        {
+            var pips = new VisualElement[total];
+            for (int i = 0; i < total; i++)
+            {
+                var p = new VisualElement();
+                p.style.width = size; p.style.height = size;
+                p.style.marginRight = 3;
+                SetBorderWidth(p, 2);
+                SetBorderColor(p, Edge);
+                SetRadius(p, (int)(size * 0.5f));
+                p.style.backgroundColor = TileFill;
+                p.pickingMode = PickingMode.Ignore;
+                host.Add(p);
+                pips[i] = p;
+            }
+            return pips;
+        }
+
+        public static void SetPips(VisualElement[] pips, int filled)
+        {
+            for (int i = 0; i < pips.Length; i++)
+                pips[i].style.backgroundColor = i < filled ? Accent : TileFill;
+        }
+
+        // ---- style helpers ----
+
+        public static void SetBorderWidth(VisualElement v, float w)
         {
             v.style.borderTopWidth = v.style.borderBottomWidth =
                 v.style.borderLeftWidth = v.style.borderRightWidth = w;
@@ -213,66 +417,44 @@ namespace ImmunologyTD.UI
             if (v == null) return;
             v.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
+
+        public static void SetScale(VisualElement v, float s) =>
+            v.style.scale = new Scale(new Vector3(s, s, 1f));
+
+        /// <summary>A 0→1→0 "pop" curve over <paramref name="t01"/>, peaking at <paramref name="peak"/>.</summary>
+        public static float Pop(float t01, float peak) =>
+            t01 <= 0f || t01 >= 1f ? 1f : 1f + (peak - 1f) * Mathf.Sin(Mathf.PI * t01);
     }
 
     /// <summary>
-    /// The buy row shared by the upgrade panel, the shop and the tower
-    /// picker (docs/UI_DESIGN.md §7): name, effect text, level dots, cost,
-    /// and a buy control with three states -- affordable, unaffordable, and
-    /// maxed.
+    /// The upgrade panel's row (Sprint 21 restyle): name, effect, level
+    /// pips, price chip, and a chunky BUY -- or MAX when capped.
     ///
-    /// It is a class rather than a factory function because the views poll
-    /// (there are no events on AtpWallet / ShopLedger / BoneMarrowManager,
-    /// and adding them is out of scope) and a row therefore has to be
-    /// *re-priced every frame* while its structure is built exactly once.
-    /// Rebuilding the elements each frame would churn the layout engine for
-    /// no reason and drop the click that lands on the frame it rebuilds.
+    /// A class because the views poll (no events on AtpWallet /
+    /// BoneMarrowManager): structure is built once, then re-priced each
+    /// frame with an early-out unless something moved.
     /// </summary>
     internal sealed class BuyRow
     {
         public readonly VisualElement Root;
 
-        private readonly Label dots;
-        private readonly Label cost;
+        private readonly VisualElement[] pips;
+        private readonly VisualElement chip;
+        private readonly Label price;
+        private readonly VisualElement progress;
         private readonly Label maxed;
         private readonly Button buy;
         private readonly int cap;
 
-        private readonly bool showLevelCount;
+        private int lastLevels = -1, lastPrice = -1, lastBalance = int.MinValue;
 
-        private bool lastAffordable = true;
-        private int lastLevels = -1;
-        private int lastPrice = -1;
-
-        /// <param name="cap">Level ceiling; 0 means "not a levelled row"
-        /// (the tower picker's place-a-tower rows), which hides the dots.</param>
-        /// <param name="showLevelCount">For uncapped repeatable rows (the
-        /// shop's items, which have no ceiling): print "Lv N" where a capped
-        /// row would print its dots. Dots can't say "seven" legibly; a
-        /// number can.</param>
-        public BuyRow(string name, string effect, int cap, System.Action onBuy,
-                      bool accentDot = false, bool showLevelCount = false)
+        public BuyRow(string name, string effect, int cap, System.Action onBuy)
         {
             this.cap = cap;
-            this.showLevelCount = showLevelCount;
-
             Root = new VisualElement();
             Root.style.marginBottom = UiTheme.S;
 
-            var nameLine = new VisualElement();
-            nameLine.style.flexDirection = FlexDirection.Row;
-            nameLine.style.alignItems = Align.Center;
-            if (accentDot)
-            {
-                // Shop rows that really do something keep a mark (a dot
-                // rather than the old "(REAL)" tag). Sprint 19: sensing,
-                // crypts and M cells; the rest are still placeholders.
-                var d = UiTheme.Text("● ", 11, UiTheme.Accent);
-                nameLine.Add(d);
-            }
-            nameLine.Add(UiTheme.Text(name, 13, UiTheme.Ink));
-            Root.Add(nameLine);
-
+            Root.Add(UiTheme.Text(name, 13, UiTheme.Ink, Weight.Bold));
             if (!string.IsNullOrEmpty(effect))
             {
                 var e = UiTheme.Text(effect, 11, UiTheme.InkDim);
@@ -286,63 +468,40 @@ namespace ImmunologyTD.UI
             line.style.alignItems = Align.Center;
             line.style.justifyContent = Justify.SpaceBetween;
 
-            dots = UiTheme.Text(UiTheme.Dots(0, cap), 11, UiTheme.Accent);
-            line.Add(dots);
+            var pipHost = new VisualElement();
+            pipHost.style.flexDirection = FlexDirection.Row;
+            pips = UiTheme.Pips(pipHost, Mathf.Max(0, cap));
+            line.Add(pipHost);
 
             var right = new VisualElement();
             right.style.flexDirection = FlexDirection.Row;
             right.style.alignItems = Align.Center;
-
-            cost = UiTheme.Text("", 11, UiTheme.InkDim);
-            cost.style.marginRight = 2 * UiTheme.S;
-            right.Add(cost);
-
-            maxed = UiTheme.Text("MAX", 13, UiTheme.AccentDim, bold: true);
+            chip = UiTheme.Chip(out price, out progress);
+            chip.style.marginRight = 2 * UiTheme.S;
+            right.Add(chip);
+            maxed = UiTheme.Text("MAX", 13, UiTheme.InkDim, Weight.Black);
             UiTheme.Show(maxed, false);
             right.Add(maxed);
-
-            buy = UiTheme.FlatButton("BUY", onBuy);
+            buy = UiTheme.ChunkyButton("BUY", onBuy);
             right.Add(buy);
-
             line.Add(right);
             Root.Add(line);
         }
 
-        /// <summary>Called every frame by the owning view. Cheap: it early-
-        /// outs unless the affordability, level or price actually moved.</summary>
-        public void Refresh(int levels, int price, bool affordable)
+        public void Refresh(int levels, int cost, int balance)
         {
-            if (levels == lastLevels && price == lastPrice && affordable == lastAffordable) return;
-
+            if (levels == lastLevels && cost == lastPrice && balance == lastBalance) return;
             bool isMaxed = cap > 0 && levels >= cap;
-
-            if (levels != lastLevels)
-            {
-                dots.text = showLevelCount
-                    ? (levels > 0 ? $"Lv {levels}" : string.Empty)
-                    : UiTheme.Dots(levels, cap);
-                dots.style.color = isMaxed ? UiTheme.AccentDim : UiTheme.Accent;
-            }
-
-            cost.text = isMaxed ? "" : $"{price} ATP";
-            cost.style.color = affordable ? UiTheme.InkDim : UiTheme.LivesLow;
-
-            UiTheme.Show(maxed, isMaxed);
+            if (levels != lastLevels) UiTheme.SetPips(pips, levels);
+            UiTheme.Show(chip, !isMaxed);
             UiTheme.Show(buy, !isMaxed);
+            UiTheme.Show(maxed, isMaxed);
             if (!isMaxed)
             {
-                // Unaffordable reads as a dash rather than a dead "BUY":
-                // the label itself says you can't, not just the colour, so
-                // it survives a colour-blind read (UI_DESIGN.md §1).
-                buy.text = affordable ? "BUY" : "–";
-                buy.style.color = affordable ? UiTheme.Ink : UiTheme.AccentDim;
-                buy.style.borderLeftColor = affordable ? UiTheme.Accent : UiTheme.AccentDim;
-                buy.SetEnabled(affordable);
+                UiTheme.SetChip(chip, price, progress, cost, balance);
+                UiTheme.SetButtonEnabled(buy, balance >= cost);
             }
-
-            lastLevels = levels;
-            lastPrice = price;
-            lastAffordable = affordable;
+            lastLevels = levels; lastPrice = cost; lastBalance = balance;
         }
     }
 }

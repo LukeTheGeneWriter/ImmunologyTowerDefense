@@ -40,20 +40,9 @@ namespace ImmunologyTD.UI
             Root.style.alignItems = Align.Center;
             Root.pickingMode = PickingMode.Ignore;
 
-            var label = UiTheme.Text(text, 11, UiTheme.InkDim, upper: true);
-            label.pickingMode = PickingMode.Ignore;
-            Root.Add(label);
-
-            // The one piece of chrome §1 allows a label: a hairline rule
-            // under it, so the name reads as a heading for the organ below
-            // rather than as floating debris on the board.
-            var rule = new VisualElement();
-            rule.style.height = 1;
-            rule.style.width = Length.Percent(100);
-            rule.style.backgroundColor = UiTheme.Rule;
-            rule.style.marginTop = UiTheme.S / 2;
-            rule.pickingMode = PickingMode.Ignore;
-            Root.Add(rule);
+            // Sprint 21 (COSMETIC_PASS_SPEC.md §1.4): a tag -- card fill, ink
+            // edge, heavy caps -- pinned to the organ's edge.
+            Root.Add(UiTheme.Tag(text));
 
             parent.Add(Root);
         }

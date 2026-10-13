@@ -1,33 +1,36 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using ImmunologyTD.Rendering;
 using ImmunologyTD.Units;
 
 namespace ImmunologyTD.UI
 {
     /// <summary>
-    /// What an *empty* marrow slot opens (docs/UI_DESIGN.md §6): the four
-    /// progenitor kinds, their price, and one line each on what they do.
-    /// Floats at the slot, same as the upgrade panel it swaps with.
-    ///
-    /// The rows are the same <see cref="BuyRow"/> component the upgrade
-    /// panel and the shop use, with the level dots switched off (`cap 0`) --
-    /// placing is a one-shot, not a ladder. That reuse is the reason §6
-    /// argued for migrating all three surfaces in one sprint instead of
-    /// leaving this one in IMGUI.
-    ///
-    /// The two adaptive kinds are hidden when there is no AdaptiveDirector
-    /// to emit into -- the same rule the old IMGUI picker had, kept because
-    /// offering a button that silently cannot work is worse than offering
-    /// two buttons.
+    /// The tower picker, floated beside the clicked empty marrow pad
+    /// (UI_DESIGN.md §4/§6). **Sprint 21 restyle** (COSMETIC_PASS_SPEC.md
+    /// §2.6): a cream card with a 2x2 grid of unit cards -- portrait, name,
+    /// one-line blurb, price chip and a chunky PLACE button. Adaptive kinds
+    /// only appear when the AdaptiveDirector exists (a harness may not
+    /// have one). Built once per target; re-priced by polling.
     /// </summary>
     internal sealed class TowerPickerView
     {
         public readonly VisualElement Root;
 
         private readonly Label title;
-        private readonly VisualElement rowHost;
-        private readonly System.Collections.Generic.List<(UnitKind kind, BuyRow row)> rows =
-            new System.Collections.Generic.List<(UnitKind, BuyRow)>();
+        private readonly VisualElement grid;
+
+        private sealed class UnitCard
+        {
+            public UnitKind Kind;
+            public VisualElement Root, Chip, Progress;
+            public Label Price;
+            public Button Place;
+            public int LastBalance = int.MinValue;
+        }
+
+        private readonly System.Collections.Generic.List<UnitCard> cards =
+            new System.Collections.Generic.List<UnitCard>();
 
         private BoneMarrowManager marrow;
         private int slotIndex = -1;
@@ -36,23 +39,26 @@ namespace ImmunologyTD.UI
 
         public TowerPickerView(VisualElement parent, System.Action onClose)
         {
-            Root = UiTheme.Panel();
+            Root = UiTheme.Card(10);
             Root.style.position = Position.Absolute;
-            Root.style.width = 300;
+            Root.style.width = 400;
             parent.Add(Root);
 
-            title = UiTheme.Text("", 10, UiTheme.InkDim, bold: true, upper: true);
-            Root.Add(title);
-            Root.Add(UiTheme.Divider());
+            var head = new VisualElement();
+            head.style.flexDirection = FlexDirection.Row;
+            head.style.alignItems = Align.Center;
+            head.style.justifyContent = Justify.SpaceBetween;
+            head.style.marginBottom = 8;
+            title = UiTheme.Text("", 12, UiTheme.InkDim, Weight.Black, upper: true);
+            head.Add(title);
+            head.Add(UiTheme.IconButton(SpriteShapes.IconClose, onClose));
+            Root.Add(head);
 
-            rowHost = new VisualElement();
-            Root.Add(rowHost);
-
-            var footer = new VisualElement();
-            footer.style.flexDirection = FlexDirection.Row;
-            footer.style.justifyContent = Justify.FlexEnd;
-            footer.Add(UiTheme.TextButton("close  ✕", onClose));
-            Root.Add(footer);
+            grid = new VisualElement();
+            grid.style.flexDirection = FlexDirection.Row;
+            grid.style.flexWrap = Wrap.Wrap;
+            grid.style.justifyContent = Justify.SpaceBetween;
+            Root.Add(grid);
 
             UiTheme.Show(Root, false);
         }
@@ -65,49 +71,77 @@ namespace ImmunologyTD.UI
             this.slotIndex = slotIndex;
             if (marrow == null || slotIndex < 0) return;
 
-            title.text = $"Place progenitor · slot {slotIndex + 1}".ToUpperInvariant();
+            title.text = $"Place a progenitor · slot {slotIndex + 1}".ToUpperInvariant();
 
             if (!built || builtWithAdaptive != marrow.AdaptiveAvailable)
             {
-                BuildRows(marrow.AdaptiveAvailable);
+                grid.Clear();
+                cards.Clear();
+                AddCard(UnitKind.Macrophage);
+                AddCard(UnitKind.Neutrophil);
+                if (marrow.AdaptiveAvailable)
+                {
+                    AddCard(UnitKind.DendriticCell);
+                    AddCard(UnitKind.HelperT);
+                }
                 builtWithAdaptive = marrow.AdaptiveAvailable;
                 built = true;
             }
+            foreach (var c in cards) c.LastBalance = int.MinValue;
         }
 
-        private void BuildRows(bool adaptiveAvailable)
+        private void AddCard(UnitKind kind)
         {
-            rowHost.Clear();
-            rows.Clear();
+            var c = new UnitCard { Kind = kind };
+            c.Root = UiTheme.Tile();
+            c.Root.style.width = 178;
+            c.Root.style.height = 128;
+            c.Root.style.marginBottom = 8;
+            c.Root.style.paddingLeft = c.Root.style.paddingRight = 8;
+            c.Root.style.paddingTop = c.Root.style.paddingBottom = 6;
+            c.Root.style.justifyContent = Justify.SpaceBetween;
 
-            AddRow(UnitKind.Macrophage);
-            AddRow(UnitKind.Neutrophil);
-            if (adaptiveAvailable)
-            {
-                AddRow(UnitKind.DendriticCell);
-                AddRow(UnitKind.HelperT);
-            }
-        }
+            var top = new VisualElement();
+            top.style.flexDirection = FlexDirection.Row;
+            top.style.alignItems = Align.Center;
+            top.Add(UiTheme.Portrait(ProgenitorUpgradeCatalog.SpriteFor(kind), marrow.GetKindColor(kind), 44, out _));
+            var name = UiTheme.Text(ProgenitorUpgradeCatalog.DisplayName(kind), 13, UiTheme.Ink, Weight.Black);
+            name.style.marginLeft = 6;
+            name.style.whiteSpace = WhiteSpace.Normal;
+            name.style.flexShrink = 1;
+            top.Add(name);
+            c.Root.Add(top);
 
-        private void AddRow(UnitKind kind)
-        {
-            var row = new BuyRow(
-                ProgenitorUpgradeCatalog.DisplayName(kind),
-                ProgenitorUpgradeCatalog.PickerBlurb(kind),
-                cap: 0,
-                onBuy: () => marrow?.PlaceTower(slotIndex, kind));
-            if (rows.Count > 0) rowHost.Add(UiTheme.Divider());
-            rowHost.Add(row.Root);
-            rows.Add((kind, row));
+            var blurb = UiTheme.Text(ProgenitorUpgradeCatalog.PickerBlurb(kind), 10, UiTheme.InkDim, Weight.Bold);
+            blurb.style.whiteSpace = WhiteSpace.Normal;
+            c.Root.Add(blurb);
+
+            var bottom = new VisualElement();
+            bottom.style.flexDirection = FlexDirection.Row;
+            bottom.style.alignItems = Align.Center;
+            bottom.style.justifyContent = Justify.SpaceBetween;
+            c.Chip = UiTheme.Chip(out c.Price, out c.Progress);
+            bottom.Add(c.Chip);
+            c.Place = UiTheme.ChunkyButton("PLACE", () => marrow?.PlaceTower(slotIndex, kind), null, 12);
+            bottom.Add(c.Place);
+            c.Root.Add(bottom);
+
+            grid.Add(c.Root);
+            cards.Add(c);
         }
 
         public void Refresh()
         {
             if (marrow == null || slotIndex < 0) return;
-            for (int i = 0; i < rows.Count; i++)
+            int balance = marrow.Balance;
+            for (int i = 0; i < cards.Count; i++)
             {
-                int price = BoneMarrowManager.PriceFor(rows[i].kind);
-                rows[i].row.Refresh(0, price, marrow.CanAfford(price));
+                var c = cards[i];
+                if (balance == c.LastBalance) continue;
+                int price = BoneMarrowManager.PriceFor(c.Kind);
+                UiTheme.SetChip(c.Chip, c.Price, c.Progress, price, balance);
+                UiTheme.SetButtonEnabled(c.Place, balance >= price);
+                c.LastBalance = balance;
             }
         }
     }

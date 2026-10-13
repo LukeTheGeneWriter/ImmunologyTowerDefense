@@ -188,6 +188,7 @@ namespace ImmunologyTD.Bootstrap
             var layout = BuildLayout();
 
             BuildCamera(layout.Bounds);
+            BuildPlateFrame(layout.Bounds);
             BuildBoardVisual();
             BuildLumenChannel();
             BuildTissueUnderlay();
@@ -321,13 +322,29 @@ namespace ImmunologyTD.Bootstrap
         /// </summary>
         private static void FitCamera(Camera cam, Rect bounds)
         {
-            const float padding = 1.04f;
             Vector2 center = bounds.center;
-            float halfHeight = bounds.height * 0.5f * padding;
             float aspect = cam.aspect > 0 ? cam.aspect : 16f / 9f;
-            float halfWidthDrivenSize = bounds.width * 0.5f * padding / aspect;
-            cam.orthographicSize = Mathf.Max(halfHeight, halfWidthDrivenSize);
+            cam.orthographicSize = CameraHalfHeight(bounds, aspect);
             cam.transform.position = new Vector3(center.x, center.y, -10f);
+        }
+
+        /// <summary>Sprint 21: the strip above and below the board
+        /// (each at least this fraction of the screen height) is where all
+        /// the permanent UI lives (COSMETIC_PASS_SPEC.md §0).</summary>
+        public const float UiGutterFraction = 0.15f;
+
+        /// <summary>Orthographic half-height that fits the board with 4%
+        /// padding AND keeps a <see cref="UiGutterFraction"/> strip above and
+        /// below it. At 16:9 the 2.5:1 board already leaves ~15.8%, so this
+        /// is a no-op there; at 21:9 it used to leave 5% and the HUD and
+        /// shop would have sat on the board. Pure, so a harness checks it.</summary>
+        public static float CameraHalfHeight(Rect bounds, float aspect)
+        {
+            const float padding = 1.04f;
+            float byHeight = bounds.height * 0.5f * padding;
+            float byGutter = bounds.height * 0.5f / (1f - 2f * UiGutterFraction);
+            float byWidth = bounds.width * 0.5f * padding / Mathf.Max(0.01f, aspect);
+            return Mathf.Max(byHeight, Mathf.Max(byGutter, byWidth));
         }
 
         private System.Collections.IEnumerator RefitCameraNextFrame(Rect bounds)
@@ -384,6 +401,26 @@ namespace ImmunologyTD.Bootstrap
             var go = new GameObject("GutInterfaceRenderer");
             var renderer = go.AddComponent<GutInterfaceRenderer>();
             renderer.Bind(board, gutInterface);
+        }
+
+        /// <summary>Sprint 21 (COSMETIC_PASS_SPEC.md §3): the board as a
+        /// textbook figure plate -- one 9-sliced renderer whose window is
+        /// the board, with a dark ink edge, a baked drop shadow, and
+        /// desk-coloured corners that round off the board's square ones. It
+        /// sits above everything on the board (order 40, over the FX at 30)
+        /// so a unit crossing a corner is clipped by the frame, which is the
+        /// accepted cost.</summary>
+        private void BuildPlateFrame(Rect bounds)
+        {
+            var go = new GameObject("PlateFrame");
+            go.transform.position = new Vector3(bounds.center.x, bounds.center.y, 0f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.PlateFrame;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            float m = ImmunologyTD.Rendering.SpriteShapes.PlateMarginWorld;
+            sr.size = new Vector2(bounds.width + 2f * m, bounds.height + 2f * m);
+            sr.color = ImmunologyTD.Rendering.Palette.CameraClear;
+            sr.sortingOrder = 40;
         }
 
         /// <summary>Sprint 20 (ART_DIRECTION.md §3.2): a flat
@@ -624,6 +661,7 @@ namespace ImmunologyTD.Bootstrap
             // does not fire at all -- which is exactly where the headless
             // bootstrap smoke needs the view tree to be constructed.
             ui.Build();
+            ui.SetLymphNode(layout.LymphCenter, BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision);
 
             // The compartment headings, world-anchored (UI_DESIGN.md §6).
             // They used to be IMGUI CompartmentLabels created next to each
