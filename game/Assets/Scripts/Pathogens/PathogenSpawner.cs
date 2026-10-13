@@ -82,7 +82,12 @@ namespace ImmunologyTD.Pathogens
         private RoundDefinition foodDef;
         private int foodAxisIndex;   // distance-from-base index, held near the wall
         private int foodCrossIndex;  // position along the flow -- this is what advances
-        private float foodStepTimer;
+        // Sprint 19: seconds since the bolus entered, and lanes stepped so
+        // far. Position is a pure function of elapsed time via
+        // Peristalsis.Travel01 (surge-and-pause), not a fixed-rate timer.
+        private float foodElapsed;
+        private int foodStepsTaken;
+        private float foodLaneFraction;
         private int burstsDone;
         private GameObject foodVisual;
 
@@ -130,7 +135,9 @@ namespace ImmunologyTD.Pathogens
             batchTarget = count < 0 ? 0 : count;
             batchEmitted = 0;
             burstsDone = 0;
-            foodStepTimer = 0f;
+            foodElapsed = 0f;
+            foodStepsTaken = 0;
+            foodLaneFraction = 0f;
 
             foodAxisIndex = Mathf.Clamp(
                 board.LumenNearWallAxisIndex + Mathf.Max(0, InvasionTuning.FoodItemWallHugDepth),
@@ -149,6 +156,7 @@ namespace ImmunologyTD.Pathogens
         {
             inBatch = false;
             foodActive = false;
+            Peristalsis.BolusActive = false;
             if (foodVisual != null) foodVisual.SetActive(false);
         }
 
@@ -222,6 +230,21 @@ namespace ImmunologyTD.Pathogens
 
             if (gutInterface != null) gutInterface.Tick(deltaTime, currentTime);
 
+            // Sprint 19: M cells over the Peyer's patch sample pathogens
+            // drifting past or sitting at the wall (a no-op until the M-cell
+            // upgrade is bought). The pathogen is untouched -- only antigen
+            // is taken.
+            var wall = ImmunologyTD.Grid.GutWallFeatures.Current;
+            if (wall != null && wall.MCellLevel > 0)
+            {
+                for (int i = 0; i < live.Count; i++)
+                {
+                    var a = live[i];
+                    if (a.State != PathogenState.Lumen && a.State != PathogenState.AtInterface) continue;
+                    wall.TrySample(a.CurrentCoarse, a.Class, deltaTime, Random.value);
+                }
+            }
+
             fieldRecomputeTimer += deltaTime;
             if (fieldRecomputeTimer >= FieldRecomputeIntervalSeconds)
             {
@@ -250,12 +273,17 @@ namespace ImmunologyTD.Pathogens
         private void AdvanceFood(float deltaTime, float currentTime)
         {
             int lanes = Mathf.Max(1, board.CrossLength);
-            float stepInterval = Mathf.Max(0.01f, InvasionTuning.FoodItemTransitSeconds / lanes);
 
-            foodStepTimer += deltaTime;
-            while (foodStepTimer >= stepInterval && foodActive)
+            // Sprint 19: peristalsis. The lanes the bolus SHOULD have covered
+            // by now come from the surge profile; step until it has. Same
+            // total transit as the old fixed-rate crawl, delivered in pushes.
+            foodElapsed += deltaTime;
+            float lanesTravelled = Peristalsis.Travel01(foodElapsed) * lanes;
+            int targetSteps = Mathf.FloorToInt(lanesTravelled);
+            foodLaneFraction = lanesTravelled - targetSteps;
+            while (foodStepsTaken < targetSteps && foodActive)
             {
-                foodStepTimer -= stepInterval;
+                foodStepsTaken++;
                 foodCrossIndex += board.FlowCrossStep;
 
                 if (!board.InCrossBounds(foodCrossIndex))
@@ -267,12 +295,12 @@ namespace ImmunologyTD.Pathogens
                         SpawnFromFood();
                     foodActive = false;
                     foodExited = true;
+                    Peristalsis.BolusActive = false;
                     if (foodVisual != null) foodVisual.SetActive(false);
                     return;
                 }
-
-                PositionFoodVisual();
             }
+            PositionFoodVisual();
 
             // Burst schedule: bursts k = 1..FoodItemBurstCount fire at
             // travelled-fractions k / (FoodItemBurstCount + 1), so they land
@@ -325,11 +353,23 @@ namespace ImmunologyTD.Pathogens
             foodVisual.SetActive(false);
         }
 
+        /// <summary>Sprint 19: glides between lane centres by the fractional
+        /// lane travelled, so the bolus moves continuously (surging, then
+        /// drifting) rather than snapping a cell at a time. The SIMULATION
+        /// position (foodCrossIndex, which drives bursts) stays a whole lane.
+        /// Also publishes the bolus to Peristalsis' cosmetic hook.</summary>
         private void PositionFoodVisual()
         {
             if (foodVisual == null) return;
             int cross = Mathf.Clamp(foodCrossIndex, 0, board.CrossLength - 1);
-            foodVisual.transform.position = board.CoarseToWorldCenter(board.CoarseFromAxis(foodAxisIndex, cross));
+            int next = Mathf.Clamp(foodCrossIndex + board.FlowCrossStep, 0, board.CrossLength - 1);
+            Vector3 a = board.CoarseToWorldCenter(board.CoarseFromAxis(foodAxisIndex, cross));
+            Vector3 b = board.CoarseToWorldCenter(board.CoarseFromAxis(foodAxisIndex, next));
+            Vector3 p = Vector3.Lerp(a, b, foodLaneFraction);
+            foodVisual.transform.position = p;
+            Peristalsis.BolusActive = foodActive;
+            Peristalsis.BolusWorldPosition = p;
+            Peristalsis.BolusElapsed = foodElapsed;
         }
 
         /// <summary>

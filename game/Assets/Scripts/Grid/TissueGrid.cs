@@ -595,6 +595,9 @@ namespace ImmunologyTD.Grid
                             // Healthy neighbours -> shorter effective regrow time.
                             float effectiveRegen = regrowAfter /
                                 (1f + TissueTuning.NeighbourRegrowthBonus * HealthyNeighbourCount(c));
+                            // Sprint 19: a crypt within reach speeds it further.
+                            if (GutWallFeatures.Current != null)
+                                effectiveRegen /= GutWallFeatures.Current.RegrowthMultiplier(c);
                             if (currentTime - emptySince[col, row] >= effectiveRegen) Regrow(c);
                             break;
                     }

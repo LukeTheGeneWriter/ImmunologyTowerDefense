@@ -194,7 +194,16 @@ namespace ImmunologyTD.UI
             // ledger; this is the only line that turns a purchase into
             // behaviour anywhere in the project.
             if (shop != null)
+            {
                 Chemotaxis.SensingUpgradeLevel = shop.LevelOf(ShopItem.CytokineSensingUpgrade);
+                // Sprint 19: crypts and M cells are real too.
+                var wall = ImmunologyTD.Grid.GutWallFeatures.Current;
+                if (wall != null)
+                {
+                    wall.SetCryptCount(shop.LevelOf(ShopItem.Crypt));
+                    wall.MCellLevel = shop.LevelOf(ShopItem.MCellSampling);
+                }
+            }
 
             hud.Refresh(wallet, rounds, spawner);
             shopView.Refresh();

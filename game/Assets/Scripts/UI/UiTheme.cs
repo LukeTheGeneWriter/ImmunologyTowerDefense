@@ -264,8 +264,9 @@ namespace ImmunologyTD.UI
             nameLine.style.alignItems = Align.Center;
             if (accentDot)
             {
-                // The one shop row that really does something keeps a mark,
-                // but a dot rather than the old "(REAL)" text tag.
+                // Shop rows that really do something keep a mark (a dot
+                // rather than the old "(REAL)" tag). Sprint 19: sensing,
+                // crypts and M cells; the rest are still placeholders.
                 var d = UiTheme.Text("● ", 11, UiTheme.Accent);
                 nameLine.Add(d);
             }

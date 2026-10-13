@@ -32,12 +32,13 @@ namespace ImmunologyTD.UI
 
         private static readonly (ShopItem item, string name, string effect)[] Items =
         {
-            (ShopItem.CytokineSensingUpgrade,  "Cytokine sensing +",       "Sharpens every unit's gradient bias — the one upgrade that already works."),
+            (ShopItem.CytokineSensingUpgrade,  "Cytokine sensing +",       "Sharpens every unit's gradient bias toward infection."),
             (ShopItem.BarrierMucusTurnover,    "Mucus turnover",           "Barrier: flush adherent pathogens back into the lumen."),
             (ShopItem.HostDsRnaSensor,         "Host dsRNA sensor",        "Infected host cells self-destruct and call for clearance."),
             (ShopItem.HostReducedViralEntry,   "Harden vs viral entry",    "Lower the per-tick chance a virion gets inside a host cell."),
             (ShopItem.HostBacterialResistance, "Bacterial resistance",     "Host cells take less damage from a grazing large bacterium."),
-            (ShopItem.Crypt,                   "Crypt (local regrowth)",   "A stem-cell niche — nearby tissue regrows faster."),
+            (ShopItem.Crypt,                   "Crypt (local regrowth)",   "A stem-cell niche at the gut wall — nearby tissue regrows faster."),
+            (ShopItem.MCellSampling,           "M-cell sampling",          "The Peyer's patch samples pathogens in the lumen and hands antigen to dendritic cells."),
         };
 
         private readonly VisualElement body;
@@ -69,7 +70,8 @@ namespace ImmunologyTD.UI
                 var entry = Items[i];
                 rows[i] = new BuyRow(entry.name, entry.effect, cap: 0,
                     onBuy: () => Buy(Items[index].item),
-                    accentDot: entry.item == ShopItem.CytokineSensingUpgrade,
+                    accentDot: entry.item == ShopItem.CytokineSensingUpgrade
+                               || entry.item == ShopItem.Crypt || entry.item == ShopItem.MCellSampling,
                     showLevelCount: true);
                 if (i > 0) body.Add(UiTheme.Divider());
                 body.Add(rows[i].Root);

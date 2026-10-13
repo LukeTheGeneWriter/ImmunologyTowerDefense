@@ -1,6 +1,7 @@
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Pooling;
+using ImmunologyTD.Pathogens;
 using ImmunologyTD.Rounds;
 
 namespace ImmunologyTD.Rendering
@@ -36,11 +37,20 @@ namespace ImmunologyTD.Rendering
         private static readonly Color MucusColor  = new Color(0.88f, 0.84f, 0.76f);
         private static readonly Color MoteColor   = new Color(0.60f, 0.52f, 0.40f);
         private static readonly Color VillusColor = new Color(0.80f, 0.50f, 0.47f);
+        /// <summary>Sprint 19 (LUMEN_REFERENCE.md P2): the back row of the
+        /// "velvet pile" -- darker, translucent, so depth reads without
+        /// lifting the background value behind pathogens.</summary>
+        private static readonly Color BackVillusColor = new Color(0.62f, 0.40f, 0.42f, 0.70f);
 
         private const int MoteCount = 28;           // Sprint 17: was 40 -- a cleaner channel
         private const float MucusDepthCells = 1.6f;
         private const float MoteBaseSpeed = 1.1f;   // world units / s
-        private const float PeristalsisPeriod = 8f; // s
+        /// <summary>Sprint 19: how far behind the bolus the contraction
+        /// ring reaches along the wall, in cells; and how much the villi in
+        /// it lengthen and lean downstream at full contraction.</summary>
+        private const float RingLengthCells = 2.5f;
+        private const float RingStretch = 0.28f;
+        private const float RingLeanDegrees = 14f;
 
         /// <summary>Villus geometry, in coarse cells. Height is kept under
         /// the mucus depth on purpose: villi are wall decoration, and a
@@ -77,6 +87,7 @@ namespace ImmunologyTD.Rendering
         private float flowSpan;      // channel length along the flow
         private float halfWidth;     // channel half-extent across the flow
         private float phase;
+        private float cellSize;
 
         private class Mote
         {
@@ -93,10 +104,15 @@ namespace ImmunologyTD.Rendering
             public float SwayPhase;
             public float SwayFreq;
             public Vector3 BaseScale;
+            public float Along;        // Sprint 19: distance along the flow from the entry end
         }
 
         private readonly System.Collections.Generic.List<Villus> villi =
             new System.Collections.Generic.List<Villus>();
+
+        private Vector3 flowStartWall;   // the wall point at the entry end
+        private float leanSign;          // which rotation sense tips a villus downstream
+        private float idleClock;         // peristalsis keeps its rhythm between rounds
 
         public void Bind(BoardConfig board)
         {
@@ -122,7 +138,9 @@ namespace ImmunologyTD.Rendering
             Vector3 center = new Vector3(lumenRect.center.x, lumenRect.center.y, 0f);
 
             // Chyme field -- fills the band.
-            chymeQuad = MakeQuad("LumenChyme", SpriteShapes.ChymeField, ChymeColor, 0);
+            // Sprint 19: chyme drops to -1 so the back row of villi (0) can
+            // sit between it and the front row (1) -- UI_STYLE_GUIDE sorting.
+            chymeQuad = MakeQuad("LumenChyme", SpriteShapes.ChymeField, ChymeColor, -1);
             chymeQuad.position = center;
             chymeQuad.localScale = chymeBaseScale = new Vector3(lumenRect.width, lumenRect.height, 1f);
 
@@ -144,6 +162,7 @@ namespace ImmunologyTD.Rendering
             mucusQuad.localScale = mucusBaseScale =
                 new Vector3(wallOnLeft ? stripDepth : -stripDepth, lumenRect.height, 1f);
 
+            cellSize = board.CoarseCellWorldSize;
             BuildVilli(board);
 
             // Flow motes -- pooled, pre-warmed so no runtime Instantiate.
@@ -212,40 +231,76 @@ namespace ImmunologyTD.Rendering
             Vector3 wallPoint = lumenCenter - intoChannel * halfWidth;
             Vector3 flowStart = wallPoint - flowDir * (flowSpan * 0.5f);
 
+            flowStartWall = flowStart;
+            // Rotating a villus counter-clockwise swings its tip toward the
+            // CCW perpendicular of intoChannel; downstream is +1 if that
+            // perpendicular points along the flow.
+            leanSign = Vector3.Dot(new Vector3(-intoChannel.y, intoChannel.x, 0f), flowDir) >= 0f ? 1f : -1f;
+
+            // Sprint 19: the Peyer's patch stretch of wall grows no villi.
+            float patchFrom = float.MaxValue, patchTo = float.MinValue;
+            var wallFeatures = GutWallFeatures.Current;
+            if (wallFeatures != null)
+            {
+                for (int lane = wallFeatures.PatchCrossStart; lane <= wallFeatures.PatchCrossEnd; lane++)
+                {
+                    Vector3 p = board.CoarseToWorldCenter(board.CoarseFromAxis(board.LumenNearWallAxisIndex, lane));
+                    float d = Vector3.Dot(p - flowStart, flowDir);
+                    patchFrom = Mathf.Min(patchFrom, d - cell * 0.5f);
+                    patchTo = Mathf.Max(patchTo, d + cell * 0.5f);
+                }
+            }
+
             float height = VillusHeightCells * cell;
             float width = VillusWidthCells * cell;
             float spacing = VillusSpacingCells * cell;
             int count = Mathf.Max(1, Mathf.FloorToInt(flowSpan / spacing));
             float angle = Mathf.Atan2(intoChannel.y, intoChannel.x) * Mathf.Rad2Deg - 90f;
 
+            // Back row first (P2): half a spacing offset, ~80% height, darker.
+            for (int i = 0; i < count; i++)
+            {
+                float along = (i + 1f) * (flowSpan / count);
+                if (along >= flowSpan) continue;
+                if (along > patchFrom - width * 0.5f && along < patchTo + width * 0.5f) continue;
+                AddVillus($"VillusBack_{i}", along, height * 0.8f * Random.Range(0.85f, 1.1f), width * 0.95f,
+                    BackVillusColor, 0, angle, intoChannel, flowStart, 0.35f, 0.6f);
+            }
             for (int i = 0; i < count; i++)
             {
                 float along = (i + 0.5f) * (flowSpan / count);
+                if (along > patchFrom - width * 0.3f && along < patchTo + width * 0.3f) continue;
                 // Per-villus height jitter so the row is a fringe, not a comb.
-                float h = height * Random.Range(0.82f, 1.16f);
-
-                var go = new GameObject($"Villus_{i}");
-                go.transform.SetParent(transform, false);
-                var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = SpriteShapes.Villus;
-                float shade = 1f + Random.Range(-0.07f, 0.07f);
-                sr.color = new Color(VillusColor.r * shade, VillusColor.g * shade, VillusColor.b * shade, 1f);
-                sr.sortingOrder = 1;   // over the chyme, under the mucus sheen
-
-                go.transform.position = flowStart + flowDir * along + intoChannel * (h * 0.5f);
-                go.transform.rotation = Quaternion.Euler(0f, 0f, angle);
-                var scale = new Vector3(width, h, 1f);
-                go.transform.localScale = scale;
-
-                villi.Add(new Villus
-                {
-                    T = go.transform,
-                    BaseAngle = angle,
-                    SwayPhase = Random.Range(0f, Mathf.PI * 2f),
-                    SwayFreq = Random.Range(0.5f, 0.9f),
-                    BaseScale = scale,
-                });
+                AddVillus($"Villus_{i}", along, height * Random.Range(0.82f, 1.16f), width,
+                    VillusColor, 1, angle, intoChannel, flowStart, 0.5f, 0.9f);
             }
+        }
+
+        private void AddVillus(string name, float along, float h, float width, Color tint, int order,
+            float angle, Vector3 intoChannel, Vector3 flowStart, float swayMin, float swayMax)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = Random.value < 0.5f ? SpriteShapes.Villus : SpriteShapes.VillusAlt;
+            float shade = 1f + Random.Range(-0.07f, 0.07f);
+            sr.color = new Color(tint.r * shade, tint.g * shade, tint.b * shade, tint.a);
+            sr.sortingOrder = order;   // back row 0, front row 1; the mucus sheen (2) glazes both
+
+            go.transform.position = flowStart + flowDir * along + intoChannel * (h * 0.5f);
+            go.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            var scale = new Vector3(width, h, 1f);
+            go.transform.localScale = scale;
+
+            villi.Add(new Villus
+            {
+                T = go.transform,
+                BaseAngle = angle,
+                SwayPhase = Random.Range(0f, Mathf.PI * 2f),
+                SwayFreq = Random.Range(swayMin, swayMax),
+                BaseScale = scale,
+                Along = along,
+            });
         }
 
         private Vector3 RandomChannelPoint(float alongFlow01)
@@ -263,7 +318,23 @@ namespace ImmunologyTD.Rendering
             float dt = Time.deltaTime;
             phase += dt;
 
-            float squeeze = 1f + peristalsisAmplitude * Mathf.Sin(phase * (2f * Mathf.PI / PeristalsisPeriod));
+            // Sprint 19: the squeeze follows the SAME surge-and-pause rhythm
+            // that moves the bolus (Peristalsis), and while a bolus is in the
+            // channel it is read off the bolus's own clock, so the wall
+            // visibly contracts as the bolus surges. Between rounds it keeps
+            // its rhythm on an idle clock.
+            float t;
+            if (Peristalsis.BolusActive) { t = Peristalsis.BolusElapsed; idleClock = t; }
+            else { idleClock += dt; t = idleClock; }
+            float contraction = Peristalsis.Contraction(t);
+            float squeeze = 1f - peristalsisAmplitude + 2f * peristalsisAmplitude * contraction;
+            float speedFactor = Peristalsis.SpeedFactor(t);
+
+            // The contraction ring sits just BEHIND the bolus.
+            float bolusAlong = Peristalsis.BolusActive
+                ? Vector3.Dot(Peristalsis.BolusWorldPosition - flowStartWall, flowDir)
+                : float.NegativeInfinity;
+            float ringLen = RingLengthCells * cellSize;
 
             // Cross-section squeeze on the two field quads.
             var cs = chymeBaseScale; cs.x *= squeeze; chymeQuad.localScale = cs;
@@ -277,8 +348,11 @@ namespace ImmunologyTD.Rendering
                 var v = villi[i];
                 if (v.T == null) continue;
                 float s = Mathf.Sin(phase * v.SwayFreq + v.SwayPhase);
-                v.T.rotation = Quaternion.Euler(0f, 0f, v.BaseAngle + s * VillusSwayDegrees);
-                var vs = v.BaseScale; vs.y *= squeeze; v.T.localScale = vs;
+                float behind = bolusAlong - v.Along;
+                float ring = behind > 0f && behind < ringLen ? contraction * (1f - behind / ringLen) : 0f;
+                v.T.rotation = Quaternion.Euler(0f, 0f,
+                    v.BaseAngle + s * VillusSwayDegrees + leanSign * RingLeanDegrees * ring);
+                var vs = v.BaseScale; vs.y *= squeeze * (1f + RingStretch * ring); v.T.localScale = vs;
             }
 
             for (int i = 0; i < motes.Length; i++)
@@ -286,7 +360,9 @@ namespace ImmunologyTD.Rendering
                 var m = motes[i];
                 if (m == null) continue;
                 float wobble = Mathf.Sin(phase * m.WobbleFreq + m.WobblePhase) * 0.35f;
-                m.T.position += flowDir * (m.Speed * squeeze * dt) + perpDir * (wobble * dt);
+                // Motes surge with the wave too, but only halfway -- they are
+                // fluid, not a bolus gripped by the wall.
+                m.T.position += flowDir * (m.Speed * Mathf.Lerp(1f, speedFactor, 0.5f) * dt) + perpDir * (wobble * dt);
 
                 Vector2 p = m.T.position;
                 float along = Vector3.Dot((Vector3)p - (new Vector3(lumenRect.center.x, lumenRect.center.y, 0f)

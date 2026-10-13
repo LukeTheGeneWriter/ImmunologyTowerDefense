@@ -168,9 +168,20 @@ namespace ImmunologyTD.Rendering
                 if (foodBolus == null)
                 {
                     var b = NewBuffer();
-                    FillLobed(b, C, C, 27f, 6, 0.28f, 0.9f); // lumpier than a macrophage
-                    Stipple(b, 4242, 0.30f);
-                    RimShade(b, 2, 0.60f);
+                    // Sprint 19 (Director: "opaque and not so spikey"). The
+                    // Sprint 13 bolus was six deep lobes (depth 0.28 -- read
+                    // as spikes at board scale) with an ALPHA stipple that
+                    // punched 70% of its pixels down to 0.4 opacity, so the
+                    // channel showed through it. Now: a soft lumpy mass --
+                    // a shallow-lobed core plus three overlapping rounded
+                    // lumps -- fully opaque, its grubbiness carried in VALUE
+                    // (darker flecks) instead of holes.
+                    FillLobed(b, C, C, 23f, 5, 0.07f, 0.9f);
+                    FillDisc(b, C - 9f, C + 8f, 15f);
+                    FillDisc(b, C + 10f, C + 5f, 14f);
+                    FillDisc(b, C + 2f, C - 11f, 15f);
+                    ValueStipple(b, 4242, 0.35f, 0.72f);
+                    RimShade(b, 3, 0.62f);
                     foodBolus = ToSprite(b);
                 }
                 return foodBolus;
@@ -690,56 +701,210 @@ namespace ImmunologyTD.Rendering
         //   reads as the foreign lump it is.
 
         private static Sprite villus;
-        /// <summary>One intestinal villus -- the finger of mucosa that makes
-        /// a gut lumen look like a gut and not a pipe. Drawn pointing **+Y**
-        /// with its base at the bottom edge; <c>LumenChannelRenderer</c>
-        /// rotates each instance so it projects from the wall into the
-        /// channel, and sways it with the peristalsis phase.
+        private static Sprite villusAlt;
+        /// <summary>One finger of the gut wall's villous fringe, base at the
+        /// bottom edge; <c>LumenChannelRenderer</c> rotates each instance so
+        /// it projects from the wall into the channel and sways it with the
+        /// peristalsis.
         ///
-        /// The darker central seam is the lacteal / capillary core -- it is
-        /// what stops a row of these reading as a row of identical blobs,
-        /// and it costs one loop.</summary>
-        public static Sprite Villus
+        /// Sprint 19 redraw (docs/LUMEN_REFERENCE.md P1 + P3), following
+        /// how textbook cartoons draw a villus:
+        ///  - **Epithelial rim / lamina-propria core.** The outer ~3 px is
+        ///    full value; the interior drops to 0.78. Under the coral tint
+        ///    that is a peach rim around a darker mauve core -- the single
+        ///    cue that turns a pink club into a villus.
+        ///  - **The lacteal**, a darker central stripe, kept from Sprint 17.
+        ///  - **Brush border**: a soft 2 px alpha fuzz *outside* the
+        ///    outline, so the edge reads hairy/velvety under the mucus
+        ///    sheen. A 1 px comb would alias into noise at ~12 px wide.
+        ///  - **Goblet cells**: two small pale ovals sitting in the rim --
+        ///    where the mucus sheen comes from.
+        /// One tint, so all of this is VALUE; a second hue would cost a
+        /// second renderer per villus. <see cref="VillusAlt"/> places the
+        /// goblet flecks differently so the row doesn't visibly repeat.</summary>
+        public static Sprite Villus => villus ??= BuildVillus(new[] { (-1f, 27f), (1f, 38f) });
+        public static Sprite VillusAlt => villusAlt ??= BuildVillus(new[] { (1f, 22f), (-1f, 34f) });
+
+        private static Sprite BuildVillus((float side, float y)[] goblets)
+        {
+            var b = NewBuffer();
+            // A club, not a capsule: narrow where it joins the wall, swelling
+            // to a rounded tip (the Sprint 17 silhouette, checked with
+            // SpriteShapeDump). Slightly slimmer to leave room for the fuzz.
+            for (int i = 0; i <= 24; i++)
+            {
+                float t = i / 24f;
+                float y = Mathf.Lerp(12f, 45f, t);
+                float r = Mathf.Lerp(8.5f, 12.5f, Mathf.SmoothStep(0f, 1f, t));
+                FillDisc(b, C, y, r);
+            }
+            var body = (Color[])b.Clone();
+
+            // Epithelium at 0.9 (so the goblet cells, at 1.0, have something
+            // to stand out from -- checked in SpriteShapeDump), lamina
+            // propria at 0.9 x 0.84 ≈ 0.76 more than 3 px inside the edge.
+            Multiply(b, 0.9f, 0.9f, 0.9f, 1f);
+            InteriorShade(b, 3, 0.84f);
+
+            // Lacteal: a darker central stripe up the core.
+            for (int y = 14; y < 43; y++)
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (b[idx].a <= 0f) continue;
+                    float dx = Mathf.Abs(x + 0.5f - C);
+                    if (dx < 2.5f)
+                    {
+                        float k = Mathf.Lerp(0.80f, 0.92f, dx / 2.5f);
+                        b[idx].r *= k; b[idx].g *= k; b[idx].b *= k;
+                    }
+                }
+
+            // Goblet cells: pale ovals in the rim band, value 1.0 against the
+            // 0.78 core -- they only read because the core went darker.
+            foreach (var (side, gy) in goblets)
+            {
+                float halfW = Mathf.Lerp(8.5f, 12.5f, Mathf.SmoothStep(0f, 1f, (gy - 12f) / 33f));
+                float gx = C + side * (halfW - 3f);
+                for (int y = 0; y < Res; y++)
+                    for (int x = 0; x < Res; x++)
+                    {
+                        int idx = y * Res + x;
+                        if (b[idx].a <= 0f) continue;
+                        float ex = (x + 0.5f - gx) / 2.6f, ey = (y + 0.5f - gy) / 3.6f;
+                        if (ex * ex + ey * ey <= 1f) { b[idx].r = 1f; b[idx].g = 1f; b[idx].b = 1f; }
+                    }
+            }
+
+            // Brush border: a soft halo just outside the outline.
+            for (int y = 0; y < Res; y++)
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (body[idx].a > 0.5f || y < 14) continue;   // only past the edge; the base stays clean at the wall
+                    float near = 99f;
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            int nx = x + dx, ny = y + dy;
+                            if (nx < 0 || nx >= Res || ny < 0 || ny >= Res) continue;
+                            if (body[ny * Res + nx].a > 0.5f) near = Mathf.Min(near, Mathf.Sqrt(dx * dx + dy * dy));
+                        }
+                    if (near > 2.5f) continue;
+                    float fuzz = 0.42f * (1f - near / 2.8f) * (0.7f + 0.3f * Hash01(x, y, 77));
+                    if (fuzz > b[idx].a) { b[idx].a = fuzz; b[idx].r = 0.95f; b[idx].g = 0.95f; b[idx].b = 0.95f; }
+                }
+            return ToSprite(b);
+        }
+
+        private static Sprite peyerDome;
+        /// <summary>Sprint 19: the Peyer's patch dome -- a low, broad,
+        /// smooth hump of follicle-associated epithelium where the wall has
+        /// no villi (docs/LUMEN_REFERENCE.md P6). Base along the bottom edge,
+        /// so it is placed and rotated exactly like a villus. Bright rim,
+        /// darker interior (the subepithelial dome, where DCs wait).</summary>
+        public static Sprite PeyerDome
         {
             get
             {
-                if (villus == null)
+                if (peyerDome == null)
                 {
                     var b = NewBuffer();
-                    // A club, not a capsule: narrow where it joins the wall,
-                    // swelling to a rounded tip. Drawn as a stack of discs
-                    // because the taper is the whole silhouette -- a uniform
-                    // capsule reads as a finger of anything, and a row of
-                    // them reads as a comb. (Checked with
-                    // Assets/Editor/SpriteShapeDump.cs, which is why this is
-                    // the second version of the shape.)
-                    for (int i = 0; i <= 24; i++)
+                    // Half-ellipse: full width, ~0.45 of the height.
+                    ForBox(0, 0, Res, Res, (x, y) =>
                     {
-                        float t = i / 24f;
-                        float y = Mathf.Lerp(12f, 46f, t);
-                        float r = Mathf.Lerp(9f, 13.5f, Mathf.SmoothStep(0f, 1f, t));
-                        FillDisc(b, C, y, r);
-                    }
-                    // Central core, slightly darker than the body.
+                        float cov = Coverage(x, y, (fx, fy) =>
+                        {
+                            float ex = (fx - C) / 31f, ey = fy / 28f;
+                            return fy >= 0f && ex * ex + ey * ey <= 1f;
+                        });
+                        Blend(b, x, y, cov);
+                    });
+                    InteriorShade(b, 3, 0.80f);
+                    peyerDome = ToSprite(b);
+                }
+                return peyerDome;
+            }
+        }
+
+        private static Sprite mCell;
+        /// <summary>Sprint 19: an M cell on the Peyer's dome -- drawn as the
+        /// textbook silhouette: a cell with a deep basal pocket (where
+        /// lymphocytes and DCs tuck in to receive what it transcytoses). A
+        /// rounded cell with a dark notch scooped from its base.</summary>
+        public static Sprite MCell
+        {
+            get
+            {
+                if (mCell == null)
+                {
+                    var b = NewBuffer();
+                    FillRounded(b, C, C + 2f, 22f, 12f);
+                    // The basal pocket: a dark rounded bay opening downward.
                     for (int y = 0; y < Res; y++)
                         for (int x = 0; x < Res; x++)
                         {
                             int idx = y * Res + x;
                             if (b[idx].a <= 0f) continue;
-                            float dx = Mathf.Abs(x + 0.5f - C);
-                            if (dx < 3f && y > 12 && y < 44)
-                            {
-                                float k = Mathf.Lerp(0.84f, 1f, dx / 3f);
-                                b[idx].r *= k; b[idx].g *= k; b[idx].b *= k;
-                            }
+                            float ex = (x + 0.5f - C) / 11f, ey = (y + 0.5f - (C - 14f)) / 16f;
+                            if (ex * ex + ey * ey <= 1f) { b[idx].r *= 0.45f; b[idx].g *= 0.45f; b[idx].b *= 0.45f; }
                         }
-                    RimShade(b, 1, 0.76f);
-                    // Velvet: the tip feathers a little, the base stays solid
-                    // where it meets the wall.
-                    AxisGradient(b, alongX: false, aStart: 1f, aEnd: 0.90f);
-                    villus = ToSprite(b);
+                    RimShade(b, 2, 0.75f);
+                    mCell = ToSprite(b);
                 }
-                return villus;
+                return mCell;
+            }
+        }
+
+        private static Sprite crypt;
+        /// <summary>Sprint 19: a crypt of Lieberkühn (docs/LUMEN_REFERENCE.md
+        /// P4) -- a narrow U-shaped pocket of epithelium, mouth at the TOP
+        /// edge (the wall), sinking down into tissue. Drawn as an outline:
+        /// a thick U wall around a darker hollow lumen, so the host cells
+        /// behind it still read through the hollow.</summary>
+        public static Sprite Crypt
+        {
+            get
+            {
+                if (crypt == null)
+                {
+                    var b = NewBuffer();
+                    // Outer U: a capsule from the bottom up through the top edge.
+                    FillCapsule(b, C, 14f, C, 70f, 15f);
+                    // Hollow: an inner capsule, alpha cut down so it is a dim lumen.
+                    for (int y = 0; y < Res; y++)
+                        for (int x = 0; x < Res; x++)
+                        {
+                            int idx = y * Res + x;
+                            if (b[idx].a <= 0f) continue;
+                            if (SegDist(x + 0.5f, y + 0.5f, C, 22f, C, 80f) < 7f)
+                            { b[idx].a *= 0.35f; b[idx].r *= 0.7f; b[idx].g *= 0.7f; b[idx].b *= 0.7f; }
+                        }
+                    RimShade(b, 2, 0.70f);
+                    crypt = ToSprite(b);
+                }
+                return crypt;
+            }
+        }
+
+        private static Sprite granuleCluster;
+        /// <summary>Sprint 19: Paneth-cell granules -- a tight cluster of four
+        /// bright dots, tinted rose and placed at the base of a crypt.</summary>
+        public static Sprite GranuleCluster
+        {
+            get
+            {
+                if (granuleCluster == null)
+                {
+                    var b = NewBuffer();
+                    FillDisc(b, C - 9f, C - 4f, 8f);
+                    FillDisc(b, C + 9f, C - 4f, 8f);
+                    FillDisc(b, C, C + 9f, 8f);
+                    FillDisc(b, C, C - 14f, 7f);
+                    RimShade(b, 2, 0.72f);
+                    granuleCluster = ToSprite(b);
+                }
+                return granuleCluster;
             }
         }
 
@@ -783,6 +948,8 @@ namespace ImmunologyTD.Rendering
             _ = OrganHalo; _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
             // Sprint 17 cartoon pass
             _ = Villus; _ = EndothelialCell;
+            // Sprint 19 gut-wall structures
+            _ = VillusAlt; _ = PeyerDome; _ = MCell; _ = Crypt; _ = GranuleCluster;
         }
 
         // ================================================================
@@ -985,6 +1152,29 @@ namespace ImmunologyTD.Rendering
             });
         }
 
+        /// <summary>Sprint 19: the inverse of <see cref="RimShade"/> -- darken
+        /// every opaque pixel MORE than <paramref name="widthPx"/> inside the
+        /// edge, leaving a bright rim (an epithelium around a core).</summary>
+        private static void InteriorShade(Color[] buf, int widthPx, float mul)
+        {
+            var src = (Color[])buf.Clone();
+            for (int y = 0; y < Res; y++)
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (src[idx].a <= 0.5f) continue;
+                    bool interior = true;
+                    for (int dy = -widthPx; dy <= widthPx && interior; dy++)
+                        for (int dx = -widthPx; dx <= widthPx; dx++)
+                        {
+                            int nx = x + dx, ny = y + dy;
+                            if (nx < 0 || nx >= Res || ny < 0 || ny >= Res || src[ny * Res + nx].a <= 0.5f)
+                            { interior = false; break; }
+                        }
+                    if (interior) { buf[idx].r *= mul; buf[idx].g *= mul; buf[idx].b *= mul; }
+                }
+        }
+
         /// <summary>Darken the outer <paramref name="widthPx"/> band of the
         /// opaque region -- the "membrane" that lifts a small sprite off the
         /// board.</summary>
@@ -1030,6 +1220,26 @@ namespace ImmunologyTD.Rendering
                     int idx = y * Res + x;
                     if (buf[idx].a <= 0f) continue;
                     buf[idx].a *= Hash01(x, y, seed) < density ? 1f : 0.4f;
+                }
+            }
+        }
+
+        /// <summary>Sprint 19: like <see cref="Stipple"/> but darkens VALUE,
+        /// leaving alpha alone -- texture without translucency. A fraction
+        /// <paramref name="density"/> of opaque pixels drop to
+        /// <paramref name="mul"/> brightness.</summary>
+        private static void ValueStipple(Color[] buf, int seed, float density, float mul)
+        {
+            for (int y = 0; y < Res; y++)
+            {
+                for (int x = 0; x < Res; x++)
+                {
+                    int idx = y * Res + x;
+                    if (buf[idx].a <= 0f) continue;
+                    if (Hash01(x / 3, y / 3, seed) < density)   // 3px flecks, not single-pixel noise
+                    {
+                        buf[idx].r *= mul; buf[idx].g *= mul; buf[idx].b *= mul;
+                    }
                 }
             }
         }

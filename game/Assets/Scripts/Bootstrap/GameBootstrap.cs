@@ -147,6 +147,11 @@ namespace ImmunologyTD.Bootstrap
             macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
             neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
             tissueGrid = new TissueGrid(board);
+            // Sprint 19: the Peyer's patch + crypts. Created before the lumen
+            // renderer binds (it leaves the patch lanes bare of villi).
+            GutWallTuning.ResetToDefaults();
+            ImmunologyTD.Pathogens.Peristalsis.ResetToDefaults();
+            GutWallFeatures.Current = new GutWallFeatures(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
             gutInterface = new GutInterface(board, tissueGrid, tally);
@@ -382,6 +387,9 @@ namespace ImmunologyTD.Bootstrap
         {
             var go = new GameObject("LumenChannelRenderer");
             go.AddComponent<LumenChannelRenderer>().Bind(board);
+            // Sprint 19: Peyer's patch dome / M cells / follicle, and crypts.
+            new GameObject("GutWallFeatureRenderer").AddComponent<GutWallFeatureRenderer>()
+                .Bind(board, GutWallFeatures.Current);
         }
 
         /// <summary>Sprint 15: the base band becomes the bloodstream --

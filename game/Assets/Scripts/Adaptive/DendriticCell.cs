@@ -205,7 +205,23 @@ namespace ImmunologyTD.Adaptive
 
             // Empty and standing on debris -> sample. No state change: the
             // DC keeps pacing, now heading back toward the base to deliver.
-            if (HasCargo || tissueGrid.GetHostState(coarse) != HostState.Dead) return;
+            if (HasCargo) return;
+
+            // Sprint 19: in the Peyer's patch follicle, collect antigen the
+            // M cells sampled from the lumen (only exists once the M-cell
+            // upgrade is bought). No debris involved -- this is the route
+            // that teaches without tissue having to die.
+            var wall = GutWallFeatures.Current;
+            if (wall != null && wall.TryTakeAntigen(coarse, out var sampled))
+            {
+                Cargo = Antigen.ForClass(sampled);
+                CargoClass = sampled;
+                HasCargo = true;
+                presentationsLeft = AdaptiveUnitTuning.PresentationsPerCargo(tuning);
+                return;
+            }
+
+            if (tissueGrid.GetHostState(coarse) != HostState.Dead) return;
             var antigen = tissueGrid.GetDebrisAntigen(coarse);
             if (!antigen.HasValue) return;
 

@@ -34,6 +34,12 @@ namespace ImmunologyTD.Economy
         /// (rung 2 of the search ladder). **This one is a real effect** —
         /// it raises <c>Chemotaxis.SensingUpgradeLevel</c>. Repeatable.</summary>
         CytokineSensingUpgrade,
+
+        /// <summary>Sprint 19: M cells over the Peyer's patch sample
+        /// pathogens in the lumen and hand the antigen to DCs patrolling the
+        /// follicle. **Real effect** (GutWallFeatures.MCellLevel). Level
+        /// scales the sampling rate. Appended last so earlier ordinals hold.</summary>
+        MCellSampling,
     }
 
     /// <summary>
@@ -52,6 +58,7 @@ namespace ImmunologyTD.Economy
         public static int HostBacterialResistanceBasePrice = 40;
         public static int CryptBasePrice = 25;
         public static int CytokineSensingUpgradeBasePrice = 35;
+        public static int MCellSamplingBasePrice = 40;
 
         /// <summary>Each subsequent level of the same item costs
         /// <c>basePrice * (1 + PriceGrowthPerLevel * currentLevel)</c>.</summary>
@@ -70,6 +77,7 @@ namespace ImmunologyTD.Economy
                 case ShopItem.HostReducedViralEntry: return HostReducedViralEntryBasePrice;
                 case ShopItem.HostBacterialResistance: return HostBacterialResistanceBasePrice;
                 case ShopItem.CytokineSensingUpgrade: return CytokineSensingUpgradeBasePrice;
+                case ShopItem.MCellSampling: return MCellSamplingBasePrice;
                 default: return CryptBasePrice;
             }
         }
@@ -110,6 +118,7 @@ namespace ImmunologyTD.Economy
             HostBacterialResistanceBasePrice = 40;
             CryptBasePrice = 25;
             CytokineSensingUpgradeBasePrice = 35;
+            MCellSamplingBasePrice = 40;
             PriceGrowthPerLevel = 0.6f;
             ProgenitorUpgradeBasePrice = 35;
         }
