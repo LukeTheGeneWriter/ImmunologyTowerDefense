@@ -1114,3 +1114,17 @@ thing to measure before this becomes routine.
 - **Look at sprites magnified before shipping.** `SpriteShapeDump` plus a
   tinted 4× montage caught that the goblet flecks were invisible (rim
   already at full value) before a build was spent on it.
+
+### Sprint 20 — head session (2026-10-14)
+
+- **The art agent's mock was the decision-maker.** A current-vs-proposed
+  board mock, built in PIL from the real sprite dumps and palette tables,
+  let the Director decide D1–D6 in one round of questions without a
+  build. Worth repeating for any visual sprint.
+- **Shrink-then-stroke kept the change contained.** Baking the outline
+  into the texture and shrinking the shape by the stroke width meant no
+  caller's scale changed; that is why 17 sprites changed and no harness
+  moved.
+- **Keep the old look runnable.** "Toggle first" made Classic a
+  first-class palette column, and asserting Classic equals the shipped
+  literals makes the A/B honest.

@@ -59,14 +59,14 @@ No gameplay changed. This was infrastructure only:
 - `tools/unity.sh` was exercised against the harnesses but **not yet with
   `webgl`** — treat the first Linux build as also testing the script.
 
-## Where the game itself stands (updated 2026-10-13)
+## Where the game itself stands (updated 2026-10-14)
 
-- **Sprint 18 shipped**: all 12 upgrade rows are live, per-tower.
-- **Sprint 19 shipped, awaiting the Director's playtest**: peristaltic
-  bolus (opaque, rounded), velvet-pile villi, Peyer's patch + buyable
-  M-cell sampling, real crypts. See `SPRINT_PLAN.md`.
-- **Queued next:** leukocyte rolling and extravasation from the vessel
-  (`BACKLOG.md`, Sprint 18 section), plus Peyer's patch refinements.
+- **Sprint 19 playtested**: "Nice job!"
+- **Sprint 20 shipped, awaiting the Director's A/B**: all colours in
+  `Rendering/Palette.cs`, two looks (Classic = shipped, Daylight =
+  `docs/ART_DIRECTION.md`), F10 to flip. Next is retiring the loser.
+- **Queued:** leukocyte rolling/extravasation; Peyer's patch refinements;
+  ART_DIRECTION #8–#10 (`BACKLOG.md`).
 
 ## For whichever session picks this up
 

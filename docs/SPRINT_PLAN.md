@@ -1,62 +1,57 @@
-# Sprint Plan — Sprint 19: peristalsis and gut-wall anatomy
+# Sprint Plan — Sprint 20: one palette, two looks
 
 ## Recent sprints
 
-- **Sprint 16** — the UI pass (UI Toolkit, floating buy panels, live buying).
-- **Sprint 17** — the cartoon pass (villi, plum lumen, cellular vessel
-  wall) and the DC jitter fix. Playtested 2026-10-13: "DCs are smooth now."
-- **Sprint 18** — all 12 progenitor upgrade rows wired, per-tower;
-  `docs/LUMEN_REFERENCE.md` (design research from scientific cartoons).
+- **Sprint 18** — all 12 progenitor upgrade rows wired, per-tower.
+- **Sprint 19** — peristalsis, an opaque bolus, velvet-pile villi,
+  Peyer's patch + M-cell sampling, real crypts. Director: "Nice job!"
+- **Art direction research** (between 19 and 20) — `docs/ART_DIRECTION.md`
+  proposes retiring the dark "histology plate" look for a light,
+  outlined "daylight cartoon". Its headline finding was legibility, not
+  taste: against the plum lumen the bacterium was 1.13:1 and the virion
+  1.04:1, effectively invisible.
 
 ## Direction (Director, 2026-10-13)
 
-> "We'll want the bolus to move through the gut via gut peristalsis, and
-> we'll also want it to be opaque and not so spikey. Great info from the
-> designer. Implement all 3. Also yes on payers patch. That can be done
-> now and refined later since it's important immunologically."
+Asked to have the designer compare the look against broad-appeal TD
+games and cross-section diagrams for "something accurate but simple fun
+and bright with mass appeal". On the resulting decisions:
 
-"All 3" means the top three lumen proposals: the villus redraw (P1 + P3),
-the back row (P2), and the crypt sprite (P4). Answers to the forks asked
-up front:
+- **D1 — toggle first, then decide.** Build both looks and an in-game
+  switch; choose after seeing them side by side in a real build.
+- **D2 — bacteria green** (knowledge flash moves to cyan).
+- **D3 — pale aqua lumen.**
+- **D5 — pathogen size floor** (visual only).
+- D4 (no faces) and D6 (rose blood) were not asked; the designer's
+  recommendations are taken, both reversible in `Palette.cs`.
 
-- **Peristalsis:** surge-and-pause. The bolus is pushed in waves, and
-  total transit is unchanged.
-- **Peyer's patch:** a landmark from the start; **M-cell sampling is a
-  shop upgrade**, "not straight out of the box".
-- **Crypts:** snapped to the wall, with the regrowth bonus wired for real
-  so the sprite never shows a bonus that doesn't exist.
+## Scope (ART_DIRECTION.md §4 items #0–#7)
 
-## Scope
-
-1. **Peristalsis** (`Pathogens/Peristalsis`): a closed-form surge profile
-   with mean 1, which moves the bolus (spawner) and the lumen squeeze
-   (renderer) on one clock. A contraction ring behind the bolus.
-2. **Bolus sprite**: opaque (no alpha stipple) and rounded (no deep lobes).
-3. **Lumen**: villus redraw (rim / core / lacteal / goblets / brush
-   border, two variants), and a darker back row.
-4. **Peyer's patch**: dome, M cells, follicle; `ShopItem.MCellSampling`
-   samples lumen pathogens over the dome into antigen a follicle DC collects.
-5. **Crypts**: `ShopItem.Crypt` is real. Each level adds a wall crypt
-   (stable spread, off the patch); Empty ground in reach regrows 3× faster.
-6. **Docs**: this file, `GAME_DESIGN.md` (§1a peristalsis, §1d crypts +
-   Peyer's patch), `UI_STYLE_GUIDE.md`, `INTERFACE.md`, `ENGINE_STATUS.md`,
-   `CHANGELOG.md`, `BACKLOG.md`, `TEAM_RETRO.md`.
+1. **`Rendering/Palette.cs`**: every world colour in one place, Classic
+   (= shipped) and Daylight values. All consumers rerouted.
+2. **F10**: flip the look, persist it, rebuild sprites, reload the scene.
+3. **Outlines**: `SpriteShapes.OuterStroke` + `Finish` on units,
+   pathogens, the bolus, structures. Daylight only.
+4. **Pathogen silhouettes + size floor**: a 2:1 bean bacterium, a corona
+   virion, drawn at ~0.55–0.6 of a cell. Daylight only.
+5. **Daylight grounds**: flat (unstippled) chyme, plasma and marrow; a
+   tissue underlay; an opaque empty-ground scar.
 
 ## Not in scope
 
-- **Leukocyte rolling / extravasation**: queued, likely Sprint 20.
-- Peyer's patch refinements (DCs seeking the follicle, M cells as a
-  pathogen entry route, follicle IgA). See `GAME_DESIGN.md` §1d.
-- LUMEN_REFERENCE P5 / P7 / P8. Any balance or price pass.
+- #8 the DC antigen dot (a child renderer showing what a DC carries).
+- #9 idle wobble / jiggle, lane-tone rows. #10 a UI re-check on the light
+  board. All in `BACKLOG.md`.
+- **Leukocyte rolling / extravasation**: still queued.
 
-## Stopping point (definition of done)
+## Stopping point
 
-- [x] The bolus surges and pauses; transit is still 30 s (measured 30.05 s).
-- [x] The bolus is opaque and rounded (checked magnified, SpriteShapeDump).
-- [x] Villi have rim, core, lacteal, goblets and brush border, with a back row.
-- [x] Peyer's patch drawn; M-cell sampling bought → a follicle DC gets cargo.
-- [x] Crypts appear when bought and speed regrowth (6.8 s → 2.3 s measured).
-- [x] 12 harnesses green (`Sprint19Verification`, 28 new checks), `BootstrapSmoke` green.
+- [x] Classic is the shipped look, exactly (asserted).
+- [x] Daylight: pathogen outlines are 13.0:1 (bacterium) and 14.7:1
+      (virion) against the lumen, up from 1.13 and 1.04.
+- [x] FX colours pairwise distinct in both looks (`ShapeFor` safety).
+- [x] Outlined sprites keep their outer extent; checked magnified.
+- [x] 13 harnesses green (`Sprint20Verification`, 24 new checks).
 - [x] WebGL build (0 errors) served for the Director.
-- [ ] **The Director's eye**: does the peristalsis read as peristalsis? Is
-      the dome legible as a place? Do villi read as velvet at board scale?
+- [ ] **The Director's eye**: play both looks (F10), then pick one, or a
+      mix. Whichever loses gets deleted from `Palette.cs` in a later sprint.

@@ -1066,6 +1066,19 @@ recording as a general point: the sprite dump tells you whether a *shape*
 is right, and only the running board tells you whether a *field of them*
 is.
 
+## Sprint 20 — one palette, two looks
+
+- **`Rendering/Palette.cs`** owns every world colour, Classic (shipped)
+  and Daylight (`ART_DIRECTION.md`). F10 flips the look, persists it,
+  clears the sprite cache and reloads the scene, so it restarts the run.
+- **Outlines are baked into textures** (`SpriteShapes.OuterStroke` via
+  `Finish`), so there is no renderer cost. The shape shrinks by the stroke
+  width first, so outer extents and every caller's scale are unchanged.
+- Pathogens have a visual size floor in Daylight (`PathogenAgent.ApplyVisualScale`).
+- **Known cost:** a look switch reloads the scene and rebuilds every
+  sprite (a boot-time cost, ~same as startup). Fine for a debug key; if a
+  look becomes a player setting, it should apply at boot only.
+
 ## Sprint 19 — peristalsis and gut-wall anatomy
 
 - **Peristalsis** (`Pathogens/Peristalsis`): the bolus position is a

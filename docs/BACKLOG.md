@@ -898,3 +898,23 @@ The buy panels and the upgrade framework landed well. Two items:
 - **The shop's "real effect" dot now marks three rows** (sensing, crypt,
   M cells). The other four shop rows (mucus turnover, dsRNA sensor, viral
   entry, bacterial resistance) are still placeholders.
+
+## Opened / updated by Sprint 20 (2026-10-14) — palette + looks
+
+- **Pick a look.** After the Director's A/B, delete the losing column
+  from `Palette.cs` (and the Classic branches in `SpriteShapes`), and
+  drop F10 or keep it as a debug key.
+- **ART_DIRECTION #8 — DC antigen dot.** A child renderer tinted the
+  colour of the pathogen whose antigen a DC carries. It shows *what* is
+  being taught. In Daylight the loaded DC is only slightly lighter (the
+  loaded sprite's shape carries the state), so this matters more there.
+- **#9 — personality from motion**: an idle "breathing" scale on units,
+  a jiggle on pathogens; also lane-tone rows.
+- **#10 — UI re-check on the light board.** The dark glass panels are
+  the BTD / KR norm and probably fine; the selection rim (`Accent`) on a
+  light board needs a look.
+- **Daylight bacterium ends look slightly faceted** at 3× magnification.
+  Probably invisible at 20 px; check in the build.
+- **Neutrophil trefoil nucleus can read as a face** at small sizes (the
+  designer flagged it). Fine unless the Director says otherwise (D4 was
+  "no faces").

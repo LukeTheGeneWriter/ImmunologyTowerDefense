@@ -1980,6 +1980,38 @@ project has ever been headlessly testable.
 ### Verification
 - `Sprint19Verification.RunAll`: 28 checks.
 
+## Sprint 20 changes — palette and looks
+
+### `ImmunologyTD.Rendering.Palette` (new, static) / `enum Look { Classic, Daylight }`
+- `Look Current` (default Daylight), `bool Daylight`, `bool Outlines`,
+  `bool PathogenSizeFloor`.
+- `Load()` reads PlayerPrefs `ImmunologyTD.Look` (GameBootstrap calls it
+  before `SpriteShapes.Prewarm`). `ToggleAndReload()` (F10 in
+  `UiController.ReadKeys`).
+- One `Color` property per world element. See the file; groups are
+  frame, host cells, units, pathogens, base/marrow/node, gut wall/lumen,
+  and FX.
+- **Now forwarding properties (were `static readonly` fields, same
+  names):** `BoardRenderer.HostColor / PathogenColor / VirionColor /
+  InfectedHostColor / InfectedByBacteriumColor / DebrisColor /
+  EmptyGroundColor / BaseBandColor / LumenBandColor`,
+  `DegranulationFlash.GranuleBurstColor / BreachBurstColor /
+  EfferocytosisColor / StressKillColor / KnowledgeMatchColor`, plus the
+  private colour statics in the renderers, `DendriticCell`, `Lymphocyte`
+  and `BoneMarrowManager`.
+
+### `ImmunologyTD.Rendering.SpriteShapes`
+- **New:** `static void ClearCache()`. Private `Finish(buf, strokePx,
+  shrink)`, `Shrink`, `OuterStroke`.
+- Daylight variants of `LargeBacterium`, `Virion`, `EmptyPit`,
+  `HostCellInfectedBacterial`, `Debris`, `MarrowRegion`, `ChymeField`,
+  `PlasmaField`.
+
+### Other
+- `PathogenAgent.ApplyVisualScale()` (private): the Daylight size floor.
+- `GameBootstrap.BuildTissueUnderlay()`: Daylight only, order −1.
+- Verification: `Sprint20Verification.RunAll`, 24 checks.
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

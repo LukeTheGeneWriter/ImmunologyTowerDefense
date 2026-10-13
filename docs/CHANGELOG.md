@@ -12,6 +12,20 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 20 -- 2026-10-14
+Two looks, one key. Press **F10** to flip.
+
+- **Daylight** (the new default) is the art-direction proposal. The board
+  is light and bright: a pale aqua gut, peach tissue, rose blood. Every
+  cell has a bold dark outline. Bacteria are green, viruses are violet
+  little spiky balls, and both are drawn big enough to see. Before this
+  they were nearly invisible against the gut (about 1.1:1 contrast); now
+  their outlines are about 13–15:1.
+- **Classic** is the game exactly as it looked through Sprint 19, kept so
+  you can compare.
+- F10 restarts the run when it switches, and it remembers your choice.
+  Pick one (or a mix) and the other gets retired.
+
 ## Sprint 19 -- 2026-10-13
 The gut moves now, and it has anatomy.
 

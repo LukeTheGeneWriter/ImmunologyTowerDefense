@@ -40,6 +40,28 @@ never load-bearing.
   ±3% per-cell colour jitter (`BoardRenderer.CellJitter`) on the host
   grid. Set once, zero per-frame cost.
 
+## Two looks — Classic and Daylight (Sprint 20)
+
+**Every world colour now lives in `Rendering/Palette.cs`**, the source of
+truth for the RGB tables below. Each entry has a **Classic** value (the
+tables in this file, i.e. the game as shipped through Sprint 19) and a
+**Daylight** value (`docs/ART_DIRECTION.md` §3.2, which holds the full
+current-vs-proposed table). **F10** in a build flips between them
+(persisted; the scene reloads).
+
+Daylight rules, in short:
+- Light, low-saturation grounds.
+- Saturated units with a dark outline in their own hue: an `OuterStroke`
+  baked into the sprite, 5–6 px at 64 px, at value 0.18.
+- Pathogens are the loudest things on the board and draw at a size floor.
+- Winning stays bright; losing darkens the field (grey debris, dark-rose
+  scars).
+
+Until the Director picks, **any new colour goes in `Palette.cs` with both
+values**, never inline. The five FX colours must stay pairwise distinct
+in both looks (`DegranulationFlash.ShapeFor` matches by colour;
+`Sprint20Verification` asserts it).
+
 ## Sorting order (z-layering, back to front)
 
 | Order | What |
