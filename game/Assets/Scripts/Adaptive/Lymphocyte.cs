@@ -41,6 +41,14 @@ namespace ImmunologyTD.Adaptive
 
         public float BornAt { get; private set; }
 
+        /// <summary>Sprint 18: this cell's tower's upgrade layer (live
+        /// reference, null = bare statics). Read by <see cref="LymphNode"/>
+        /// for the pairing tolerance and the age-out.</summary>
+        public AdaptiveUnitTuning Tuning { get; private set; }
+
+        public int MatchMaxHammingDistance => AdaptiveUnitTuning.MatchMaxHammingDistance(Tuning);
+        public float LifespanSeconds => AdaptiveUnitTuning.LymphocyteLifespanSeconds(Tuning);
+
         /// <summary>Set by <see cref="LymphNode"/> while this cell is locked
         /// in a pairing -- it stops moving for
         /// <see cref="AdaptiveTuning.PairingSeconds"/> whether or not the
@@ -55,8 +63,9 @@ namespace ImmunologyTD.Adaptive
         private float tweenTimer;
 
         public void Initialize(LymphNode node, byte tag, FineCoord start, float bornAt,
-            System.Action<Lymphocyte> onDespawn)
+            System.Action<Lymphocyte> onDespawn, AdaptiveUnitTuning tuning = null)
         {
+            Tuning = tuning;
             this.node = node;
             this.onDespawn = onDespawn;
             Tag = tag;
@@ -118,6 +127,7 @@ namespace ImmunologyTD.Adaptive
 
         public void ResetForPool()
         {
+            Tuning = null;
             node = null;
             onDespawn = null;
             Frozen = false;

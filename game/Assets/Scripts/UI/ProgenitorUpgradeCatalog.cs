@@ -5,14 +5,12 @@ namespace ImmunologyTD.UI
     /// <summary>
     /// The per-kind progenitor upgrade roster (docs/UI_DESIGN.md §5).
     ///
-    /// **These are placeholders that buy nothing yet** -- GAME_DESIGN.md
-    /// §6d's rule stands: buying spends ATP and bumps a level and the
-    /// simulation does not change. What makes them worth shipping in that
-    /// state is <see cref="Row.FieldLabel"/>: every row names the exact
-    /// field an effect would write, so the wiring sprint is one line per
-    /// row rather than a design conversation per row. The field name is
-    /// never shown to the player -- only in the debug readout while the
-    /// panel is open (§3).
+    /// **Sprint 18: every row is live.** The effect itself lives in the
+    /// model layer (<see cref="ProgenitorUpgrades"/>, row indices matching
+    /// this table); this class keeps the player-facing text, the price and
+    /// the cap. <see cref="Row.FieldLabel"/> names the field each row writes
+    /// -- never shown to the player, only in the debug readout while the
+    /// panel is open (§3). Keep it in step with ProgenitorUpgrades' numbers.
     ///
     /// Three rows per kind, the Director's call from the §10 questions.
     /// The spec offered an optional fourth per kind; the macrophage's
@@ -67,33 +65,33 @@ namespace ImmunologyTD.UI
                     "UnitLifecycleTuning.KillLimit 5 → +2/lvl", 30, 4),
             new Row("Rapid chemokinesis",
                     "The cell covers ground faster on its way to a signal.",
-                    "FineTilesPerTick 3 → +1/lvl (needs the field moved onto UnitLifecycleTuning)", 45, 2),
+                    "UnitLifecycleTuning.FineTilesPerTick 3 → +1/lvl", 45, 2),
         };
 
         private static readonly Row[] DendriticCell =
         {
             new Row("Macropinocytosis rate",
                     "Each trip to the node is worth more presentations before the cell goes back for antigen.",
-                    "AdaptiveTuning.DcPresentationsPerCargo 4 → +2/lvl", 35, 3),
+                    "AdaptiveUnitTuning.DcPresentationsBonus: DcPresentationsPerCargo 4 → +2/lvl", 35, 3),
             new Row("CCR7 expression",
                     "The cell migrates faster — antigen reaches the node sooner.",
-                    "AdaptiveTuning.DcFineTilesPerTick 3 → +1/lvl", 40, 3),
+                    "AdaptiveUnitTuning.DcFineTilesBonus: DcFineTilesPerTick 3 → +1/lvl", 40, 3),
             new Row("Antigen-sparing sampling",
                     "Takes a smaller bite of each debris pile — leaves more for macrophage clearance.",
-                    "AdaptiveTuning.DcDebrisSamplePerBite 0.34 → −0.08/lvl, floor 0.1", 30, 3),
+                    "AdaptiveUnitTuning.DcDebrisBiteReduction: DcDebrisSamplePerBite 0.34 → −0.08/lvl, floor 0.1", 30, 3),
         };
 
         private static readonly Row[] HelperT =
         {
             new Row("Clonal expansion",
-                    "More helper-T cells resident in the node at once — a busier node teaches faster.",
-                    "per-tower MaxActiveChildren 8 → +4/lvl", 35, 3),
+                    "Proliferates faster and holds more helper-T cells in the node — a busier node teaches faster.",
+                    "per-tower MaxActiveChildren 8 → +4/lvl, emission rate ×(1 + 0.5·lvl)", 35, 3),
             new Row("TCR affinity maturation",
                     "A near-miss barcode still teaches — more pairings count.",
-                    "AdaptiveTuning.MatchMaxHammingDistance 2 → +1/lvl, cap 4", 45, 2),
+                    "AdaptiveUnitTuning.MatchDistanceBonus: MatchMaxHammingDistance 2 → +1/lvl, cap 4", 45, 2),
             new Row("Rapid recirculation",
                     "Shorter helper-T lifespan — the repertoire refreshes faster, so you are less often stuck with no match.",
-                    "AdaptiveTuning.LymphocyteLifespanSeconds 20 → −4/lvl, floor 6", 30, 3),
+                    "AdaptiveUnitTuning.LymphocyteLifespanReduction: LymphocyteLifespanSeconds 20 → −4/lvl, floor 6", 30, 3),
         };
 
         private static readonly Row[] None = new Row[0];

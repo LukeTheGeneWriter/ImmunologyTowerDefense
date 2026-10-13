@@ -69,6 +69,14 @@ namespace ImmunologyTD.Units
         /// 0 = cannot sense intracellular infection.</summary>
         public float StressSenseChancePerTick;
 
+        /// <summary>Sprint 18: fine tiles moved per logical tick. Moved here
+        /// from <see cref="UnitProfile"/> (which still seeds it) so the
+        /// neutrophil's "Rapid chemokinesis" upgrade speeds up ONE tower's
+        /// cells rather than every tower of the kind. 0 = not set (an
+        /// instance a harness built by hand) -- SearchUnit then falls back to
+        /// the profile's value.</summary>
+        public int FineTilesPerTick;
+
         public static UnitLifecycleTuning FromProfile(UnitProfile profile) => new UnitLifecycleTuning
         {
             MaxActiveChildren = profile.MaxActiveChildren,
@@ -78,6 +86,7 @@ namespace ImmunologyTD.Units
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles,
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick,
             StressSenseChancePerTick = profile.StressSenseChancePerTick,
+            FineTilesPerTick = profile.FineTilesPerTick,
         };
 
         /// <summary>Allocation-free equivalent of FromProfile, for filling an
@@ -92,6 +101,7 @@ namespace ImmunologyTD.Units
             ContactRadiusFineTiles = profile.ContactRadiusFineTiles;
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = profile.StressSenseChancePerTick;
+            FineTilesPerTick = profile.FineTilesPerTick;
         }
 
         /// <summary>Value copy, used to snapshot a tower's current numbers
@@ -105,6 +115,7 @@ namespace ImmunologyTD.Units
             ContactRadiusFineTiles = other.ContactRadiusFineTiles;
             EfferocytosisDebrisPerTick = other.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = other.StressSenseChancePerTick;
+            FineTilesPerTick = other.FineTilesPerTick;
         }
     }
 }

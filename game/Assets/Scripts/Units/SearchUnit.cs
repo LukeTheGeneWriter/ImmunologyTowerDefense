@@ -209,7 +209,9 @@ namespace ImmunologyTD.Units
             if (board == null) return;
 
             tickStartWorld = transform.position;
-            for (int i = 0; i < profile.FineTilesPerTick; i++)
+            // Sprint 18: per-tower speed (an upgrade target), profile as fallback.
+            int steps = tuning.FineTilesPerTick > 0 ? tuning.FineTilesPerTick : profile.FineTilesPerTick;
+            for (int i = 0; i < steps; i++)
             {
                 StepOnce();
             }

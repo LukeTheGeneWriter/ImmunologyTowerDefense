@@ -209,7 +209,7 @@ namespace ImmunologyTD.Adaptive
 
                 bool taught = p.Visitor != null && p.Resident != null &&
                               p.Visitor.HasCargo &&
-                              Antigen.IsMatch(p.Visitor.Cargo, p.Resident.Tag);
+                              Antigen.IsMatch(p.Visitor.Cargo, p.Resident.Tag, p.Resident.MatchMaxHammingDistance);
 
                 if (p.Visitor != null) { p.Visitor.Frozen = false; p.Visitor.OnPairingResolved(taught); }
                 if (p.Resident != null) p.Resident.Frozen = false;
@@ -261,7 +261,7 @@ namespace ImmunologyTD.Adaptive
             {
                 var res = residents[i];
                 if (res.Frozen) continue; // don't yank a cell mid-pairing
-                if (currentTime - res.BornAt < AdaptiveTuning.LymphocyteLifespanSeconds) continue;
+                if (currentTime - res.BornAt < res.LifespanSeconds) continue;
                 res.DespawnToPool(); // its onDespawn calls UnregisterResident + pool release
             }
         }

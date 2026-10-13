@@ -46,6 +46,12 @@ namespace ImmunologyTD.Adaptive
         public static bool IsMatch(byte a, byte b) =>
             HammingDistance(a, b) <= AdaptiveTuning.MatchMaxHammingDistance;
 
+        /// <summary>Sprint 18: the same test against an explicit tolerance --
+        /// a helper-T's own, which its tower's "TCR affinity maturation"
+        /// upgrade can widen.</summary>
+        public static bool IsMatch(byte a, byte b, int maxHammingDistance) =>
+            HammingDistance(a, b) <= maxHammingDistance;
+
         /// <summary>The fixed antigen a given pathogen class presents.
         /// Species key = <see cref="PathogenClass"/> until a real
         /// species roster exists (SPRINT_PLAN.md item 1).</summary>

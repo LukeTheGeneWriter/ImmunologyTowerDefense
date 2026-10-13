@@ -93,7 +93,8 @@ namespace ImmunologyTD.Adaptive
         /// <summary>Emit one helper-T cell into the node with a fresh random
         /// 8-bit tag. <paramref name="onSlotChildDespawned"/> is the marrow
         /// manager's per-slot callback (slot index, the despawned GameObject).</summary>
-        public GameObject EmitLymphocyte(int slotIndex, System.Action<int, GameObject> onSlotChildDespawned)
+        public GameObject EmitLymphocyte(int slotIndex, System.Action<int, GameObject> onSlotChildDespawned,
+            AdaptiveUnitTuning tuning = null)
         {
             if (node == null || lymphocytePool == null) return null;
 
@@ -112,7 +113,7 @@ namespace ImmunologyTD.Adaptive
                 onSlotChildDespawned?.Invoke(slotIndex, l.gameObject);
             };
 
-            lym.Initialize(node, Antigen.RandomTag(), node.RandomInteriorFine(), Clock, despawn);
+            lym.Initialize(node, Antigen.RandomTag(), node.RandomInteriorFine(), Clock, despawn, tuning);
             node.RegisterResident(lym);
             list.Add(lym);
             return go;
@@ -120,7 +121,8 @@ namespace ImmunologyTD.Adaptive
 
         /// <summary>Emit one dendritic cell into tissue at a random lane on
         /// the tissue base edge (same entry as the innate units).</summary>
-        public GameObject EmitDendriticCell(int slotIndex, System.Action<int, GameObject> onSlotChildDespawned)
+        public GameObject EmitDendriticCell(int slotIndex, System.Action<int, GameObject> onSlotChildDespawned,
+            AdaptiveUnitTuning tuning = null)
         {
             if (dcPool == null || tissueBoard == null) return null;
 
@@ -143,7 +145,7 @@ namespace ImmunologyTD.Adaptive
                 tissueBoard.TissueBaseEdgeAxisIndex, Random.Range(0, tissueBoard.CrossLength)));
             // allDcs is handed in as the cohort for patrol lane-repulsion --
             // a live read-only view; the DC skips itself.
-            dc.Initialize(tissueBoard, tissueGrid, tissueCytokine, node, start, despawn, allDcs);
+            dc.Initialize(tissueBoard, tissueGrid, tissueCytokine, node, start, despawn, allDcs, tuning);
             list.Add(dc);
             allDcs.Add(dc);
             return go;

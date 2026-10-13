@@ -129,12 +129,17 @@ public static class Sprint11Verification
             marrow.UpgradeTower(0) && marrow.GetUpgradeLevel(0) == 1 && wallet.Balance == before - price);
         Check("the next upgrade costs more", ShopTuning.ProgenitorUpgradePrice(1) > price);
 
-        // The placeholder does NOT touch the tower's real tuning.
+        // Sprint 18: no longer a placeholder. The legacy shim banks on row 0
+        // (macrophage: efferocytic capacity), so it moves efferocytosis and
+        // leaves the kill limit -- row 1's field -- alone. Full per-row
+        // coverage is Sprint18Verification.
         var tuning = marrow.GetTuning(0);
         int killLimitBefore = tuning.KillLimit;
+        float effBefore = tuning.EfferocytosisDebrisPerTick;
         marrow.UpgradeTower(0);
-        Check("the upgrade is a placeholder -- UnitLifecycleTuning is untouched",
-            marrow.GetTuning(0).KillLimit == killLimitBefore && marrow.GetUpgradeLevel(0) == 2);
+        Check("the legacy upgrade writes row 0 (efferocytosis), not the kill limit",
+            marrow.GetTuning(0).KillLimit == killLimitBefore &&
+            marrow.GetTuning(0).EfferocytosisDebrisPerTick > effBefore && marrow.GetUpgradeLevel(0) == 2);
 
         var broke = new GameObject("S11_MarrowBroke").AddComponent<BoneMarrowManager>();
         broke.Initialize(board, grid, field, mac, macPool, neu, neuPool, positions, 1f, new AtpWallet(1));

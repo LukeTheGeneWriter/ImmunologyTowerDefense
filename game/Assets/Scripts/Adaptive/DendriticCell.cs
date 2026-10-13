@@ -66,6 +66,12 @@ namespace ImmunologyTD.Adaptive
         /// mutated here.</summary>
         private IReadOnlyList<DendriticCell> cohort;
 
+        /// <summary>Sprint 18: this DC's tower's upgrade layer, held by
+        /// reference so an upgrade applies to fielded cells instantly
+        /// (GAME_DESIGN.md §6d). Null = the bare AdaptiveTuning statics.</summary>
+        private AdaptiveUnitTuning tuning;
+        public AdaptiveUnitTuning Tuning => tuning;
+
         private readonly FineCoord[] candidateBuffer = new FineCoord[4];
         private readonly float[] weightBuffer = new float[4];
 
@@ -101,8 +107,9 @@ namespace ImmunologyTD.Adaptive
         public void Initialize(
             BoardConfig tissueBoard, TissueGrid tissueGrid, CytokineField tissueCytokine,
             LymphNode node, FineCoord tissueStart, System.Action<DendriticCell> onDespawn,
-            IReadOnlyList<DendriticCell> cohort = null)
+            IReadOnlyList<DendriticCell> cohort = null, AdaptiveUnitTuning tuning = null)
         {
+            this.tuning = tuning;
             this.tissueBoard = tissueBoard;
             this.tissueGrid = tissueGrid;
             this.tissueCytokine = tissueCytokine;
@@ -184,7 +191,7 @@ namespace ImmunologyTD.Adaptive
             else if (axisC >= tissueBoard.TissueLumenEdgeAxisIndex) patrolHeading = -1;
             else if (axisC <= tissueBoard.TissueBaseEdgeAxisIndex) patrolHeading = 1;
 
-            for (int i = 0; i < AdaptiveTuning.DcFineTilesPerTick; i++)
+            for (int i = 0, n = AdaptiveUnitTuning.DcFineTilesPerTick(tuning); i < n; i++)
                 Current = RepelledPatrolStep(Current);
 
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
@@ -207,8 +214,8 @@ namespace ImmunologyTD.Adaptive
             Cargo = Antigen.ForClass(antigen.Value);
             CargoClass = antigen.Value;
             HasCargo = true;
-            presentationsLeft = AdaptiveTuning.DcPresentationsPerCargo;
-            tissueGrid.ClearDebris(coarse, AdaptiveTuning.DcDebrisSamplePerBite, currentTime);
+            presentationsLeft = AdaptiveUnitTuning.PresentationsPerCargo(tuning);
+            tissueGrid.ClearDebris(coarse, AdaptiveUnitTuning.DcDebrisSamplePerBite(tuning), currentTime);
         }
 
         private void TickInNode()
@@ -356,6 +363,7 @@ namespace ImmunologyTD.Adaptive
 
         public void ResetForPool()
         {
+            tuning = null;
             tissueBoard = null;
             tissueGrid = null;
             tissueCytokine = null;

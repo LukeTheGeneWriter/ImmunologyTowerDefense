@@ -100,6 +100,13 @@ namespace ImmunologyTD.Units
             /// Allocated at PlaceTower time, when the kind is known.</summary>
             public int[] UpgradeLevels = System.Array.Empty<int>();
 
+            /// <summary>Sprint 18: the per-tower upgrade layer for an
+            /// ADAPTIVE tower (null for innate -- their upgrades write
+            /// <see cref="Tuning"/>). Handed by reference to every DC /
+            /// helper-T this tower emits, same live-reference rule as the
+            /// innate kinds.</summary>
+            public AdaptiveUnitTuning AdaptiveTuning;
+
             /// <summary>Sprint 16: the board-side half of the selection
             /// (UI_DESIGN.md §4). A thin ring drawn over the niche, breathing
             /// slowly, so the floating panel is visibly *about* this slot.
@@ -303,11 +310,16 @@ namespace ImmunologyTD.Units
         }
 
         /// <summary>Sprint 16: one row of the selected tower's roster
-        /// (<c>UI.ProgenitorUpgradeCatalog</c>). Still the §6d placeholder --
-        /// it spends the ATP and bumps that row's level and does **not**
-        /// touch <see cref="UnitLifecycleTuning"/>. The catalog lives in the
+        /// (<c>UI.ProgenitorUpgradeCatalog</c>). The catalog lives in the
         /// UI layer, so the price comes in from the caller rather than this
-        /// class reaching up into it.</summary>
+        /// class reaching up into it.
+        ///
+        /// Sprint 18: no longer a placeholder -- after the level bumps,
+        /// <see cref="ProgenitorUpgrades.Apply"/> writes the row's effect to
+        /// this tower's <see cref="UnitLifecycleTuning"/> (innate) or
+        /// <see cref="AdaptiveUnitTuning"/> (adaptive). Both are held by
+        /// reference by the tower's fielded cells, so the effect is
+        /// immediate (GAME_DESIGN.md §6d).</summary>
         public bool UpgradeTower(int index, int row, int basePrice, int cap)
         {
             if (index < 0 || index >= slots.Count) return false;
@@ -319,6 +331,7 @@ namespace ImmunologyTD.Units
             int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(basePrice, slot.UpgradeLevels[row]);
             if (wallet != null && !wallet.TrySpend(price)) return false;
             slot.UpgradeLevels[row]++;
+            ApplyUpgrade(index, row);
             return true;
         }
 
@@ -339,7 +352,17 @@ namespace ImmunologyTD.Units
             int price = ImmunologyTD.Economy.ShopTuning.ProgenitorUpgradePrice(GetUpgradeLevel(index));
             if (wallet != null && !wallet.TrySpend(price)) return false;
             slot.UpgradeLevels[0]++;
+            ApplyUpgrade(index, 0);
             return true;
+        }
+
+        private void ApplyUpgrade(int index, int row)
+        {
+            var slot = slots[index];
+            ProgenitorUpgrades.Apply(slot.Kind, row, slot.UpgradeLevels[row],
+                slot.Tuning, slot.AdaptiveTuning,
+                IsAdaptive(slot.Kind) ? null : ProfileFor(slot.Kind),
+                IsAdaptive(slot.Kind) ? AdaptiveCapFor(slot.Kind) : 0);
         }
 
         /// <summary>Total upgrades bought on this tower, across every row --
@@ -415,6 +438,7 @@ namespace ImmunologyTD.Units
             slot.Tuning = IsAdaptive(kind)
                 ? new UnitLifecycleTuning { MaxActiveChildren = AdaptiveCapFor(kind) }
                 : UnitLifecycleTuning.FromProfile(ProfileFor(kind));
+            slot.AdaptiveTuning = IsAdaptive(kind) ? new AdaptiveUnitTuning() : null;
             slot.UpgradeLevels = new int[UpgradeRowsPerTower];
             int capturedIndex = index;
             slot.OnChildDespawned = unit => OnChildDespawned(capturedIndex, unit);
@@ -439,6 +463,10 @@ namespace ImmunologyTD.Units
         /// (GAME_DESIGN.md section 6d, Director 2026-08-21).</summary>
         public UnitLifecycleTuning GetTuning(int index) => slots[index].Tuning;
 
+        /// <summary>Sprint 18: an adaptive tower's live upgrade layer (null
+        /// for innate towers and empty slots).</summary>
+        public AdaptiveUnitTuning GetAdaptiveTuning(int index) => slots[index].AdaptiveTuning;
+
         /// <summary>Read-only view of one tower's live children, for the
         /// HUD and for Assets/Editor/LifecycleVerification.cs.</summary>
         public IReadOnlyList<SearchUnit> GetChildren(int index) => slots[index].Children;
@@ -455,6 +483,9 @@ namespace ImmunologyTD.Units
                 if (slot.State != BoneMarrowSlotState.Placed) continue;
 
                 float interval = IntervalFor(slot.Kind);
+                // Sprint 18: an adaptive tower's own rate upgrade (clonal expansion).
+                if (slot.AdaptiveTuning != null && slot.AdaptiveTuning.EmissionRateMultiplier > 0f)
+                    interval /= slot.AdaptiveTuning.EmissionRateMultiplier;
                 slot.EmissionTimer += deltaTime;
                 if (slot.EmissionTimer < interval) continue;
 
@@ -617,8 +648,8 @@ namespace ImmunologyTD.Units
         private void EmitAdaptive(int slotIndex, Slot slot)
         {
             GameObject go = slot.Kind == UnitKind.DendriticCell
-                ? adaptive.EmitDendriticCell(slotIndex, OnAdaptiveChildDespawned)
-                : adaptive.EmitLymphocyte(slotIndex, OnAdaptiveChildDespawned);
+                ? adaptive.EmitDendriticCell(slotIndex, OnAdaptiveChildDespawned, slot.AdaptiveTuning)
+                : adaptive.EmitLymphocyte(slotIndex, OnAdaptiveChildDespawned, slot.AdaptiveTuning);
             if (go == null) return;
 
             slot.AdaptiveChildren.Add(go);
