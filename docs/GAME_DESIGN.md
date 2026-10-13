@@ -150,6 +150,20 @@ at the board edge, marched it across, and adhered it at a **uniformly
 random column**, which is what produced the "flying across the board"
 problem this section exists to fix.
 
+> **Under revision (Director, 2026-10-14, after the Sprint 21 playtest).**
+> The *drawn* colonisation -- adhered pathogens stacked in an orderly
+> line at one interface position (`GutInterface` + `PathogenAgent.
+> InterfaceStackWorldPosition`) -- was always a placeholder and should
+> go. The Director's direction: pathogens **float around an area near a
+> breach spot** (and may be **trapped by secretory IgA**) rather than
+> queueing in a lane. That opens **proximity-based ingress** (breach
+> wherever enough pathogens crowd a stretch of wall, not per lane),
+> **mucus sloughing** (§6b's turnover upgrade, made spatial), and
+> **barrier-cell death**: a dead epithelial cell is a hole bacteria can
+> use but that still **blocks viruses**, which need a living cell to
+> infect. Step 2's "pressure builds visibly, then bursts" should survive
+> the rework. Design it before building it: see `SESSION_HANDOFF.md`.
+
 ### Step 1 — Adhesion is proximity-gated
 
 A pathogen riding the lumen flow has a **chance to adhere that depends on

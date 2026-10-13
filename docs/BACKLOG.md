@@ -933,3 +933,21 @@ The buy panels and the upgrade framework landed well. Two items:
 - **`docs/UI_DESIGN.md` §1/§2/§6 describe the Sprint 16 dark glass.**
   `COSMETIC_PASS_SPEC.md` and the UI_STYLE_GUIDE Sprint 21 section
   supersede them; fold them in if UI_DESIGN is revised again.
+
+## Opened by the Sprint 21 playtest (Director, 2026-10-14)
+
+- **Invasion rework (next).** Replace the orderly per-position
+  colonisation stack with pathogens milling near a breach spot.
+  Proximity-based ingress instead of lane-based; IgA trapping; spatial
+  mucus sloughing; dead barrier cells that pass bacteria but block
+  viruses. `GAME_DESIGN.md` §1b is marked "under revision".
+  `SESSION_HANDOFF.md` has the plan: design first.
+- **Add pathogens**, with distinct silhouettes (fold in the
+  two-bacteria-look-alike fix).
+- **Plan rounds**: a real progression in `RoundScript`.
+- **Agent playtests for "broken strategies"**: classify each as a true
+  biological strategy or a balance problem. Strongly consider a headless
+  strategy harness on the simulation APIs before (or instead of)
+  pixel-driving agents.
+- **Bone marrow second pass**: "technically correct" but not loved; match
+  the node.

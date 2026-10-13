@@ -163,6 +163,22 @@ If a sprint *is* dispatched:
 - **Research agents: images go to a scratch dir outside the repo**, are
   viewed with Read, and are never committed. Record URL and licence
   instead. This worked cleanly in Sprint 18.
+- **The design-agent loop is the project's best-performing process**
+  (Sprints 18–21; the Director called Sprint 21's result "transformative"):
+  1. **Dispatch a Design agent** to research references (scientific
+     cartoons, comparable games) and write a spec doc **with PIL mocks**
+     built from the real `_spritedump/` sprites and `Palette.cs` values.
+  2. **Review the mocks yourself**, commit the spec + mocks
+     (`docs/art/`), and put the agent's decisions to the Director via
+     `AskUserQuestion` (recommended option first).
+  3. **Implement inline**, checking every new sprite magnified
+     (`SpriteShapeDump` + a tinted PIL composite) **before** spending a
+     build. Expect a few spec numbers to be wrong in ways only a raster
+     shows.
+  The brief that worked: cold-start onboarding, exact files to read, the
+  rendering constraints (64 px white-on-alpha, one hue per renderer, baked
+  outlines), web-request rules, "do not edit code or other docs, do not
+  commit", "write the doc incrementally", and an 8–12 line report.
 - The head re-verifies everything at integration and runs the
   stopping-point checklist before it reaches the Director.
 
