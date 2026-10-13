@@ -78,14 +78,126 @@ M-cell sampling (`IsOverDome` uses the near-wall rows) and
   pathogens.
 - **Agent playtests to find "broken strategies"**, then sort each into
   "a true biological strategy" (keep it, maybe teach it) or "needs work".
-  Prior art: `docs/AGENT_PLAYTEST_01.md`, plus the input recipe in
-  `AGENT_HANDBOOK.md` ("Driving the built game from a shell"). That recipe
-  is **Win32-only**, so on Linux either build an equivalent or, likely
-  better, add a **headless strategy harness** that plays rounds through
-  the real simulation APIs (place towers, buy, tick) and reports
-  outcomes. The explicit-time simulation makes that possible, and it is
-  far cheaper than driving pixels. The old agent also suggested
-  debug-only keyboard shortcuts for common actions.
+  **Recommended approach: a headless strategy harness**, written up
+  below, rather than pixel-driving agents.
+
+### 2a. The headless strategy harness: design notes
+
+**Why not pixel-driving agents.** The Sprint 17 agentic playtest
+(`docs/AGENT_PLAYTEST_01.md`) drove the built game through Win32 mouse
+calls. That doesn't port to Linux / Wayland. It spent most of a session
+fighting input, and it plays one game at real-time speed. Broken-strategy
+hunting needs the opposite: **many full runs, fast, reproducible, with
+numbers**.
+
+**Why it's feasible.** Every simulation class already takes explicit time
+(`AGENT_HANDBOOK.md`: "Explicit-time simulation surfaces"), and the
+harnesses already play rounds headlessly. `RoundVerification` ticks
+`spawner.Tick`, each `PathogenAgent.SimulationTick` and
+`rounds.Tick` in a loop. Every player action is already a plain method:
+- `BoneMarrowManager.PlaceTower(slot, kind)`
+- `UpgradeTower(slot, row, base, cap)`
+- `ShopLedger.TryBuy(item, wallet)`
+- `RoundController.StartRound()`
+
+There is no UI in the way.
+
+**The one real piece of work: a single `SimulationStep(dt)`.** Unity
+doesn't run `Update()` in batchmode, and today the game's tick is
+scattered across **19 `Update()` methods**. Some are cosmetic renderers;
+the ones that matter are:
+- `RoundClock` (the frozen-aware clock)
+- `PathogenSpawner`, `PathogenAgent`, `SearchUnit`
+- `BoneMarrowManager`
+- `AdaptiveDirector`, `DendriticCell`, `Lymphocyte`
+- `TissueDriver`, `RoundController`
+
+There are also two behaviour bridges hiding in the UI:
+`UiController.Update` pushes shop levels into `Chemotaxis` and
+`GutWallFeatures`. A harness that copies that order by hand will drift
+from the real game the first time someone adds a system. So:
+
+1. **Extract one world ticker** (e.g. `Bootstrap/SimulationDriver`) that
+   advances every simulation system in a fixed, documented order for a
+   given `dt`, including the shop → effect bridges, moved out of the UI.
+2. **The game's `Update()`s stop ticking the simulation.** One
+   `SimulationDriver.Update()` calls `SimulationStep(Time.deltaTime)`
+   while `!RoundClock.Frozen`. The per-object `Update()`s keep only their
+   visual tweens.
+3. **The harness calls the same `SimulationStep(0.1f)`** in a tight
+   loop. Same code path, no drift. `BootstrapSmoke` already builds the
+   whole game headlessly, so the harness can boot through `GameBootstrap`
+   rather than re-wiring systems.
+
+This refactor has its own value. It makes the tick order explicit,
+which today is an emergent property of Unity's `Update()` order. It also
+needs the full harness suite plus a played build to confirm nothing
+moved.
+
+**Determinism.** 13 scripts call `UnityEngine.Random`. Seed it
+(`Random.InitState(seed)`) at the start of each run, and run each
+strategy over **N seeds** (say 20). A "broken strategy" must win across
+seeds, not get lucky once. If something still varies with the same seed,
+that is a determinism bug worth finding anyway.
+
+**Strategies as data.** A strategy is a small script of actions keyed to
+game state: "R1: macrophage in slot 0; whenever ATP ≥ 40, buy crypt;
+from R3, DC in slot 2 and max CCR7…". Start with a handful of hand-written
+archetypes:
+- all-neutrophil;
+- all-macrophage;
+- turtle on crypts + mucus;
+- rush the adaptive side (DC + helper-T + M cells);
+- never buy upgrades;
+- dump everything into one upgrade row.
+
+Then add a **greedy / random-search** player that tries action sequences
+and keeps the ones that win. That is what finds the strategies nobody
+thought of.
+
+**What to measure per run:**
+- rounds survived and lives left;
+- ATP earned and spent, by category;
+- kills by unit kind;
+- breaches by position;
+- peak tissue damage and debris;
+- knowledge % per species, and the round each rung was reached;
+- the time each round took.
+
+Write one CSV/JSON row per run under `game/Logs/strategies/`, plus a
+summary table. The Director reads the summary; the raw rows are for
+digging.
+
+**What "broken" means.** Flag any strategy that does one of these:
+- (a) survives far longer than the median;
+- (b) wins while ignoring a whole system (never fields an adaptive cell,
+  never buys an upgrade);
+- (c) has a degenerate signature: one purchase repeated 20 times, or zero
+  breaches ever.
+
+**Each flag goes to the Director to classify:**
+- **Real biology:** e.g. a neutrophil swarm early is genuinely how innate
+  immunity wins. Keep it, maybe make it a lesson.
+- **Needs work:** e.g. infinite crypts make tissue immortal. Rebalance or
+  cap it.
+
+That classification is his call; the harness only surfaces candidates.
+
+**Order of work:**
+1. The `SimulationDriver` refactor (verify: all harnesses plus a played
+   build).
+2. Seeding.
+3. One strategy end to end.
+4. The archetypes.
+5. The search player.
+6. The report.
+
+It pairs naturally with **round planning**. The harness is also how you
+check that a planned round progression is beatable and not trivial.
+
+**Cheap extra from the old agent's suggestion:** debug-only keyboard
+shortcuts for common actions (place kind N in slot M, buy item K). They
+help the Director's own testing, and any future pixel-level agent.
 
 ### 3. Smaller
 

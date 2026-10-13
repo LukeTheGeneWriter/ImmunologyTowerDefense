@@ -946,8 +946,10 @@ The buy panels and the upgrade framework landed well. Two items:
   two-bacteria-look-alike fix).
 - **Plan rounds**: a real progression in `RoundScript`.
 - **Agent playtests for "broken strategies"**: classify each as a true
-  biological strategy or a balance problem. Strongly consider a headless
-  strategy harness on the simulation APIs before (or instead of)
-  pixel-driving agents.
+  biological strategy or a balance problem. **Approach: the headless
+  strategy harness.** Full design is in `SESSION_HANDOFF.md` §2a: first
+  extract a single `SimulationStep(dt)` shared by the game and the
+  harness, then add seeded runs, strategy scripts plus a search player,
+  and a CSV report.
 - **Bone marrow second pass**: "technically correct" but not loved; match
   the node.
