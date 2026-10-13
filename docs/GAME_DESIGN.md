@@ -1233,6 +1233,22 @@ to the tower's instance is immediately visible to all of its live units.
 Do not "fix" this back into a copy; it is deliberate. Note the mechanism
 does **not** leak across towers — each progenitor still owns its own
 instance, and the shared per-kind `UnitProfile` defaults are never mutated.
+
+**Sprint 18 (2026-10-13): the upgrades are live.** Every row of every
+kind writes its field (`Units/ProgenitorUpgrades`). Two decisions made
+while wiring:
+
+- **Adaptive upgrades are per-tower too**, through `AdaptiveUnitTuning`
+  (per-tower bonuses on the shared `AdaptiveTuning` base, held by
+  reference). The Sprint 16 note had accepted global-per-kind. Doing it
+  per-tower cost little, and it keeps this section's "an upgrade is a
+  write to one tower" true for every kind.
+- **Clonal expansion raises the production rate as well as the cap.**
+  The cap alone was inert: a helper-T niche's steady state is lifespan ÷
+  interval ≈ 20 / 3.5 ≈ 6, under its cap of 8. Clonal expansion is
+  proliferation, so the rate (×(1 + 0.5·level)) is the honest lever and
+  the cap stays the ceiling. **General rule for cap-style upgrades:**
+  check the cap binds at default numbers, or the upgrade buys nothing.
 to.
 
 Numbers (max active children, neutrophil kill-count limit, macrophage

@@ -12,6 +12,30 @@ yet — next sprint starts real gameplay.
 
 -->
 
+## Sprint 18 -- 2026-10-13
+The upgrade buttons do something now.
+
+- **All twelve progenitor upgrades are live.** Since Sprint 16, buying one
+  took your ATP and changed nothing. Every row now does what it says: a
+  macrophage clears debris faster or lives longer, a neutrophil's burst
+  scars less or it runs faster, a DC presents more per trip or walks
+  faster, a helper-T niche fills up or matches more loosely. Upgrades
+  apply instantly, including to cells already on the board.
+- **Upgrades belong to the niche you bought them on.** Upgrading one DC
+  niche used to be going to upgrade *every* DC niche, because the DC's
+  numbers were global. Each adaptive tower now carries its own upgrades,
+  like the innate ones always did.
+- **Clonal expansion was going to be a dud, so it changed.** It was only
+  going to raise the helper-T cap, but a niche never reaches its cap: the
+  cells age out first. Clonal expansion now also makes the niche produce
+  helper-Ts faster, which is what it means biologically. Level 2 doubles
+  the standing population (6 to 12, measured).
+- **Lumen reference research.** A design agent surveyed textbook-style
+  diagrams of the gut wall and wrote `docs/LUMEN_REFERENCE.md`: eight
+  ranked ideas for the next lumen pass, from a cheap villus redraw (bright
+  epithelial rim, fuzzy brush border, goblet flecks) to crypts and a
+  Peyer's patch. Nothing in it is built yet; it's waiting on your pick.
+
 ## Sprint 17 -- 2026-09-04
 The gut looks like a gut, and the dendritic cells stopped twitching.
 

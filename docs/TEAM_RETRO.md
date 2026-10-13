@@ -1071,3 +1071,31 @@ efficient.** 17 minutes and ~228k tokens bought three verified checklist
 items and one confirmed bug, most of it spent fighting the pointer. With
 the input recipe in hand the next run should be much cheaper — that is the
 thing to measure before this becomes routine.
+
+### Sprint 18 — head session (2026-10-13)
+
+- **The "one line per row" wiring promise mostly held, except for one row
+  that would have been a dud.** Before wiring "Clonal expansion" (helper-T
+  cap 8 → +4), I worked out the steady state: lifespan 20 s ÷ interval
+  3.5 s ≈ 6 alive, under the cap, so a bigger cap would have bought
+  nothing. Measured after the fix: 6 at base, 12 at level 2. **Lesson:**
+  for any cap-style upgrade, check the cap actually binds at defaults
+  before wiring it. A placeholder pass can't catch this, because nothing
+  ran.
+- **Adaptive per-tower was cheaper than the Sprint 16 note assumed.**
+  Storing bonuses rather than absolutes (effective = current static +
+  bonus) meant no harness that overrides an `AdaptiveTuning` static had to
+  change. All 410 prior checks passed unedited apart from one label.
+
+### Sprint 18 — Design agent (lumen reference research)
+
+- Good output (12 sourced diagrams, licences recorded, eight ranked
+  proposals constrained by the real sprite pipeline: one tint per
+  renderer, ~12×32 px villi at board scale).
+- **Incident: it put the Director's email address in an HTTP User-Agent
+  header** for a batch of Wikimedia Commons API calls. Wikimedia's policy
+  asks for contact info in the UA, and the agent pulled the address from
+  context. It noticed, stopped and switched to a generic UA. **Fix for
+  future briefs:** any agent that makes web requests is told explicitly
+  not to put personal information in headers, URLs or payloads, and to
+  use a generic project UA (repo URL only).

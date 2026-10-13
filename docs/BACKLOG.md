@@ -833,3 +833,46 @@ The buy panels and the upgrade framework landed well. Two items:
   (click slot → picker → BUY → upgrade panel, ATP 100→60) is exactly the
   kind of thing a scripted play-mode test could assert if UI keeps
   growing.
+
+## Opened / updated by Sprint 18 (2026-10-13) — upgrades live
+
+- **~~The upgrade rows are still placeholders~~ — wired, Sprint 18.**
+  Adaptive rows went per-tower rather than global-per-kind (cheap via
+  `AdaptiveUnitTuning`), which closes the Sprint 16 "adaptive upgrades
+  are global-per-kind" note.
+- **Bolus motion (Director, 2026-10-13: "we'll fix its motion next").**
+  The likely Sprint 19. The look is fine for now; it's the movement. Ask
+  the Director what reads wrong about it before guessing.
+- **Leukocyte rolling and extravasation, made visible (Director,
+  2026-10-13).** New cells would arrive *with the blood*, roll along the
+  vessel wall (selectin tethering), arrest, and squeeze through
+  (diapedesis) into tissue, instead of appearing at a random lane on the
+  tissue base edge (`BoneMarrowManager.Emit`, `AdaptiveDirector.EmitDendriticCell`).
+  `GAME_DESIGN.md` §2a already designs *where* they cross: the search
+  ladder (random, then near inflammation, then tightly localised), which
+  would make the cytokine-sensing upgrade visibly pay off at the vessel
+  too. Open: does the rolling cost time (a real delay before a new cell
+  fights, so it is balance as well as visuals), and is the emitted cell
+  pooled as one object through both phases (it should be, per §8).
+- **Lumen redraw from `docs/LUMEN_REFERENCE.md`.** Eight ranked
+  proposals. Cheap and high-payoff: P1 (villus rim/core + brush-border
+  halo, one texture), P2 (a darker back row of villi, needs a lumen
+  sorting slot between chyme 0 and villi 1), P3 (goblet flecks).
+  **Needs design calls:** P4 crypt sprite (real crypts sit at the wall,
+  but §1d calls crypts "placeable"; the agent suggests snapping them to
+  the wall with a regrowth radius into tissue), P6 Peyer's patch + M cells
+  (a villus-free antigen-sampling landmark; ties to the DC loop), P7
+  commensals in the outer mucus (readability risk against real
+  bacteria). Two colour conventions are deliberately broken there (no
+  blue venules, since blue is the macrophage; no yellow lacteals, since
+  yellow is near the infected tint and the bolus).
+- **The upgrade effects are mostly invisible.** Kill limits,
+  presentations per cargo and match tolerance change numbers, not
+  pixels. If the playtest says "did that do anything?", the fix is
+  feedback (a brief tint or pulse on the niche's cells when an upgrade
+  lands, or the effect line showing current → next value), not bigger
+  numbers.
+- **Upgrade numbers live in two places.** `ProgenitorUpgradeCatalog`'s
+  `FieldLabel` text and `ProgenitorUpgrades`' consts. The labels are
+  debug-only; if they drift it costs a confused debug readout, not a bug.
+  Generate the label from the consts if that ever bites.

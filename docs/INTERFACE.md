@@ -1884,6 +1884,49 @@ Ten harnesses green unedited (410), `BootstrapSmoke` green. Everything
 else here is the Director's eye — no rendering or motion change in this
 project has ever been headlessly testable.
 
+## Sprint 18 changes — the upgrades go live
+
+### `ImmunologyTD.Units.ProgenitorUpgrades` (new, static)
+- `void Apply(UnitKind kind, int row, int level, UnitLifecycleTuning tuning,
+  AdaptiveUnitTuning adaptive, UnitProfile profile, int adaptiveBaseCap)`
+  — writes row `row`'s effect at `level`. Recomputed from base, idempotent.
+- Public `const` per-level steps (`EfferocytosisPerLevel`,
+  `ClonalRatePerLevel`, ...). **Row order must match
+  `UI.ProgenitorUpgradeCatalog`.**
+
+### `ImmunologyTD.Adaptive.AdaptiveUnitTuning` (new)
+- Fields (bonuses, default 0): `DcPresentationsBonus`, `DcFineTilesBonus`,
+  `DcDebrisBiteReduction`, `MatchDistanceBonus`,
+  `LymphocyteLifespanReduction`; `EmissionRateMultiplier` (default 1).
+- Consts: `DcDebrisBiteFloor` 0.1, `MatchDistanceCeiling` 4,
+  `LymphocyteLifespanFloor` 6.
+- Static accessors taking a nullable instance (null = bare
+  `AdaptiveTuning` value): `PresentationsPerCargo`, `DcFineTilesPerTick`,
+  `DcDebrisSamplePerBite`, `MatchMaxHammingDistance`,
+  `LymphocyteLifespanSeconds`.
+
+### `ImmunologyTD.Units.BoneMarrowManager`
+- `UpgradeTower(int, int, int, int)` and the legacy `UpgradeTower(int)`
+  **now apply the effect** (no longer placeholders).
+- **New:** `AdaptiveUnitTuning GetAdaptiveTuning(int index)` (null for
+  innate / empty).
+
+### `ImmunologyTD.Adaptive`
+- `AdaptiveDirector.EmitDendriticCell` / `EmitLymphocyte` — new optional
+  trailing `AdaptiveUnitTuning tuning = null`.
+- `DendriticCell.Initialize` / `Lymphocyte.Initialize` — same optional
+  trailing param. **New:** `DendriticCell.Tuning`, `Lymphocyte.Tuning`,
+  `Lymphocyte.MatchMaxHammingDistance`, `Lymphocyte.LifespanSeconds`.
+- **New overload:** `Antigen.IsMatch(byte a, byte b, int maxHammingDistance)`.
+  The two-argument form is unchanged.
+
+### `ImmunologyTD.Units.UnitLifecycleTuning`
+- **New field:** `int FineTilesPerTick`, seeded from the profile.
+
+### Verification
+- `Sprint18Verification.RunAll` — 28 checks. Sprint11's placeholder
+  assertion reworded (the shim now writes row 0).
+
 ## Verification harness (`Assets/Editor/MapVerification.cs`, new Sprint 4)
 
 `MapVerification.RunAll` — 71 assertions over band layout, axis-frame

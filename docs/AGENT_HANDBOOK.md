@@ -155,6 +155,14 @@ If a sprint *is* dispatched:
   with a reasoning-heavy message; **write docs incrementally**.
 - Dispatched agents can't talk to each other — cross-cutting design
   questions come back to the head.
+- **Any agent that makes web requests: no personal information in
+  headers, URLs or payloads.** Tell it to use a generic User-Agent
+  (project name + repo URL). A Sprint 18 research agent filled the
+  Wikimedia "contact info in UA" convention with the Director's email
+  from context.
+- **Research agents: images go to a scratch dir outside the repo**, are
+  viewed with Read, and are never committed. Record URL and licence
+  instead. This worked cleanly in Sprint 18.
 - The head re-verifies everything at integration and runs the
   stopping-point checklist before it reaches the Director.
 

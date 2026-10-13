@@ -48,11 +48,9 @@ No gameplay changed. This was infrastructure only:
   there: install `6000.6.4f1` via the Hub (with "Web Build Support"),
   then `git pull`. Opening it in `6000.5.8f1` would try to *downgrade* the
   project — don't.
-- **No player build has been made on `6000.6.4f1` yet**, on either
-  machine. Harnesses are green, but a WebGL (and on Windows, a desktop)
-  build + headless launch should be the first verification on the new
-  editor. First WebGL build on Linux will be the slow full IL2CPP →
-  Emscripten pass (30+ min; quiet logs aren't a hang).
+- **WebGL builds cleanly on `6000.6.4f1` from Linux** (2026-10-13, via
+  `tools/unity.sh webgl`, which is now proven). No Windows desktop build
+  on the new editor yet.
 - **Windows-only harness tooling stays Windows-only.** The agentic
   playtest in `AGENT_PLAYTEST_01.md` drove input via Win32
   (`SetCursorPos`, DPI awareness); none of that ports to Linux/Wayland as
@@ -61,18 +59,14 @@ No gameplay changed. This was infrastructure only:
 - `tools/unity.sh` was exercised against the harnesses but **not yet with
   `webgl`** — treat the first Linux build as also testing the script.
 
-## Where the game itself stands
+## Where the game itself stands (updated 2026-10-13)
 
-Unchanged since 2026-09-04 — see `SPRINT_PLAN.md` (Sprint 17) and
-`CHANGELOG.md`:
-
-- **Sprint 17 is code-complete; only the Director's playtest remains**
-  (smooth DCs, villi/velvety lumen, cartoon vessel, bolus contrast).
-  Nothing in it is headlessly testable.
-- **The obvious Sprint 18** is wiring the upgrade rows to the simulation —
-  they are still `GAME_DESIGN.md` §6d placeholders, the widest gap in the
-  game. Also waiting on the Director's eye: the DC's lateral zigzag walk
-  (a design question, deliberately left alone — `BACKLOG.md`).
+- **Sprint 17 playtested**: DCs are smooth (Director).
+- **Sprint 18 shipped**: all 12 upgrade rows are live and per-tower; see
+  `SPRINT_PLAN.md`. `docs/LUMEN_REFERENCE.md` holds design research for
+  the next lumen pass.
+- **Queued by the Director:** bolus motion next, then leukocyte rolling
+  and extravasation from the vessel (`BACKLOG.md`, Sprint 18 section).
 
 ## For whichever session picks this up
 

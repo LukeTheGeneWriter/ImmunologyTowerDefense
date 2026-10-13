@@ -1066,6 +1066,31 @@ recording as a general point: the sprite dump tells you whether a *shape*
 is right, and only the running board tells you whether a *field of them*
 is.
 
+## Sprint 18 — the upgrades go live
+
+- **`Units/ProgenitorUpgrades`** (new, static) — `Apply(kind, row, level,
+  UnitLifecycleTuning, AdaptiveUnitTuning, UnitProfile, adaptiveBaseCap)`.
+  The effect table for all 12 rows, recomputed from base + level, with
+  `const` per-level steps. Row indices match `UI.ProgenitorUpgradeCatalog`;
+  `Sprint18Verification` buys every row, so a reorder trips it.
+- **`BoneMarrowManager.UpgradeTower`** (both overloads) now calls it after
+  bumping the level. Slot gained `AdaptiveTuning` (an
+  `AdaptiveUnitTuning`, adaptive towers only); `Tick` divides an adaptive
+  tower's emission interval by its `EmissionRateMultiplier`.
+- **`Adaptive/AdaptiveUnitTuning`** (new) — per-tower upgrade *bonuses*
+  for DC / helper-T, layered on the current `AdaptiveTuning` statics by
+  static accessors (`PresentationsPerCargo(t)`, `DcFineTilesPerTick(t)`,
+  `DcDebrisSamplePerBite(t)`, `MatchMaxHammingDistance(t)`,
+  `LymphocyteLifespanSeconds(t)`), with the floors and ceilings. A null
+  instance reads the bare statics, so every pre-18 harness is unchanged.
+- **`DendriticCell` / `Lymphocyte`** take the tower's instance at
+  `Initialize` (optional trailing param) and hold it by reference.
+  `LymphNode` reads the *resident's* tolerance and lifespan.
+- **`UnitLifecycleTuning.FineTilesPerTick`** (moved from being read off
+  `UnitProfile`; the profile still seeds it). `SearchUnit` falls back to
+  the profile when it is 0 (a hand-built harness instance).
+- Prices, caps and per-level steps are all still placeholders.
+
 ## Build status (Sprints 13-17)
 
 All run by the **head session**. Numbers copied from actual output.
