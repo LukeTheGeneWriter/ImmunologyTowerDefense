@@ -62,11 +62,18 @@ namespace ImmunologyTD.Rendering
         public static Color FoodBolus     => C(0.64f, 0.44f, 0.20f);
 
         // ---- base band, marrow, node --------------------------------------
-        public static Color MarrowBackdrop => C(1.00f, 0.88f, 0.80f);
-        public static Color MarrowSlotEmpty => C(0.80f, 0.85f, 0.93f);
+        /// <summary>Sprint 21 organs (COSMETIC_PASS_SPEC.md §1.1).</summary>
+        public static Color Bone           => C(1.00f, 0.94f, 0.80f);
+        public static Color MarrowSpace    => C(1.00f, 0.62f, 0.52f);
+        public static Color PadSteel       => C(0.80f, 0.85f, 0.93f);
         public static Color SelectionRim   => C(0.431f, 0.561f, 0.690f);
-        public static Color NodeBackdrop   => C(0.82f, 0.92f, 0.76f);
-        public static Color OrganHalo      => C(0.60f, 0.20f, 0.26f, 0.6f);
+        public static Color NodeBody       => C(0.80f, 0.93f, 0.78f);
+        /// <summary>Lymph-node B-cell follicles (apricot) -- not the Peyer's
+        /// patch follicle haze, which is <see cref="Follicle"/>.</summary>
+        public static Color NodeFollicle   => C(1.00f, 0.84f, 0.62f);
+        public static Color Lymph          => C(1.00f, 0.95f, 0.70f);
+        /// <summary>Cartoon drop shadows under the organs (replaces the halo).</summary>
+        public static Color OrganShadow    => C(0.50f, 0.12f, 0.20f, 0.40f);
         public static Color Plasma         => C(0.94f, 0.50f, 0.52f);
         public static Color VesselWall     => C(1.00f, 0.80f, 0.78f);
         public static Color Erythrocyte    => C(0.86f, 0.12f, 0.18f, 1f);

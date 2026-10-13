@@ -265,9 +265,12 @@ namespace ImmunologyTD.Bootstrap
             float marrowStripHeight = (BoneMarrowSlotCount - 1) * pitch + marrowSlotSize;
             float marrowCenterY = topSlotY - (BoneMarrowSlotCount - 1) * pitch * 0.5f;
 
+            // Sprint 21 (spec §1.2): a wider block of bone (side lanes of
+            // spongy holes either side of the pads). Height keeps 0.30 pitch
+            // of margin (the spec's 0.15 let the end cavities break through).
             var marrowBackdropSize = new Vector2(
-                Mathf.Min(marrowSlotSize * 1.35f, baseRect.width * 0.92f),
-                marrowStripHeight + pitch * 0.35f);
+                Mathf.Min(marrowSlotSize * 2.9f, baseRect.width * 0.50f),
+                marrowStripHeight + pitch * 0.30f);
             var marrowBackdropCenter = new Vector3(marrowCenterX, marrowCenterY, 0f);
 
             var lymphSize = new Vector2(baseRect.width * 0.82f, lymphRegionH);
@@ -462,46 +465,53 @@ namespace ImmunologyTD.Bootstrap
             go.AddComponent<BaseCompartmentRenderer>().Bind(board);
         }
 
-        /// <summary>Sprint 15: a soft dark-plasma halo behind a base-band
-        /// organ so it reads as suspended in the bloodstream rather than
-        /// floating on the camera clear colour (docs/COMPARTMENT_DESIGN.md
-        /// §2.2). Sits at sortingOrder 1, behind the backdrop at 2.</summary>
-        private void BuildOrganHalo(string name, Vector3 center, Vector2 backdropSize)
+        /// <summary>Sprint 21 (COSMETIC_PASS_SPEC.md §1.1): a cartoon drop
+        /// shadow -- the organ's own silhouette, offset down-right, under it.
+        /// Replaces Sprint 15's dark halo ring.</summary>
+        private static void BuildOrganLayer(string name, Vector3 center, Sprite sprite, Color tint, int order)
         {
             var go = new GameObject(name);
             go.transform.position = center;
-            go.transform.localScale = new Vector3(backdropSize.x * 1.5f, backdropSize.y * 1.5f, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.OrganHalo;
-            sr.color = ImmunologyTD.Rendering.Palette.OrganHalo; // Classic: deeper plasma; Daylight: a soft drop shadow
-            sr.sortingOrder = 1;
+            sr.sprite = sprite;
+            sr.color = tint;
+            sr.sortingOrder = order;
         }
 
+        private static readonly Vector3 ShadowOffset = new Vector3(0.06f, -0.09f, 0f);
+
+        /// <summary>Sprint 21 (spec §1.2): spongy bone -- cream struts round
+        /// salmon marrow spaces -- with a rounded cavity behind each of the
+        /// five steel build pads (BoneMarrowManager draws the pads).</summary>
         private void BuildBoneMarrowBackdrop(Layout layout)
         {
-            BuildOrganHalo("BoneMarrowHalo", layout.MarrowBackdropCenter, layout.MarrowBackdropSize);
-
-            var go = new GameObject("BoneMarrowBackdrop");
-            go.transform.position = layout.MarrowBackdropCenter;
-            go.transform.localScale = new Vector3(layout.MarrowBackdropSize.x, layout.MarrowBackdropSize.y, 1f);
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.MarrowRegion; // Sprint 13 texture, Sprint 15 revision
-            sr.color = ImmunologyTD.Rendering.Palette.MarrowBackdrop;
-            sr.sortingOrder = 2; // Sprint 15: above the organ halo
+            var pads = new Vector2[layout.MarrowSlotPositions.Length];
+            for (int i = 0; i < pads.Length; i++)
+                pads[i] = layout.MarrowSlotPositions[i] - layout.MarrowBackdropCenter;
+            float pitch = pads.Length > 1 ? Mathf.Abs(layout.MarrowSlotPositions[0].y - layout.MarrowSlotPositions[1].y) : 0f;
+            var m = ImmunologyTD.Rendering.OrganShapes.BuildMarrow(layout.MarrowBackdropSize, pads, layout.MarrowSlotSize, pitch);
+            var c = layout.MarrowBackdropCenter;
+            BuildOrganLayer("BoneMarrowShadow", c + ShadowOffset, m.Shadow, ImmunologyTD.Rendering.Palette.OrganShadow, 1);
+            BuildOrganLayer("BoneMarrowSpace", c, m.Space, ImmunologyTD.Rendering.Palette.MarrowSpace, 2);
+            BuildOrganLayer("BoneMarrowBone", c, m.Bone, ImmunologyTD.Rendering.Palette.Bone, 3);
         }
 
+        /// <summary>Sprint 21 (spec §1.3): capsule, follicles with
+        /// germinal centres, paracortex, medullary cords to a hilum on the
+        /// far side, and afferent lymphatics plugging in from the tissue.
+        /// The body is a rounded rect that contains the helper-T arena (86%
+        /// of LymphSize) -- the old bean ellipse let T cells walk off it.</summary>
         private void BuildLymphNodeBackdrop(Layout layout)
         {
-            BuildOrganHalo("LymphNodeHalo", layout.LymphCenter, layout.LymphSize);
-
-            var go = new GameObject("LymphNode");
-            go.transform.position = layout.LymphCenter;
-            go.transform.localScale = new Vector3(layout.LymphSize.x, layout.LymphSize.y, 1f);
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.LymphNodeBean; // Sprint 13 silhouette, Sprint 15 revision
-            sr.color = ImmunologyTD.Rendering.Palette.NodeBackdrop;
-            sr.sortingOrder = 2; // Sprint 15: above the organ halo
-
+            var baseRect = board.BandWorldRect(BoardBand.Base);
+            var tissueRect = board.BandWorldRect(BoardBand.Tissue);
+            bool tissueOnRight = tissueRect.center.x >= baseRect.center.x;
+            var n = ImmunologyTD.Rendering.OrganShapes.BuildNode(layout.LymphSize, tissueOnRight);
+            var c = layout.LymphCenter;
+            BuildOrganLayer("LymphNodeShadow", c + ShadowOffset, n.Shadow, ImmunologyTD.Rendering.Palette.OrganShadow, 1);
+            BuildOrganLayer("LymphNodeVessels", c, n.Vessels, ImmunologyTD.Rendering.Palette.Lymph, 1);
+            BuildOrganLayer("LymphNode", c, n.Body, ImmunologyTD.Rendering.Palette.NodeBody, 2);
+            BuildOrganLayer("LymphNodeFollicles", c, n.Follicles, ImmunologyTD.Rendering.Palette.NodeFollicle, 3);
         }
 
         private GameObject BuildPathogenTemplate()
@@ -667,11 +677,13 @@ namespace ImmunologyTD.Bootstrap
             // They used to be IMGUI CompartmentLabels created next to each
             // backdrop; they are UITK elements now, so they are made here
             // where the panel exists rather than there where the sprite is.
+            // Sprint 21: tags pinned to the organs' edges -- the marrow's top,
+            // the node's bottom (COSMETIC_PASS_SPEC.md §1.4).
             ui.AddWorldLabel(
-                layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f + 0.9f, 0f),
+                layout.MarrowBackdropCenter + new Vector3(0f, layout.MarrowBackdropSize.y * 0.5f, 0f),
                 "Bone marrow");
             ui.AddWorldLabel(
-                layout.LymphCenter + new Vector3(0f, layout.LymphSize.y * 0.5f + 0.9f, 0f),
+                layout.LymphCenter - new Vector3(0f, layout.LymphSize.y * 0.5f, 0f),
                 "Lymph node");
         }
     }

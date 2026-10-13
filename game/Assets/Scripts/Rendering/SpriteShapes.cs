@@ -307,23 +307,6 @@ namespace ImmunologyTD.Rendering
             }
         }
 
-        private static Sprite slotNiche;
-        public static Sprite SlotNiche
-        {
-            get
-            {
-                if (slotNiche == null)
-                {
-                    var b = NewBuffer();
-                    FillRounded(b, C, C, 30f, 6f);
-                    InnerShade(b, C, C, 24f, 0.62f); // recessed
-                    RimShade(b, 2, 0.80f);
-                    slotNiche = Finish(b, 5);
-                }
-                return slotNiche;
-            }
-        }
-
         private static Sprite epithelialBar;
         public static Sprite EpithelialBar
         {
@@ -355,67 +338,6 @@ namespace ImmunologyTD.Rendering
                     epithelialBar = ToSprite(b);
                 }
                 return epithelialBar;
-            }
-        }
-
-        private static Sprite marrowRegion;
-        /// <summary>Sprint 15: struts raised and multiplied so the sponge
-        /// reads at a glance (not only up close), two faint sinusoid
-        /// channels toward the blood-side edge (the route emitted cells and
-        /// birth-puff motes take), lighter stipple so the struts survive.
-        /// Retinted to red marrow in <c>GameBootstrap</c>.</summary>
-        public static Sprite MarrowRegion
-        {
-            get
-            {
-                if (marrowRegion == null)
-                {
-                    var b = NewBuffer();
-                    FillRounded(b, C, C, 31f, 4f);
-                    var rng = new System.Random(7);
-                    for (int i = 0; i < 5; i++) // bold lighter trabecular struts
-                    {
-                        float ox = C + (float)(rng.NextDouble() - 0.5) * 44f;
-                        float oy = C + (float)(rng.NextDouble() - 0.5) * 44f;
-                        InnerShade(b, ox, oy, 12f, 1.35f);
-                    }
-                    for (int i = 0; i < 3; i++) // thinner secondary struts
-                    {
-                        float ox = C + (float)(rng.NextDouble() - 0.5) * 46f;
-                        float oy = C + (float)(rng.NextDouble() - 0.5) * 46f;
-                        InnerShade(b, ox, oy, 7f, 1.30f);
-                    }
-                    // sinusoid channels draining toward the wall-side (x = Res) edge
-                    FillCapsule(b, 40f, 20f, 62f, 26f, 2.4f);
-                    FillCapsule(b, 38f, 44f, 62f, 40f, 2.4f);
-                    InnerShade(b, 52f, 23f, 12f, 0.80f);
-                    InnerShade(b, 52f, 42f, 12f, 0.80f);
-                    marrowRegion = ToSprite(b);
-                }
-                return marrowRegion;
-            }
-        }
-
-        private static Sprite lymphNodeBean;
-        /// <summary>Sprint 15: keeps the Sprint 13 bean outline; adds a
-        /// darker medullary notch on the concave side (the hilum where
-        /// vessels enter) and a third germinal-centre zone.</summary>
-        public static Sprite LymphNodeBean
-        {
-            get
-            {
-                if (lymphNodeBean == null)
-                {
-                    var b = NewBuffer();
-                    FillLobed(b, C, C, 26f, 2, 0.18f, 0.4f); // rounded bean
-                    InnerShade(b, C - 9f, C + 5f, 8f, 1.18f); // follicles
-                    InnerShade(b, C + 10f, C - 4f, 7f, 1.18f);
-                    InnerShade(b, C + 2f, C + 9f, 6f, 1.15f); // third germinal centre
-                    InnerShade(b, C - 2f, C - 10f, 9f, 0.72f); // medullary notch / hilum
-                    RimShade(b, 1, 0.85f);
-                    lymphNodeBean = Finish(b, 2);
-                }
-                return lymphNodeBean;
             }
         }
 
@@ -528,33 +450,6 @@ namespace ImmunologyTD.Rendering
                     vesselWallBar = ToSprite(b);
                 }
                 return vesselWallBar;
-            }
-        }
-
-        private static Sprite organHalo;
-        /// <summary>Seats the marrow / lymph backdrops in the plasma: an
-        /// annulus of darker plasma (clear centre so the backdrop shows) with
-        /// a bright rim at the organ edge. <c>GameBootstrap</c> builds one per
-        /// organ, <c>sortingOrder 1</c>, behind the backdrops (which move to 2).</summary>
-        public static Sprite OrganHalo
-        {
-            get
-            {
-                if (organHalo == null)
-                {
-                    var b = NewBuffer();
-                    ForBox(0f, 0f, Res, Res, (x, y) =>
-                    {
-                        float d = Mathf.Sqrt((x + 0.5f - C) * (x + 0.5f - C) + (y + 0.5f - C) * (y + 0.5f - C));
-                        float a = d < 19f
-                            ? Mathf.Lerp(0f, 0.78f, Mathf.Clamp01((d - 8f) / 11f))
-                            : Mathf.Lerp(0.78f, 0f, Mathf.Clamp01((d - 19f) / 12f));
-                        b[y * Res + x].a = a;
-                    });
-                    FillRing(b, C, C, 21f, 19f); // bright rim where organ meets fluid
-                    organHalo = ToSprite(b);
-                }
-                return organHalo;
             }
         }
 
@@ -952,11 +847,11 @@ namespace ImmunologyTD.Rendering
             _ = Macrophage; _ = Neutrophil; _ = DendriteStar; _ = DendriteStarLoaded;
             _ = Lymphocyte; _ = LargeBacterium; _ = Virion; _ = FoodBolus;
             _ = HostCell; _ = HostCellInfectedViral; _ = HostCellInfectedBacterial; _ = Debris; _ = EmptyPit;
-            _ = SlotNiche; _ = EpithelialBar; _ = MarrowRegion; _ = LymphNodeBean;
+            _ = EpithelialBar;
             _ = GranuleBurst; _ = BreachStar; _ = EffeBloom; _ = StressRing; _ = KnowledgeRing;
             // Sprint 15 compartment shapes
             _ = ChymeField; _ = MucusBand; _ = FlowMote; _ = PlasmaField; _ = VesselWallBar;
-            _ = OrganHalo; _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
+            _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
             // Sprint 17 cartoon pass
             _ = Villus; _ = EndothelialCell;
             // Sprint 19 gut-wall structures

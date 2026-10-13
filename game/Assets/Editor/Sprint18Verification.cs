@@ -246,8 +246,8 @@ public static class Sprint18Verification
         rig.Marrow.PlaceTower(1, UnitKind.HelperT);
         Tick(rig, 2f);
 
-        var dcs = Object.FindObjectsByType<DendriticCell>(FindObjectsSortMode.None);
-        var lyms = Object.FindObjectsByType<Lymphocyte>(FindObjectsSortMode.None);
+        var dcs = Object.FindObjectsByType<DendriticCell>();
+        var lyms = Object.FindObjectsByType<Lymphocyte>();
         DendriticCell dc = null;
         foreach (var d in dcs) if (d.Tuning != null) { dc = d; break; }
         Lymphocyte lym = null;

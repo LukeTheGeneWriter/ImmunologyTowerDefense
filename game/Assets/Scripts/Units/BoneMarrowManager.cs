@@ -113,6 +113,13 @@ namespace ImmunologyTD.Units
             /// Built for every slot at Initialize and disabled; only ever one
             /// is on at a time.</summary>
             public SpriteRenderer Rim;
+
+            /// <summary>Sprint 21 (COSMETIC_PASS_SPEC.md §1.2): what stands
+            /// on the pad -- a "+" while empty, the unit's own sprite in its
+            /// own colour once placed. The pad itself stays steel either way
+            /// (the Kingdom Rush "tower built here" read), where Sprint 16
+            /// painted the whole socket the kind's colour.</summary>
+            public SpriteRenderer Glyph;
         }
 
         /// <summary>The two adaptive kinds emit their own agent types via
@@ -153,9 +160,24 @@ namespace ImmunologyTD.Units
         /// renderer in the model layer and UiTheme is the screen-space
         /// theme; a one-way dependency from UI to model is worth keeping
         /// one-way for a single colour.</summary>
-        private static Color SelectionRimColor => Palette.SelectionRim;
+        /// <summary>Sprint 21: white -- the slate rim vanished on the light board.</summary>
+        private static Color SelectionRimColor => Color.white;
 
-        private static Color EmptySlotColor => Palette.MarrowSlotEmpty; // pale bone-ish tan
+        private static Color EmptySlotColor => Palette.PadSteel;
+
+        private const float EmptyGlyphScale = 0.55f;
+        private const float PlacedGlyphScale = 0.70f;
+
+        private static Sprite UnitSprite(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.Macrophage: return ImmunologyTD.Rendering.SpriteShapes.Macrophage;
+                case UnitKind.Neutrophil: return ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
+                case UnitKind.DendriticCell: return ImmunologyTD.Rendering.SpriteShapes.DendriteStar;
+                default: return ImmunologyTD.Rendering.SpriteShapes.Lymphocyte;
+            }
+        }
 
         private BoardConfig board;
         private TissueGrid tissueGrid;
@@ -246,9 +268,17 @@ namespace ImmunologyTD.Units
                 slotGo.transform.localScale = new Vector3(slotWorldSize, slotWorldSize, 1f);
 
                 var sr = slotGo.AddComponent<SpriteRenderer>();
-                sr.sprite = ImmunologyTD.Rendering.SpriteShapes.SlotNiche; // Sprint 13 -- recessed socket
+                sr.sprite = ImmunologyTD.Rendering.SpriteShapes.BuildPad; // Sprint 21 -- a steel build pad
                 sr.sortingOrder = 5;
                 sr.color = EmptySlotColor;
+
+                var glyphGo = new GameObject("Glyph");
+                glyphGo.transform.SetParent(slotGo.transform, false);
+                glyphGo.transform.localScale = Vector3.one * EmptyGlyphScale;
+                var glyph = glyphGo.AddComponent<SpriteRenderer>();
+                glyph.sprite = ImmunologyTD.Rendering.SpriteShapes.PlusGlyph;
+                glyph.color = new Color(1f, 1f, 1f, 0.9f);
+                glyph.sortingOrder = 7;
 
                 var col = slotGo.AddComponent<BoxCollider2D>();
                 col.size = Vector2.one;
@@ -262,9 +292,9 @@ namespace ImmunologyTD.Units
                 // niches (5) and below the agents (10).
                 var rimGo = new GameObject("Rim");
                 rimGo.transform.SetParent(slotGo.transform, false);
-                rimGo.transform.localScale = Vector3.one * 1.28f;
+                rimGo.transform.localScale = Vector3.one * 1.22f;
                 var rim = rimGo.AddComponent<SpriteRenderer>();
-                rim.sprite = ImmunologyTD.Rendering.SpriteShapes.KnowledgeRing;
+                rim.sprite = ImmunologyTD.Rendering.SpriteShapes.SelectRing;   // Sprint 21: the slate ring vanished on light
                 rim.sortingOrder = 6;
                 rim.color = SelectionRimColor;
                 rim.enabled = false;
@@ -274,6 +304,7 @@ namespace ImmunologyTD.Units
                     State = BoneMarrowSlotState.Empty,
                     Visual = sr,
                     Rim = rim,
+                    Glyph = glyph,
                     WorldPosition = slotWorldPositions[i],
                 });
             }
@@ -446,7 +477,13 @@ namespace ImmunologyTD.Units
             slot.UpgradeLevels = new int[UpgradeRowsPerTower];
             int capturedIndex = index;
             slot.OnChildDespawned = unit => OnChildDespawned(capturedIndex, unit);
-            slot.Visual.color = ColorForKind(kind);
+            // Sprint 21: the unit now stands on the (still steel) pad.
+            if (slot.Glyph != null)
+            {
+                slot.Glyph.sprite = UnitSprite(kind);
+                slot.Glyph.color = ColorForKind(kind);
+                slot.Glyph.transform.localScale = Vector3.one * PlacedGlyphScale;
+            }
         }
 
         public BoneMarrowSlotState GetSlotState(int index) => slots[index].State;
@@ -697,10 +734,25 @@ namespace ImmunologyTD.Units
             // is frozen -- it is chrome, not simulation, and with live buying
             // (docs/SPRINT_PLAN.md) a slot can be selected mid-round.
             BreatheSelectionRim();
+            BobEmptyGlyphs();
 
             if (board == null) return;
             if (ImmunologyTD.Rounds.RoundClock.Frozen) return; // Sprint 9: towers don't emit during the frozen buy phase
             Tick(Time.deltaTime);
+        }
+
+        /// <summary>Sprint 21: in the buy phase the empty pads' "+" bobs ±3%
+        /// at 1 Hz -- "build here". Still once a round runs.</summary>
+        private void BobEmptyGlyphs()
+        {
+            bool frozen = ImmunologyTD.Rounds.RoundClock.Frozen;
+            float k = frozen ? 1f + 0.03f * Mathf.Sin(Time.unscaledTime * 2f * Mathf.PI) : 1f;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var g = slots[i].Glyph;
+                if (g == null || slots[i].State != BoneMarrowSlotState.Empty) continue;
+                g.transform.localScale = Vector3.one * (EmptyGlyphScale * k);
+            }
         }
 
         /// <summary>A slow alpha pulse on the one enabled rim, ~1.4 s round

@@ -36,7 +36,7 @@ namespace ImmunologyTD.Rendering
 
             sr = gameObject.AddComponent<SpriteRenderer>();
             sr.sprite = SpriteShapes.NodeColocGlow;
-            sr.sortingOrder = 3;
+            sr.sortingOrder = 4;   // Sprint 21: over the node follicles (3)
             sr.color = new Color(GlowColor.r, GlowColor.g, GlowColor.b, 0f);
 
             transform.position = new Vector3(rect.center.x, rect.center.y, 0f);
