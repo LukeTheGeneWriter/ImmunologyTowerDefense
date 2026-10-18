@@ -30,6 +30,14 @@ public static class Sprint22Verification
     public static void RunAll()
     {
         checks = 0; failures = 0;
+
+        // Seeded, because several of these are RACES -- coating against a
+        // charging plaque, division against link-breaking -- and an unseeded
+        // race makes a harness that passes alone and fails in the suite, as
+        // this one did. A seeded run also means a failure can be reproduced
+        // exactly rather than argued about.
+        Random.InitState(2210);
+
         Debug.Log("[Sprint22Verification] === IgA and in-lumen replication ===");
 
         RunCoating();
@@ -38,6 +46,10 @@ public static class Sprint22Verification
         RunEnchainedGrowth();
         RunReplicationDensityDamper();
         RunPacified();
+        RunBarrierWeakSpot();
+        RunVirusAsymmetry();
+        RunSentinelSlough();
+        RunPlayerAgency();
 
         if (failures > 0)
             Debug.LogError($"[Sprint22Verification] FAILED -- {failures} of {checks} checks failed.");
@@ -313,6 +325,196 @@ public static class Sprint22Verification
 
         sparse.Dispose();
         dense.Dispose();
+    }
+
+    // -----------------------------------------------------------------
+    // 7. A dead stretch is a WEAK SPOT, not a hole (Director, D2)
+    // -----------------------------------------------------------------
+    private static void RunBarrierWeakSpot()
+    {
+        Debug.Log("[Sprint22Verification] --- Barrier: weak spot, not hole ---");
+        var rig = BuildRig("Barrier", 0f);
+
+        Check("The wall starts intact",
+            rig.Wall.StateAt(10f) == GutWall.BarrierState.Intact);
+
+        // A rupture kills the epithelium it came through. Sample AT the
+        // rupture: the wall self-heals (fork 7), so by the end of a long run
+        // it has already grown back, which is correct and would hide this.
+        int deadAtRupture = 0;
+        float multiplierAtRupture = 0f;
+        rig.Wall.Ruptured += (centre, released, footprint) =>
+        {
+            deadAtRupture = rig.Wall.DeadSegmentCount;
+            multiplierAtRupture = rig.Wall.BarrierChargeMultiplierAt(centre);
+        };
+
+        Clump(rig, 8, 10f, "Bar");
+        Advance(rig, 120f);
+        Check($"A breach happened ({rig.Tally.Breaches})", rig.Tally.Breaches >= 1);
+        Check($"...and it killed the wall it tore through ({deadAtRupture} segments)",
+            deadAtRupture > 0);
+
+        // The Director chose the gentler option: dead wall charges FASTER but
+        // still needs a crowd. There must not be a second ingress path.
+        Check($"Dead wall charges faster ({multiplierAtRupture:0.0}x)", multiplierAtRupture > 1f);
+
+        Check($"...and an unmanaged wall grows back on its own ({rig.Wall.DeadSegmentCount} still dead)",
+            rig.Wall.DeadSegmentCount < deadAtRupture);
+
+        var hole = BuildRig("Hole", 0f);
+        hole.Wall.DamageBarrier(10f, 999f, 0f);
+        Check("A stretch can be killed outright",
+            hole.Wall.StateAt(10f) == GutWall.BarrierState.Dead);
+
+        // ONE organism on dead wall. If dead wall were an open hole it would
+        // walk through. It must not: ingress is still something a crowd does.
+        // Suppress replication for this one: left to divide, a "lone"
+        // bacterium becomes a crowd and gets in legitimately, which would
+        // test the opposite of what this check is about.
+        IgaTuning.LumenDivideIntervalSeconds = 1e6f;
+        var loner = NewAgent(hole, "Loner", PathogenClass.LargeBacterium);
+        loner.AdhereToWall(10f);
+        Advance(hole, 180f);
+        IgaTuning.ResetToDefaults();
+        Check($"A LONE organism on dead wall still cannot get in ({hole.Tally.Breaches})",
+            hole.Tally.Breaches == 0);
+
+        rig.Dispose();
+        hole.Dispose();
+    }
+
+    // -----------------------------------------------------------------
+    // 8. The asymmetry: bacteria and viruses want opposite walls
+    // -----------------------------------------------------------------
+    private static void RunVirusAsymmetry()
+    {
+        Debug.Log("[Sprint22Verification] --- Virus asymmetry ---");
+
+        // Viruses on INTACT wall: there are living cells to infect.
+        var intact = BuildRig("ViralIntact", 0f);
+        for (int i = 0; i < 8; i++)
+        {
+            var v = NewAgent(intact, $"VI_{i}", PathogenClass.IntracellularVirus);
+            v.AdhereToWall(10f + (i - 4) * 0.07f);
+        }
+        Advance(intact, 120f);
+        Check($"Viruses break through LIVING wall ({intact.Tally.Breaches})",
+            intact.Tally.Breaches >= 1);
+
+        // The same crowd of viruses on DEAD wall: nothing there to infect.
+        var dead = BuildRig("ViralDead", 0f);
+        for (float s = 8f; s <= 12f; s += 0.4f) dead.Wall.DamageBarrier(s, 999f, 0f);
+        for (int i = 0; i < 8; i++)
+        {
+            var v = NewAgent(dead, $"VD_{i}", PathogenClass.IntracellularVirus);
+            v.AdhereToWall(10f + (i - 4) * 0.07f);
+        }
+        // 40s: comfortably longer than the ~9s this crowd needs on living
+        // wall, and shorter than the 45s the stretch takes to grow back. The
+        // claim is about the window in which the wall is DEAD -- once it
+        // regrows there are living cells again and the viruses get in, which
+        // is the mechanic working, not failing.
+        Advance(dead, 40f);
+        Check($"The SAME viruses cannot use a dead stretch ({dead.Tally.Breaches})",
+            dead.Tally.Breaches == 0);
+
+        // ...and once it has grown back, they can. The asymmetry is a window,
+        // not a permanent immunity.
+        Advance(dead, 80f, 40f);
+        Check($"...but once it regrows, they can ({dead.Tally.Breaches})",
+            dead.Tally.Breaches >= 1);
+
+        // And the mirror: bacteria do fine on dead wall -- better, in fact.
+        var bact = BuildRig("BactDead", 0f);
+        for (float s = 8f; s <= 12f; s += 0.4f) bact.Wall.DamageBarrier(s, 999f, 0f);
+        Clump(bact, 8, 10f, "BD");
+        Advance(bact, 120f);
+        Check($"Bacteria DO exploit the same dead stretch ({bact.Tally.Breaches})",
+            bact.Tally.Breaches >= 1);
+
+        intact.Dispose();
+        dead.Dispose();
+        bact.Dispose();
+    }
+
+    // -----------------------------------------------------------------
+    // 9. The sentinel goblet cell (Birchenough 2016, Science)
+    // -----------------------------------------------------------------
+    private static void RunSentinelSlough()
+    {
+        Debug.Log("[Sprint22Verification] --- Sentinel sloughing ---");
+        var rig = BuildRig("Sentinel", 0f);
+
+        // A crypt at lane 10, which is where our crowd will gather.
+        var featuresGo = new GameObject("Sprint22_WallFeatures");
+        rig.Junk.Add(featuresGo);
+        var features = new GutWallFeatures(rig.Board);
+        GutWallFeatures.Current = features;
+        features.SetCryptCount(1);
+
+        int cryptLane = features.CryptLanes.Count > 0 ? features.CryptLanes[0] : 10;
+        float cryptS = rig.Wall.SOfLane(cryptLane);
+
+        int sloughEvents = 0;
+        rig.Wall.Sloughs += (centre, half, expelled) => sloughEvents++;
+
+        Clump(rig, 8, cryptS, "Sent");
+        Advance(rig, 30f);
+
+        Check($"The sentinel fired on its own, with no purchase ({sloughEvents} events)",
+            sloughEvents >= 1);
+        Check($"...expelling organisms rather than killing them ({rig.Wall.Sloughed})",
+            rig.Wall.Sloughed > 0);
+        Check($"...which relieved the wall ({rig.Wall.TotalAdhered} still adhered)",
+            rig.Wall.TotalAdhered < 8);
+
+        // It is TRIGGERED, not timed: a quiet crypt never fires.
+        var quiet = BuildRig("Quiet", 0f);
+        int quietEvents = 0;
+        quiet.Wall.Sloughs += (c, h, e) => quietEvents++;
+        IgaTuning.LumenDivideIntervalSeconds = 1e6f; // as above: keep "lone" lone
+        var lone = NewAgent(quiet, "Lone", PathogenClass.LargeBacterium);
+        lone.AdhereToWall(cryptS);
+        Advance(quiet, 120f);
+        IgaTuning.ResetToDefaults();
+        Check($"A quiet crypt never fires -- it is triggered, not timed ({quietEvents})",
+            quietEvents == 0);
+
+        GutWallFeatures.Current = null;
+        rig.Dispose();
+        quiet.Dispose();
+    }
+
+    // -----------------------------------------------------------------
+    // 10. The player can answer the wall (Director, D3)
+    // -----------------------------------------------------------------
+    private static void RunPlayerAgency()
+    {
+        Debug.Log("[Sprint22Verification] --- Player agency ---");
+        var rig = BuildRig("Agency", 0f);
+
+        Clump(rig, 6, 10f, "Ag");
+        Advance(rig, 8f); // caught mid-fill: 6 members rupture in about 10s
+
+        int plaque = -1;
+        for (int i = 0; i < rig.Wall.PlaqueCapacity; i++)
+            if (rig.Wall.PlaqueAt(i).Live && rig.Wall.PlaqueAt(i).Charge > 0f) plaque = i;
+        Check("A plaque is charging", plaque >= 0);
+
+        float before = rig.Wall.PlaqueAt(plaque).Charge;
+        float removed = rig.Wall.SuppressPlaques(10f, 1.5f, 2f);
+        Check($"A tower can talk a blister down ({before:0.000} -> {rig.Wall.PlaqueAt(plaque).Charge:0.000})",
+            removed > 0f && rig.Wall.PlaqueAt(plaque).Charge < before);
+
+        // Repair restores wall the player has lost.
+        rig.Wall.DamageBarrier(20f, 999f, 0f);
+        Check("A stretch is dead", rig.Wall.StateAt(20f) == GutWall.BarrierState.Dead);
+        int repaired = rig.Wall.RepairBarrier(20f);
+        Check($"Repair restores it ({repaired} segments)",
+            repaired > 0 && rig.Wall.StateAt(20f) == GutWall.BarrierState.Intact);
+
+        rig.Dispose();
     }
 
     // -----------------------------------------------------------------

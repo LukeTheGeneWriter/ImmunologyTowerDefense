@@ -45,12 +45,27 @@ namespace ImmunologyTD.Pathogens
         /// SecretoryIgA rung, not a free number.</summary>
         public static float KnowledgePercent = 70f;
 
-        /// <summary>Per-second chance an eligible organism gets coated. Mean
-        /// ~5.5s. Fast enough that the wall visibly turns pearly within a few
-        /// seconds of earning the rung -- the reward has to be legible the
-        /// moment it arrives -- and slow enough that a big round still has
-        /// free organisms gripping for a while.</summary>
-        public static float CoatChancePerSecond = 0.18f;
+        /// <summary>
+        /// Per-second chance an eligible organism gets coated. Mean ~3.3s.
+        ///
+        /// **Raised 0.18 -> 0.30 during Sprint 22's build**, after a race
+        /// showed up in testing: a crowd of 8 erodes the wall it is gripping,
+        /// eroded wall charges 1.4x faster, and at 0.18 coating only just
+        /// beat the plaque -- so the armed wall breached on some runs and not
+        /// others.
+        ///
+        /// The tie-break is the Director's ruling that the 70% rung must be
+        /// "an unambiguous reward, never a trap", and the spec's promise that
+        /// earning it visibly DISSOLVES an existing threat: the blister
+        /// deflates as its members are coated and rafted away. A rung that
+        /// sometimes arrives too late to save the wall it was bought for does
+        /// not deliver that.
+        ///
+        /// It is still slow enough that a big round has free organisms
+        /// gripping for several seconds. Flagged as a playtest number: this
+        /// is the lever if IgA proves too strong, per the spec's own residual
+        /// -risk note.</summary>
+        public static float CoatChancePerSecond = 0.30f;
 
         /// <summary>How far out from the seam IgA reaches. Section 5 is
         /// explicit that IgA acts "before adhesion is possible", so this
@@ -192,7 +207,7 @@ namespace ImmunologyTD.Pathogens
         public static void ResetToDefaults()
         {
             KnowledgePercent = 70f;
-            CoatChancePerSecond = 0.18f;
+            CoatChancePerSecond = 0.30f;
             ReachDepthCells = 1.8f;
             CrossLinkChancePerSecondPerNeighbour = 0.25f;
             CrossLinkRadiusCells = 0.45f;

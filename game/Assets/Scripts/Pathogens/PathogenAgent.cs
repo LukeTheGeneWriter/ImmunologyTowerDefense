@@ -182,6 +182,10 @@ namespace ImmunologyTD.Pathogens
         // twice the along-wall frequency, which makes the path a lazy
         // figure-eight rather than a circle -- and nothing here is random per
         // frame, so it reads as drifting in slime, not as jitter.
+        /// <summary>Round-clock time before which this organism cannot
+        /// adhere -- set when a slough wave sheds it.</summary>
+        private float adhesionRefractoryUntil = float.NegativeInfinity;
+
         private float millPeriod = 3f;
         private float millAlong;
         private float millDepth;
@@ -575,6 +579,7 @@ namespace ImmunologyTD.Pathogens
             MoveTo(board.CoarseToWorldCenter(CurrentCoarse), InvasionTuning.LumenStepIntervalSeconds);
 
             if (gutWall == null) return;
+            if (currentTime < adhesionRefractoryUntil) return; // just sloughed, still drifting clear
             int depth = board.LumenDepthFromInterface(CurrentCoarse);
             if (depth < 0) return; // not actually in the channel; nothing to adhere to
             if (Random.value >= AdhesionChanceAt(depth)) return;
@@ -667,6 +672,31 @@ namespace ImmunologyTD.Pathogens
         /// are tangled rather than braked, but the net read is "much
         /// slower".</summary>
         public float MotilityScale => IsCoated ? IgaTuning.MotilityMultiplier : 1f;
+
+        /// <summary>
+        /// Shed back into the lumen by a slough wave. The organism is NOT
+        /// killed -- it rejoins the flow and will be excreted unless it
+        /// re-adheres downstream. The gut's answer out here is flush, not
+        /// eat, and sloughing is that rule at its most literal.
+        ///
+        /// The refractory window stops it re-sticking to the very wall it was
+        /// just shed from while it is still drifting clear of it.
+        /// </summary>
+        public void ReturnToFlow(int lane, float refractoryUntil)
+        {
+            if (board == null || State == PathogenState.Cleared) return;
+
+            State = PathogenState.Lumen;
+            PlaqueIndex = -1;
+            ClumpId = -1;
+            WallD = 0f;
+            adhesionRefractoryUntil = refractoryUntil;
+
+            CurrentCoarse = board.CoarseFromAxis(board.LumenNearWallAxisIndex, lane);
+            Current = board.CoarseCenterFine(CurrentCoarse);
+            stepTimer = 0f;
+            SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
+        }
 
         /// <summary>The mucus carried this pathogen off the downstream end of
         /// the wall. It is excreted, with no penalty -- the same deliberate
@@ -1353,6 +1383,7 @@ namespace ImmunologyTD.Pathogens
             ClumpId = -1;
             DivideAt = float.PositiveInfinity;
             PlaqueIndex = -1;
+            adhesionRefractoryUntil = float.NegativeInfinity;
             contactFlashTimer = 0f;
             hasSpread = false;
             lastSpreadAttemptTime = float.NegativeInfinity;

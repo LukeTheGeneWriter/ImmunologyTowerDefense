@@ -64,6 +64,26 @@ namespace ImmunologyTD.Grid
     /// </summary>
     public class GutWall
     {
+        /// <summary>
+        /// The state of one stretch of epithelium.
+        ///
+        /// Deliberately NOT the same vocabulary as TissueGrid's host states
+        /// (Healthy / Infected / Dead), although the ideas overlap. Section 1c
+        /// is a Director-set section describing the LATTICE's host layer; the
+        /// barrier is 20 segments on a seam with its own geometry, its own
+        /// regrowth rule and its own occupancy. The names differ on purpose so
+        /// that a later session cannot conflate the two structures -- the same
+        /// reasoning the old GutInterface gave for not living on TissueGrid.
+        /// </summary>
+        public enum BarrierState { Intact, Eroded, Dead }
+
+        public struct BarrierSegment
+        {
+            public BarrierState State;
+            public float Health;
+            public float RegrowAt;
+        }
+
         /// <summary>One plaque. A struct in a fixed pooled array -- nothing
         /// here allocates per event, per CLAUDE.md's standing rule.</summary>
         public struct Plaque
@@ -82,6 +102,8 @@ namespace ImmunologyTD.Grid
         private readonly List<PathogenAgent> adhered = new List<PathogenAgent>();
         private readonly float[] crowd;
         private readonly Plaque[] plaques;
+        private readonly BarrierSegment[] barrier;
+        private readonly float[] cryptReadyAt;
 
         /// <summary>Scratch buffer for a rupture's membership, reused so a
         /// burst allocates nothing. Read it inside the Ruptured handler or
@@ -138,6 +160,16 @@ namespace ImmunologyTD.Grid
             this.tally = tally;
             crowd = new float[Mathf.Max(1, board.CrossLength * Mathf.Max(1, InvasionTuning.CrowdBucketsPerCell))];
             plaques = new Plaque[Mathf.Max(1, InvasionTuning.MaxPlaques)];
+
+            barrier = new BarrierSegment[Mathf.Max(1, board.CrossLength * Mathf.Max(1, BarrierTuning.SegmentsPerLane))];
+            for (int i = 0; i < barrier.Length; i++)
+                barrier[i] = new BarrierSegment
+                {
+                    State = BarrierState.Intact,
+                    Health = BarrierTuning.SegmentMaxHealth,
+                    RegrowAt = float.PositiveInfinity,
+                };
+            cryptReadyAt = new float[board.CrossLength];
         }
 
         /// <summary>Length of the wall in coarse cells. s lives in
@@ -255,6 +287,8 @@ namespace ImmunologyTD.Grid
             // what charged is what was gripping at the top of the tick.
             TickIga(deltaTime, currentTime);
             TickReplication(currentTime);
+            TickBarrier(deltaTime, currentTime);
+            TickSentinels(currentTime);
         }
 
         /// <summary>Creep, cohesion and settling -- the simulated half of the
@@ -403,6 +437,14 @@ namespace ImmunologyTD.Grid
         private int NearestPlaque(PathogenAgent p, float footprint)
         {
             if (!p.IsGrippingWall || p.IsCrossLinked) return -1;
+
+            // A virus over a DEAD stretch has nothing left to infect, so it
+            // contributes nothing to breaking in there. This is the other
+            // half of the Director's asymmetry, and it is what makes a
+            // battered wall a bacterial sieve and a viral dead end.
+            if (BarrierTuning.VirusesNeedLivingWall
+                && p.Class == PathogenClass.IntracellularVirus
+                && StateAt(p.WallS) == BarrierState.Dead) return -1;
             int best = -1;
             float bestDistance = footprint;
             for (int i = 0; i < plaques.Length; i++)
@@ -472,7 +514,13 @@ namespace ImmunologyTD.Grid
                     // The floor subtracts, so two members charge at zero and
                     // one charges NEGATIVE-clamped-to-nothing. The trickle is
                     // arithmetically impossible here, not merely unlikely.
-                    float rate = (plaques[i].MemberCount - floor) * InvasionTuning.ChargeRatePerCrowdUnit;
+                    // A battered stretch charges faster -- the board
+                    // remembers where it was breached -- but it still takes a
+                    // CROWD. The Director chose "a weak spot, not a hole":
+                    // one ingress mechanic, not two.
+                    float rate = (plaques[i].MemberCount - floor)
+                               * InvasionTuning.ChargeRatePerCrowdUnit
+                               * BarrierChargeMultiplierAt(plaques[i].CentreS);
                     plaques[i].Charge += rate * deltaTime;
                     plaques[i].CentreS = Mathf.Lerp(plaques[i].CentreS, MemberCentroid(i), lerp);
                 }
@@ -544,6 +592,11 @@ namespace ImmunologyTD.Grid
                 adhered.Remove(p);
                 released++;
             }
+
+            // The rupture kills the epithelium it came through. That stretch
+            // now charges faster until it regrows -- and is dead ground to
+            // viruses while it does.
+            KillBarrier(centre, footprint, currentTime);
 
             plaques[plaqueIndex].Charge = 0f;
             plaques[plaqueIndex].MemberCount = 0;
@@ -944,6 +997,253 @@ namespace ImmunologyTD.Grid
         {
             float p = Mathf.Clamp01(perSecond);
             return 1f - Mathf.Pow(1f - p, Mathf.Max(0f, deltaTime));
+        }
+
+        // -- The barrier (INVASION_REWORK_SPEC.md section 6) ------------
+
+        public int SegmentCount => barrier.Length;
+
+        public float SegmentsPerCell => Mathf.Max(1, BarrierTuning.SegmentsPerLane);
+
+        public int SegmentIndexAt(float s) =>
+            Mathf.Clamp(Mathf.FloorToInt(s * SegmentsPerCell), 0, barrier.Length - 1);
+
+        public BarrierSegment SegmentAt(int index) =>
+            index >= 0 && index < barrier.Length ? barrier[index] : default;
+
+        public BarrierState StateAt(float s) => barrier[SegmentIndexAt(s)].State;
+
+        public float SegmentCentreS(int index) => (index + 0.5f) / SegmentsPerCell;
+
+        /// <summary>How much faster a plaque charges over this stretch, given
+        /// what the wall there has already been through.</summary>
+        public float BarrierChargeMultiplierAt(float s)
+        {
+            switch (StateAt(s))
+            {
+                case BarrierState.Dead: return BarrierTuning.DeadChargeMultiplier;
+                case BarrierState.Eroded: return BarrierTuning.ErodedChargeMultiplier;
+                default: return 1f;
+            }
+        }
+
+        /// <summary>Grazing damage from gripping organisms, plus regrowth.
+        /// Crypts speed regrowth within reach -- the organ that regenerates
+        /// the lattice regenerates the wall too, which is what crypts
+        /// actually do.</summary>
+        private void TickBarrier(float deltaTime, float currentTime)
+        {
+            for (int i = 0; i < adhered.Count; i++)
+            {
+                var p = adhered[i];
+                // A rafted organism is held away from the cells and pacified
+                // besides, so it does no damage. Exclusion is not a fight.
+                if (p == null || !p.IsGrippingWall || p.IsCrossLinked) continue;
+
+                // **Only bacteria graze.** A virus has no machinery to chew
+                // through epithelium from the outside -- its whole problem is
+                // getting INTO a cell. Letting virions erode the wall also
+                // produced a genuinely silly loop in testing: a crowd of
+                // viruses destroyed the epithelium in four seconds and
+                // thereby locked itself out, because a dead stretch has no
+                // living cell to infect.
+                if (p.Class == PathogenClass.IntracellularVirus) continue;
+                DamageBarrier(p.WallS, BarrierTuning.GrazeDamagePerSecond * p.VirulenceScale * deltaTime, currentTime);
+            }
+
+            for (int i = 0; i < barrier.Length; i++)
+            {
+                if (barrier[i].State != BarrierState.Dead)
+                {
+                    if (barrier[i].Health < BarrierTuning.SegmentMaxHealth)
+                    {
+                        float heal = BarrierTuning.SegmentMaxHealth / BarrierTuning.RegrowSeconds
+                                   * CryptBoostAt(SegmentCentreS(i)) * deltaTime;
+                        barrier[i].Health = Mathf.Min(BarrierTuning.SegmentMaxHealth, barrier[i].Health + heal);
+                    }
+                    barrier[i].State = barrier[i].Health < BarrierTuning.ErodedBelowHealth
+                        ? BarrierState.Eroded : BarrierState.Intact;
+                    continue;
+                }
+
+                if (currentTime < barrier[i].RegrowAt) continue;
+                barrier[i].State = BarrierState.Eroded;
+                barrier[i].Health = BarrierTuning.ErodedBelowHealth;
+                barrier[i].RegrowAt = float.PositiveInfinity;
+            }
+        }
+
+        private float CryptBoostAt(float s)
+        {
+            var features = GutWallFeatures.Current;
+            if (features == null) return 1f;
+            var lanes = features.CryptLanes;
+            for (int i = 0; i < lanes.Count; i++)
+                if (Mathf.Abs(SOfLane(lanes[i]) - s) <= BarrierTuning.CryptReachCells)
+                    return BarrierTuning.CryptRegrowMultiplier;
+            return 1f;
+        }
+
+        public void DamageBarrier(float s, float amount, float currentTime)
+        {
+            int index = SegmentIndexAt(s);
+            if (barrier[index].State == BarrierState.Dead) return;
+            barrier[index].Health -= amount;
+            if (barrier[index].Health > 0f) return;
+            barrier[index].Health = 0f;
+            barrier[index].State = BarrierState.Dead;
+            barrier[index].RegrowAt = currentTime + BarrierTuning.RegrowSeconds;
+        }
+
+        private void KillBarrier(float centre, float footprint, float currentTime)
+        {
+            int lo = SegmentIndexAt(centre - footprint);
+            int hi = SegmentIndexAt(centre + footprint);
+            for (int i = lo; i <= hi; i++)
+            {
+                barrier[i].State = BarrierState.Dead;
+                barrier[i].Health = 0f;
+                barrier[i].RegrowAt = currentTime + BarrierTuning.RegrowSeconds;
+            }
+        }
+
+        public int DeadSegmentCount
+        {
+            get
+            {
+                int n = 0;
+                for (int i = 0; i < barrier.Length; i++) if (barrier[i].State == BarrierState.Dead) n++;
+                return n;
+            }
+        }
+
+        // -- Player agency on the wall (section 12.1 D3) -----------------
+
+        /// <summary>Knocks charge off any plaque near a point -- a tower
+        /// firing on a forming blister. A visible blister has to be something
+        /// the player can answer, not only watch.</summary>
+        public float SuppressPlaques(float s, float radiusCells, float deltaTime)
+        {
+            float removed = 0f;
+            for (int i = 0; i < plaques.Length; i++)
+            {
+                if (!plaques[i].Live) continue;
+                if (Mathf.Abs(plaques[i].CentreS - s) > radiusCells) continue;
+                float before = plaques[i].Charge;
+                plaques[i].Charge = Mathf.Max(0f, before - BarrierTuning.SuppressionPerSecond * deltaTime);
+                removed += before - plaques[i].Charge;
+            }
+            return removed;
+        }
+
+        /// <summary>Restores wall around a point. The bought repair.</summary>
+        public int RepairBarrier(float s)
+        {
+            int lo = SegmentIndexAt(s - BarrierTuning.RepairRadiusCells);
+            int hi = SegmentIndexAt(s + BarrierTuning.RepairRadiusCells);
+            int repaired = 0;
+            for (int i = lo; i <= hi; i++)
+            {
+                if (barrier[i].State == BarrierState.Intact) continue;
+                barrier[i].State = BarrierState.Intact;
+                barrier[i].Health = BarrierTuning.RepairHealthRestored;
+                barrier[i].RegrowAt = float.PositiveInfinity;
+                repaired++;
+            }
+            return repaired;
+        }
+
+        // -- Sentinel sloughing (section 12.1 D4) ------------------------
+
+        /// <summary>Level of the mucus-turnover shop row. Zero is fine: the
+        /// sentinel response is INNATE and works from round 1. The row buys
+        /// amplification, not the mechanic.</summary>
+        public int MucusTurnoverLevel { get; set; }
+
+        /// <summary>Organisms expelled by sloughing. They are returned to the
+        /// flow, not killed.</summary>
+        public int Sloughed { get; private set; }
+
+        /// <summary>Fired when a crypt's sentinel dumps its mucus, with
+        /// (centre s, patch half-width, organisms expelled).</summary>
+        public event System.Action<float, float, int> Sloughs;
+
+        /// <summary>
+        /// The sentinel goblet cell response (Birchenough 2016). Each crypt
+        /// watches the stretch of wall in front of it; when pathogens crowd
+        /// close enough, it dumps its whole mucus load and its neighbours
+        /// follow through gap junctions, expelling whatever is caught.
+        ///
+        /// Triggered, not timed. Local, not global. Non-specific, so it needs
+        /// no knowledge and works from round 1. And it EXPELS rather than
+        /// kills, like everything else in this compartment.
+        /// </summary>
+        private void TickSentinels(float currentTime)
+        {
+            var features = GutWallFeatures.Current;
+            if (features == null) return;
+
+            var lanes = features.CryptLanes;
+            float cooldown = Mathf.Max(1f,
+                BarrierTuning.SentinelCooldownSeconds
+                - BarrierTuning.SentinelCooldownPerLevel * MucusTurnoverLevel);
+
+            for (int i = 0; i < lanes.Count; i++)
+            {
+                int lane = lanes[i];
+                if (lane < 0 || lane >= cryptReadyAt.Length) continue;
+                if (currentTime < cryptReadyAt[lane]) continue;
+
+                float centre = SOfLane(lane);
+                if (CrowdAt(centre) < BarrierTuning.SentinelTriggerCrowd) continue;
+
+                cryptReadyAt[lane] = currentTime + cooldown;
+                Slough(centre, currentTime);
+            }
+        }
+
+        /// <summary>
+        /// One slough event. Everything in the patch goes back to the flow,
+        /// and every plaque centred there loses its charge outright --
+        /// pressure is physically removed, not merely reduced.
+        ///
+        /// The barrier is neither healed nor damaged here. A slough is a
+        /// mucus-and-shed-cell event; repairing epithelium is the crypt's
+        /// other job. Keeping them separate is what stops the mucus row from
+        /// quietly becoming the wall-repair row as well.
+        /// </summary>
+        public int Slough(float centre, float currentTime)
+        {
+            float half = BarrierTuning.SentinelPatchCells
+                       + BarrierTuning.SentinelPatchPerLevel * MucusTurnoverLevel;
+
+            int expelled = 0;
+            for (int i = adhered.Count - 1; i >= 0; i--)
+            {
+                var p = adhered[i];
+                if (p == null) { adhered.RemoveAt(i); continue; }
+                if (Mathf.Abs(p.WallS - centre) > half) continue;
+
+                // Rafts go too, whole. Mucus turnover is the transport half
+                // of immune exclusion, so the two compound rather than
+                // overlapping.
+                if (p.IsCrossLinked) LeaveClump(p);
+                adhered.RemoveAt(i);
+                p.ReturnToFlow(LaneOf(p.WallS), currentTime + BarrierTuning.SloughRefractorySeconds);
+                expelled++;
+            }
+
+            for (int i = 0; i < plaques.Length; i++)
+            {
+                if (!plaques[i].Live) continue;
+                if (Mathf.Abs(plaques[i].CentreS - centre) > half) continue;
+                plaques[i].Charge = 0f;
+                plaques[i].MemberCount = 0;
+            }
+
+            Sloughed += expelled;
+            if (expelled > 0) Sloughs?.Invoke(centre, half, expelled);
+            return expelled;
         }
 
         /// <summary>Where a wall point is drawn. The outward direction is

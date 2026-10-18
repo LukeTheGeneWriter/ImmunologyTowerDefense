@@ -226,6 +226,12 @@ namespace ImmunologyTD.UI
                 {
                     wall.SetCryptCount(shop.LevelOf(ShopItem.Crypt));
                     wall.MCellLevel = shop.LevelOf(ShopItem.MCellSampling);
+                    // Section 6b's mucus-turnover row, read spatially. Level 0
+                    // is fine: the sentinel goblet-cell response is innate and
+                    // works from round 1, so this row buys amplification --
+                    // wider patches, shorter refill -- not the mechanic.
+                    if (gutWall != null)
+                        gutWall.MucusTurnoverLevel = shop.LevelOf(ShopItem.BarrierMucusTurnover);
                 }
             }
 
