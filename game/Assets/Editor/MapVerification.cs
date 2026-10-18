@@ -11,7 +11,7 @@ using ImmunologyTD.Rendering;
 ///
 /// Same philosophy as CytokineVerification (Sprint 1), CombatVerification
 /// (Sprint 2) and LifecycleVerification (Sprint 3): drive the REAL
-/// production classes -- BoardConfig, GutInterface, PathogenAgent,
+/// production classes -- BoardConfig, GutWall, PathogenAgent,
 /// PathogenSpawner -- with no Play Mode and no rendering. Nothing here
 /// reimplements game logic; where a number is asserted it came out of the
 /// production path.
@@ -41,7 +41,8 @@ public static class MapVerification
         RunAxisFrame();
         RunLumenFlow();
         RunAdhesionProximity();
-        RunBreachBurst();
+        RunRuptureBurst();
+        RunNoTrickle();
         RunBaseDirectedAdvance();
         RunBaseReached();
         RunMirroredMap();
@@ -76,7 +77,7 @@ public static class MapVerification
         public TissueGrid Grid;
         public CytokineField Field;
         public InvasionTally Tally;
-        public GutInterface Gut;
+        public GutWall Gut;
         public readonly List<GameObject> Junk = new List<GameObject>();
 
         public void Dispose()
@@ -102,7 +103,7 @@ public static class MapVerification
         rig.Grid = new TissueGrid(rig.Board);
         rig.Field = new CytokineField(rig.Board);
         rig.Tally = new InvasionTally();
-        rig.Gut = new GutInterface(rig.Board, rig.Grid, rig.Tally);
+        rig.Gut = new GutWall(rig.Board, rig.Grid, rig.Tally);
         return rig;
     }
 
@@ -159,7 +160,8 @@ public static class MapVerification
         Check($"Lumen depth at the far side is {b.LumenBandCells - 1}",
             b.LumenDepthFromInterface(b.AxisLength - 1) == b.LumenBandCells - 1);
 
-        Check("Gut interface has one position per lane", rig.Gut.PositionCount == b.CrossLength);
+        Check($"The wall is one s-unit per lane ({rig.Gut.WallLengthCells})",
+            Mathf.Approximately(rig.Gut.WallLengthCells, b.CrossLength));
 
         rig.Dispose();
     }
@@ -334,7 +336,7 @@ public static class MapVerification
     private static int RunChannelCohort(Rig rig, int cohort, string label)
     {
         var tally = new InvasionTally();
-        var gut = new GutInterface(rig.Board, rig.Grid, tally);
+        var gut = new GutWall(rig.Board, rig.Grid, tally);
         var agents = new List<PathogenAgent>();
 
         for (int i = 0; i < cohort; i++)
@@ -359,85 +361,181 @@ public static class MapVerification
     }
 
     // =================================================================
-    // 5. The breach burst (SPRINT_PLAN.md item 6 -- the signature mechanic)
+    // 5. The rupture burst (INVASION_REWORK_SPEC.md -- the signature mechanic)
+    //
+    // Rewritten wholesale in Sprint 22. The old version piled pathogens at
+    // two LANE indices and called Gut.Breach(lane). There are no lanes and no
+    // piles any more: pathogens mill at continuous positions, crowding seeds
+    // a plaque, and the plaque's charge is what bursts.
+    //
+    // What this must still prove is unchanged, and it is the whole reason
+    // the mechanic exists: pressure builds at ONE SPOT and releases
+    // EVERYTHING THERE AT ONCE, without touching a separate crowd elsewhere.
     // =================================================================
-    private static void RunBreachBurst()
+    private static void RunRuptureBurst()
     {
-        Debug.Log("[MapVerification] --- Breach burst ---");
-        var rig = BuildRig("Breach");
+        Debug.Log("[MapVerification] --- Rupture burst ---");
+        var rig = BuildRig("Rupture");
         InvasionTuning.ResetToDefaults();
 
-        const int pileSize = 6;
-        const int positionA = 10;
-        const int positionB = 25;
+        const int crowdSize = 6;
+        const float spotA = 10.5f;
+        const float spotB = 25.5f;
 
         var atA = new List<PathogenAgent>();
-        for (int i = 0; i < pileSize; i++)
+        for (int i = 0; i < crowdSize; i++)
         {
-            var agent = NewAgent(rig, $"PileA_{i}");
+            var agent = NewAgent(rig, $"RuptureA_{i}");
             agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, cls, free, t) => false);
-            agent.AdhereToInterface(positionA);
+            // Tight clump: well inside one crowd radius, so these read as one
+            // spot rather than as six separate adherents.
+            agent.AdhereToWall(spotA + (i - crowdSize * 0.5f) * 0.08f);
             atA.Add(agent);
         }
-
-        var atB = new List<PathogenAgent>();
         for (int i = 0; i < 3; i++)
         {
-            var agent = NewAgent(rig, $"PileB_{i}");
+            var agent = NewAgent(rig, $"RuptureB_{i}");
             agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, cls, free, t) => false);
-            agent.AdhereToInterface(positionB);
-            atB.Add(agent);
+            agent.AdhereToWall(spotB + (i - 1) * 0.08f);
         }
 
-        Check($"Adhering moves the pathogen TO the wall, not where it was floating",
-            rig.Board.AxisIndex(atA[0].CurrentCoarse) == rig.Board.LumenNearWallAxisIndex);
-        Check("...and it is now AtInterface, not still flowing", atA[0].State == PathogenState.AtInterface);
-        Check($"Position A holds all {pileSize} ({rig.Gut.AdheredCountAt(positionA)})",
-            rig.Gut.AdheredCountAt(positionA) == pileSize);
-        Check($"Position B holds 3 ({rig.Gut.AdheredCountAt(positionB)})", rig.Gut.AdheredCountAt(positionB) == 3);
-        Check($"PeakAdhered reports the worst position ({rig.Gut.PeakAdhered})", rig.Gut.PeakAdhered == pileSize);
-        Check("Breach chance rises with pressure at a position",
-            rig.Gut.BreachChanceAt(positionA) > rig.Gut.BreachChanceAt(positionB));
-        Check("An empty position has no breach chance", rig.Gut.BreachChanceAt(0) == 0f);
+        Check($"All {crowdSize + 3} are on the wall ({rig.Gut.TotalAdhered})",
+            rig.Gut.TotalAdhered == crowdSize + 3);
 
-        int breachEvents = 0;
-        int releasedByEvent = 0;
-        rig.Gut.Breached += (pos, count) => { breachEvents++; releasedByEvent += count; };
+        // Settle: they arrive in the outer mucus and come in to land, so
+        // nothing grips (or crowds, or charges) for the first couple of
+        // seconds. That delay is deliberate -- see SettleSpeedCellsPerSecond.
+        for (int i = 0; i < 40; i++) rig.Gut.Tick(0.1f, i * 0.1f, i * 0.1f);
 
-        int released = rig.Gut.Breach(positionA, 0f);
+        int gripping = 0;
+        foreach (var a in atA) if (a.IsGrippingWall) gripping++;
+        Check($"The clump has settled in to grip ({gripping}/{crowdSize})", gripping == crowdSize);
 
-        // THE assertion this whole sprint item exists for.
-        Check($"A breach releases EVERY pathogen at that position at once ({released} of {pileSize})",
-            released == pileSize);
-        Check("...leaving that wall position empty", rig.Gut.AdheredCountAt(positionA) == 0);
+        Check($"Crowd at the clump is high ({rig.Gut.CrowdAt(spotA):0.0})",
+            rig.Gut.CrowdAt(spotA) > 4f);
+        Check($"Crowd far away is nil ({rig.Gut.CrowdAt(spotA + 5f):0.0})",
+            rig.Gut.CrowdAt(spotA + 5f) < 0.01f);
+
+        int plaqueA = -1, plaqueB = -1;
+        for (int i = 0; i < rig.Gut.PlaqueCapacity; i++)
+        {
+            var plaque = rig.Gut.PlaqueAt(i);
+            if (!plaque.Live) continue;
+            if (Mathf.Abs(plaque.CentreS - spotA) < 1.5f) plaqueA = i;
+            if (Mathf.Abs(plaque.CentreS - spotB) < 1.5f) plaqueB = i;
+        }
+
+        Check("A plaque seeded on the big clump", plaqueA >= 0);
+        Check("A plaque seeded on the small clump too", plaqueB >= 0);
+        Check($"The big clump's plaque owns all {crowdSize} ({rig.Gut.PlaqueAt(plaqueA).MemberCount})",
+            rig.Gut.PlaqueAt(plaqueA).MemberCount == crowdSize);
+        Check($"The small clump's plaque owns 3 ({rig.Gut.PlaqueAt(plaqueB).MemberCount})",
+            rig.Gut.PlaqueAt(plaqueB).MemberCount == 3);
+
+        // Pressure is a CHARGE, so this is a direct assertion rather than the
+        // statistical test over hundreds of hidden rolls the old model needed.
+        float chargeBefore = rig.Gut.PlaqueAt(plaqueA).Charge;
+        for (int i = 0; i < 20; i++) rig.Gut.Tick(0.1f, 4f + i * 0.1f, 4f + i * 0.1f);
+        Check($"Charge rises while the crowd sits there ({chargeBefore:0.000} -> {rig.Gut.PlaqueAt(plaqueA).Charge:0.000})",
+            rig.Gut.PlaqueAt(plaqueA).Charge > chargeBefore);
+
+        Check($"A bigger crowd charges faster ({rig.Gut.PlaqueAt(plaqueA).Charge:0.000} > {rig.Gut.PlaqueAt(plaqueB).Charge:0.000})",
+            rig.Gut.PlaqueAt(plaqueA).Charge > rig.Gut.PlaqueAt(plaqueB).Charge);
+
+        int ruptureEvents = 0, releasedByEvent = 0;
+        float ruptureCentre = -1f;
+        rig.Gut.Ruptured += (centre, count, footprint) =>
+        {
+            ruptureEvents++; releasedByEvent += count; ruptureCentre = centre;
+        };
+
+        int released = rig.Gut.Rupture(plaqueA, 0f);
+
+        Check($"The rupture released all {crowdSize} at once ({released})", released == crowdSize);
+        Check("...in exactly one event", ruptureEvents == 1);
+        Check($"...and the event reported the same count ({releasedByEvent})", releasedByEvent == crowdSize);
+        Check($"...centred on the clump ({ruptureCentre:0.0})", Mathf.Abs(ruptureCentre - spotA) < 1.5f);
 
         int inTissue = 0;
-        for (int i = 0; i < atA.Count; i++)
-            if (atA[i].State == PathogenState.InTissue) inTissue++;
-        Check($"...and all {pileSize} are now in tissue ({inTissue})", inTissue == pileSize);
+        foreach (var a in atA) if (a.State == PathogenState.InTissue) inTissue++;
+        Check($"Every member is now in tissue ({inTissue})", inTissue == crowdSize);
 
-        bool allInTissueBand = true;
-        for (int i = 0; i < atA.Count; i++)
-            if (rig.Board.BandOf(atA[i].CurrentCoarse) != BoardBand.Tissue) allInTissueBand = false;
-        Check("...inside the tissue band, not the lumen or base", allInTissueBand);
+        // The burst arrives pre-spread by its own geometry, which is why
+        // MaxReleaseCrossSpread could drop 20 -> 4 this sprint.
+        var lanes = new HashSet<int>();
+        foreach (var a in atA) lanes.Add(rig.Board.CrossIndex(a.CurrentCoarse));
+        Check($"...landing across several lanes, not stacked in one ({lanes.Count})", lanes.Count >= 2);
 
-        Check($"...reported as ONE breach event, not {pileSize} ({breachEvents})", breachEvents == 1);
-        Check($"...carrying the released count ({releasedByEvent})", releasedByEvent == pileSize);
-        Check($"Tally recorded one breach ({rig.Tally.Breaches})", rig.Tally.Breaches == 1);
-        Check($"Tally recorded the released pathogens ({rig.Tally.ReleasedIntoTissue})",
-            rig.Tally.ReleasedIntoTissue == pileSize);
-
-        // Isolation: the other pile is untouched.
-        Check($"A breach at one position does NOT release another ({rig.Gut.AdheredCountAt(positionB)})",
-            rig.Gut.AdheredCountAt(positionB) == 3);
-        bool bStillOnWall = true;
-        for (int i = 0; i < atB.Count; i++)
-            if (atB[i].State != PathogenState.AtInterface) bStillOnWall = false;
-        Check("...and those pathogens are all still on the wall", bStillOnWall);
-
-        Check("Breaching an empty position releases nothing", rig.Gut.Breach(positionA, 0f) == 0);
+        Check($"The other crowd is untouched ({rig.Gut.PlaqueAt(plaqueB).MemberCount})",
+            rig.Gut.PlaqueAt(plaqueB).MemberCount == 3);
+        Check($"Tally counted one breach ({rig.Tally.Breaches})", rig.Tally.Breaches == 1);
 
         rig.Dispose();
+    }
+
+    // =================================================================
+    // 5b. THE ANTI-TRICKLE REGRESSION
+    //
+    // The single most important test in this file, and the reason
+    // IngressCrowdFloor exists. GutInterface carried a capitalised warning
+    // against refactoring its per-position roll into a per-pathogen one,
+    // because independent rolls produce a steady leak across the whole wall
+    // and destroy "pressure builds at one spot, then bursts" --
+    // GAME_DESIGN.md section 1b step 2's whole point.
+    //
+    // The charge model makes that arithmetically impossible rather than
+    // merely unlikely: charge accrues at (members - floor) * rate, so one or
+    // two adherents accrue nothing, forever. This proves it, so that nobody
+    // can quietly "simplify" the floor away later.
+    // =================================================================
+    private static void RunNoTrickle()
+    {
+        Debug.Log("[MapVerification] --- Anti-trickle regression ---");
+        var rig = BuildRig("NoTrickle");
+        InvasionTuning.ResetToDefaults();
+
+        // Scatter lone adherents a full crowd radius apart, so no two of them
+        // can ever see each other in the field.
+        var loners = new List<PathogenAgent>();
+        for (int i = 0; i < 8; i++)
+        {
+            var agent = NewAgent(rig, $"Loner_{i}");
+            agent.Initialize(rig.Board, rig.Grid, rig.Gut, rig.Tally, a => { }, (c, cls, free, t) => false);
+            agent.AdhereToWall(2f + i * 4f);
+            loners.Add(agent);
+        }
+
+        // Five simulated minutes. Under Sprint 4's model each of these would
+        // have leaked into the tissue in ~80 seconds.
+        for (int i = 0; i < 3000; i++) rig.Gut.Tick(0.1f, i * 0.1f, i * 0.1f);
+
+        Check($"After 5 minutes, NOTHING trickled in ({rig.Tally.Breaches} breaches)",
+            rig.Tally.Breaches == 0);
+        Check($"...and nothing reached the tissue ({rig.Tally.ReleasedIntoTissue})",
+            rig.Tally.ReleasedIntoTissue == 0);
+
+        float peak = 0f;
+        for (int i = 0; i < rig.Gut.PlaqueCapacity; i++)
+            if (rig.Gut.PlaqueAt(i).Live) peak = Mathf.Max(peak, rig.Gut.PlaqueAt(i).Charge);
+        Check($"No plaque built any charge at all ({peak:0.000})", peak < 0.001f);
+
+        // And the complement: the SAME number of pathogens, in one place,
+        // must get in. Ingress is something a crowd does.
+        var rig2 = BuildRig("NoTrickle2");
+        for (int i = 0; i < 8; i++)
+        {
+            var agent = NewAgent(rig2, $"Together_{i}");
+            agent.Initialize(rig2.Board, rig2.Grid, rig2.Gut, rig2.Tally, a => { }, (c, cls, free, t) => false);
+            agent.AdhereToWall(12f + (i - 4) * 0.07f);
+        }
+        for (int i = 0; i < 3000 && rig2.Tally.Breaches == 0; i++)
+            rig2.Gut.Tick(0.1f, i * 0.1f, i * 0.1f);
+
+        Check($"The same 8 TOGETHER do get in ({rig2.Tally.Breaches} breach)",
+            rig2.Tally.Breaches >= 1);
+
+        rig.Dispose();
+        rig2.Dispose();
     }
 
     // =================================================================

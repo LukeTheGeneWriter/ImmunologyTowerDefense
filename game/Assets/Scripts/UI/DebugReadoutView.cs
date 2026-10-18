@@ -36,7 +36,7 @@ namespace ImmunologyTD.UI
 
         private BoardConfig board;
         private BoneMarrowManager boneMarrow;
-        private GutInterface gutInterface;
+        private GutWall gutWall;
         private InvasionTally tally;
         private PathogenSpawner spawner;
         private KnowledgeLedger knowledge;
@@ -66,12 +66,12 @@ namespace ImmunologyTD.UI
 
         public void Bind(
             BoardConfig board, int macrophageSpeed, int neutrophilSpeed,
-            BoneMarrowManager boneMarrow, GutInterface gutInterface, InvasionTally tally,
+            BoneMarrowManager boneMarrow, GutWall gutWall, InvasionTally tally,
             PathogenSpawner spawner, KnowledgeLedger knowledge, AdaptiveDirector adaptive)
         {
             this.board = board;
             this.boneMarrow = boneMarrow;
-            this.gutInterface = gutInterface;
+            this.gutWall = gutWall;
             this.tally = tally;
             this.spawner = spawner;
             this.knowledge = knowledge;
@@ -180,9 +180,9 @@ namespace ImmunologyTD.UI
             if (spawner == null) return string.Empty;
 
             spawner.CountByState(out int inLumen, out int atInterface, out int inTissue);
-            string peak = gutInterface == null
+            string peak = gutWall == null
                 ? string.Empty
-                : $"   (worst wall position right now: {gutInterface.PeakAdhered})";
+                : $"   (worst plaque right now: {gutWall.PeakPlaqueMembers} members, charge {gutWall.PeakCharge:0.00})";
             return $"Pathogens -- lumen: {inLumen}   adhered at gut wall: {atInterface}   in tissue: {inTissue}{peak}";
         }
 

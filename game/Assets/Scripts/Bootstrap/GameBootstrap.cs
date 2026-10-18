@@ -84,7 +84,7 @@ namespace ImmunologyTD.Bootstrap
         private BoardConfig board;
         private TissueGrid tissueGrid;
         private CytokineField cytokineField;
-        private GutInterface gutInterface;
+        private GutWall gutWall;
         private InvasionTally tally;
 
         private struct Layout
@@ -159,7 +159,7 @@ namespace ImmunologyTD.Bootstrap
             GutWallFeatures.Current = new GutWallFeatures(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
-            gutInterface = new GutInterface(board, tissueGrid, tally);
+            gutWall = new GutWall(board, tissueGrid, tally);
 
             // Sprint 7: the ATP economy + round loop (GAME_DESIGN.md §5b/§5d/§6c).
             EconomyTuning.ResetToDefaults();
@@ -193,7 +193,7 @@ namespace ImmunologyTD.Bootstrap
             BuildLumenChannel();
             BuildTissueUnderlay();
             BuildBaseCompartment();
-            BuildGutInterfaceVisual();
+            BuildGutWallVisual();
             BuildBoneMarrowBackdrop(layout);
             BuildLymphNodeBackdrop(layout);
 
@@ -399,11 +399,11 @@ namespace ImmunologyTD.Bootstrap
             boardRenderer.Bind(board, tissueGrid, cytokineField, views);
         }
 
-        private void BuildGutInterfaceVisual()
+        private void BuildGutWallVisual()
         {
-            var go = new GameObject("GutInterfaceRenderer");
-            var renderer = go.AddComponent<GutInterfaceRenderer>();
-            renderer.Bind(board, gutInterface);
+            var go = new GameObject("GutWallRenderer");
+            var renderer = go.AddComponent<GutWallRenderer>();
+            renderer.Bind(board, gutWall);
         }
 
         /// <summary>Sprint 21 (COSMETIC_PASS_SPEC.md §3): the board as a
@@ -527,7 +527,7 @@ namespace ImmunologyTD.Bootstrap
         {
             var spawnerGo = new GameObject("PathogenSpawner");
             var spawner = spawnerGo.AddComponent<PathogenSpawner>();
-            spawner.Initialize(board, tissueGrid, cytokineField, gutInterface, tally, pathogenTemplate);
+            spawner.Initialize(board, tissueGrid, cytokineField, gutWall, tally, pathogenTemplate);
             pathogenSpawner = spawner;
         }
 
@@ -664,7 +664,7 @@ namespace ImmunologyTD.Bootstrap
 
             var ui = uiGo.AddComponent<ImmunologyTD.UI.UiController>();
             ui.Bind(board, wallet, rounds, pathogenSpawner, boneMarrow, knowledge, adaptive, shop,
-                gutInterface, tally,
+                gutWall, tally,
                 macrophageProfile.FineTilesPerTick, neutrophilProfile.FineTilesPerTick);
             // Built explicitly rather than left to OnEnable: AddComponent
             // fires OnEnable before Bind has run, and in Editor batchmode it

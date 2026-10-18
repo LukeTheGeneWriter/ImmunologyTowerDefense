@@ -113,7 +113,7 @@ public static class Sprint19Verification
         var grid = new TissueGrid(board);
         var field = new CytokineField(board);
         var tally = new InvasionTally();
-        var gut = new GutInterface(board, grid, tally);
+        var gut = new GutWall(board, grid, tally);
         var junk = new List<GameObject>();
 
         var go = new GameObject("S19_Spawner"); junk.Add(go);

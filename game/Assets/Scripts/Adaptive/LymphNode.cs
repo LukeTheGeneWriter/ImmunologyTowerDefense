@@ -59,7 +59,7 @@ namespace ImmunologyTD.Adaptive
     /// <see cref="Tick"/> takes deltaTime + currentTime, driven by
     /// <see cref="AdaptiveDirector"/> in a build and by a simulated clock in
     /// the harness -- same convention as TissueGrid / BoneMarrowManager /
-    /// GutInterface. Agents' Update() only tween.
+    /// GutWall. Agents' Update() only tween.
     /// </summary>
     public class LymphNode
     {

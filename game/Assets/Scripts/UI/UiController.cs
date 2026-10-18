@@ -57,7 +57,7 @@ namespace ImmunologyTD.UI
         private KnowledgeLedger knowledge;
         private AdaptiveDirector adaptive;
         private ShopLedger shop;
-        private GutInterface gutInterface;
+        private GutWall gutWall;
         private InvasionTally tally;
         private int macrophageSpeed, neutrophilSpeed;
 
@@ -89,7 +89,7 @@ namespace ImmunologyTD.UI
         public void Bind(
             BoardConfig board, AtpWallet wallet, RoundController rounds, PathogenSpawner spawner,
             BoneMarrowManager marrow, KnowledgeLedger knowledge, AdaptiveDirector adaptive,
-            ShopLedger shop, GutInterface gutInterface, InvasionTally tally,
+            ShopLedger shop, GutWall gutWall, InvasionTally tally,
             int macrophageSpeed, int neutrophilSpeed)
         {
             this.board = board;
@@ -100,7 +100,7 @@ namespace ImmunologyTD.UI
             this.knowledge = knowledge;
             this.adaptive = adaptive;
             this.shop = shop;
-            this.gutInterface = gutInterface;
+            this.gutWall = gutWall;
             this.tally = tally;
             this.macrophageSpeed = macrophageSpeed;
             this.neutrophilSpeed = neutrophilSpeed;
@@ -156,7 +156,7 @@ namespace ImmunologyTD.UI
             picker = new TowerPickerView(floatLayer, ClearSelection);
 
             debug = new DebugReadoutView(topLeft);
-            debug.Bind(board, macrophageSpeed, neutrophilSpeed, marrow, gutInterface, tally,
+            debug.Bind(board, macrophageSpeed, neutrophilSpeed, marrow, gutWall, tally,
                        spawner, knowledge, adaptive);
 
             foreach (var (pos, text) in pendingLabels)

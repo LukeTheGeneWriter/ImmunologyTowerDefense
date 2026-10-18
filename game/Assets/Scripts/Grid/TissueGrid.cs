@@ -70,7 +70,7 @@ namespace ImmunologyTD.Grid
     /// ## Explicit time
     ///
     /// <see cref="Tick"/> takes deltaTime and currentTime, like
-    /// PathogenAgent.SimulationTick / GutInterface.Tick /
+    /// PathogenAgent.SimulationTick / GutWall.Tick /
     /// BoneMarrowManager.Tick. Debris decay and host regrowth live there,
     /// never in an Update(). TissueDriver forwards the real clock; a harness
     /// forwards a fake one.

@@ -23,7 +23,7 @@ namespace ImmunologyTD.Pathogens
         Lumen,
 
         /// <summary>Colonising the gut interface at one boundary position
-        /// (GutInterface). Off the flow, but NOT yet in the tissue and not
+        /// (GutWall). Off the flow, but NOT yet in the tissue and not
         /// yet attackable -- "accumulating," per section 1b step 1.</summary>
         AtInterface,
 
@@ -62,7 +62,7 @@ namespace ImmunologyTD.Pathogens
     ///     becoming the player's problem. On success it MOVES TO THE
     ///     BOUNDARY and joins the pile at that position.
     ///  3. **Wait on the wall until its position breaches** -- not its own
-    ///     decision; GutInterface rolls per position and releases everyone
+    ///     decision; GutWall charges a plaque and releases everyone
     ///     there at once (<see cref="EnterTissueAt"/>).
     ///  4. **Advance toward the base by a strongly biased random walk**
     ///     (<see cref="StepTissue"/>). Reaching the base despawns it and
@@ -93,7 +93,7 @@ namespace ImmunologyTD.Pathogens
     {
         private BoardConfig board;
         private TissueGrid tissueGrid;
-        private GutInterface gutInterface;
+        private GutWall gutWall;
         private InvasionTally tally;
         private System.Action<PathogenAgent> onExit;
         private System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear;
@@ -108,12 +108,57 @@ namespace ImmunologyTD.Pathogens
 
         /// <summary>The coarse cell this pathogen occupies (lumen cell while
         /// flowing, tissue slot while invading). Undefined while
-        /// AtInterface -- use <see cref="InterfacePosition"/> then.</summary>
+        /// AtInterface -- the wall keeps it on the near-wall lane cell.</summary>
         public CoarseCoord CurrentCoarse { get; private set; }
 
-        /// <summary>Which gut-interface position (lane) this pathogen is
-        /// colonising, or -1 when it is not AtInterface.</summary>
+        /// <summary>Position ALONG the wall, in coarse cells from the flow's
+        /// entry end, while AtInterface. Continuous, not a lane index: this
+        /// is what lets a pathogen sit anywhere on the seam and lets a
+        /// dangerous spot straddle two lanes (INVASION_REWORK_SPEC.md 1.2).
+        ///
+        /// This is the SIMULATED base position. The milling swirl is added
+        /// at draw time only and never feeds the crowd field -- if it did, a
+        /// pathogen orbiting a bucket boundary would make marginal plaques
+        /// flicker in and out.</summary>
+        public float WallS { get; private set; }
+
+        /// <summary>Depth OUT from the seam, in coarse cells, while
+        /// AtInterface. 0 is against the wall; InvasionTuning's
+        /// MucusBandDepthCells is the outer edge of the drawn mucus.</summary>
+        public float WallD { get; private set; }
+
+        /// <summary>True when this pathogen is close enough to the wall to
+        /// matter: it counts toward crowding, can be a plaque member, and can
+        /// damage a barrier segment. Beyond the grip depth it is visible but
+        /// counts for nothing.</summary>
+        public bool IsGrippingWall =>
+            State == PathogenState.AtInterface && WallD <= InvasionTuning.GripDepthCells;
+
+        /// <summary>True when secretory IgA has cross-linked this pathogen to
+        /// another (INVASION_REWORK_SPEC.md section 4). A cross-linked
+        /// pathogen contributes NOTHING to crowding and can never be a plaque
+        /// member -- bulk cannot reach the epithelium. Set in a later scope
+        /// item of this sprint; the wall already honours it.</summary>
+        public bool IsCrossLinked { get; private set; }
+
+        /// <summary>Which plaque owns this pathogen, or -1. Membership is
+        /// exclusive and assigned by GutWall each tick.</summary>
+        public int PlaqueIndex { get; private set; } = -1;
+
+        /// <summary>The lane this pathogen's wall position falls in, for the
+        /// things that still think in lanes -- M-cell sampling reads
+        /// CurrentCoarse, which SetWallPosition keeps in sync.</summary>
         public int InterfacePosition { get; private set; } = -1;
+
+        // The mill's per-agent constants, drawn once on joining so there is
+        // no per-tick RNG and no per-agent allocation. The depth term runs at
+        // twice the along-wall frequency, which makes the path a lazy
+        // figure-eight rather than a circle -- and nothing here is random per
+        // frame, so it reads as drifting in slime, not as jitter.
+        private float millPeriod = 3f;
+        private float millAlong;
+        private float millDepth;
+        private float millPhase;
 
         public PathogenClass Class { get; private set; }
         public float Health { get; private set; }
@@ -259,11 +304,11 @@ namespace ImmunologyTD.Pathogens
         /// and the base counter then simply do nothing.
         /// </summary>
         public void Initialize(
-            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
+            BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
             System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
             CoarseCoord? lumenCellOverride = null, PathogenClass? classOverride = null)
         {
-            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
+            BindContext(board, tissueGrid, gutWall, tally, onExit, onSpawnNear);
             EnsureSprite();
 
             Class = classOverride ?? PickRandomClass();
@@ -307,17 +352,17 @@ namespace ImmunologyTD.Pathogens
         /// Places a pathogen directly into tissue at a known coarse slot,
         /// bypassing the lumen and the wall entirely. Two production
         /// callers: PathogenSpawner.RequestSpread (a viral spread event
-        /// creates a new infection instantly) and GutInterface.Breach via
+        /// creates a new infection instantly) and GutWall.Rupture via
         /// <see cref="EnterTissueAt"/>'s sibling path for a fresh agent.
         /// Renamed from Sprint 2's `InitializeAdheredDirect` because
         /// "adhered" now means the gut wall, not tissue.
         /// </summary>
         public void InitializeInTissueDirect(
-            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
+            BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
             System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
             CoarseCoord slot, PathogenClass pClass, float currentTime)
         {
-            BindContext(board, tissueGrid, gutInterface, tally, onExit, onSpawnNear);
+            BindContext(board, tissueGrid, gutWall, tally, onExit, onSpawnNear);
             EnsureSprite();
 
             Class = pClass;
@@ -374,12 +419,12 @@ namespace ImmunologyTD.Pathogens
         }
 
         private void BindContext(
-            BoardConfig board, TissueGrid tissueGrid, GutInterface gutInterface, InvasionTally tally,
+            BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
             System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
-            this.gutInterface = gutInterface;
+            this.gutWall = gutWall;
             this.tally = tally;
             this.onExit = onExit;
             this.onSpawnNear = onSpawnNear;
@@ -418,7 +463,14 @@ namespace ImmunologyTD.Pathogens
 
             SimulationTick(Time.deltaTime, ImmunologyTD.Rounds.RoundClock.Time);
 
-            if (moveDuration > 0f && moveElapsed < moveDuration)
+            if (State == PathogenState.AtInterface && gutWall != null)
+            {
+                // The swirl is a visual tween and nothing else, per the
+                // handbook's "Update() only forwards the clock and drives the
+                // visual tween." GutWall never reads this position.
+                transform.position = MillWorldPosition(ImmunologyTD.Rounds.RoundClock.Time);
+            }
+            else if (moveDuration > 0f && moveElapsed < moveDuration)
             {
                 moveElapsed += Time.deltaTime;
                 transform.position = Vector3.Lerp(moveStartWorld, moveEndWorld, Mathf.Clamp01(moveElapsed / moveDuration));
@@ -463,9 +515,9 @@ namespace ImmunologyTD.Pathogens
                 TickCombat(currentTime);
             }
 
-            // AtInterface: nothing to do. A colonising pathogen sits still
-            // and waits for GutInterface to roll its position's breach --
-            // deliberately NOT its own decision (SPRINT_PLAN.md item 6).
+            // AtInterface: nothing to do here. GutWall.Tick moves the mill,
+            // builds the crowd field and charges the plaques -- ingress is
+            // something a CROWD does, never a decision this agent makes.
         }
 
         /// <summary>
@@ -491,12 +543,12 @@ namespace ImmunologyTD.Pathogens
             Current = board.CoarseCenterFine(CurrentCoarse);
             MoveTo(board.CoarseToWorldCenter(CurrentCoarse), InvasionTuning.LumenStepIntervalSeconds);
 
-            if (gutInterface == null) return;
+            if (gutWall == null) return;
             int depth = board.LumenDepthFromInterface(CurrentCoarse);
             if (depth < 0) return; // not actually in the channel; nothing to adhere to
             if (Random.value >= AdhesionChanceAt(depth)) return;
 
-            AdhereToInterface(board.CrossIndex(CurrentCoarse));
+            AdhereToWall(gutWall.SOfLane(board.CrossIndex(CurrentCoarse)));
         }
 
         /// <summary>Per-step adhesion probability as a function of distance
@@ -518,52 +570,89 @@ namespace ImmunologyTD.Pathogens
         /// immediately. Public so a harness can put a pathogen on the wall
         /// deterministically without waiting on a roll.
         /// </summary>
-        public bool AdhereToInterface(int position)
+        public bool AdhereToWall(float s)
         {
-            if (gutInterface == null || State == PathogenState.Cleared) return false;
-            if (!board.InCrossBounds(position)) return false;
+            if (gutWall == null || State == PathogenState.Cleared) return false;
 
-            int stackIndex = gutInterface.AdheredCountAt(position);
-            if (!gutInterface.Adhere(position, this)) return false;
+            if (!gutWall.Adhere(this, s)) return false;
 
             State = PathogenState.AtInterface;
-            InterfacePosition = position;
-            CurrentCoarse = board.CoarseFromAxis(board.LumenNearWallAxisIndex, position);
-            Current = board.CoarseCenterFine(CurrentCoarse);
+            PlaqueIndex = -1;
+            IsCrossLinked = false;
+
+            // Draw the mill constants once, here. Ranges are
+            // INVASION_REWORK_SPEC.md section 2.2: a 2.5-4.5s period is
+            // low-frequency enough to read as drift, and the desynced phases
+            // are what stop a clump pulsing in unison.
+            millPeriod = Random.Range(2.5f, 4.5f);
+            millAlong = Random.Range(0.10f, 0.22f);
+            millDepth = Random.Range(0.05f, 0.12f);
+            millPhase = Random.Range(0f, Mathf.PI * 2f);
+
             restColor = BoardRenderer.PathogenColor;
             if (sr != null) { sr.color = restColor; sr.enabled = true; }
-            SnapTo(InterfaceStackWorldPosition(position, stackIndex));
+            SnapTo(gutWall.WallToWorld(WallS, WallD));
             return true;
         }
 
-        /// <summary>
-        /// Where the Nth pathogen in a boundary pile is drawn: at the seam,
-        /// pushed back OUT INTO THE CHANNEL by its depth in the pile, so a
-        /// dangerous position literally reads as a queue of pathogens
-        /// pressing against the wall (SPRINT_PLAN.md item 6: "make an
-        /// accumulating boundary position visibly distinct from an empty
-        /// one"). Direction is derived from the two cells either side of the
-        /// seam, so it follows the map's orientation rather than assuming
-        /// the lumen is on the right.
-        /// </summary>
-        private Vector3 InterfaceStackWorldPosition(int position, int stackIndex)
+        /// <summary>Back-compat entry point for anything that still thinks in
+        /// lanes (and for harnesses that want a pathogen on the wall at a
+        /// known lane without waiting on a roll). Puts it at the lane's
+        /// centre.</summary>
+        public bool AdhereToInterface(int lane)
         {
-            var seam = board.InterfaceWorldCenter(position);
-            var tissueSide = board.CoarseToWorldCenter(board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex, position));
-            var outward = (seam - tissueSide);
-            if (outward.sqrMagnitude > 0.0001f) outward.Normalize();
-            const int VisualStackCap = 7; // beyond this the pile stops growing outward and just overlaps
-            float step = board.CoarseCellWorldSize * 0.55f;
-            return seam + outward * (Mathf.Min(stackIndex, VisualStackCap) * step);
+            if (gutWall == null || board == null) return false;
+            if (!board.InCrossBounds(lane)) return false;
+            return AdhereToWall(gutWall.SOfLane(lane));
+        }
+
+        /// <summary>Called by GutWall when it moves this pathogen in the
+        /// mill. Keeps CurrentCoarse and the lane in sync, because M-cell
+        /// sampling (PathogenSpawner) and the fine-tile contact test both
+        /// read them while a pathogen is AtInterface.</summary>
+        public void SetWallPosition(float s, float d)
+        {
+            WallS = s;
+            WallD = Mathf.Clamp(d, 0f, InvasionTuning.MucusBandDepthCells);
+            if (board == null || gutWall == null) return;
+            InterfacePosition = gutWall.LaneOf(s);
+            CurrentCoarse = board.CoarseFromAxis(board.LumenNearWallAxisIndex, InterfacePosition);
+            Current = board.CoarseCenterFine(CurrentCoarse);
+        }
+
+        public void SetPlaqueIndex(int index) => PlaqueIndex = index;
+
+        public void SetCrossLinked(bool crossLinked) => IsCrossLinked = crossLinked;
+
+        /// <summary>The mucus carried this pathogen off the downstream end of
+        /// the wall. It is excreted, with no penalty -- the same deliberate
+        /// break from Bloons TD 6 that a never-adhering pathogen gets
+        /// (GAME_DESIGN.md section 1b step 1).</summary>
+        public void SweptOffWall()
+        {
+            if (tally != null) tally.Excreted++;
+            Exit();
+        }
+
+        /// <summary>Where this pathogen is DRAWN while milling: its simulated
+        /// base position plus a closed-form figure-eight. Pure function of
+        /// time, so it costs nothing to skip headlessly and the harness never
+        /// has to reproduce it.</summary>
+        private Vector3 MillWorldPosition(float time)
+        {
+            float omega = Mathf.PI * 2f / Mathf.Max(0.01f, millPeriod);
+            float s = WallS + millAlong * Mathf.Sin(omega * time + millPhase);
+            float d = WallD + millDepth * Mathf.Sin(2f * omega * time + millPhase);
+            return gutWall.WallToWorld(Mathf.Max(0f, s), Mathf.Max(0f, d));
         }
 
         /// <summary>
         /// Enters the tissue at <paramref name="slot"/>. Called by
-        /// GutInterface.Breach for every pathogen at a breaching position,
+        /// GutWall.Rupture for every member of a rupturing plaque,
         /// in one pass, so a burst genuinely lands in a single tick.
         ///
         /// Deliberately does NOT remove itself from the interface pile --
-        /// GutInterface owns pile membership and compacts it around the
+        /// GutWall owns mill membership and removes the
         /// pathogens that did move, which is what keeps "released
         /// everything at once" a single, auditable operation.
         /// </summary>
@@ -1201,11 +1290,15 @@ namespace ImmunologyTD.Pathogens
             State = PathogenState.Cleared;
             board = null;
             tissueGrid = null;
-            gutInterface = null;
+            gutWall = null;
             tally = null;
             onSpawnNear = null;
             onExit = null;
             InterfacePosition = -1;
+            WallS = 0f;
+            WallD = 0f;
+            IsCrossLinked = false;
+            PlaqueIndex = -1;
             contactFlashTimer = 0f;
             hasSpread = false;
             lastSpreadAttemptTime = float.NegativeInfinity;

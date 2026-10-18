@@ -58,31 +58,148 @@ namespace ImmunologyTD.Pathogens
         /// of the descent instead.</summary>
         public static float AdhesionFalloffCells = 5f;
 
-        // -- Per-position breach (SPRINT_PLAN.md item 6) --
+        // -- The wall: the mill, the crowd field, and plaques --
+        // Sprint 22 (INVASION_REWORK_SPEC.md) replaced the per-position
+        // breach roll. BreachRollIntervalSeconds and PerPathogenBreachChance
+        // are GONE: breach is no longer per lane and no longer a hidden
+        // memoryless roll. Pressure is now a visible CHARGE on a plaque,
+        // placed by where pathogens actually crowd.
 
-        /// <summary>How often each boundary position rolls for a breach.
-        /// GAME_DESIGN.md section 1b step 2 explicitly permits rolling less
-        /// often with a correspondingly larger chance, and calls it the
-        /// cheaper implementation across 40 positions -- 1 roll/second
-        /// across 40 positions is nothing, and it makes the numbers below
-        /// readable as "per second."</summary>
-        public static float BreachRollIntervalSeconds = 1f;
+        /// <summary>Depth of the mucus band the adhered population mills in,
+        /// in coarse cells out from the seam. Deliberately equal to the band
+        /// LumenChannelRenderer already draws, so "in the mill" and "in the
+        /// drawn glaze" are the same region.</summary>
+        public static float MucusBandDepthCells = 1.6f;
 
-        /// <summary>Each adhered pathogen's independent contribution to its
-        /// position's breach chance, per roll. The position's chance is
-        /// `1 - (1 - PerPathogenBreachChance)^n`, so it RISES WITH PRESSURE
-        /// -- 1 pathogen ~1.2%/s (a breach in ~80s), 5 ~5.9%/s (~17s), 10
-        /// ~11.4%/s (~9s).
+        /// <summary>Within this depth a pathogen is GRIPPING: it counts
+        /// toward crowding, can be a plaque member, and can damage a barrier
+        /// segment. Beyond it (out to MucusBandDepthCells) it is loose --
+        /// visible, still on the wall, counting for nothing. Half a cell, so
+        /// a gripping pathogen visibly touches the wall.</summary>
+        public static float GripDepthCells = 0.55f;
+
+        /// <summary>Radius, in coarse cells, of the triangular kernel the
+        /// crowd field is built with. 1.5 cells is ~111px on Map 01 -- a
+        /// "stretch of wall" the eye reads as one spot, about three lanes.
+        /// This is the number that makes ingress PROXIMITY-based rather than
+        /// lane-based: it is the width of "near each other."</summary>
+        public static float CrowdRadiusCells = 1.5f;
+
+        /// <summary>Crowd-field resolution. 4 buckets per coarse cell is
+        /// 18.5px on Map 01; finer is wasted at this board scale. The field
+        /// is 1-D -- depth is a gate (gripping or not), not a dimension of
+        /// the statistic.</summary>
+        public static int CrowdBucketsPerCell = 4;
+
+        /// <summary>Crowd value a bucket must reach before it seeds a
+        /// plaque. Just above IngressCrowdFloor, so a plaque becomes visible
+        /// slightly BEFORE it can charge -- the player gets a beat of warning
+        /// that is honest rather than decorative.</summary>
+        public static float PlaqueSeedCrowd = 2.5f;
+
+        /// <summary>Minimum separation between plaque centres, in cells.
+        /// Equal to the footprint, so plaques tile the wall instead of
+        /// stacking on one hot spot.</summary>
+        public static float PlaqueMinSeparationCells = 1.5f;
+
+        /// <summary>Hard cap on live plaques. The 738px wall holds about six
+        /// non-overlapping footprints; eight is slack. Fixed-size and pooled
+        /// -- nothing here allocates per event (CLAUDE.md's pooling rule).
+        /// </summary>
+        public static int MaxPlaques = 8;
+
+        /// <summary>**The minimum infectious dose, and the single most
+        /// important number in the invasion model.** A plaque only charges
+        /// while its membership EXCEEDS this, so one or two adherents never
+        /// charge anything: they sit, mill, erode a little barrier, and creep
+        /// away downstream.
         ///
-        /// The count-dependence is not decoration. With a flat per-position
-        /// chance, a position holding one pathogen breaches as often as one
-        /// holding ten, so nothing ever accumulates and the "pressure builds
-        /// visibly, then bursts" shape GAME_DESIGN.md section 1b step 2
-        /// insists on cannot happen. Note this is still ONE roll per
-        /// position -- when it trips, EVERY pathogen there is released at
-        /// once. It is emphatically not a per-pathogen roll, which would
-        /// produce the trickle SPRINT_PLAN.md item 6 warns against.</summary>
-        public static float PerPathogenBreachChance = 0.012f;
+        /// Mechanically this is what forbids the trickle. Ingress is not
+        /// something a pathogen does, it is something a CROWD does -- which
+        /// is the property GAME_DESIGN.md section 1b step 2 exists to
+        /// protect, carried over from the per-position model intact.
+        ///
+        /// Biologically it is the infectious-dose threshold, which is real
+        /// and famously species-specific (tens of organisms for Shigella,
+        /// ~10^5 for Salmonella), so this is also the knob that will later
+        /// tell one species from another.</summary>
+        public static float IngressCrowdFloor = 2.0f;
+
+        /// <summary>Charge added per second per plaque member above the
+        /// floor. This is Sprint 4's PerPathogenBreachChance (0.012) scaled
+        /// by 1.5 to compensate for the floor subtracting two members, so a
+        /// LOADED spot still ruptures in 5-10s and round pacing does not
+        /// move. What changed is the bottom of the curve: a lone adherent
+        /// used to leak in after ~80s and now never gets in at all.
+        /// Placeholder like everything here -- the headless strategy harness
+        /// (SESSION_HANDOFF.md section 2a) is what should eventually set
+        /// it.</summary>
+        public static float ChargeRatePerCrowdUnit = 0.018f;
+
+        /// <summary>How fast an abandoned plaque's charge drains. ~25s from
+        /// full to empty: slow enough that relieving a spot reads as relief
+        /// rather than as the threat evaporating.</summary>
+        public static float ChargeDecayPerSecond = 0.04f;
+
+        /// <summary>Fractional jitter on a plaque's rupture threshold, drawn
+        /// once when it seeds (so threshold is uniform in 1 +/- this).
+        ///
+        /// A charge is honest -- what is drawn IS the state -- but a
+        /// perfectly deterministic fill would make a rupture predictable to
+        /// the second. +/-15% keeps "it is nearly due" true while keeping
+        /// "exactly when" unknowable.</summary>
+        public static float ChargeThresholdJitter = 0.15f;
+
+        /// <summary>How fast a plaque centre chases its membership's
+        /// centroid, per second. A plaque follows a swarm drifting
+        /// downstream within about half a second instead of being left
+        /// behind by it.</summary>
+        public static float PlaqueCentreLerpPerSecond = 2.0f;
+
+        /// <summary>Radius, in cells, of what a rupture releases and what it
+        /// kills. Equal to CrowdRadiusCells on purpose: what gathered is
+        /// exactly what goes in.</summary>
+        public static float BurstFootprintCells = 1.5f;
+
+        // -- The mill (INVASION_REWORK_SPEC.md section 2) --
+
+        /// <summary>How fast the mucus layer shears adherents downstream, in
+        /// cells per second, BEFORE peristalsis modulation. At 0.035 a
+        /// pathogen takes ~285s to travel the whole wall and rejoin the flow
+        /// at the downstream end -- so the barrier population still
+        /// accumulates across rounds (GAME_DESIGN.md section 6b) without
+        /// being immortal.
+        ///
+        /// Multiplied by Peristalsis.SpeedFactor, which the bolus and the
+        /// drawn wall squeeze already use, so the WHOLE adhered population
+        /// lurches downstream in time with the contraction the player can
+        /// already see. That shared modulation is what makes the mill read
+        /// as "stuck in moving slime" rather than as agents twitching
+        /// independently.</summary>
+        public static float MucusCreepCellsPerSecond = 0.035f;
+
+        /// <summary>How fast a pathogen drifts toward the nearest plaque
+        /// centre (or the best crowd bucket in reach). One 1.5 cells from a
+        /// forming clump joins it in ~12s.
+        ///
+        /// Biologically this stands in for co-aggregation on the glycocalyx
+        /// -- colonisation genuinely is a social process. Mechanically it is
+        /// what turns four scattered bolus clumps into ONE dangerous spot
+        /// over a round, which is where the drama comes from.</summary>
+        public static float CohesionSpeedCellsPerSecond = 0.12f;
+
+        /// <summary>How far a pathogen looks for something to drift toward.
+        /// </summary>
+        public static float CohesionReachCells = 2.0f;
+
+        /// <summary>Depth a pathogen settles toward once it joins the mill,
+        /// and how fast it gets there. It ARRIVES at the outer mucus and
+        /// settles in over ~2s: a pathogen never jumps to the wall, because
+        /// the old snap-to-seam is exactly the "orderly" artefact the
+        /// Director objected to.</summary>
+        public static float SettleDepthCells = 0.25f;
+        public static float SettleSpeedCellsPerSecond = 0.5f;
+        public static float MillArrivalDepthCells = 1.3f;
 
         /// <summary>How far into the tissue, along the threat axis, a
         /// breach may look for a free slot when the first tissue layer is
@@ -90,11 +207,14 @@ namespace ImmunologyTD.Pathogens
         /// wall."</summary>
         public static int MaxReleaseAxisDepth = 3;
 
-        /// <summary>How far along the lanes a breach may look for a free
-        /// slot. Generous, because a burst of ten pathogens must land
-        /// somewhere -- it fans out along the wall rather than punching
-        /// deep.</summary>
-        public static int MaxReleaseCrossSpread = 20;
+        /// <summary>How far along the lanes a rupture may look for a free
+        /// slot. **Sprint 22 dropped this 20 -> 4.** The old value was
+        /// compensating for a ten-deep pile in a SINGLE lane, which had to
+        /// be fanned across half the board on release. A plaque is already
+        /// spread across ~3 lanes by its own geometry, and each member asks
+        /// for the cell behind its own position first, so the burst arrives
+        /// pre-spread and only needs a little slack.</summary>
+        public static int MaxReleaseCrossSpread = 4;
 
         // -- Base-directed advance (SPRINT_PLAN.md item 7) --
 
@@ -246,10 +366,27 @@ namespace ImmunologyTD.Pathogens
             FoodItemTransitSeconds = 30f;
             FoodItemBurstCount = 4;
             FoodItemWallHugDepth = 1;
-            BreachRollIntervalSeconds = 1f;
-            PerPathogenBreachChance = 0.012f;
+            MucusBandDepthCells = 1.6f;
+            GripDepthCells = 0.55f;
+            CrowdRadiusCells = 1.5f;
+            CrowdBucketsPerCell = 4;
+            PlaqueSeedCrowd = 2.5f;
+            PlaqueMinSeparationCells = 1.5f;
+            MaxPlaques = 8;
+            IngressCrowdFloor = 2.0f;
+            ChargeRatePerCrowdUnit = 0.018f;
+            ChargeDecayPerSecond = 0.04f;
+            ChargeThresholdJitter = 0.15f;
+            PlaqueCentreLerpPerSecond = 2.0f;
+            BurstFootprintCells = 1.5f;
+            MucusCreepCellsPerSecond = 0.035f;
+            CohesionSpeedCellsPerSecond = 0.12f;
+            CohesionReachCells = 2.0f;
+            SettleDepthCells = 0.25f;
+            SettleSpeedCellsPerSecond = 0.5f;
+            MillArrivalDepthCells = 1.3f;
             MaxReleaseAxisDepth = 3;
-            MaxReleaseCrossSpread = 20;
+            MaxReleaseCrossSpread = 4;
             TissueStepIntervalSeconds = 1f;
             AdvanceBaseWeight = 0.70f;
             AdvanceLateralWeight = 0.13f;

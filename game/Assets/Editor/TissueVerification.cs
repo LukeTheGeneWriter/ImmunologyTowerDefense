@@ -72,7 +72,7 @@ public static class TissueVerification
         public TissueGrid Grid;
         public CytokineField Field;
         public InvasionTally Tally;
-        public GutInterface Gut;
+        public GutWall Gut;
         public readonly List<GameObject> Junk = new List<GameObject>();
 
         public void Dispose()
@@ -94,7 +94,7 @@ public static class TissueVerification
         rig.Grid = new TissueGrid(rig.Board);
         rig.Field = new CytokineField(rig.Board);
         rig.Tally = new InvasionTally();
-        rig.Gut = new GutInterface(rig.Board, rig.Grid, rig.Tally);
+        rig.Gut = new GutWall(rig.Board, rig.Grid, rig.Tally);
         return rig;
     }
 

@@ -17,7 +17,7 @@ namespace ImmunologyTD.Pathogens
     /// **Sprint 4** moved the spawn point from "fine column 0, march right"
     /// to "a uniformly random position across the width of the lumen band,
     /// at the upstream end of the flow" (GAME_DESIGN.md section 1a), and
-    /// made this the owner of GutInterface.Tick -- the per-position breach
+    /// made this the owner of GutWall.Tick -- the wall's mill, crowd
     /// rolls have to be driven by something, and this class already owns the
     /// pathogen lifecycle.
     /// </summary>
@@ -26,7 +26,7 @@ namespace ImmunologyTD.Pathogens
         private BoardConfig board;
         private TissueGrid tissueGrid;
         private CytokineField cytokineField;
-        private GutInterface gutInterface;
+        private GutWall gutWall;
         private InvasionTally tally;
         private PrefabPool pool;
 
@@ -181,12 +181,12 @@ namespace ImmunologyTD.Pathogens
 
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, CytokineField cytokineField,
-            GutInterface gutInterface, InvasionTally tally, GameObject pathogenTemplate)
+            GutWall gutWall, InvasionTally tally, GameObject pathogenTemplate)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
             this.cytokineField = cytokineField;
-            this.gutInterface = gutInterface;
+            this.gutWall = gutWall;
             this.tally = tally;
 
             pool = gameObject.AddComponent<PrefabPool>();
@@ -228,7 +228,18 @@ namespace ImmunologyTD.Pathogens
                 }
             }
 
-            if (gutInterface != null) gutInterface.Tick(deltaTime, currentTime);
+            // The wall needs round-elapsed as well as the clock: the mill's
+            // downstream creep is modulated by Peristalsis.SpeedFactor, so
+            // the whole adhered population lurches in time with the
+            // contraction already on screen.
+            // While a bolus is on screen we hand the wall the SAME elapsed
+            // time the bolus runs on, so the mill's downstream lurch is in
+            // phase with the contraction the player can see. Off a food
+            // round there is no bolus to match, so the clock does. The creep
+            // is 0.035 cells/s, so the phase change at the hand-over is far
+            // too small to read as a jerk.
+            if (gutWall != null)
+                gutWall.Tick(deltaTime, currentTime, foodActive ? foodElapsed : currentTime);
 
             // Sprint 19: M cells over the Peyer's patch sample pathogens
             // drifting past or sitting at the wall (a no-op until the M-cell
@@ -257,7 +268,7 @@ namespace ImmunologyTD.Pathogens
         {
             var go = pool.Get();
             var agent = go.GetComponent<PathogenAgent>();
-            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear);
+            agent.Initialize(board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear);
             live.Add(agent);
         }
 
@@ -333,7 +344,7 @@ namespace ImmunologyTD.Pathogens
 
             var go = pool.Get();
             var agent = go.GetComponent<PathogenAgent>();
-            agent.Initialize(board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear,
+            agent.Initialize(board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear,
                 cell, foodDef.RollClass());
             live.Add(agent);
             batchEmitted++;
@@ -437,7 +448,7 @@ namespace ImmunologyTD.Pathogens
             var go = pool.Get();
             var child = go.GetComponent<PathogenAgent>();
             child.InitializeInTissueDirect(
-                board, tissueGrid, gutInterface, tally, OnPathogenExit, RequestSpawnNear,
+                board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear,
                 candidate, pClass, currentTime);
             live.Add(child);
             return true;
@@ -451,7 +462,7 @@ namespace ImmunologyTD.Pathogens
         private void OnPathogenExit(PathogenAgent agent)
         {
             live.Remove(agent);
-            if (gutInterface != null) gutInterface.Remove(agent);
+            if (gutWall != null) gutWall.Remove(agent);
             agent.ResetForPool();
             pool.Release(agent.gameObject);
         }
