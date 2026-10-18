@@ -87,6 +87,21 @@ namespace ImmunologyTD.Rendering
         public static Color Chyme          => C(0.80f, 0.91f, 0.95f);
         /// <summary>Includes alpha.</summary>
         public static Color Mucus          => C(1.00f, 1.00f, 1.00f, 0.35f);
+
+        /// <summary>Sprint 22: secretory IgA. The mucus family pushed COOL,
+        /// so a coated organism reads against both the green bacterium and
+        /// the violet virion without colliding with any reserved hue.</summary>
+        public static Color IgaCoat        => C(0.86f, 0.94f, 1.00f, 0.85f);
+
+        /// <summary>Sprint 22: a slough wave -- the mucus glaze at full
+        /// brightness, because a sentinel goblet cell dumping its whole load
+        /// is the glaze arriving all at once.</summary>
+        public static Color MucusSlough    => C(1.00f, 1.00f, 1.00f, 0.75f);
+
+        /// <summary>Sprint 22: epithelium that has been killed. Desaturated
+        /// and darkened from GutWallQuiet rather than given a new hue -- dead
+        /// wall is the same tissue, just gone.</summary>
+        public static Color GutWallDead    => C(0.55f, 0.43f, 0.42f);
         public static Color FlowMote       => C(0.55f, 0.74f, 0.82f, 0.7f);
         public static Color Villus         => C(1.00f, 0.62f, 0.57f);
         /// <summary>Includes alpha. The back row is LIGHTER than the front --

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ImmunologyTD.Grid;
 using ImmunologyTD.Pathogens;
@@ -56,7 +57,16 @@ namespace ImmunologyTD.Rendering
         private GutWall wall;
         private SpriteRenderer[] bars;
         private SpriteRenderer[] blisters;
+        private SpriteRenderer[] rafts;
+        private SpriteRenderer[] antibodies;
         private float refreshTimer;
+
+        /// <summary>Antibody glyphs drawn between cross-linked neighbours.
+        /// Pooled and fixed: a clump is a handful of organisms, and nothing in
+        /// this project allocates per event.</summary>
+        private const int MaxAntibodies = 32;
+
+        private readonly List<PathogenAgent> clumpScratch = new List<PathogenAgent>();
 
         public void Bind(BoardConfig board, GutWall wall)
         {
@@ -90,24 +100,53 @@ namespace ImmunologyTD.Rendering
                 var go = new GameObject($"Plaque_{i}");
                 go.transform.SetParent(blisterContainer, false);
                 var sr = go.AddComponent<SpriteRenderer>();
-                // Placeholder shape: the dedicated blister sprite is specified
-                // in INVASION_REWORK_SPEC.md section 7.2 and deferred to this
-                // sprint's sprite pass, which checks every new sprite magnified
-                // before a build is spent.
-                sr.sprite = SpriteShapes.EffeBloom;
+                sr.sprite = SpriteShapes.PlaqueBlister;
                 sr.color = AlarmColor;
                 sr.sortingOrder = 4; // above the wall, below the pathogens on it
                 sr.enabled = false;
                 blisters[i] = sr;
             }
 
+            // One raft blob per clump slot and a pool of antibody glyphs.
+            var igaContainer = new GameObject("GutWallIgA").transform;
+            igaContainer.SetParent(transform, false);
+
+            rafts = new SpriteRenderer[wall.PlaqueCapacity * 2];
+            for (int i = 0; i < rafts.Length; i++)
+            {
+                var go = new GameObject($"Raft_{i}");
+                go.transform.SetParent(igaContainer, false);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = SpriteShapes.Agglomerate;
+                sr.color = Palette.IgaCoat;
+                sr.sortingOrder = 18; // under the pathogens (20), over the wall
+                sr.enabled = false;
+                rafts[i] = sr;
+            }
+
+            antibodies = new SpriteRenderer[MaxAntibodies];
+            for (int i = 0; i < antibodies.Length; i++)
+            {
+                var go = new GameObject($"IgA_{i}");
+                go.transform.SetParent(igaContainer, false);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = SpriteShapes.IgaY;
+                sr.color = Palette.IgaCoat;
+                sr.sortingOrder = 21; // ON TOP of the organisms it bridges
+                sr.enabled = false;
+                antibodies[i] = sr;
+            }
+
             wall.Ruptured += OnRuptured;
+            wall.Sloughs += OnSlough;
             Refresh();
         }
 
         private void OnDestroy()
         {
-            if (wall != null) wall.Ruptured -= OnRuptured;
+            if (wall == null) return;
+            wall.Ruptured -= OnRuptured;
+            wall.Sloughs -= OnSlough;
         }
 
         private void OnRuptured(float centreS, int released, float footprintCells)
@@ -119,9 +158,20 @@ namespace ImmunologyTD.Rendering
             DegranulationFlash.Play(wall.WallToWorld(centreS, 0f), size, DegranulationFlash.BreachBurstColor);
         }
 
+        /// <summary>A sentinel goblet cell dumping its load: a pale crescent
+        /// sweeping the patch it just cleared.</summary>
+        private void OnSlough(float centreS, float halfCells, int expelled)
+        {
+            if (board == null || wall == null) return;
+            float size = board.CoarseCellWorldSize * halfCells * 2f;
+            DegranulationFlash.Play(wall.WallToWorld(centreS, 0.6f), size, Palette.MucusSlough);
+        }
+
         private void Update()
         {
             if (board == null) return;
+
+            RefreshIga();
 
             // Blisters every frame: a charge the player is watching fill must
             // not step. The wall's heat is a slower read and stays on the
@@ -141,8 +191,15 @@ namespace ImmunologyTD.Rendering
 
             for (int lane = 0; lane < bars.Length; lane++)
             {
-                float crowd = wall.CrowdAt(wall.SOfLane(lane));
+                float laneS = wall.SOfLane(lane);
+                float crowd = wall.CrowdAt(laneS);
                 float t = Mathf.Clamp01(crowd / Mathf.Max(0.01f, FullAlarmCrowd));
+
+                // What the wall has actually been through outranks what is
+                // sitting on it: a dead stretch reads as dead even when the
+                // crowd that killed it has moved on, because the player needs
+                // to see where the board is still damaged.
+                var state = wall.StateAt(laneS);
 
                 // Thickness runs ACROSS the threat axis; length runs along
                 // the lane. Derived from ThreatAxis rather than assumed, so
@@ -152,8 +209,73 @@ namespace ImmunologyTD.Rendering
                 bars[lane].transform.localScale = horizontalThreat
                     ? new Vector3(thickness, length, 1f)
                     : new Vector3(length, thickness, 1f);
-                bars[lane].color = Color.Lerp(WallColor, AlarmColor, t);
+                bars[lane].color = state == GutWall.BarrierState.Dead
+                    ? Palette.GutWallDead
+                    : Color.Lerp(Color.Lerp(WallColor, Palette.GutWallDead, state == GutWall.BarrierState.Eroded ? 0.35f : 0f),
+                                 AlarmColor, t);
             }
+        }
+
+        /// <summary>
+        /// Draws the IgA layer: one raft under each clump, and an antibody Y
+        /// SPANNING each pair of cross-linked neighbours.
+        ///
+        /// The spanning Y is the single clearest piece of teaching in the
+        /// rework and the reason it is drawn on top rather than behind. The
+        /// Director's ruling was that IgA is two-headed and ties one organism
+        /// to another MATCHING one; a glyph with one arm on each of two
+        /// organisms says that without a tooltip.
+        /// </summary>
+        private void RefreshIga()
+        {
+            int raftsUsed = 0, antibodiesUsed = 0;
+            float cell = board.CoarseCellWorldSize;
+            var adhered = wall.Adhered;
+
+            for (int clump = 0; clump < wall.ClumpCount && raftsUsed < rafts.Length; clump++)
+            {
+                if (wall.ClumpMembers(clump) < 2) continue;
+
+                clumpScratch.Clear();
+                for (int i = 0; i < adhered.Count; i++)
+                    if (adhered[i] != null && adhered[i].ClumpId == clump) clumpScratch.Add(adhered[i]);
+                if (clumpScratch.Count < 2) continue;
+
+                float sumS = 0f, sumD = 0f;
+                for (int i = 0; i < clumpScratch.Count; i++) { sumS += clumpScratch[i].WallS; sumD += clumpScratch[i].WallD; }
+                float centreS = sumS / clumpScratch.Count;
+                float centreD = sumD / clumpScratch.Count;
+
+                float radius = wall.ClumpRadiusCells(clump);
+                var raft = rafts[raftsUsed++];
+                raft.enabled = true;
+                raft.transform.position = wall.WallToWorld(centreS, centreD);
+                raft.transform.localScale = Vector3.one * (radius * cell * 2.2f);
+
+                // One Y per adjacent pair, so a chain of k organisms shows
+                // k-1 bridges rather than a decorative scatter.
+                clumpScratch.Sort((a, b) => a.WallS.CompareTo(b.WallS));
+                for (int i = 0; i + 1 < clumpScratch.Count && antibodiesUsed < antibodies.Length; i++)
+                {
+                    var a = clumpScratch[i];
+                    var b = clumpScratch[i + 1];
+                    var pa = wall.WallToWorld(a.WallS, a.WallD);
+                    var pb = wall.WallToWorld(b.WallS, b.WallD);
+
+                    var y = antibodies[antibodiesUsed++];
+                    y.enabled = true;
+                    y.transform.position = (pa + pb) * 0.5f;
+                    y.transform.localScale = Vector3.one * (cell * 0.34f);
+                    // Point the stem along the gap it bridges.
+                    var span = pb - pa;
+                    y.transform.rotation = span.sqrMagnitude > 0.000001f
+                        ? Quaternion.Euler(0f, 0f, Mathf.Atan2(span.y, span.x) * Mathf.Rad2Deg - 90f)
+                        : Quaternion.identity;
+                }
+            }
+
+            for (int i = raftsUsed; i < rafts.Length; i++) rafts[i].enabled = false;
+            for (int i = antibodiesUsed; i < antibodies.Length; i++) antibodies[i].enabled = false;
         }
 
         private void RefreshBlisters()

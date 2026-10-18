@@ -709,3 +709,41 @@ and runs in-browser via a custom local server (`tools/serve_webgl.ps1`).
 Nothing playable yet -- next sprint starts real gameplay. Repo linked to
 GitHub throughout; several device-bridge/Unity CLI quirks discovered and
 documented (see TEAM_RETRO.md and AGENT_HANDBOOK.md).
+
+## Sprint 22 -- 2026-10-19
+The wall stopped being a queue.
+
+- **Pathogens mill instead of queueing.** An adherent now has a
+  continuous position in the mucus band, drifts, loops, is carried
+  downstream in time with the peristaltic squeeze, and drifts toward its
+  neighbours. The orderly per-lane stack is gone.
+- **Ingress is proximity-based.** Crowding is measured as concentration
+  over a stretch of wall; where it peaks, a **plaque** forms and its
+  pressure fills as a **visible charge**. What is drawn is now the actual
+  state -- the blister's height and colour ARE the charge -- instead of a
+  proxy for a hidden roll that might fire in one second or thirty.
+- **A trickle is now arithmetically impossible.** The charge subtracts a
+  floor, so one or two adherents accrue nothing forever. Ingress is
+  something a crowd does. That floor is also the minimum infectious dose,
+  which is real and species-specific.
+- **Bacteria replicate on the wall**, damped by nutrient competition from
+  neighbours of their own kind.
+- **Secretory IgA arrived** at the 70% knowledge rung, and it inverts the
+  wall: free crowding charges a plaque, coated crowding cross-links into
+  rafts that cannot reach the epithelium and are swept away. A coated
+  bacterium still divides at full rate -- and its daughter is born
+  attached to it, so replicating faster builds its own cage. Nothing in
+  the lumen is killed; everything is flushed.
+- **Dead epithelium is a weak spot, not a hole** (Director's call): it
+  charges faster but still needs a crowd. And because a virus needs a
+  living cell, a dead stretch is a bacterial sieve and a viral dead end
+  -- the two threat families now want opposite walls.
+- **Crypts defend themselves.** A sentinel goblet cell fires when
+  bacteria crowd too close, expelling them. Innate, free, from round 1;
+  the mucus-turnover row buys amplification.
+- **The player can answer the wall**: towers suppress a charging plaque,
+  and a bought repair restores dead epithelium.
+- Two research docs underpin it: `INVASION_REWORK_SPEC.md` and
+  `IGA_REFERENCE.md`, the latter correcting two of the Director's stated
+  claims and one of the head session's.
+- 15 harnesses, 550 checks. Sprint22Verification is seeded.

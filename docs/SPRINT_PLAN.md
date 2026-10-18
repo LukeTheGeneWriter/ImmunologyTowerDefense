@@ -76,11 +76,55 @@ before it built.
 - **Crowding damps replication through nutrient competition**, not quorum
   sensing. Same number, correct reason.
 
+## Deviations from the spec (all small, all noted in code)
+
+- **IgA chain membership is uncapped; the BULK saturates instead.** The
+  spec capped a chain at 9 members and said "past this a new clump forms".
+  Every way of implementing that leaked: refusing the daughter left it
+  free, coated and gripping (and a free coated organism still charges a
+  plaque, so the armed wall breached MORE than a naive one); giving it a
+  chain of its own produced one-member "chains" linked to nothing; moving
+  the parent out to pair with it shredded established chains. Bulk
+  saturation is what the cap was for, and it is physically truer.
+- **Coating raised 0.18 -> 0.30 /s.** Bacteria erode the wall they grip,
+  eroded wall charges 1.4x faster, and at 0.18 IgA only just won the race
+  -- so the armed wall breached on some runs and not others. The
+  Director's ruling is that the rung is "an unambiguous reward, never a
+  trap". Playtest number.
+- **Only bacteria graze the epithelium.** Virions were chewing through a
+  segment in four seconds and thereby locking themselves out of it.
+- **The plaque blister is a disc, not an arc.** The spec's arc rendered
+  as a sideways crescent; caught in the magnified dump before a build was
+  spent.
+- **Sentinel sloughing is innate and free**, with the shop row buying
+  amplification. The spec gated the whole mechanic behind the purchase;
+  the research (Birchenough 2016) describes an innate response, and the
+  Director's fork 7 answer was that an unmanaged wall self-cleans.
+
 ## Stopping point
 
-- [ ] All seven build items in, per spec + §12.
-- [ ] 15 harnesses green (14 existing + `Sprint22Verification`), no warnings.
-- [ ] New sprites checked magnified before a build is spent.
+- [x] All seven build items in, per spec + §12.
+- [x] 15 harnesses green (550 checks), no warnings. Sprint22Verification
+      is **seeded** -- several of these mechanics are races, and an
+      unseeded race passes alone and fails in the suite, which is how two
+      real bugs were found.
+- [x] New sprites checked magnified before a build was spent (one was
+      wrong, and was fixed).
 - [ ] WebGL build served for the Director.
 - [ ] **The Director's eye**: does pressure still read, and does IgA feel
       like a reward rather than a wall of text?
+
+## What to watch for in the playtest
+
+1. **Does the blister read?** It is the one thing that replaced a hidden
+   roll, and the whole case for the charge model rests on it being
+   legible mid-round without being studied.
+2. **Does earning IgA feel like a reward?** The design's best moment is
+   meant to be a charging blister deflating as its members turn pearly,
+   raft up and drift away. If that lands, the rung works.
+3. **Is the mill alive or is it noise?** It should read as organisms stuck
+   in moving slime, not as jitter.
+4. **Is the wall too safe once IgA is up?** Stated as a residual risk in
+   the spec; the lever is the coat rate, not the mechanic.
+5. **Does round 1 feel different now that bacteria replicate?** There is
+   finally something to watch and act on before anything is at the wall.

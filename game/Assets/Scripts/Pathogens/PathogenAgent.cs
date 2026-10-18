@@ -657,7 +657,22 @@ namespace ImmunologyTD.Pathogens
 
         public void SetPlaqueIndex(int index) => PlaqueIndex = index;
 
-        public void SetCoated(bool coated) => IsCoated = coated;
+        public void SetCoated(bool coated)
+        {
+            if (IsCoated == coated) return;
+            IsCoated = coated;
+
+            // A coated organism reads pearly even on its own, before it has
+            // found a partner to be bridged to. The clump gets a raft sprite;
+            // a single gets this, so "the wall turns pearly" happens the
+            // moment the rung is earned rather than only once agglutination
+            // catches up.
+            if (sr == null) return;
+            restColor = coated
+                ? Color.Lerp(BoardRenderer.PathogenColor, Rendering.Palette.IgaCoat, 0.55f)
+                : BoardRenderer.PathogenColor;
+            sr.color = restColor;
+        }
 
         public void SetClump(int clumpId) => ClumpId = clumpId;
 

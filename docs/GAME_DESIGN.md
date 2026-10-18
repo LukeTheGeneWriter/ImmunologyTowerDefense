@@ -150,21 +150,15 @@ at the board edge, marched it across, and adhered it at a **uniformly
 random column**, which is what produced the "flying across the board"
 problem this section exists to fix.
 
-> **Under revision (Director, 2026-10-14, after the Sprint 21 playtest).**
-> The *drawn* colonisation -- adhered pathogens stacked in an orderly
-> line at one interface position (`GutInterface` + `PathogenAgent.
-> InterfaceStackWorldPosition`) -- was always a placeholder and should
-> go. The Director's direction: pathogens **float around an area near a
-> breach spot** (and may be **trapped by secretory IgA**) rather than
-> queueing in a lane. That opens **proximity-based ingress** (breach
-> wherever enough pathogens crowd a stretch of wall, not per lane),
-> **mucus sloughing** (§6b's turnover upgrade, made spatial), and
-> **barrier-cell death**: a dead epithelial cell is a hole bacteria can
-> use but that still **blocks viruses**, which need a living cell to
-> infect. Step 2's "pressure builds visibly, then bursts" should survive
-> the rework. Design it before building it: see `SESSION_HANDOFF.md`.
+> **Revised and re-locked (Director, 2026-10-18/19, Sprint 22).** Steps 1
+> and 2 below are the REWRITTEN versions. The orderly per-lane
+> colonisation stack is gone; so is the hidden per-position breach roll.
+> The design is in `docs/INVASION_REWORK_SPEC.md` (its §12 carries the
+> Director's decisions and supersedes its own fork list), and the
+> immunology it rests on is checked against the literature in
+> `docs/IGA_REFERENCE.md`. Steps 3–5 are unchanged.
 
-### Step 1 — Adhesion is proximity-gated
+### Step 1 — Adhesion is proximity-gated, and adherents MILL
 
 A pathogen riding the lumen flow has a **chance to adhere that depends on
 its distance from the gut interface**. Close to the boundary, it likely
@@ -174,29 +168,92 @@ This makes lateral position in the lumen meaningful rather than decorative,
 and it means the flow itself does real work: a pathogen's lane through the
 lumen determines its odds of ever becoming the player's problem. A pathogen
 that never adheres rides the flow out the bottom and is excreted, with no
-penalty — the deliberate break from Bloons TD 6 (`handoff-map01-intestine.md`
-§1) that this layout preserves.
+penalty — the deliberate break from Bloons TD 6 that this layout preserves.
 
-**On adhering, the pathogen moves to the boundary** and sits there. It is
-now colonising the gut interface (`GAME_DESIGN.md` §6b) — not yet in the
-tissue, and not yet the player's problem, but accumulating.
+**On adhering, the pathogen joins the mill.** It takes a continuous
+position in the mucus band — distance *along* the wall, and depth *out*
+from it — arrives in the outer mucus and **settles in over about two
+seconds**. It does not snap to the seam and it does not queue: it drifts,
+loops and crowds. The adhered population is carried slowly **downstream**
+by the mucus, in time with the peristaltic contraction already on screen,
+and an adherent that reaches the far end rejoins the flow and is excreted.
+So the barrier population accumulates across rounds (§6b) without being
+immortal.
 
-### Step 2 — Breach is per-position and releases everything at once
+Adherents **drift toward each other**. Colonisation is a social process,
+and mechanically this is what turns several scattered clumps into one
+dangerous spot over the course of a round.
 
-**Each position along the boundary carries its own breach chance**, rolled
-per tick (or every X ticks — a tuning decision, and rolling less often with
-a correspondingly larger chance is the cheaper implementation on a
-40-row boundary).
+**Bacteria replicate while on the wall**, damped by local density. The
+damper is **nutrient competition between metabolically overlapping
+neighbours** — your own kind compete with you hardest, because they eat
+exactly what you eat. It is *not* quorum sensing, which governs virulence
+and biofilm rather than growth rate. Viruses do not replicate out here:
+no host, no replication.
 
-When a position's breach trips, **every pathogen adhered at that position
-is released at once** into the first layer of healthy tissue.
+### Step 2 — Ingress is proximity-based, and pressure is a visible charge
 
-This is the shape that makes the mechanic good, and it should be preserved
-even if the numbers move: pressure at a boundary position **builds
-visibly** as pathogens pile up, and then **bursts**. The player can see a
-dangerous position forming before it breaks, which is what makes defending
-it a decision rather than a reaction. A trickle of independent single
-invasions would lose that entirely.
+**Breach is no longer per lane.** Crowding is measured as *concentration*
+over a stretch of wall about a cell and a half wide — a tight knot reads as
+dangerous, the same organisms spread thin do not. Where that crowding
+peaks, the wall forms a **plaque**: a patch that owns the organisms inside
+it and carries a **charge**.
+
+The charge **fills while the plaque holds more than a minimum number of
+organisms**, and when it fills, the plaque **ruptures**: every member
+enters the tissue at once, across whatever lanes the crowd had spread over,
+and the epithelium it tore through **dies**.
+
+Three properties are load-bearing and must survive any future change:
+
+1. **Pressure builds visibly at a spot, then bursts.** This is the original
+   requirement and the reason the section exists. What is *drawn* is now
+   the actual state: the blister's height and colour are the charge. The
+   old model drew a proxy for a memoryless roll — a "hot" lane might go in
+   one second or in thirty, nothing accumulated, and a player could never
+   see that an intervention had worked.
+2. **Ingress is something a CROWD does, never something a pathogen does.**
+   The charge rate subtracts a floor, so one or two adherents accrue
+   nothing, *forever*. A trickle is arithmetically impossible, not merely
+   unlikely. This floor is also the **minimum infectious dose**, which is
+   real and famously species-specific, so it is the knob that will later
+   distinguish one species from another.
+3. **A rupture is one event releasing everything at once**, not a stream of
+   independent invasions.
+
+**A dead stretch of wall is a weak spot, not a hole** (Director,
+2026-10-18). It charges markedly faster — the board remembers where it was
+breached — but it still takes a crowd, so there is **one** ingress
+mechanic in the game and not two. Dead wall regrows slowly on its own, and
+faster near a crypt.
+
+**The asymmetry: bacteria and viruses want opposite walls.** A virus needs
+a *living* cell, so over a dead stretch there is nothing left to infect and
+viruses gain nothing there. (Phrase this as "nothing there to infect",
+never "cannot cross" — a virion can physically drift through a gap, it
+simply finds no host.) A battered wall is therefore a bacterial sieve and a
+viral dead end, and a pristine wall is the reverse. The player cannot
+optimise for both, and a mixed round forces the choice.
+
+**Two defences act out here, and both flush rather than kill.**
+
+- **Sentinel sloughing (innate, free, from round 1).** A sentinel goblet
+  cell at a crypt entrance detects bacteria crowding too close, dumps its
+  whole mucus load, and signals its neighbours to do the same, expelling
+  what is caught back into the flow. Triggered, not timed; local, not
+  global; non-specific, so it needs no knowledge. §6b's mucus-turnover
+  upgrade buys **amplification** of this — a wider patch and a faster
+  refill — not the mechanic itself.
+- **Secretory IgA (adaptive, at §5's ~70% rung).** See §5. Its effect on
+  this step is that **crowding flips sign**: free crowding charges a
+  plaque, coated crowding cross-links into rafts that cannot reach the
+  epithelium and are swept away. Above the rung, a dense patch of a
+  characterised species is not a threat forming — it is a clearance event
+  forming.
+
+**The player can answer the wall.** Towers can suppress a charging plaque,
+and a bought repair restores dead epithelium. A visible blister has to be
+something the player can act on, not only watch.
 
 ### Step 3 — Advance is toward the base, not "leftward"
 
@@ -795,7 +852,7 @@ nothing else. Each capability's real mechanic is its own later sprint.
 | ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
 | ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. |
-| ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. |
+| ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. **Built in Sprint 22.** Two stages: a *coated* organism is slower, pacified and more fragile behind the wall; two coated organisms of the same species are **cross-linked** into a raft that cannot reach the epithelium and is swept away. Crucially, a coated bacterium still divides at full rate and its **daughter is born attached to it**, so under IgA replication is what traps it. Nothing out here is killed. |
 
 The **~90% "specific sensing" capstone** (antibody-coated pathogens
 become chemotactic beacons) is not in the Director's six — treat it as the
