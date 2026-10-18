@@ -90,9 +90,12 @@ penalty on division rate. If a future session adds one, the observable
 
 ### What is queued next
 
-1. **The Director's playtest of Sprint 22** -- see `SPRINT_PLAN.md`'s
-   "what to watch for". The open question is whether the blister reads
-   mid-round and whether earning IgA feels like a reward.
+1. **DONE -- he played it 2026-10-19.** The blister reads; the mill,
+   the post-IgA wall and round 1 are all good. **He never perceived
+   IgA**, "overshadowed by the relative strength of the macrophages."
+   `PLAYTEST_LOG.md` triages that into three candidate causes to check
+   IN ORDER -- the likeliest being that knowledge never reached 70%, so
+   the rung never fired. **Do not tune `IgaTuning` before checking.**
 2. **Round planning and new pathogens**, which the rework was blocking.
    Both now have a wall model to design against, and the barrier
    asymmetry gives a mixed round a real decision.
@@ -129,7 +132,14 @@ penalty on division rate. If a future session adds one, the observable
 ## For whichever session picks this up
 
 Read `CLAUDE.md` and `WORKFLOW.md`, then this file, then `PLAYTEST_LOG.md`
-(the newest entries) and `BACKLOG.md` (Sprints 18–21 sections). Suggested
-opening move: **ask the Director how Sprint 22 played**, against
-`SPRINT_PLAN.md`'s "what to watch for" list, before building anything
-new on top of the wall.
+(the newest entries) and `BACKLOG.md` (Sprints 18–21 sections). **Opening move for the next session, set by the Director on 2026-10-19:**
+ask him about **new cell types and upgrades** -- he has ideas to
+suggest -- and **review how the upgrades currently work** alongside that
+conversation. Start there, not with the wall.
+
+Useful context to have ready for that conversation: all 12 progenitor
+upgrade rows were wired in Sprint 18, `ShopLedger` / `ShopTuning` hold the
+shop rows, and `BACKLOG.md`'s oldest open question is still Round 1's
+economy and whether a "forced opening" is a goal. The IgA miss above may
+also turn out to be a round-design problem rather than an IgA one, which
+is adjacent to this conversation.

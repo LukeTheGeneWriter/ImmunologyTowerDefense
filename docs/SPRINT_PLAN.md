@@ -110,9 +110,16 @@ before it built.
       real bugs were found.
 - [x] New sprites checked magnified before a build was spent (one was
       wrong, and was fixed).
-- [ ] WebGL build served for the Director.
-- [ ] **The Director's eye**: does pressure still read, and does IgA feel
-      like a reward rather than a wall of text?
+- [x] WebGL build served for the Director (9,198,052 bytes, 0 errors).
+- [x] **The Director's eye** (2026-10-19, verbatim in `PLAYTEST_LOG.md`):
+      the blister **reads**; the mill, the wall's safety after IgA, and
+      round 1 with replication are all good. **He never perceived IgA** --
+      "overshadowed by the relative strength of the macrophages."
+
+**Sprint 22 is closed.** The IgA miss is triaged in `PLAYTEST_LOG.md`
+with three candidate causes to check in order; the likeliest is that
+knowledge never reached 70% in that session, in which case the rung never
+fired and there was nothing to see.
 
 ## What to watch for in the playtest
 

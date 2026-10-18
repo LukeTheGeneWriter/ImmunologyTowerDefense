@@ -61,3 +61,49 @@ game board, and a pathogen knowledge HUD.
 - Next sprints should focus on **adding pathogens, planning rounds, and
   setting up agent playtests to find "broken strategies"**, so we can tell
   which are true biological strategies and which need work.
+
+## Sprint 22 — 2026-10-19 (Director)
+The invasion rework. In his words:
+
+> "I can tell the blister is there now. I don't think I perceived IgA,
+> it's overshadowed by the relative strength of the macrophages. I think
+> the next step will be for me to suggest new cell types and upgrades.
+> 3-5 are all good."
+
+Against `SPRINT_PLAN.md`'s five watch-items:
+
+1. **Does the blister read?** — **Yes.** The charge model's whole case was
+   that what is drawn should be the actual state, and it landed.
+2. **Does earning IgA feel like a reward?** — **No: he never perceived it
+   at all.** This is the sprint's one miss, and it is NOT the same
+   complaint as "IgA is too weak." See below.
+3. **Is the mill alive or noise?** — good.
+4. **Is the wall too safe once IgA is up?** — good (no complaint).
+5. **Does round 1 feel different with replication?** — good.
+
+### The IgA miss — diagnose before tuning
+
+"Overshadowed by the relative strength of the macrophages" has at least
+three distinct causes and they want opposite fixes. **Check them in this
+order before touching `IgaTuning`:**
+
+1. **Did knowledge ever reach 70% for any species in that session?** If
+   not, IgA never switched on and there is nothing to perceive. The rung
+   is `KnowledgeCapability.SecretoryIgA` at 70%; the HUD pip going solid
+   is the tell. This is the cheapest check and the most likely answer.
+2. **If it did fire, was there ever a crowd at the wall to clear?** IgA
+   acts in the lumen. If macrophages clear the tissue so efficiently that
+   wall pressure never builds, the player never sees the thing IgA
+   prevents. A defence against a problem you never have is invisible by
+   construction — that is a ROUND-DESIGN problem, not an IgA problem.
+3. **Only if 1 and 2 are fine** is this a strength question, and the lever
+   is `IgaTuning.CoatChancePerSecond`.
+
+Note (2) is the interesting possibility, because it says the wall rework
+is working and the rounds are not yet asking anything of it.
+
+### Direction for next session (Director)
+
+He will **suggest new cell types and upgrades**, and wants the current
+upgrade behaviour reviewed alongside. Open the next session by asking him
+about both.
