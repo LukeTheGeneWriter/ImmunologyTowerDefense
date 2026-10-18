@@ -187,6 +187,10 @@ namespace ImmunologyTD.Pathogens
             this.tissueGrid = tissueGrid;
             this.cytokineField = cytokineField;
             this.gutWall = gutWall;
+            // The wall asks for daughters; it never allocates. Pooling is
+            // non-negotiable in this project (CLAUDE.md), and the pool lives
+            // here.
+            if (gutWall != null) gutWall.SpawnDaughter = SpawnDaughterOnWall;
             this.tally = tally;
 
             pool = gameObject.AddComponent<PrefabPool>();
@@ -262,6 +266,35 @@ namespace ImmunologyTD.Pathogens
                 fieldRecomputeTimer = 0f;
                 cytokineField.Recompute(tissueGrid.InfectedSources(currentTime));
             }
+        }
+
+        /// <summary>
+        /// Spawns a daughter beside a dividing parent on the wall
+        /// (INVASION_REWORK_SPEC.md section 4a). Returns null when the pool
+        /// is near its ceiling -- a blocked division simply re-arms, so
+        /// replication can never starve the bolus.
+        ///
+        /// The daughter is placed a fraction of a cell from its parent, which
+        /// matters more than it looks: under IgA it will be born enchained to
+        /// that parent, and the pair has to read as one object.
+        /// </summary>
+        private PathogenAgent SpawnDaughterOnWall(PathogenAgent parent, float currentTime)
+        {
+            if (parent == null) return null;
+            if (live.Count >= maxLivePathogens - IgaTuning.PoolHeadroom) return null;
+
+            var go = pool.Get();
+            var daughter = go.GetComponent<PathogenAgent>();
+            daughter.Initialize(board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear,
+                                classOverride: parent.Class);
+            live.Add(daughter);
+
+            float offset = Random.Range(0.04f, 0.10f) * (Random.value < 0.5f ? -1f : 1f);
+            daughter.AdhereToWall(Mathf.Clamp(parent.WallS + offset, 0f, gutWall.WallLengthCells - 0.001f));
+            // Born where its parent is, not out in the mucus: it did not
+            // arrive, it was made here.
+            daughter.SetWallPosition(daughter.WallS, parent.WallD);
+            return daughter;
         }
 
         private void SpawnOne()

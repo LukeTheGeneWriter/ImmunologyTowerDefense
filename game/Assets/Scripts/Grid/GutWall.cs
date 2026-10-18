@@ -88,6 +88,30 @@ namespace ImmunologyTD.Grid
         /// not at all.</summary>
         private readonly List<PathogenAgent> ruptureBuffer = new List<PathogenAgent>();
 
+        /// <summary>Members per IgA clump, indexed by clump id. A clump is
+        /// never destroyed, only emptied -- ids are stable for the renderer.
+        /// </summary>
+        private readonly List<int> clumpSize = new List<int>();
+
+        /// <summary>Reads knowledge per species, so the wall can tell whether
+        /// IgA against a given class is online. Null until the adaptive side
+        /// is wired, in which case no coating ever happens -- which is
+        /// exactly right for a harness that has not bought any knowledge.
+        /// </summary>
+        private ImmunologyTD.Adaptive.KnowledgeLedger knowledge;
+
+        /// <summary>How many organisms IgA has excluded from the wall --
+        /// agglutinated, swept downstream and lost. Counted separately from
+        /// Excreted because "it never stuck" and "we pushed it off" are
+        /// different things for the strategy harness to read.</summary>
+        public int IgaExcluded { get; private set; }
+
+        /// <summary>How many organisms have been born on the wall. With
+        /// enchained growth this is NOT purely bad news for the player --
+        /// under IgA a division is what builds the attacker's own cage.
+        /// </summary>
+        public int LumenDivisions { get; private set; }
+
         /// <summary>Fired once per rupture, with (centre s, pathogens
         /// released, footprint in cells). Replaces GutInterface.Breached.
         ///
@@ -97,6 +121,15 @@ namespace ImmunologyTD.Grid
         /// about half the bursts -- and a burst that isn't drawn is the one
         /// thing the mechanic cannot afford to lose.</summary>
         public event System.Action<float, int, float> Ruptured;
+
+        /// <summary>Gives the wall the knowledge ledger, so IgA can come
+        /// online at the 70% rung. Optional: without it, nothing is ever
+        /// coated.</summary>
+        public void BindKnowledge(ImmunologyTD.Adaptive.KnowledgeLedger ledger) => knowledge = ledger;
+
+        /// <summary>Spawns a daughter. Set by PathogenSpawner, which owns the
+        /// pool -- the wall asks, it does not allocate.</summary>
+        public System.Func<PathogenAgent, float, PathogenAgent> SpawnDaughter;
 
         public GutWall(BoardConfig board, TissueGrid tissueGrid, InvasionTally tally)
         {
@@ -192,6 +225,7 @@ namespace ImmunologyTD.Grid
         public bool Remove(PathogenAgent pathogen)
         {
             if (pathogen == null) return false;
+            if (pathogen.IsCrossLinked) LeaveClump(pathogen);
             return adhered.Remove(pathogen);
         }
 
@@ -215,6 +249,12 @@ namespace ImmunologyTD.Grid
             SeedPlaques();
             AssignMembership();
             ChargeAndRupture(deltaTime, currentTime);
+
+            // IgA and replication run AFTER the plaque pass, so that within a
+            // tick the player's reading of the wall and the simulation agree:
+            // what charged is what was gripping at the top of the tick.
+            TickIga(deltaTime, currentTime);
+            TickReplication(currentTime);
         }
 
         /// <summary>Creep, cohesion and settling -- the simulated half of the
@@ -235,11 +275,24 @@ namespace ImmunologyTD.Grid
                 var p = adhered[i];
                 if (p == null) { adhered.RemoveAt(i); continue; }
 
-                float s = p.WallS + creep;
-                float d = Mathf.MoveTowards(p.WallD, InvasionTuning.SettleDepthCells, settleStep);
+                // A raft outruns the rest of the mill: it has let go of the
+                // wall and the mucus is taking it.
+                float s = p.WallS + creep * (p.IsCrossLinked ? IgaTuning.ClearCreepMultiplier : 1f);
+                // A clumped organism is held out by SweepClumps, not settling
+                // in; everything else comes in to land.
+                float d = p.IsCrossLinked
+                    ? p.WallD
+                    : Mathf.MoveTowards(p.WallD, InvasionTuning.SettleDepthCells, settleStep);
 
-                float target = CohesionTarget(s);
-                if (!float.IsNaN(target)) s = Mathf.MoveTowards(s, target, cohesionStep);
+                // A clumped organism has nothing left to adhere WITH -- its
+                // adhesins are spent on its neighbours -- so it does not seek
+                // a crowd. A merely coated one is slower about it.
+                if (!p.IsCrossLinked)
+                {
+                    float target = CohesionTarget(s);
+                    if (!float.IsNaN(target))
+                        s = Mathf.MoveTowards(s, target, cohesionStep * p.MotilityScale);
+                }
 
                 // Off the downstream end: the mucus has carried it out of the
                 // gut. It rejoins the flow and is excreted -- no penalty,
@@ -248,6 +301,7 @@ namespace ImmunologyTD.Grid
                 // without making it immortal.
                 if (s >= WallLengthCells)
                 {
+                    if (p.IsCrossLinked) { IgaExcluded++; LeaveClump(p); }
                     adhered.RemoveAt(i);
                     p.SweptOffWall();
                     continue;
@@ -564,6 +618,332 @@ namespace ImmunologyTD.Grid
 
             slot = default;
             return false;
+        }
+
+        // -- Secretory IgA (INVASION_REWORK_SPEC.md section 4) ---------
+
+        /// <summary>
+        /// Coats eligible organisms, bridges coated neighbours of the same
+        /// class into clumps, breaks old links, and sweeps rafts away.
+        ///
+        /// **The resolution of the IgA trap lives here**, and it is worth
+        /// stating because a plausible implementation of this rung is
+        /// actively harmful: trapping organisms AT the wall concentrates
+        /// them, and under proximity ingress concentration is what breaches.
+        /// So a naive IgA would charge the player 70% of a species' knowledge
+        /// to make that species MORE dangerous.
+        ///
+        /// It is closed four times over, on purpose:
+        ///  1. a clumped organism contributes 0 to the crowd field;
+        ///  2. it is held beyond the grip depth, and FURTHER OUT the bigger
+        ///     its clump -- so density increases the exclusion;
+        ///  3. it is not a plaque member, so a rupture beside it leaves it;
+        ///  4. cross-linking ACCELERATES with density, because bridging
+        ///     needs a partner.
+        ///
+        /// (4) is the one that makes the inversion real rather than merely
+        /// safe: the denser a coated patch, the faster it rafts up and
+        /// leaves.
+        /// </summary>
+        private void TickIga(float deltaTime, float currentTime)
+        {
+            if (knowledge == null) return;
+
+            float coatP = Probability(IgaTuning.CoatChancePerSecond, deltaTime);
+            float breakP = Probability(IgaTuning.LinkBreakChancePerSecond, deltaTime);
+
+            for (int i = 0; i < adhered.Count; i++)
+            {
+                var p = adhered[i];
+                if (p == null) continue;
+
+                if (!p.IsCoated
+                    && p.WallD <= IgaTuning.ReachDepthCells
+                    && knowledge.Get(p.Class) >= IgaTuning.KnowledgePercent
+                    && Random.value < coatP)
+                {
+                    p.SetCoated(true);
+                }
+
+                // Links break over time -- the other half of Bansept's race,
+                // and why a stalled chain slowly comes apart while a dividing
+                // one grows.
+                //
+                // A break SPLITS a chain; it does not dissolve one. Only the
+                // last pair can actually come apart, because an organism in
+                // the middle of a chain is still held by its other neighbour.
+                // Letting any member walk free instead cost an afternoon: at
+                // 0.02/s every member of a 9-chain escapes within a couple of
+                // minutes, and a free COATED organism still grips and still
+                // charges a plaque, so the wall leaked exactly as if IgA were
+                // not there.
+                if (p.IsCrossLinked && Random.value < breakP) DislocateFrom(p);
+            }
+
+            CrossLinkNeighbours(deltaTime);
+            SweepClumps(deltaTime);
+        }
+
+        /// <summary>Bridges coated organisms of the same class. The rate is
+        /// per NEIGHBOUR, so it rises with local density -- which is the
+        /// whole promise that density flips sign above the rung.</summary>
+        private void CrossLinkNeighbours(float deltaTime)
+        {
+            float radius = IgaTuning.CrossLinkRadiusCells;
+
+            for (int i = 0; i < adhered.Count; i++)
+            {
+                var a = adhered[i];
+                if (a == null || !a.IsCoated) continue;
+
+                int neighbours = 0;
+                PathogenAgent partner = null;
+                for (int j = 0; j < adhered.Count; j++)
+                {
+                    if (i == j) continue;
+                    var b = adhered[j];
+                    // Same class only: knowledge is per-species, and IgA ties
+                    // an organism to another MATCHING one. A mixed round is
+                    // therefore harder to clear by IgA alone, which is
+                    // correct and is a nice piece of teaching.
+                    if (b == null || !b.IsCoated || b.Class != a.Class) continue;
+                    if (Mathf.Abs(b.WallS - a.WallS) > radius) continue;
+                    neighbours++;
+                    if (partner == null || b.ClumpId >= 0) partner = b;
+                }
+                if (neighbours == 0 || partner == null) continue;
+
+                float p = Probability(
+                    IgaTuning.CrossLinkChancePerSecondPerNeighbour * neighbours, deltaTime);
+                if (Random.value >= p) continue;
+
+                Bridge(a, partner);
+            }
+        }
+
+        /// <summary>Joins two organisms into one clump, merging the smaller
+        /// into the larger when both already have one.</summary>
+        public void Bridge(PathogenAgent a, PathogenAgent b)
+        {
+            if (a == null || b == null || a == b) return;
+
+            if (a.ClumpId < 0 && b.ClumpId < 0)
+            {
+                int id = NewClump();
+                JoinClump(a, id);
+                JoinClump(b, id);
+                return;
+            }
+            if (a.ClumpId < 0) { JoinClump(a, b.ClumpId); return; }
+            if (b.ClumpId < 0) { JoinClump(b, a.ClumpId); return; }
+            if (a.ClumpId == b.ClumpId) return;
+
+            int from = clumpSize[a.ClumpId] < clumpSize[b.ClumpId] ? a.ClumpId : b.ClumpId;
+            int into = from == a.ClumpId ? b.ClumpId : a.ClumpId;
+
+            for (int i = 0; i < adhered.Count; i++)
+                if (adhered[i] != null && adhered[i].ClumpId == from) JoinClump(adhered[i], into);
+        }
+
+        private int NewClump()
+        {
+            for (int i = 0; i < clumpSize.Count; i++)
+                if (clumpSize[i] == 0) return i;
+            clumpSize.Add(0);
+            return clumpSize.Count - 1;
+        }
+
+        /// <summary>Puts an organism in a chain. Always succeeds:
+        /// membership is unbounded and the BULK saturates instead -- see
+        /// ClumpRadiusCells for why the spec's membership cap was dropped.
+        /// </summary>
+        private bool JoinClump(PathogenAgent p, int id)
+        {
+            if (p.ClumpId == id) return true;
+            if (p.ClumpId >= 0) clumpSize[p.ClumpId]--;
+            p.SetClump(id);
+            clumpSize[id]++;
+            return true;
+        }
+
+
+        /// <summary>One link gives way. A pair comes apart; a longer chain
+        /// splits, and the organism stays enchained to the piece it leaves
+        /// with.</summary>
+        private void DislocateFrom(PathogenAgent p)
+        {
+            if (p.ClumpId < 0) return;
+            if (ClumpMembers(p.ClumpId) <= 2)
+            {
+                // The last pair: both are genuinely free again, and will
+                // re-bridge quickly if they are still touching.
+                int id = p.ClumpId;
+                for (int i = 0; i < adhered.Count; i++)
+                    if (adhered[i] != null && adhered[i].ClumpId == id) LeaveClump(adhered[i]);
+                return;
+            }
+            JoinClump(p, NewClump());
+        }
+
+        private void LeaveClump(PathogenAgent p)
+        {
+            if (p.ClumpId < 0) return;
+            int id = p.ClumpId;
+            clumpSize[id]--;
+            p.SetClump(-1);
+
+            // A chain of one is linked to nothing. Free the straggler rather
+            // than leaving it "cross-linked" and therefore excluded by a bond
+            // that does not exist.
+            if (clumpSize[id] != 1) return;
+            for (int i = 0; i < adhered.Count; i++)
+                if (adhered[i] != null && adhered[i].ClumpId == id) { clumpSize[id]--; adhered[i].SetClump(-1); break; }
+        }
+
+        public int ClumpCount => clumpSize.Count;
+
+        public int ClumpMembers(int id) =>
+            id >= 0 && id < clumpSize.Count ? clumpSize[id] : 0;
+
+        /// <summary>
+        /// Bulk of a chain, in cells. sqrt so a 4-chain is twice the base
+        /// radius and a 9-chain three times -- visibly chunky.
+        ///
+        /// **Deviation from INVASION_REWORK_SPEC.md section 4.3**, found in
+        /// testing. The spec capped chain MEMBERSHIP at 9 and said "past this
+        /// a new clump forms instead". Every way of implementing that cap
+        /// leaked: refusing the daughter left it free, coated and gripping
+        /// (an armed wall then breached MORE than a naive one); giving it a
+        /// chain of its own produced one-member "chains" linked to nothing,
+        /// which dislocated on the next roll; and moving the parent out to
+        /// pair with it shredded established chains as members kept leaving.
+        ///
+        /// Membership is therefore unbounded and the BULK saturates instead.
+        /// That is what the cap was for -- keeping the drawn raft under a
+        /// cell and sqrt() bounded -- and it is physically truer: a long
+        /// chain really does exist, its hold-depth effect simply stops
+        /// growing. The invariant that matters survives intact: an organism
+        /// is either free, or attached to at least one other organism.
+        /// </summary>
+        public float ClumpRadiusCells(int id) =>
+            IgaTuning.ClumpBaseRadiusCells
+            * Mathf.Sqrt(Mathf.Clamp(ClumpMembers(id), 1, IgaTuning.ClumpMaxMembers));
+
+        /// <summary>Pushes rafts off the wall and carries them downstream.
+        /// Nothing is killed: everything leaves. That is the compartment's
+        /// rule -- the gut's answer is flush, not eat.</summary>
+        private void SweepClumps(float deltaTime)
+        {
+            float push = IgaTuning.PushOutSpeedCellsPerSecond * deltaTime;
+
+            for (int i = adhered.Count - 1; i >= 0; i--)
+            {
+                var p = adhered[i];
+                if (p == null || !p.IsCrossLinked) continue;
+
+                // Held at the larger of the floor and its own bulk, so a
+                // growing raft pushes ITSELF further out of reach.
+                float hold = Mathf.Max(IgaTuning.HoldDepthCells, ClumpRadiusCells(p.ClumpId));
+                p.SetWallPosition(p.WallS, Mathf.MoveTowards(p.WallD, hold, push));
+            }
+        }
+
+        // -- In-lumen replication (INVASION_REWORK_SPEC.md section 4a) --
+
+        /// <summary>
+        /// Divides bacteria on the wall, damped by local density.
+        ///
+        /// **A daughter of a cross-linked parent is born INTO its parent's
+        /// clump.** That is enchained growth (Moor 2017), and it is why there
+        /// is no IgA penalty on the division rate anywhere in this method:
+        /// IgA does not slow bacteria down, it exploits their division. Under
+        /// IgA, replicating faster is what traps you.
+        ///
+        /// The consequence is the best property in this design: **fast
+        /// replicators trap themselves hardest, and nothing here ever decides
+        /// which pathogen deserves it.** The physics does the targeting.
+        /// </summary>
+        private void TickReplication(float currentTime)
+        {
+            if (SpawnDaughter == null) return;
+
+            int count = adhered.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var p = adhered[i];
+                if (p == null || !p.CanReplicateInLumen) continue;
+
+                if (float.IsPositiveInfinity(p.DivideAt))
+                {
+                    p.SetDivideAt(currentTime + NextDivideInterval(p));
+                    continue;
+                }
+                if (currentTime < p.DivideAt) continue;
+
+                var daughter = SpawnDaughter(p, currentTime);
+                p.SetDivideAt(currentTime + NextDivideInterval(p));
+                if (daughter == null) continue;
+
+                LumenDivisions++;
+                daughter.SetCoated(p.IsCoated);
+
+                // **Enchained growth is what CREATES a chain**, not just what
+                // extends one. A coated parent keeps its daughter whether or
+                // not it was already in a clump -- that is the whole finding
+                // (Moor 2017): clumps form from division, because classical
+                // agglutination needs densities real infections never reach.
+                //
+                // Requiring the parent to be pre-clumped, as this first did,
+                // leaves every first-generation daughter free and coated, and
+                // free coated organisms still grip and still charge plaques.
+                if (p.IsCoated && p.ClumpId < 0)
+                {
+                    int chain = NewClump();
+                    JoinClump(p, chain);
+                    JoinClump(daughter, chain);
+                }
+                else if (p.IsCrossLinked)
+                {
+                    // Born enchained: the daughter never separates from its
+                    // parent, so the clump grows by exactly the mechanism
+                    // that was supposed to be the attacker's win condition.
+                    // If the parent's chain is already at its bulk cap, the
+                    // daughter starts a NEW chain -- it must never be left
+                    // free.
+                    JoinClump(daughter, p.ClumpId);
+                }
+                else
+                {
+                    daughter.SetDivideAt(currentTime + NextDivideInterval(daughter));
+                }
+            }
+        }
+
+        /// <summary>Division interval, damped by how crowded it is here.
+        ///
+        /// The damper is nutrient competition between metabolically
+        /// overlapping neighbours -- your own kind compete with you hardest,
+        /// because they eat exactly what you eat. It is NOT quorum sensing,
+        /// which governs virulence and biofilm rather than growth rate.
+        /// </summary>
+        private float NextDivideInterval(PathogenAgent p)
+        {
+            float interval = IgaTuning.LumenDivideIntervalSeconds;
+            if (p.Class == PathogenClass.IntracellularBacterium)
+                interval /= Mathf.Max(0.01f, IgaTuning.IntracellularLumenRateMultiplier);
+
+            float localCrowd = CrowdAt(p.WallS);
+            interval *= 1f + IgaTuning.CrowdDamperStrength * localCrowd;
+            return Mathf.Max(0.5f, interval);
+        }
+
+        /// <summary>The project's standard per-second-to-per-tick conversion,
+        /// the same `1 - (1-p)^dt` shape GutWallFeatures.TrySample uses.
+        /// </summary>
+        private static float Probability(float perSecond, float deltaTime)
+        {
+            float p = Mathf.Clamp01(perSecond);
+            return 1f - Mathf.Pow(1f - p, Mathf.Max(0f, deltaTime));
         }
 
         /// <summary>Where a wall point is drawn. The outward direction is

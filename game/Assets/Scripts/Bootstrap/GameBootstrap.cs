@@ -170,6 +170,10 @@ namespace ImmunologyTD.Bootstrap
             // (GAME_DESIGN.md §5a/§5c). Knowledge % persists for the run.
             AdaptiveTuning.ResetToDefaults();
             knowledge = new KnowledgeLedger();
+            // Secretory IgA is the only capability that acts in the lumen, so
+            // the wall needs to see knowledge directly (KnowledgeLadder's 70%
+            // rung).
+            gutWall.BindKnowledge(knowledge);
 
             // Sprint 11: the placeholder buy-phase shop.
             ShopTuning.ResetToDefaults();

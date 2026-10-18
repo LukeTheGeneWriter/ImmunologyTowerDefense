@@ -134,12 +134,39 @@ namespace ImmunologyTD.Pathogens
         public bool IsGrippingWall =>
             State == PathogenState.AtInterface && WallD <= InvasionTuning.GripDepthCells;
 
-        /// <summary>True when secretory IgA has cross-linked this pathogen to
-        /// another (INVASION_REWORK_SPEC.md section 4). A cross-linked
-        /// pathogen contributes NOTHING to crowding and can never be a plaque
-        /// member -- bulk cannot reach the epithelium. Set in a later scope
-        /// item of this sprint; the wall already honours it.</summary>
-        public bool IsCrossLinked { get; private set; }
+        /// <summary>True when secretory IgA has bound this organism. A coated
+        /// organism still grips, still crowds and still divides at full rate
+        /// -- coating alone is not exclusion. What it changes is that the
+        /// organism is slower, pacified, more fragile in tissue, and
+        /// **eligible to be cross-linked**.</summary>
+        public bool IsCoated { get; private set; }
+
+        /// <summary>Which IgA clump this organism belongs to, or -1.
+        /// Cross-linking requires a partner of the SAME class, because
+        /// knowledge is per-species and IgA ties an organism to another
+        /// MATCHING organism.</summary>
+        public int ClumpId { get; private set; } = -1;
+
+        /// <summary>True when secretory IgA has cross-linked this organism
+        /// into a clump. **This is the exclusion**, and the resolution of the
+        /// trap the design brief warned about: a cross-linked organism
+        /// contributes NOTHING to crowding, can never be a plaque member, is
+        /// held off the wall (further out the bigger its clump), and is swept
+        /// downstream at three times the creep.
+        ///
+        /// So crowding of FREE organisms charges a plaque, while crowding of
+        /// COATED ones cross-links and leaves. Above 70% knowledge a dense
+        /// patch of that species stops being a threat forming and becomes a
+        /// clearance event forming.</summary>
+        public bool IsCrossLinked => ClumpId >= 0;
+
+        /// <summary>When this bacterium next divides, on the round clock.
+        /// Viruses never divide in the lumen -- no host, no replication.
+        /// </summary>
+        public float DivideAt { get; private set; } = float.PositiveInfinity;
+
+        public bool CanReplicateInLumen =>
+            Class == PathogenClass.LargeBacterium || Class == PathogenClass.IntracellularBacterium;
 
         /// <summary>Which plaque owns this pathogen, or -1. Membership is
         /// exclusive and assigned by GutWall each tick.</summary>
@@ -505,7 +532,11 @@ namespace ImmunologyTD.Pathogens
 
             if (State == PathogenState.InTissue)
             {
-                float interval = Mathf.Max(0.0001f, InvasionTuning.TissueStepIntervalSeconds);
+                // A coated organism is visibly labouring: ~2.9s per cell
+                // instead of 1s. A front of them can be held by far fewer
+                // cells, which is ruling 2 paying off behind the wall.
+                float interval = Mathf.Max(0.0001f,
+                    InvasionTuning.TissueStepIntervalSeconds / Mathf.Max(0.01f, MotilityScale));
                 stepTimer += deltaTime;
                 while (stepTimer >= interval && State == PathogenState.InTissue)
                 {
@@ -578,7 +609,6 @@ namespace ImmunologyTD.Pathogens
 
             State = PathogenState.AtInterface;
             PlaqueIndex = -1;
-            IsCrossLinked = false;
 
             // Draw the mill constants once, here. Ranges are
             // INVASION_REWORK_SPEC.md section 2.2: a 2.5-4.5s period is
@@ -622,7 +652,21 @@ namespace ImmunologyTD.Pathogens
 
         public void SetPlaqueIndex(int index) => PlaqueIndex = index;
 
-        public void SetCrossLinked(bool crossLinked) => IsCrossLinked = crossLinked;
+        public void SetCoated(bool coated) => IsCoated = coated;
+
+        public void SetClump(int clumpId) => ClumpId = clumpId;
+
+        public void SetDivideAt(float time) => DivideAt = time;
+
+        /// <summary>Multiplier on everything this organism does TO the host.
+        /// A coated organism is pacified -- reduced, never zero: it is still
+        /// a pathogen and still has to be cleared.</summary>
+        public float VirulenceScale => IsCoated ? IgaTuning.VirulenceMultiplier : 1f;
+
+        /// <summary>Multiplier on this organism's movement. Coated organisms
+        /// are tangled rather than braked, but the net read is "much
+        /// slower".</summary>
+        public float MotilityScale => IsCoated ? IgaTuning.MotilityMultiplier : 1f;
 
         /// <summary>The mucus carried this pathogen off the downstream end of
         /// the wall. It is excreted, with no penalty -- the same deliberate
@@ -880,7 +924,7 @@ namespace ImmunologyTD.Pathogens
             }
 
             if (tissueGrid.IsHealthyHost(CurrentCoarse) &&
-                Random.value < InvasionTuning.IntracellularEntryChance &&
+                Random.value < InvasionTuning.IntracellularEntryChance * VirulenceScale &&
                 tissueGrid.TryInfect(CurrentCoarse, this, currentTime))
             {
                 tissueGrid.ReleaseOccupant(CurrentCoarse);
@@ -939,7 +983,8 @@ namespace ImmunologyTD.Pathogens
             // InvasionTuning.LargeBacteriumHostDamagePerStep.
             if (Class == PathogenClass.LargeBacterium)
             {
-                tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.LargeBacteriumHostDamagePerStep, Class);
+                tissueGrid.DamageHostCell(CurrentCoarse,
+                    InvasionTuning.LargeBacteriumHostDamagePerStep * VirulenceScale, Class);
             }
 
             StepTissue();
@@ -1199,6 +1244,13 @@ namespace ImmunologyTD.Pathogens
             if (State != PathogenState.InTissue) return;
             if (IsIntracellular) return; // hidden inside a host cell -- §4b
             contactFlashTimer = 0.25f;
+            // "Easier for immune cells to deal with" -- applied HERE, in
+            // tissue, and nowhere in the lumen. Secretory IgA is the
+            // non-inflammatory isotype: it does not fix complement and the
+            // lumen has no patrolling phagocytes to hand anything to. The
+            // gut's own answer out there is flush, not eat.
+            // See docs/IGA_REFERENCE.md claim 2.
+            if (IsCoated) amount *= IgaTuning.TissueDamageTakenMultiplier;
             Health -= amount;
             if (Health > 0f) return;
 
@@ -1297,7 +1349,9 @@ namespace ImmunologyTD.Pathogens
             InterfacePosition = -1;
             WallS = 0f;
             WallD = 0f;
-            IsCrossLinked = false;
+            IsCoated = false;
+            ClumpId = -1;
+            DivideAt = float.PositiveInfinity;
             PlaqueIndex = -1;
             contactFlashTimer = 0f;
             hasSpread = false;
