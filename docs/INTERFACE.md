@@ -728,9 +728,19 @@ public fields on a reference type:
 
 ## Map 01 geometry (`ImmunologyTD.Grid.BoardConfig`, rewritten Sprint 4)
 
-Design: `GAME_DESIGN.md` §1a. The board is **100 × 40 coarse cells** in
-three lateral bands. `Rows` is no longer a `static const` — it is an
-instance property, and the `[Range(24,40)]` clamp on columns is gone.
+Design: `GAME_DESIGN.md` §1a. That section describes Map 01 as **100 × 40
+coarse cells** in three lateral bands — but that is the *aspiration*, not
+what runs. **The scene that actually runs is 25 × 10**, so the gut
+interface has **10 lanes, not 40** (`BoardConfig` code defaults
+`columns 25` / `rows 10`; `Sprint1.unity` sets columns explicitly;
+`COMPARTMENT_DESIGN.md` §0 has the full as-it-runs layout). Corrected
+2026-10-18 during Sprint 22 design — this table said 100 / 40 as fact for
+several sprints, and `BoardConfig`'s own doc comments said the same while
+defaulting to 10. `MapVerification` never caught it because it builds its
+own 100 × 40 rig via `ConfigureForTest`.
+
+`Rows` is no longer a `static const` — it is an instance property, and the
+`[Range(24,40)]` clamp on columns is gone.
 
 ### The axis frame — read this before writing any movement code
 
@@ -744,7 +754,7 @@ property so later maps can put it anywhere (Director, 2026-08-21).
 | `BaseEnd` | Which end of that axis the base occupies |
 | `AxisIndex(CoarseCoord)` | **Distance from the base.** 0 = outermost base cell, always, whichever world side that is |
 | `CrossIndex(CoarseCoord)` | Lane index, perpendicular to the threat axis |
-| `AxisLength` / `CrossLength` | 100 / 40 on Map 01 |
+| `AxisLength` / `CrossLength` | **25 / 10 as the scene runs today** (100 / 40 is `GAME_DESIGN.md` §1a's aspiration — see above) |
 | `CoarseFromAxis(axis, cross)` | Inverse of the two above |
 | `OffsetInAxisFrame(c, dAxis, dCross)` | **The only sanctioned way to step along the threat axis.** `dAxis = -1` is always one cell toward the base |
 | `InAxisBounds` / `InCrossBounds` | Bounds in the frame |

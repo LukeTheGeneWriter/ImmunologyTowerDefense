@@ -3,6 +3,38 @@
 Ideas and known issues not yet scheduled into a sprint. Owned by the head
 session; feedback lands here when it's noted but not urgent.
 
+## Queued by Sprint 22's design + research pass (2026-10-18)
+
+From `docs/IGA_REFERENCE.md` — all real biology, all out of Sprint 22 scope:
+
+- **A player-aimed mucus purge** as the *adaptive* tier. Innate sloughing is
+  automatic and local (sentinel goblet cell, Nlrp6, gap-junction spread);
+  the aimed version is the type-2 "weep-and-sweep" response (IL-4/5/13,
+  mucus + smooth-muscle contractility). It belongs on the knowledge ladder
+  as an earned upgrade. Director chose the innate baseline for Sprint 22.
+- **IgA blocks horizontal gene transfer.** IgA sorts plasmid donors and
+  recipients into separate clumps, impeding conjugative transfer in vivo
+  (Moor 2017). Mechanic: stop one enemy type passing a resistance trait to
+  another. Novel for a tower defence and genuinely true.
+- **IgA1 protease vs. IgA2.** Cleaved IgA1 fragments still inhibit
+  IgG-driven complement, so a protease-bearing enemy turns the player's own
+  antibody into a shield; IgA2 lacks the vulnerable hinge and dominates the
+  distal gut. Clean rock-paper-scissors that is also real.
+- **Antigenic escape.** Pneumococci shed pilus-1 under sIgA pressure, and
+  children of more-exposed mothers are less often colonised by
+  pilus-expressing strains (Binsker 2020). Mechanic: survivors of an IgA
+  wave return having shed the antigen, forcing re-targeting.
+- **IgA on commensals builds colonisation resistance** — gives
+  `LUMEN_REFERENCE.md` P7's "commensal density thins as pathogens adhere"
+  an actual mechanism.
+- **Secretory IgM** as an earlier, lower-specificity secretory defence.
+- **sIgA retro-transports antigen to dendritic cells**, so deployed IgA
+  could accelerate the DC loop the game already has — IgA as scout.
+- **IgA effectiveness should scale with local mucus quality**, which would
+  give the goblet-cell / mucus upgrades a real synergy.
+- **Bone marrow second pass** (carried from Sprint 21): technically
+  correct, not loved; the lymph node is the bar to match.
+
 ## Open design questions (from Director decisions, 2026-08-19)
 
 These block specific parts of `docs/GAME_DESIGN.md` from being buildable,

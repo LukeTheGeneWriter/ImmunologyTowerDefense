@@ -106,11 +106,15 @@ namespace ImmunologyTD.Grid
         public BoardAxis ThreatAxis => threatAxis;
         public AxisEnd BaseEnd => baseEnd;
 
-        /// <summary>Number of cells along the threat axis (100 on Map 01).</summary>
+        /// <summary>Number of cells along the threat axis (25 as the scene runs
+        /// today; GAME_DESIGN.md section 1a's 100 is an aspiration).</summary>
         public int AxisLength => threatAxis == BoardAxis.Horizontal ? columns : rows;
 
-        /// <summary>Number of lanes perpendicular to the threat axis (40 on
-        /// Map 01). Also the number of gut-interface positions.</summary>
+        /// <summary>Number of lanes perpendicular to the threat axis (10 as the
+        /// scene runs today, NOT the 40 that GAME_DESIGN.md section 1a
+        /// aspires to). Also the number of gut-interface positions -- which
+        /// is why one lane is a tenth of the wall, and too coarse a unit for
+        /// "a stretch of wall" (INVASION_REWORK_SPEC.md).</summary>
         public int CrossLength => threatAxis == BoardAxis.Horizontal ? rows : columns;
 
         /// <summary>Distance-from-base index of a coarse cell. 0 = the
