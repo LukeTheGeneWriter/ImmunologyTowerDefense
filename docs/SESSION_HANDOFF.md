@@ -1,4 +1,4 @@
-# Session Handoff — 2026-10-14 (Sprints 18–21 shipped; next: invasion rework, pathogens, rounds, agent playtests)
+# Session Handoff — 2026-10-19 (Sprint 22 shipped the invasion rework; next: playtest, rounds, pathogens)
 
 A checkpoint written by the head session. **This is a living file:
 overwrite it at the next checkpoint rather than accumulating dated
@@ -39,174 +39,71 @@ The process that produced 19–21 is now written up in
 mocks → Director decisions via `AskUserQuestion` → inline build, sprites
 checked magnified before building. **Reuse it for any visual work.**
 
-## The Director's direction for what's next (2026-10-14, verbatim in `PLAYTEST_LOG.md`)
+## Where Sprint 22 left things (2026-10-18/19, Linux machine)
 
-### 1. Invasion rework: pathogens shouldn't queue in an orderly line at the wall
+**Sprint 22 shipped the invasion rework.** `GAME_DESIGN.md` §1b is
+rewritten and **re-locked** -- steps 1 and 2 replaced, steps 3-5
+untouched. Read that section first; it is the source of truth now.
 
-Today an adhered pathogen sits at one `GutInterface` position, and the
-adhered pile is drawn as an orderly stack
-(`PathogenAgent.InterfaceStackWorldPosition`). Breach is per
-**lane / position** (`GAME_DESIGN.md` §1b, step 2). The Director wants:
+Two docs underpin it and are worth reading before touching the wall:
 
-- pathogens **floating around an area near a breach spot**, not lined up;
-- **secretory IgA** possibly trapping them there (it's §5's ~70% rung,
-  not built yet);
-- which opens:
-  - **proximity-based ingress** in place of lane-based;
-  - **mucus sloughing**: §6b's turnover upgrade, made spatial;
-  - **barrier-cell death**: a dead epithelial cell lets bacteria through
-    but still **blocks viruses**, which need a living cell.
+- `docs/INVASION_REWORK_SPEC.md` -- the design. **Its §12 carries the
+  Director's decisions and supersedes its own fork list**, so read §12
+  before trusting anything earlier in the file.
+- `docs/IGA_REFERENCE.md` -- the immunology, 36 DOIs, every citation
+  resolved against PubMed. It corrected two of the Director's five
+  stated claims and one of the head session's recommendations.
 
-Keep §1b step 2's best property: *pressure builds visibly, then
-bursts*. §1b now carries an "under revision" note. **This is a design
-change to a LOCKED section, so design it before building it.** Write the
-model (what replaces per-position piles; how crowding and breach work
-spatially; how IgA, sloughing and dead barrier cells plug in), put the
-genuine forks to the Director, then build. Harnesses that lean on the
-current model: `MapVerification`, `RoundVerification`, `Sprint19`'s
-M-cell sampling (`IsOverDome` uses the near-wall rows) and
-`TissueVerification`. Expect to revise them deliberately.
+### The one idea the whole wall rests on
 
-### 2. Then, the next sprints' focus
+Under IgA, **a bacterium's own replication is what traps it**. IgA does
+not slow bacteria (Moor 2017, Nature 544:498-502): it cross-links
+DAUGHTER cells as they divide, because classical agglutination needs
+densities real infections never reach. Links break over time (Bansept
+2019), so it is a race -- divide faster than your links break and you
+build your own cage.
 
-- **Adding pathogens.** The roster is three classes (`PathogenClass`).
-  `GAME_DESIGN.md` §4a describes the class model. Note that the board
-  already can't tell the two bacterial classes apart (`BACKLOG.md`,
-  Sprint 21), so any new pathogen needs its own silhouette.
-- **Planning rounds.** `Rounds/RoundScript.cs` holds the per-round
-  definitions and taglines. Design a real progression around the new
-  pathogens.
-- **Agent playtests to find "broken strategies"**, then sort each into
-  "a true biological strategy" (keep it, maybe teach it) or "needs work".
-  **Recommended approach: a headless strategy harness**, written up
-  below, rather than pixel-driving agents.
+What that buys: **nothing in the game ever decides which pathogen
+deserves IgA.** Fast replicators trap themselves hardest; the physics
+does the targeting. There is deliberately NO field anywhere for an IgA
+penalty on division rate. If a future session adds one, the observable
+(free numbers stop growing) will survive and the reason will be a lie.
 
-### 2a. The headless strategy harness: design notes
+### Other invariants a later session must not "simplify"
 
-**Why not pixel-driving agents.** The Sprint 17 agentic playtest
-(`docs/AGENT_PLAYTEST_01.md`) drove the built game through Win32 mouse
-calls. That doesn't port to Linux / Wayland. It spent most of a session
-fighting input, and it plays one game at real-time speed. Broken-strategy
-hunting needs the opposite: **many full runs, fast, reproducible, with
-numbers**.
+- **`IngressCrowdFloor`.** Charge accrues at `(members - floor) * rate`,
+  so one or two adherents accrue nothing forever. A trickle is
+  arithmetically impossible, not merely unlikely. `MapVerification.
+  RunNoTrickle` exists to stop anyone removing it.
+- **One ingress mechanic, not two.** The Director chose "dead wall is a
+  weak spot, not a hole": it charges faster, it does not let bacteria
+  walk through.
+- **No killing in the lumen, anywhere.** IgA excludes, sloughing expels.
+  Secretory IgA is non-inflammatory, inhibits IgG-driven complement, and
+  the lumen has no patrolling phagocytes. The gut's answer is flush, not
+  eat. The "easier to deal with" bonus lives in `ReceiveDamage`, behind
+  the wall.
+- **Seed the harness.** `Sprint22Verification` calls `Random.InitState`.
+  Several mechanics are races, and an unseeded race gives a harness that
+  passes alone and fails in the suite -- which is how two real bugs were
+  found.
 
-**Why it's feasible.** Every simulation class already takes explicit time
-(`AGENT_HANDBOOK.md`: "Explicit-time simulation surfaces"), and the
-harnesses already play rounds headlessly. `RoundVerification` ticks
-`spawner.Tick`, each `PathogenAgent.SimulationTick` and
-`rounds.Tick` in a loop. Every player action is already a plain method:
-- `BoneMarrowManager.PlaceTower(slot, kind)`
-- `UpgradeTower(slot, row, base, cap)`
-- `ShopLedger.TryBuy(item, wallet)`
-- `RoundController.StartRound()`
+### What is queued next
 
-There is no UI in the way.
-
-**The one real piece of work: a single `SimulationStep(dt)`.** Unity
-doesn't run `Update()` in batchmode, and today the game's tick is
-scattered across **19 `Update()` methods**. Some are cosmetic renderers;
-the ones that matter are:
-- `RoundClock` (the frozen-aware clock)
-- `PathogenSpawner`, `PathogenAgent`, `SearchUnit`
-- `BoneMarrowManager`
-- `AdaptiveDirector`, `DendriticCell`, `Lymphocyte`
-- `TissueDriver`, `RoundController`
-
-There are also two behaviour bridges hiding in the UI:
-`UiController.Update` pushes shop levels into `Chemotaxis` and
-`GutWallFeatures`. A harness that copies that order by hand will drift
-from the real game the first time someone adds a system. So:
-
-1. **Extract one world ticker** (e.g. `Bootstrap/SimulationDriver`) that
-   advances every simulation system in a fixed, documented order for a
-   given `dt`, including the shop → effect bridges, moved out of the UI.
-2. **The game's `Update()`s stop ticking the simulation.** One
-   `SimulationDriver.Update()` calls `SimulationStep(Time.deltaTime)`
-   while `!RoundClock.Frozen`. The per-object `Update()`s keep only their
-   visual tweens.
-3. **The harness calls the same `SimulationStep(0.1f)`** in a tight
-   loop. Same code path, no drift. `BootstrapSmoke` already builds the
-   whole game headlessly, so the harness can boot through `GameBootstrap`
-   rather than re-wiring systems.
-
-This refactor has its own value. It makes the tick order explicit,
-which today is an emergent property of Unity's `Update()` order. It also
-needs the full harness suite plus a played build to confirm nothing
-moved.
-
-**Determinism.** 13 scripts call `UnityEngine.Random`. Seed it
-(`Random.InitState(seed)`) at the start of each run, and run each
-strategy over **N seeds** (say 20). A "broken strategy" must win across
-seeds, not get lucky once. If something still varies with the same seed,
-that is a determinism bug worth finding anyway.
-
-**Strategies as data.** A strategy is a small script of actions keyed to
-game state: "R1: macrophage in slot 0; whenever ATP ≥ 40, buy crypt;
-from R3, DC in slot 2 and max CCR7…". Start with a handful of hand-written
-archetypes:
-- all-neutrophil;
-- all-macrophage;
-- turtle on crypts + mucus;
-- rush the adaptive side (DC + helper-T + M cells);
-- never buy upgrades;
-- dump everything into one upgrade row.
-
-Then add a **greedy / random-search** player that tries action sequences
-and keeps the ones that win. That is what finds the strategies nobody
-thought of.
-
-**What to measure per run:**
-- rounds survived and lives left;
-- ATP earned and spent, by category;
-- kills by unit kind;
-- breaches by position;
-- peak tissue damage and debris;
-- knowledge % per species, and the round each rung was reached;
-- the time each round took.
-
-Write one CSV/JSON row per run under `game/Logs/strategies/`, plus a
-summary table. The Director reads the summary; the raw rows are for
-digging.
-
-**What "broken" means.** Flag any strategy that does one of these:
-- (a) survives far longer than the median;
-- (b) wins while ignoring a whole system (never fields an adaptive cell,
-  never buys an upgrade);
-- (c) has a degenerate signature: one purchase repeated 20 times, or zero
-  breaches ever.
-
-**Each flag goes to the Director to classify:**
-- **Real biology:** e.g. a neutrophil swarm early is genuinely how innate
-  immunity wins. Keep it, maybe make it a lesson.
-- **Needs work:** e.g. infinite crypts make tissue immortal. Rebalance or
-  cap it.
-
-That classification is his call; the harness only surfaces candidates.
-
-**Order of work:**
-1. The `SimulationDriver` refactor (verify: all harnesses plus a played
-   build).
-2. Seeding.
-3. One strategy end to end.
-4. The archetypes.
-5. The search player.
-6. The report.
-
-It pairs naturally with **round planning**. The harness is also how you
-check that a planned round progression is beatable and not trivial.
-
-**Cheap extra from the old agent's suggestion:** debug-only keyboard
-shortcuts for common actions (place kind N in slot M, buy item K). They
-help the Director's own testing, and any future pixel-level agent.
-
-### 3. Smaller
-
-- **Bone marrow second pass.** Technically correct, but not loved. The
-  node is the bar to match. `OrganShapes.BuildMarrow`; mocks and
-  reasoning are in `COSMETIC_PASS_SPEC.md` §1.2.
-- Still queued from earlier: leukocyte rolling and extravasation (the
-  Sprint 18 section of `BACKLOG.md`); Peyer's patch refinements
-  (`GAME_DESIGN.md` §1d); the DC antigen dot; idle wobble.
+1. **The Director's playtest of Sprint 22** -- see `SPRINT_PLAN.md`'s
+   "what to watch for". The open question is whether the blister reads
+   mid-round and whether earning IgA feels like a reward.
+2. **Round planning and new pathogens**, which the rework was blocking.
+   Both now have a wall model to design against, and the barrier
+   asymmetry gives a mixed round a real decision.
+3. **The `SimulationDriver` refactor and the headless strategy harness**
+   (§2a below, unchanged). Sprint 22 makes this more valuable: the wall
+   now has numbers worth sweeping (coat rate, crowd floor, charge rate),
+   and several are explicitly flagged as playtest-set.
+4. **Bone marrow second pass**, still queued from Sprint 21.
+5. `BACKLOG.md` carries eight further real IgA mechanics the research
+   surfaced -- blocking plasmid transfer between enemy lineages, IgA1
+   protease vs. IgA2, antigenic escape, and more.
 
 ## State of the code (one-liners; details in `ENGINE_STATUS.md` / `INTERFACE.md`)
 
@@ -217,15 +114,22 @@ help the Director's own testing, and any future pixel-level agent.
   `KnowledgeView` + `KnowledgeWatcher` drive the knowledge HUD.
 - **Organs** are `Rendering/OrganShapes` canvases; UI and marrow sprites
   are in `Rendering/SpriteShapes.Ui.cs`.
-- **Gut wall**: `Grid/GutWallFeatures` (Peyer's patch, M cells, crypts),
-  `Pathogens/Peristalsis`.
-- 14 harnesses; `tools/unity.sh verify` is green as of `515af53`, plus
-  this handoff's docs commit.
+- **The wall** is `Grid/GutWall` (Sprint 22; `GutInterface` is deleted):
+  the mill, the crowd field, plaques, barrier segments, IgA and luminal
+  replication. Numbers live in `InvasionTuning`, `IgaTuning` and
+  `BarrierTuning`. `Grid/GutWallFeatures` still owns the Peyer's patch,
+  M cells and crypts; `Pathogens/Peristalsis` the squeeze.
+- **The board is 25 x 10, not 100 x 40** -- ten interface lanes. Corrected
+  in `INTERFACE.md` and `BoardConfig`'s comments on 2026-10-18; both had
+  asserted 40 for several sprints. `MapVerification` builds its own
+  100x40 rig, which is why nothing caught it.
+- **15 harnesses, 550 checks**; `tools/unity.sh verify` green as of
+  Sprint 22's final commit. `Sprint22Verification` is seeded.
 
 ## For whichever session picks this up
 
 Read `CLAUDE.md` and `WORKFLOW.md`, then this file, then `PLAYTEST_LOG.md`
 (the newest entries) and `BACKLOG.md` (Sprints 18–21 sections). Suggested
-opening move: **propose the invasion-rework design** in conversation (or
-dispatch a design agent if the Director wants mocks of the new wall
-behaviour), get the forks answered, and only then touch `GutInterface`.
+opening move: **ask the Director how Sprint 22 played**, against
+`SPRINT_PLAN.md`'s "what to watch for" list, before building anything
+new on top of the wall.
