@@ -145,6 +145,31 @@ namespace ImmunologyTD.Adaptive
         public static float DcEmissionIntervalSeconds = 5f;
         public static float LymphocyteEmissionIntervalSeconds = 3.5f;
 
+        // -- Sprint 23 roster. Intervals, not rates, to match the existing
+        //    cadence model. See docs/CELL_KINETICS_REFERENCE.md.
+
+        /// <summary>CD8 effector and germinal-centre B cells are the two
+        /// fastest-dividing cells in the body and are within ~15% of each
+        /// other (6.2 h vs 6-7 h), so the CTL and B-cell towers deliberately
+        /// SHARE a base interval. If one is ever retuned without the other,
+        /// that shared basis is the thing being broken.</summary>
+        public static float CytotoxicTEmissionIntervalSeconds = 4.5f;
+        public static float BCellEmissionIntervalSeconds = 4.5f;
+
+        /// <summary>Slower, and deliberately NOT upgradeable by clonal
+        /// expansion: human NK proliferation is *unchanged* during acute
+        /// infection (Zhang 2007) and homeostatic doubling is ~16 days. NK
+        /// cells are early because they are already present, not because
+        /// they ramp fast -- the common "NK responds faster than T" framing
+        /// is contradicted by Schlub 2011, which found NK proliferation
+        /// neither earlier nor faster than CD4/CD8.</summary>
+        public static float NaturalKillerEmissionIntervalSeconds = 6f;
+
+        /// <summary>Tissue-RESIDENT: this tower is topping up a standing
+        /// epithelial population, not mounting a response, so it is the
+        /// slowest producer on the board.</summary>
+        public static float GammaDeltaTEmissionIntervalSeconds = 7f;
+
         /// <summary>Per-progenitor ceiling on simultaneously-alive children,
         /// same role as UnitLifecycleTuning.MaxActiveChildren for the innate
         /// towers.</summary>
@@ -173,6 +198,10 @@ namespace ImmunologyTD.Adaptive
             NodeLymphocyteSourceStrength = 6f;
             DcEmissionIntervalSeconds = 5f;
             LymphocyteEmissionIntervalSeconds = 3.5f;
+            CytotoxicTEmissionIntervalSeconds = 4.5f;
+            BCellEmissionIntervalSeconds = 4.5f;
+            NaturalKillerEmissionIntervalSeconds = 6f;
+            GammaDeltaTEmissionIntervalSeconds = 7f;
             DcMaxActiveChildren = 4;
             LymphocyteMaxActiveChildren = 8;
         }

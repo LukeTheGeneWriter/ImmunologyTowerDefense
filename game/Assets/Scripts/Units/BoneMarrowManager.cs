@@ -124,8 +124,35 @@ namespace ImmunologyTD.Units
 
         /// <summary>The two adaptive kinds emit their own agent types via
         /// <see cref="AdaptiveDirector"/> rather than a SearchUnit.</summary>
-        public static bool IsAdaptive(UnitKind k) =>
+        /// <summary>
+        /// **Sprint 23 split this predicate, because the cytotoxic T cell is
+        /// the first kind that breaks it.** It used to mean two unrelated
+        /// things at once: "lives in the lymph node and has no tissue
+        /// profile" (at the emission path) and "needs the adaptive subsystem
+        /// to exist" (at the placement path). A CTL is adaptive AND a
+        /// tissue-roaming searcher, so one bool could not answer both.
+        ///
+        /// Kept as a wrapper for <see cref="IsNodeResident"/>'s old callers;
+        /// **do not reintroduce it as the gate for anything else.**
+        /// </summary>
+        public static bool IsAdaptive(UnitKind k) => IsNodeResident(k);
+
+        /// <summary>Lives in the lymph node compartment and is emitted
+        /// through <c>AdaptiveDirector</c>, not into tissue. These are the
+        /// kinds with no <see cref="UnitProfile"/>.</summary>
+        public static bool IsNodeResident(UnitKind k) =>
             k == UnitKind.DendriticCell || k == UnitKind.HelperT;
+
+        /// <summary>Cannot emit until this species' knowledge clears its
+        /// rung (GAME_DESIGN.md §5). **Orthogonal to residency**: a CTL is
+        /// gated and tissue-roaming; a dendritic cell is node-resident and
+        /// ungated; a gamma-delta T cell is neither -- it is tissue-resident
+        /// and needs no priming, which is exactly why §4 calls it "the one T
+        /// cell that can exist on the board before the lymph node is
+        /// online"; an NK/ILC1 is innate and ungated by the Director's
+        /// 2026-10-25 ruling.</summary>
+        public static bool IsKnowledgeGated(UnitKind k) =>
+            k == UnitKind.CytotoxicT || k == UnitKind.PlasmaCell;
 
         /// <summary>Sprint 15: fired with the emitting slot's world position
         /// each time a progenitor emits a child, so the base compartment
@@ -175,6 +202,10 @@ namespace ImmunologyTD.Units
                 case UnitKind.Macrophage: return ImmunologyTD.Rendering.SpriteShapes.Macrophage;
                 case UnitKind.Neutrophil: return ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
                 case UnitKind.DendriticCell: return ImmunologyTD.Rendering.SpriteShapes.DendriteStar;
+                case UnitKind.CytotoxicT: return ImmunologyTD.Rendering.SpriteShapes.CytotoxicT;
+                case UnitKind.NaturalKiller: return ImmunologyTD.Rendering.SpriteShapes.NaturalKiller;
+                case UnitKind.GammaDeltaT: return ImmunologyTD.Rendering.SpriteShapes.GammaDeltaT;
+                case UnitKind.PlasmaCell: return ImmunologyTD.Rendering.SpriteShapes.PlasmaCell;
                 default: return ImmunologyTD.Rendering.SpriteShapes.Lymphocyte;
             }
         }
@@ -187,6 +218,30 @@ namespace ImmunologyTD.Units
         private PrefabPool macrophagePool;
         private UnitProfile neutrophilProfile;
         private PrefabPool neutrophilPool;
+
+        /// <summary>Sprint 23. Every TISSUE-roaming kind's profile and pool,
+        /// keyed by kind.
+        ///
+        /// **This replaces a pair of binary ternaries** that read
+        /// `kind == Macrophage ? macrophageProfile : neutrophilProfile`.
+        /// With four new kinds that was not a compile error -- it was a
+        /// silent wrong answer: a cytotoxic T cell would have been handed
+        /// NEUTROPHIL stats and a neutrophil sprite and nothing would have
+        /// complained. <c>Sprint23Verification.RunEveryTissueKindHasItsOwnProfile</c>
+        /// exists to stop that regressing.</summary>
+        private readonly System.Collections.Generic.Dictionary<UnitKind, UnitProfile> tissueProfiles
+            = new System.Collections.Generic.Dictionary<UnitKind, UnitProfile>();
+        private readonly System.Collections.Generic.Dictionary<UnitKind, PrefabPool> tissuePools
+            = new System.Collections.Generic.Dictionary<UnitKind, PrefabPool>();
+
+        /// <summary>Sprint 23: a tissue kind registered after construction,
+        /// so <see cref="Initialize"/> keeps its existing signature for the
+        /// harnesses that call it with two kinds.</summary>
+        public struct TissueKindRegistration
+        {
+            public UnitProfile Profile;
+            public PrefabPool Pool;
+        }
 
         /// <summary>The player's ATP -- placement spends from it (Sprint 7,
         /// GAME_DESIGN.md §5b/§2a). **Nullable:** a headless harness passes
@@ -248,7 +303,8 @@ namespace ImmunologyTD.Units
             UnitProfile neutrophilProfile, PrefabPool neutrophilPool,
             Vector3[] slotWorldPositions, float slotWorldSize,
             ImmunologyTD.Economy.AtpWallet wallet = null,
-            AdaptiveDirector adaptive = null)
+            AdaptiveDirector adaptive = null,
+            TissueKindRegistration[] extraTissueKinds = null)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
@@ -259,6 +315,18 @@ namespace ImmunologyTD.Units
             this.neutrophilPool = neutrophilPool;
             this.wallet = wallet;
             this.adaptive = adaptive;
+
+            tissueProfiles.Clear();
+            tissuePools.Clear();
+            RegisterTissueKind(macrophageProfile, macrophagePool);
+            RegisterTissueKind(neutrophilProfile, neutrophilPool);
+            if (extraTissueKinds != null)
+            {
+                for (int k = 0; k < extraTissueKinds.Length; k++)
+                {
+                    RegisterTissueKind(extraTissueKinds[k].Profile, extraTissueKinds[k].Pool);
+                }
+            }
 
             for (int i = 0; i < slotWorldPositions.Length; i++)
             {
@@ -523,6 +591,19 @@ namespace ImmunologyTD.Units
                 var slot = slots[i];
                 if (slot.State != BoneMarrowSlotState.Placed) continue;
 
+                // Sprint 23: a knowledge-gated tower is bought whenever the
+                // player likes but stays DARK until a species clears its
+                // rung (Director, 2026-10-25: "you buy a CTL progenitor at
+                // any time, but it emits nothing until ~10%"). The timer is
+                // held at zero rather than banked, so switching the licence
+                // on does not dump a backlog of cells onto the board.
+                if (IsKnowledgeGated(slot.Kind)
+                    && !ImmunologyTD.Adaptive.KnowledgeLicence.IsTowerLicensed(slot.Kind))
+                {
+                    slot.EmissionTimer = 0f;
+                    continue;
+                }
+
                 float interval = IntervalFor(slot.Kind);
                 // Sprint 18: an adaptive tower's own rate upgrade (clonal expansion).
                 if (slot.AdaptiveTuning != null && slot.AdaptiveTuning.EmissionRateMultiplier > 0f)
@@ -560,6 +641,10 @@ namespace ImmunologyTD.Units
                 case UnitKind.Macrophage: return ImmunologyTD.Economy.EconomyTuning.MacrophagePrice;
                 case UnitKind.Neutrophil: return ImmunologyTD.Economy.EconomyTuning.NeutrophilPrice;
                 case UnitKind.DendriticCell: return ImmunologyTD.Economy.EconomyTuning.DendriticCellPrice;
+                case UnitKind.CytotoxicT: return ImmunologyTD.Economy.EconomyTuning.CytotoxicTPrice;
+                case UnitKind.NaturalKiller: return ImmunologyTD.Economy.EconomyTuning.NaturalKillerPrice;
+                case UnitKind.GammaDeltaT: return ImmunologyTD.Economy.EconomyTuning.GammaDeltaTPrice;
+                case UnitKind.PlasmaCell: return ImmunologyTD.Economy.EconomyTuning.BCellPrice;
                 default: return ImmunologyTD.Economy.EconomyTuning.HelperTPrice;
             }
         }
@@ -570,6 +655,10 @@ namespace ImmunologyTD.Units
             {
                 case UnitKind.DendriticCell: return AdaptiveTuning.DcEmissionIntervalSeconds;
                 case UnitKind.HelperT: return AdaptiveTuning.LymphocyteEmissionIntervalSeconds;
+                case UnitKind.CytotoxicT: return AdaptiveTuning.CytotoxicTEmissionIntervalSeconds;
+                case UnitKind.PlasmaCell: return AdaptiveTuning.BCellEmissionIntervalSeconds;
+                case UnitKind.NaturalKiller: return AdaptiveTuning.NaturalKillerEmissionIntervalSeconds;
+                case UnitKind.GammaDeltaT: return AdaptiveTuning.GammaDeltaTEmissionIntervalSeconds;
                 default: return EmissionIntervalSeconds;
             }
         }
@@ -583,10 +672,13 @@ namespace ImmunologyTD.Units
         {
             switch (kind)
             {
-                case UnitKind.Macrophage: return macrophageProfile.Color;
-                case UnitKind.Neutrophil: return neutrophilProfile.Color;
                 case UnitKind.DendriticCell: return Palette.Dendritic;
-                default: return Palette.HelperT;
+                case UnitKind.HelperT: return Palette.HelperT;
+                default:
+                    // Sprint 23: every tissue kind's colour now comes from its
+                    // own registered profile rather than a per-kind case.
+                    var p = ProfileFor(kind);
+                    return p != null ? p.Color : Palette.HelperT;
             }
         }
 
@@ -597,6 +689,10 @@ namespace ImmunologyTD.Units
                 case UnitKind.Macrophage: return "Macrophage";
                 case UnitKind.Neutrophil: return "Neutrophil";
                 case UnitKind.DendriticCell: return "Dendritic";
+                case UnitKind.CytotoxicT: return "Cytotoxic T";
+                case UnitKind.NaturalKiller: return "NK (ILC1)";
+                case UnitKind.GammaDeltaT: return "gd T";
+                case UnitKind.PlasmaCell: return "B cell";
                 default: return "Helper-T";
             }
         }
@@ -629,11 +725,28 @@ namespace ImmunologyTD.Units
             }
         }
 
+        private void RegisterTissueKind(UnitProfile profile, PrefabPool pool)
+        {
+            if (profile == null) return;
+            tissueProfiles[profile.Kind] = profile;
+            if (pool != null) tissuePools[profile.Kind] = pool;
+        }
+
+        /// <summary>Sprint 23: dictionary lookup, not a ternary. Returns null
+        /// for an unregistered kind rather than silently handing back the
+        /// neutrophil's numbers -- a null is findable, a wrong profile is
+        /// not. Callers already null-check (an adaptive kind has no tissue
+        /// profile).</summary>
         private UnitProfile ProfileFor(UnitKind kind) =>
-            kind == UnitKind.Macrophage ? macrophageProfile : neutrophilProfile;
+            tissueProfiles.TryGetValue(kind, out var p) ? p : null;
 
         private PrefabPool PoolFor(UnitKind kind) =>
-            kind == UnitKind.Macrophage ? macrophagePool : neutrophilPool;
+            tissuePools.TryGetValue(kind, out var p) ? p : null;
+
+        /// <summary>Every tissue kind this manager knows about -- used by the
+        /// Sprint 23 harness and by the UI to enumerate buyable towers
+        /// without hardcoding the roster twice.</summary>
+        public System.Collections.Generic.IEnumerable<UnitKind> RegisteredTissueKinds => tissueProfiles.Keys;
 
         private void Emit(int slotIndex, Slot slot)
         {

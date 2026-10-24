@@ -25,8 +25,10 @@ namespace ImmunologyTD.UI
             public UnitKind Kind;
             public VisualElement Root, Chip, Progress;
             public Label Price;
+            public Label Blurb;
             public Button Place;
             public int LastBalance = int.MinValue;
+            public bool LastLicensed = true;
         }
 
         private readonly System.Collections.Generic.List<UnitCard> cards =
@@ -77,12 +79,25 @@ namespace ImmunologyTD.UI
             {
                 grid.Clear();
                 cards.Clear();
+                // Innate, available from round 1.
                 AddCard(UnitKind.Macrophage);
                 AddCard(UnitKind.Neutrophil);
+                // Sprint 23: also innate, also ungated. The NK/ILC1 needs no
+                // priming and the gamma-delta IEL is tissue-resident, so
+                // neither waits on the lymph node OR on knowledge -- they are
+                // the expensive innate answer for a player who does not want
+                // to wait for adaptive immunity.
+                AddCard(UnitKind.NaturalKiller);
+                AddCard(UnitKind.GammaDeltaT);
                 if (marrow.AdaptiveAvailable)
                 {
                     AddCard(UnitKind.DendriticCell);
                     AddCard(UnitKind.HelperT);
+                    // Knowledge-gated: buyable whenever, but dark until the
+                    // rung is reached. The card says so rather than hiding,
+                    // so the player can plan the spend (Director, 2026-10-25).
+                    AddCard(UnitKind.CytotoxicT);
+                    AddCard(UnitKind.PlasmaCell);
                 }
                 builtWithAdaptive = marrow.AdaptiveAvailable;
                 built = true;
@@ -112,9 +127,9 @@ namespace ImmunologyTD.UI
             top.Add(name);
             c.Root.Add(top);
 
-            var blurb = UiTheme.Text(ProgenitorUpgradeCatalog.PickerBlurb(kind), 10, UiTheme.InkDim, Weight.Bold);
-            blurb.style.whiteSpace = WhiteSpace.Normal;
-            c.Root.Add(blurb);
+            c.Blurb = UiTheme.Text(ProgenitorUpgradeCatalog.PickerBlurb(kind), 10, UiTheme.InkDim, Weight.Bold);
+            c.Blurb.style.whiteSpace = WhiteSpace.Normal;
+            c.Root.Add(c.Blurb);
 
             var bottom = new VisualElement();
             bottom.style.flexDirection = FlexDirection.Row;
@@ -137,11 +152,33 @@ namespace ImmunologyTD.UI
             for (int i = 0; i < cards.Count; i++)
             {
                 var c = cards[i];
-                if (balance == c.LastBalance) continue;
+
+                // Sprint 23: a knowledge-gated tower's licence can flip
+                // mid-round, so its card has to refresh on that too -- not
+                // just on the balance changing.
+                bool licensed = ImmunologyTD.Adaptive.KnowledgeLicence.IsTowerLicensed(c.Kind);
+                if (balance == c.LastBalance && licensed == c.LastLicensed) continue;
+
                 int price = BoneMarrowManager.PriceFor(c.Kind);
                 UiTheme.SetChip(c.Chip, c.Price, c.Progress, price, balance);
+
+                // **Buyable while unlicensed, deliberately** (Director,
+                // 2026-10-25): you can commit ATP to a CTL progenitor before
+                // the rung is reached, and it sits dark until knowledge
+                // arrives. So the button stays enabled and the BLURB carries
+                // the warning -- hiding the card would remove the ability to
+                // plan toward it, which was the point of choosing this model.
                 UiTheme.SetButtonEnabled(c.Place, balance >= price);
+                if (c.Blurb != null)
+                {
+                    c.Blurb.text = licensed
+                        ? ProgenitorUpgradeCatalog.PickerBlurb(c.Kind)
+                        : ProgenitorUpgradeCatalog.LockedBlurb(c.Kind);
+                    c.Blurb.style.color = licensed ? UiTheme.InkDim : UiTheme.Hatch;
+                }
+
                 c.LastBalance = balance;
+                c.LastLicensed = licensed;
             }
         }
     }

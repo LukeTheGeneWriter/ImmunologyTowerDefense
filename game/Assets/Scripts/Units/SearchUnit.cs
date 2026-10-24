@@ -133,6 +133,14 @@ namespace ImmunologyTD.Units
             this.onDespawn = onDespawn;
             Current = start;
 
+            // Sprint 23: join the live registry so IFN-gamma auras can find
+            // this unit. Guarded against double-add -- a pooled object is
+            // Initialized many times over its life.
+            if (!live.Contains(this)) live.Add(this);
+            activatedUntil = -1f;
+            nextSecretionAt = -1f;
+            nextRepairAt = -1f;
+
             // Hold the tower's OWN instance, so an upgrade bought mid-round
             // reaches this unit immediately (Director, 2026-08-21). Only a
             // tower-less unit (harness fixture) gets a private fallback.
@@ -219,6 +227,9 @@ namespace ImmunologyTD.Units
 
             CheckContact();
             CheckStressSense(currentTime);
+            CheckIfnGammaAura(currentTime);
+            CheckAntibodySecretion(currentTime);
+            CheckBarrierPatrol(currentTime);
             CheckEfferocytosis(currentTime);
             ResolveDepletionIfDue();
         }
@@ -248,32 +259,82 @@ namespace ImmunologyTD.Units
             if (tissueGrid == null || tuning.StressSenseChancePerTick <= 0f) return false;
 
             var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
-            if (TryStressSenseAt(coarse)) return true;
+            if (TryStressSenseAt(coarse, currentTime)) return true;
 
             if (tuning.ContactRadiusFineTiles < BoardConfig.FineSubdivision / 2 + 1) return false;
 
             for (int i = 0; i < FineCoord.VonNeumannOffsets.Length; i++)
             {
                 var off = FineCoord.VonNeumannOffsets[i];
-                if (TryStressSenseAt(new CoarseCoord(coarse.Column + off.Column, coarse.Row + off.Row))) return true;
+                if (TryStressSenseAt(new CoarseCoord(coarse.Column + off.Column, coarse.Row + off.Row), currentTime)) return true;
             }
             return false;
         }
 
-        private bool TryStressSenseAt(CoarseCoord coarse)
+        private bool TryStressSenseAt(CoarseCoord coarse, float currentTime)
         {
             if (tissueGrid.GetHostState(coarse) != HostState.Infected) return false;
             var resident = tissueGrid.GetIntracellularAt(coarse);
             if (resident == null || !WithinContactRange(resident.Current)) return false;
-            if (Random.value >= tuning.StressSenseChancePerTick) return false;
 
-            // Recognised. Loud necrotic kill: cell + everything inside, no
-            // pathogen released. KillHostCell notifies the resident via
+            // Sprint 23: MHC-I restriction is SPECIES-specific, so a CTL
+            // walking past a species the adaptive system has never
+            // characterised does nothing at all. Innate kinds are ungated
+            // and this returns true for them immediately.
+            if (!ImmunologyTD.Adaptive.KnowledgeLicence.RecognisesSpecies(
+                    profile.Kind, resident.Class))
+            {
+                return false;
+            }
+
+            // Declare the contact BEFORE testing the meter: this unit counts
+            // toward next tick's cooperation bonus whether or not it is the
+            // one that finishes the job.
+            tissueGrid.NoteAttacker(coarse, currentTime);
+
+            // Sprint 23: an IFN-gamma-activated macrophage recognises an
+            // infection faster as well as hitting harder -- the measured NK
+            // contribution is specifically that the phagocyte gets better at
+            // killing what is inside it.
+            float rate = tuning.StressSenseChancePerTick * ActivationMultiplier;
+            if (rate <= 0f) return false;
+
+            // Cooperation (Halle 2016): the bonus is driven by LAST tick's
+            // attacker count, which is already at least 1 whenever this unit
+            // was here last tick too. A lone attacker gets x1, so a solo
+            // macrophage behaves exactly as the old per-tick roll did on
+            // average -- the change only bites when cells converge.
+            int attackers = Mathf.Max(1, tissueGrid.AttackersLastTick(coarse));
+            rate *= TissueTuning.CooperationFactor(attackers);
+
+            if (!tissueGrid.AddInfectionStress(coarse, rate)) return false;
+
+            // The meter filled. What happens now is the whole innate/adaptive
+            // distinction, and it is decided by one per-tower flag.
+            var worldCenter = board.CoarseToWorldCenter(coarse);
+            if (tuning.QuietKill)
+            {
+                // Precise kill (GAME_DESIGN.md §5, ~10% rung): the pathogen
+                // dies and **the enterocyte is still standing**. No debris,
+                // no DAMP, nothing for fibrosis to feed on. Detach from the
+                // grid first, then tell the agent -- same ordering contract
+                // as KillHostCell/OnHostCellDestroyed.
+                tissueGrid.ReleaseIntracellular(coarse);
+                resident.OnPreciselyKilled();
+                RegisterKill();
+                DegranulationFlash.Play(
+                    worldCenter,
+                    BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * 1.1f,
+                    DegranulationFlash.QuietKillColor);
+                return true;
+            }
+
+            // Loud necrotic kill: cell + everything inside, no pathogen
+            // released. KillHostCell notifies the resident via
             // OnHostCellDestroyed. Credit this unit -- it did the work.
             // (The DAMP that a loud death should broadcast -- extra innate
             // recruitment, fibrosis feed -- is GAME_DESIGN.md §6, not built;
             // for now "loud" is the flash.)
-            var worldCenter = board.CoarseToWorldCenter(coarse);
             tissueGrid.KillHostCell(coarse);
             RegisterKill();
             DegranulationFlash.Play(
@@ -375,8 +436,186 @@ namespace ImmunologyTD.Units
             var pathogen = tissueGrid.GetAttackableAt(coarse);
             if (pathogen == null) return false;
             if (!WithinContactRange(pathogen.Current)) return false;
-            pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit, this);
+            pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit * ActivationMultiplier, this);
             return true;
+        }
+
+        // ==================================================================
+        // Sprint 23 -- IFN-gamma activation (the NK/ILC1 tower's real job)
+        // ==================================================================
+
+        /// <summary>Every live unit, so an aura can find its neighbours. The
+        /// board carries on the order of a hundred units, and only the
+        /// handful with a non-zero aura ever scan, so the O(n) walk is
+        /// cheaper than maintaining a spatial index.</summary>
+        private static readonly System.Collections.Generic.List<SearchUnit> live =
+            new System.Collections.Generic.List<SearchUnit>();
+
+        public static System.Collections.Generic.IReadOnlyList<SearchUnit> Live => live;
+
+        /// <summary>Round-clock time this unit next attempts a wall repair.</summary>
+        private float nextRepairAt = -1f;
+
+        /// <summary>
+        /// Sprint 23: the intraepithelial gamma-delta T cell holding the
+        /// wall in front of it.
+        ///
+        /// Two effects, both drawn straight from the research rather than
+        /// invented:
+        ///
+        ///  1. **Interception.** It knocks charge off forming plaques in the
+        ///     stretch of wall it covers. Edelblum 2015 showed gamma-delta
+        ///     IELs converge on the enterocyte bacteria are *currently*
+        ///     touching, and that increasing their intercalation cut
+        ///     bacterial invasion by ~63% -- so this is the cell reducing
+        ///     the chance of ingress, which is exactly what a plaque's
+        ///     charge represents.
+        ///  2. **Repair.** It restores dead barrier segments nearby, on a
+        ///     slow timer (these cells make KGF and hold tight junctions
+        ///     together). This is the only unit in the game that REPAIRS
+        ///     rather than kills, which is why it earns a slot next to three
+        ///     cytotoxic cells.
+        ///
+        /// Both reuse the wall API Sprint 22 already built for the bought
+        /// repair and tower suppression, so the gamma-delta cell is a new
+        /// *user* of those mechanics, not a second implementation of them.
+        ///
+        /// Kinds with no patrol radius fall out on the first line.
+        /// </summary>
+        public bool CheckBarrierPatrol(float currentTime)
+        {
+            if (tuning.BarrierPatrolRadiusCells <= 0f) return false;
+
+            var wall = ImmunologyTD.Grid.GutWall.Current;
+            if (wall == null || board == null) return false;
+
+            // Where on the wall is this cell standing? The wall is indexed
+            // by `s` along the lumen, and a unit's lane is its cross-axis
+            // index -- so go through SOfLane rather than assuming any
+            // particular board orientation.
+            var coarse = Current.ToCoarse(BoardConfig.FineSubdivision);
+            float s = wall.SOfLane(board.CrossIndex(coarse));
+
+            bool didSomething = false;
+
+            // 1. Interception: hold the blisters down.
+            if (wall.SuppressPlaques(s, tuning.BarrierPatrolRadiusCells,
+                                     BoardConfig.TickIntervalSeconds) > 0f)
+            {
+                didSomething = true;
+            }
+
+            // 2. Repair, on its own slower clock.
+            float interval = tuning.BarrierRepairIntervalSeconds;
+            if (interval > 0f)
+            {
+                if (nextRepairAt < 0f) nextRepairAt = currentTime + interval;
+                else if (currentTime >= nextRepairAt)
+                {
+                    nextRepairAt = currentTime + interval;
+                    if (wall.RepairBarrier(s) > 0)
+                    {
+                        didSomething = true;
+                        DegranulationFlash.Play(
+                            board.CoarseToWorldCenter(coarse),
+                            BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision,
+                            DegranulationFlash.RepairColor);
+                    }
+                }
+            }
+
+            return didSomething;
+        }
+
+        /// <summary>Round-clock time this unit next secretes an antibody.</summary>
+        private float nextSecretionAt = -1f;
+
+        /// <summary>
+        /// Sprint 23: a plasma cell exporting antibody.
+        ///
+        /// Kinds with no secretion interval fall out on the first line with
+        /// no kind check -- the same shape as efferocytosis and the aura.
+        /// </summary>
+        public bool CheckAntibodySecretion(float currentTime)
+        {
+            float interval = tuning.AntibodySecretionIntervalSeconds;
+            if (interval <= 0f) return false;
+
+            if (nextSecretionAt < 0f) { nextSecretionAt = currentTime + interval; return false; }
+            if (currentTime < nextSecretionAt) return false;
+
+            // Clamp rather than bank, the same rule the bone marrow's
+            // emission timer follows (GAME_DESIGN.md §6d): a plasma cell
+            // that was frozen through a buy phase should resume secreting,
+            // not dump a backlog of antibodies the moment time restarts.
+            nextSecretionAt = currentTime + interval;
+
+            return ImmunologyTD.Adaptive.Antibody.Secrete(
+                board.FineToWorld(Current), board, tissueGrid);
+        }
+
+        /// <summary>Round-clock time this unit's IFN-gamma activation lapses.</summary>
+        private float activatedUntil = -1f;
+
+        /// <summary>True while this unit is IFN-gamma-activated.</summary>
+        public bool IsActivated(float currentTime) => currentTime < activatedUntil;
+
+        /// <summary>Damage/recognition multiplier from activation. 1 when not
+        /// activated, so every existing call site is unchanged by default.</summary>
+        private float ActivationMultiplier =>
+            activatedUntil > 0f && ImmunologyTD.Rounds.RoundClock.Time < activatedUntil
+                ? UnitTuning.IfnGammaActivationMultiplier
+                : 1f;
+
+        /// <summary>
+        /// IFN-gamma: this unit activates the macrophages around it.
+        ///
+        /// **This is the NK/ILC1 tower, not a side effect of it.** Human
+        /// intestinal NK cells are published as less cytotoxic and higher
+        /// IFN-gamma-producing than blood NK cells, and the clearest in vivo
+        /// demonstration of NK function in this setting is NK cells cutting
+        /// *intramacrophage* Salmonella load -- i.e. the NK cell's measurable
+        /// contribution is making a phagocyte better at killing what it has
+        /// already eaten. Building it as "a cheap cytotoxic T cell" would
+        /// have been the obvious game design and the wrong biology, and it
+        /// would have competed with the macrophage instead of compounding it.
+        ///
+        /// Kinds with no aura fall out on the first line with no kind check,
+        /// the same way efferocytosis excludes neutrophils.
+        /// </summary>
+        public bool CheckIfnGammaAura(float currentTime)
+        {
+            if (tuning.IfnGammaAuraChancePerTick <= 0f) return false;
+            if (Random.value >= tuning.IfnGammaAuraChancePerTick) return false;
+
+            int radius = Mathf.Max(0, tuning.IfnGammaAuraCoarseRadius);
+            var here = Current.ToCoarse(BoardConfig.FineSubdivision);
+            bool activatedAny = false;
+
+            for (int i = 0; i < live.Count; i++)
+            {
+                var other = live[i];
+                if (other == null || other == this) continue;
+                // Only phagocytes are worth activating -- IFN-gamma's classic
+                // effect is on the macrophage.
+                if (other.profile == null || other.profile.Kind != UnitKind.Macrophage) continue;
+
+                var there = other.Current.ToCoarse(BoardConfig.FineSubdivision);
+                if (Mathf.Max(Mathf.Abs(there.Column - here.Column),
+                              Mathf.Abs(there.Row - here.Row)) > radius) continue;
+
+                other.activatedUntil = currentTime + UnitTuning.IfnGammaActivationSeconds;
+                activatedAny = true;
+            }
+
+            if (activatedAny)
+            {
+                DegranulationFlash.Play(
+                    board.CoarseToWorldCenter(here),
+                    BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * radius,
+                    DegranulationFlash.IfnGammaColor);
+            }
+            return activatedAny;
         }
 
         private bool WithinContactRange(FineCoord target)
@@ -500,6 +739,10 @@ namespace ImmunologyTD.Units
         /// </summary>
         public void ResetForPool()
         {
+            live.Remove(this); // Sprint 23: leave the aura registry
+            activatedUntil = -1f;
+            nextSecretionAt = -1f;
+            nextRepairAt = -1f;
             board = null;
             tissueGrid = null;
             cytokineField = null;

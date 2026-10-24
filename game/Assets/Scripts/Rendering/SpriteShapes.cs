@@ -854,6 +854,9 @@ namespace ImmunologyTD.Rendering
             _ = Erythrocyte; _ = BirthPuff; _ = NodeColocGlow;
             // Sprint 17 cartoon pass
             _ = Villus; _ = EndothelialCell;
+            // Sprint 23 roster
+            _ = CytotoxicT; _ = NaturalKiller; _ = GammaDeltaT; _ = PlasmaCell;
+            _ = Antibody; _ = HostCellRecognised;
             // Sprint 19 gut-wall structures
             _ = VillusAlt; _ = PeyerDome; _ = MCell; _ = Crypt; _ = GranuleCluster;
             // Sprint 21 UI + marrow

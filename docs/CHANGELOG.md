@@ -747,3 +747,54 @@ The wall stopped being a queue.
   `IGA_REFERENCE.md`, the latter correcting two of the Director's stated
   claims and one of the head session's.
 - 15 harnesses, 550 checks. Sprint22Verification is seeded.
+
+## Sprint 23 -- 2026-10-25
+Four new cells, and only one of them is a killer.
+
+The sprint opened with six parallel research passes against PubMed and
+Consensus, at the Director's request, on the reasoning that getting the
+cells right first lets rounds be designed against a stable roster. The
+research changed two of the four towers before a line was written.
+
+- **Cytotoxic T cell** (~10% knowledge). Its mechanic is not damage --
+  it is that **the infected cell survives being cleared**. Innate cells
+  have to destroy a cell to reach what is inside it; a CTL excises the
+  pathogen and leaves the enterocyte standing. That contrast is the whole
+  reason to invest in adaptive immunity.
+- **NK cell (ILC1)**, buyable from round 1. Mostly an **IFN-gamma
+  amplifier that upgrades the macrophages around it**, with a weak precise
+  kill of its own. The research is clear that intestinal NK cells are less
+  cytotoxic and higher IFN-gamma than blood NK, and that the clearest in
+  vivo demonstration of NK function here is NK cells cutting
+  *intramacrophage* Salmonella. So it compounds with your macrophages
+  rather than competing with them.
+- **gamma-delta T cell (IEL)**, also ungated -- it is tissue-resident and
+  needs no priming. **The only tower that repairs.** It patrols the wall,
+  holds forming blisters down, and mends dead barrier segments.
+- **B cell** (~20% knowledge) fielding sessile **plasma cells that emit
+  drifting antibodies**, which stick to pathogens and coat them -- reusing
+  the exact coating state secretory IgA already uses, because tissue
+  antibody and luminal IgA are one molecule in two compartments.
+
+Underneath:
+
+- **Recognition is now a visible, cumulative, cooperative meter** instead
+  of a hidden per-tick roll. An infected cell brightens and takes a collar
+  as immune cells work on it. Three cells converging clear it far faster
+  than three working apart -- superadditive, as measured.
+- **The innate recognition numbers were inverted and are fixed.** A
+  macrophage cleared an infected cell in ~4s despite having no
+  MHC-I-restricted recognition at all -- roughly 800x faster than a real
+  cytotoxic T cell. The design always said innate immunity is bad at this
+  on purpose; the number said the opposite. Innate is now ~10x slower than
+  cytotoxic rather than ~800x faster.
+- **The neutrophil got faster** (3 -> 5 fine tiles/tick): the game showed
+  a 3x speed gap over the macrophage where the measured gap is 7-10x.
+- **Knowledge now changes behaviour**, not just the HUD. A gated tower is
+  buyable whenever you like and sits dark until a species reaches its rung.
+
+Fixed on the way: **the Sprint 22 secretory-IgA rung was never marked
+built**, so for a whole sprint -- including the playtest where the Director
+reported never perceiving IgA -- the HUD called a live mechanic "planned".
+
+16 harnesses green, 603 checks. WebGL build 9,222,409 bytes, 0 errors.

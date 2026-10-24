@@ -83,9 +83,26 @@ public static class Sprint21Verification
 
     private static void RunHonesty()
     {
-        bool anyBuilt = false;
-        foreach (var r in KnowledgeLadder.Rungs) anyBuilt |= r.Built;
-        Check("no rung capability is built yet -> every reached rung shows 'planned'", !anyBuilt);
+        // Sprint 23 replaced "nothing is built yet" with the exact set.
+        // The old assertion could only catch a rung being flipped too early;
+        // it could not catch one being flipped too LATE, which is precisely
+        // what happened -- secretory IgA shipped in Sprint 22 and went on
+        // being displayed as "planned" for a whole sprint, including
+        // through the playtest where the Director reported never perceiving
+        // it. This version pins the set in both directions.
+        var built = new System.Collections.Generic.HashSet<KnowledgeCapability>();
+        foreach (var r in KnowledgeLadder.Rungs) if (r.Built) built.Add(r.Capability);
+
+        Check("the CTL rung is built (Sprint 23)",
+            built.Contains(KnowledgeCapability.CytotoxicTCells));
+        Check("the neutralising-antibody rung is built (Sprint 23)",
+            built.Contains(KnowledgeCapability.NeutralizingAntibodies));
+        Check("the secretory-IgA rung is built (Sprint 22)",
+            built.Contains(KnowledgeCapability.SecretoryIgA));
+        Check("memory-T, Fc receptor and complement are still honestly 'planned'",
+            !built.Contains(KnowledgeCapability.MemoryTCells)
+            && !built.Contains(KnowledgeCapability.FcReceptor)
+            && !built.Contains(KnowledgeCapability.Complement));
         Check("the capstone sits at 90%, above the last rung",
             Mathf.Approximately(KnowledgeLadder.CapstonePercent, 90f) &&
             KnowledgeLadder.CapstonePercent > KnowledgeLadder.Rungs[KnowledgeLadder.Rungs.Length - 1].ThresholdPercent);

@@ -69,6 +69,30 @@ namespace ImmunologyTD.Units
         /// 0 = cannot sense intracellular infection.</summary>
         public float StressSenseChancePerTick;
 
+        /// <summary>Sprint 23: wall patrol radius and repair cadence. Both
+        /// per-tower and mutable, so "my gamma-delta cells hold a wider
+        /// stretch" is a one-field upgrade when that work lands.</summary>
+        public float BarrierPatrolRadiusCells;
+        public float BarrierRepairIntervalSeconds;
+
+        /// <summary>Sprint 23: seconds between antibody secretions. 0 = this
+        /// kind secretes none. Per-tower and mutable, so a future "more
+        /// plasma cells / higher titre" upgrade is one field write.</summary>
+        public float AntibodySecretionIntervalSeconds;
+
+        /// <summary>Sprint 23: true = this unit's stress-sense kill spares the
+        /// host cell (GAME_DESIGN.md §5, ~10% rung). Per-tower and mutable
+        /// like everything else here, so a future upgrade could in principle
+        /// teach a kind precision -- which is exactly what the knowledge
+        /// ladder is.</summary>
+        public bool QuietKill;
+
+        /// <summary>Sprint 23: per-tick chance of IFN-gamma-upgrading a nearby
+        /// macrophage, and the coarse radius it reaches. The NK/ILC1 tower's
+        /// main output. 0 = no aura.</summary>
+        public float IfnGammaAuraChancePerTick;
+        public int IfnGammaAuraCoarseRadius;
+
         /// <summary>Sprint 18: fine tiles moved per logical tick. Moved here
         /// from <see cref="UnitProfile"/> (which still seeds it) so the
         /// neutrophil's "Rapid chemokinesis" upgrade speeds up ONE tower's
@@ -87,6 +111,12 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick,
             StressSenseChancePerTick = profile.StressSenseChancePerTick,
             FineTilesPerTick = profile.FineTilesPerTick,
+            QuietKill = profile.QuietKill,
+            AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds,
+            BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells,
+            BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds,
+            IfnGammaAuraChancePerTick = profile.IfnGammaAuraChancePerTick,
+            IfnGammaAuraCoarseRadius = profile.IfnGammaAuraCoarseRadius,
         };
 
         /// <summary>Allocation-free equivalent of FromProfile, for filling an
@@ -102,6 +132,12 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = profile.StressSenseChancePerTick;
             FineTilesPerTick = profile.FineTilesPerTick;
+            QuietKill = profile.QuietKill;
+            AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds;
+            BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells;
+            BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds;
+            IfnGammaAuraChancePerTick = profile.IfnGammaAuraChancePerTick;
+            IfnGammaAuraCoarseRadius = profile.IfnGammaAuraCoarseRadius;
         }
 
         /// <summary>Value copy, used to snapshot a tower's current numbers
@@ -116,6 +152,12 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = other.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = other.StressSenseChancePerTick;
             FineTilesPerTick = other.FineTilesPerTick;
+            QuietKill = other.QuietKill;
+            AntibodySecretionIntervalSeconds = other.AntibodySecretionIntervalSeconds;
+            BarrierPatrolRadiusCells = other.BarrierPatrolRadiusCells;
+            BarrierRepairIntervalSeconds = other.BarrierRepairIntervalSeconds;
+            IfnGammaAuraChancePerTick = other.IfnGammaAuraChancePerTick;
+            IfnGammaAuraCoarseRadius = other.IfnGammaAuraCoarseRadius;
         }
     }
 }

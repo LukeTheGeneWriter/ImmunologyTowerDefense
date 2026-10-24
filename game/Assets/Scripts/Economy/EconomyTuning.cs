@@ -45,6 +45,33 @@ namespace ImmunologyTD.Economy
         public static int DendriticCellPrice = 30;
         public static int HelperTPrice = 25;
 
+        // -- Sprint 23. GAME_DESIGN.md §4: "T and B cells: expensive
+        //    early-to-mid-game towers. Priced deliberately high so the step
+        //    from innate to adaptive is felt as an investment decision, not
+        //    a natural progression." These sit well above the innate pair
+        //    (macrophage 40, neutrophil 15) for that reason.
+
+        /// <summary>The headline adaptive purchase, and the most expensive
+        /// thing on the board: it is also the only one that is dead weight
+        /// until a species reaches ~10% knowledge, which is the cost the
+        /// Director wanted the player to feel.</summary>
+        public static int CytotoxicTPrice = 70;
+
+        /// <summary>Cheaper than the CTL and needs no knowledge, but its
+        /// output is mostly an IFN-gamma buff rather than kills -- so it is
+        /// priced as a force multiplier on macrophages you already own, not
+        /// as a killer in its own right.</summary>
+        public static int NaturalKillerPrice = 45;
+
+        /// <summary>Tissue-resident wall defence. Needs no priming, so it is
+        /// available from round 1 -- the expensive innate answer for a
+        /// player who does not want to wait for adaptive immunity.</summary>
+        public static int GammaDeltaTPrice = 55;
+
+        /// <summary>The B-cell progenitor (it fields plasma cells). Gated at
+        /// the ~20% neutralising-antibody rung.</summary>
+        public static int BCellPrice = 65;
+
         // -- Lives (GAME_DESIGN.md §6c) --
 
         public static int StartingLives = 100;
@@ -84,6 +111,10 @@ namespace ImmunologyTD.Economy
             NeutrophilPrice = 15;
             DendriticCellPrice = 30;
             HelperTPrice = 25;
+            CytotoxicTPrice = 70;
+            NaturalKillerPrice = 45;
+            GammaDeltaTPrice = 55;
+            BCellPrice = 65;
             StartingLives = 100;
             LifeRegenRounds = 2;
             LifeRegenAmount = 1;

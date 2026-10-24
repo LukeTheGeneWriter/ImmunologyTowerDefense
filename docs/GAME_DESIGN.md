@@ -645,6 +645,11 @@ board before the lymph node is online. Not a round-1 purchase.
 
 Costs are unresolved — see `BACKLOG.md`.
 
+> **Built in Sprint 23 (2026-10-25) — see §4c**, which supersedes the
+> paragraph above for the γδ cell specifically: it ships as a *wall patrol
+> and repair* tower, not an expensive hunter, because the research says
+> that is what the cell does.
+
 ## 4a. Pathogen classes — LOCKED in principle (Director, 2026-08-19)
 
 Four classes, distinguished by where they sit relative to a host cell and
@@ -811,6 +816,167 @@ burn-out fraction and its timing. None chosen; all belong in
 `InvasionTuning`/`TissueTuning` as mutable fields. The Director's standing
 instruction is still mechanics first.
 
+## 4c. The adaptive and unconventional roster — LOCKED (Director, 2026-10-25)
+
+Sprint 23 added four towers. The evidence behind every number is in
+`docs/CELL_KINETICS_REFERENCE.md`, with the unabridged passes in
+`docs/research/`.
+
+**The organising decision, and the one most worth protecting:** only one
+of these four is primarily a killer. The obvious design — four cytotoxic
+cells at four price points — was available and is wrong on the biology,
+and it would have made the roster a single stat line with four names on
+it. Each tower here answers a threat the others cannot.
+
+| Tower | Gated? | Speed | Its actual job |
+|---|---|---|---|
+| **Cytotoxic T cell** | ~10% knowledge | 3 | Precise kill of an infected cell — *the host cell survives* |
+| **NK cell (ILC1)** | no — innate | 3 | IFN-γ: **upgrades nearby macrophages**; weak precise kill of its own |
+| **γδ T cell (IEL)** | no — tissue-resident | 1 | Patrols the wall: intercepts adherents, **repairs the barrier** |
+| **B cell** → plasma cells | ~20% knowledge | 0 (sessile) | Secretes drifting **antibodies** that coat extracellular pathogens |
+
+### The CTL's mechanic is not damage — it is that the enterocyte lives
+
+The ~10% rung buys `QuietKill`. An innate cell clearing an intracellular
+infection destroys the host cell to reach it (loud, leaves debris, feeds
+fibrosis). A cytotoxic cell excises the pathogen and the cell is still
+standing.
+
+So the *observable* a player should learn to read is not "infections clear
+faster" — it is **the tissue stops being destroyed to save it**. If a
+later session ever collapses the quiet branch into the loud one, every
+test about infections clearing still passes and the entire reason to
+invest in adaptive immunity silently disappears.
+`Sprint23Verification.RunQuietKillSparesTheHostCell` exists for that.
+
+A quiet kill leaves **no debris** — and debris is the antigen source
+(§1c). Precision costs you the thing you learn from. That tension is
+deliberate and unmeasured; watch it in playtest.
+
+### Recognition is a visible cumulative meter, not a hidden roll
+
+Replaced the per-tick coin flip. An immune cell in contact with an
+infected cell adds pressure to a 0..1 meter on that cell; the kill fires
+when it fills; an unattended cell sheds pressure. Expected time to clear
+is unchanged (a roll at *p* per tick and an accumulator at *p* per tick
+both resolve in 1/*p* ticks), so this is a legibility change, not a
+balance one.
+
+Two reasons it is worth the extra state:
+
+1. **Sprint 22 already proved the point.** The plaque blister read because
+   it replaced a hidden roll with something that visibly fills. This is
+   the same move for the same reason.
+2. **It makes cooperation expressible**, which a single roll cannot.
+   Halle 2016 measured p(death) = 0.01 / 0.15 / 0.28 for 0 / 1 / 2 CTL
+   contacts, superadditive at 3+. Three cytotoxic cells converging clear a
+   cell far faster than three working separately — so letting a cytokine
+   gradient concentrate your cells is now a real tactic rather than a
+   cosmetic one.
+
+### The innate recognition numbers were inverted, and are now fixed
+
+`StressSenseChancePerTick` was 0.03 (macrophage) / 0.02 (neutrophil) — a
+mean 4.0 s of contact to clear an infected cell. A real CTL, which *has*
+MHC-I-restricted recognition, kills with p≈0.15 per ~9-minute contact. Our
+macrophage, which has none, was ~800× faster than that.
+
+§4b has always said established intracellular infection is "the thing
+innate immunity is *bad at*, on purpose." The number never implemented the
+sentence. Now: innate 0.003/0.002 (~40–60 s of contact), cytotoxic 0.03
+(~4 s) — about a 10× gap, which was the Director's explicit ceiling.
+**Not more than ~20×**: past that the innate roll stops reading as a
+mechanic at all and becomes a flat "innate cannot do this".
+
+### The NK cell is an amplifier, not a competitor
+
+Buyable from round 1, no knowledge required. Its main output is an
+IFN-γ aura that activates nearby macrophages (×2.5 damage and recognition,
+6 s, radius 3). It has a weak quiet kill — a third of the CTL's.
+
+This is the shape the literature supports and it also solves a design
+problem: an ungated cytotoxic tower would compete with the CTL and cheapen
+the ~10% rung. An amplifier compounds with the macrophages the player
+already owns instead.
+
+**Named "NK cell (ILC1)"** (Director's call): the familiar name leads so
+players can place it, the correct one follows because in human small
+intestine the epithelial population is ILC1, which lacks perforin and
+granzyme B entirely.
+
+**Do not give it a clonal-expansion upgrade.** Human NK proliferation is
+unchanged during acute infection; homeostatic doubling is ~16 days. NK
+cells are early because they are already present, not because they ramp
+fast. The common "NK is the fast responder" framing is contradicted by the
+data (Schlub 2011) and should not be narrated anywhere in the game.
+
+### The γδ IEL repairs — the only tower that does
+
+Needs no priming and is tissue-resident, so it is gated by neither
+knowledge nor the lymph node. Speed **1**, deliberately against its real
+ratio: it is already at the wall, so search speed is beside the point and
+a fast number would read as "another hunter".
+
+Two effects, both reusing the wall API Sprint 22 built:
+
+- **Interception** — suppresses charge on forming plaques within 2 cells.
+- **Repair** — restores dead barrier segments nearby every 3.5 s.
+
+Sourced rather than invented: γδ IELs converge on the enterocyte bacteria
+are *currently* touching, migration-defective γδ cells are as useless as
+having none, and more intercalation cut invasion ~63% (Edelblum 2015).
+
+### B cells field plasma cells that emit real antibodies
+
+The Director's ruling was that antibody must be **visible**: plasma cells
+(sessile — motility is inversely related to secretion capacity) secreting
+drifting 1×1 antibody objects that stick to extracellular pathogens and
+coat them.
+
+Coating calls the **same `SetCoated`** secretory IgA already uses, so a
+coated organism is pacified, slowed and more fragile in tissue by exactly
+one code path. Tissue antibody and luminal IgA are one molecule in two
+compartments and the game must not grow two implementations of that.
+
+An antibody **cannot reach inside a host cell** — which is why the ~10%
+and ~20% rungs answer genuinely different threats instead of stacking.
+
+Queued, not built: **B cells deploying to form a tertiary lymphoid organ**
+(Director's idea, 2026-10-25). The research backs it — see
+`CELL_KINETICS_REFERENCE.md`. Three things it must carry when built: the
+player *matures a pre-seeded cryptopatch* rather than placing a follicle
+anywhere; it saturates at ~4–6 follicles ≈ one Peyer's patch; and its
+drawback is that gut TLOs **obstruct lymphatic outflow toward the node** —
+the follicle built to bypass the DC shuttle physically blocks it, and
+resists regression once mature.
+
+### Licensing: buy early, switch on later
+
+A knowledge-gated tower is **purchasable at any time** and emits nothing
+until a species clears its rung. The Director chose this over hiding the
+card so the spend can be planned in advance; the card stays enabled and
+its blurb names the threshold.
+
+`IsNodeResident` and `IsKnowledgeGated` are **orthogonal** and must stay
+two predicates. They used to be one (`IsAdaptive`), which worked only
+because no cell was both adaptive and tissue-roaming. A CTL is both. A γδ
+cell is neither.
+
+### Open — needs a Director decision
+
+- **Per-species recognition.** A CTL currently only acts on species that
+  have themselves cleared 10% (MHC-I restriction is species-specific), so
+  your CTLs walk past a novel pathogen. Biologically right and makes mixed
+  rounds a real decision, but harsher. `KnowledgeLicence.PerSpeciesRecognition`
+  flips it in one write.
+- **What one round is in biological time** — two research passes
+  disagreed (1 day vs 2 days). Belongs with round design.
+- **The MHC-I stealth pathogen.** Designed, not built (Director's call:
+  not this sprint). Under real MHC-I downmodulation CTL killing goes to
+  *exactly zero*, which makes a sourced hard counter that only the NK cell
+  answers. Build it as a cliff — there must be no graded stealth stat,
+  because partial MHC-I reduction does nothing in reality.
+
 ## 5. Pathogen knowledge — LOCKED
 
 A percentage representing how well the adaptive system has characterised a
@@ -833,7 +999,12 @@ Knowledge is now player-facing: the bottom-left strip shows each species'
 really earned. So a reached rung shows as *learned · planned*, with the
 UI's "designed, not built" hatch, rather than being hidden or shown as
 live. `KnowledgeLadder.Rung.Built` flips each to solid as its mechanic
-lands. The ~90% capstone (`KnowledgeLadder.CapstonePercent`) is a star at
+lands. **Flip the flag in the same commit that builds the mechanic.**
+Sprint 22 shipped secretory IgA and did not flip its flag, so for a whole
+sprint — including the playtest in which the Director reported never
+perceiving IgA — the HUD went on calling a live mechanic *planned*.
+`Sprint21Verification.RunHonesty` now pins the exact built set in both
+directions so neither kind of drift can recur. The ~90% capstone (`KnowledgeLadder.CapstonePercent`) is a star at
 the end of every ladder, permanently planned for now: it names the
 campaign's goal.
 
@@ -847,8 +1018,8 @@ nothing else. Each capability's real mechanic is its own later sprint.
 
 | Knowledge | Capability | Mechanic (Director's note) |
 |---|---|---|
-| ~10% | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the *quiet* version of §4b's stress-sense kill). MHC-I restricted recognition. |
-| ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). |
+| ~10% | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the *quiet* version of §4b's stress-sense kill). MHC-I restricted recognition. **Built in Sprint 23.** |
+| ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). **Built in Sprint 23** as plasma-cell-secreted antibody that coats pathogens in tissue, reusing the §6b coating state. |
 | ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
 | ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. |

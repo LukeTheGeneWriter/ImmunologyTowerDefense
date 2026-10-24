@@ -119,6 +119,10 @@ namespace ImmunologyTD.UI
                 case UnitKind.Macrophage: return "ruffled scavenger · clears debris";
                 case UnitKind.Neutrophil: return "fast · high collateral";
                 case UnitKind.DendriticCell: return "antigen shuttle to the node";
+                case UnitKind.CytotoxicT: return "precise kill · the cell survives";
+                case UnitKind.NaturalKiller: return "IFN-γ · upgrades your macrophages";
+                case UnitKind.GammaDeltaT: return "patrols the wall · repairs it";
+                case UnitKind.PlasmaCell: return "antibody factory · coats pathogens";
                 default: return "node resident · barcode match";
             }
         }
@@ -131,7 +135,26 @@ namespace ImmunologyTD.UI
                 case UnitKind.Macrophage: return ImmunologyTD.Rendering.SpriteShapes.Macrophage;
                 case UnitKind.Neutrophil: return ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
                 case UnitKind.DendriticCell: return ImmunologyTD.Rendering.SpriteShapes.DendriteStar;
+                case UnitKind.CytotoxicT: return ImmunologyTD.Rendering.SpriteShapes.CytotoxicT;
+                case UnitKind.NaturalKiller: return ImmunologyTD.Rendering.SpriteShapes.NaturalKiller;
+                case UnitKind.GammaDeltaT: return ImmunologyTD.Rendering.SpriteShapes.GammaDeltaT;
+                case UnitKind.PlasmaCell: return ImmunologyTD.Rendering.SpriteShapes.PlasmaCell;
                 default: return ImmunologyTD.Rendering.SpriteShapes.Lymphocyte;
+            }
+        }
+
+        /// <summary>Sprint 23: what a knowledge-gated tower's card says
+        /// while its rung is still out of reach. The card stays BUYABLE --
+        /// the Director's model is "spend now, it switches on later" -- so
+        /// this text is the only thing telling the player the tower will sit
+        /// dark, and it names the threshold so the spend can be planned.</summary>
+        public static string LockedBlurb(UnitKind kind)
+        {
+            switch (kind)
+            {
+                case UnitKind.CytotoxicT: return "dark until a species hits 10% knowledge";
+                case UnitKind.PlasmaCell: return "dark until a species hits 20% knowledge";
+                default: return PickerBlurb(kind);
             }
         }
 
@@ -142,6 +165,13 @@ namespace ImmunologyTD.UI
                 case UnitKind.Macrophage: return "Macrophage";
                 case UnitKind.Neutrophil: return "Neutrophil";
                 case UnitKind.DendriticCell: return "Dendritic cell";
+                case UnitKind.CytotoxicT: return "Cytotoxic T cell";
+                // Both names on purpose (Director, 2026-10-25): players know
+                // "NK cell", but the cell that actually dominates the human
+                // small-intestinal epithelium is an ILC1.
+                case UnitKind.NaturalKiller: return "NK cell (ILC1)";
+                case UnitKind.GammaDeltaT: return "γδ T cell (IEL)";
+                case UnitKind.PlasmaCell: return "B cell";
                 default: return "Helper-T cell";
             }
         }

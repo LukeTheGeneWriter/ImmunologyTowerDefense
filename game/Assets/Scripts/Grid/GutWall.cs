@@ -149,6 +149,14 @@ namespace ImmunologyTD.Grid
         /// coated.</summary>
         public void BindKnowledge(ImmunologyTD.Adaptive.KnowledgeLedger ledger) => knowledge = ledger;
 
+        /// <summary>Sprint 23: the live wall, so a gamma-delta IEL standing
+        /// in tissue can reach the stretch of barrier in front of it.
+        /// Process-global and null-safe, the same pattern as
+        /// <see cref="GutWallFeatures.Current"/> -- a harness that never
+        /// builds a wall simply has gamma-delta cells with nothing to
+        /// patrol, rather than a crash.</summary>
+        public static GutWall Current;
+
         /// <summary>Spawns a daughter. Set by PathogenSpawner, which owns the
         /// pool -- the wall asks, it does not allocate.</summary>
         public System.Func<PathogenAgent, float, PathogenAgent> SpawnDaughter;

@@ -60,6 +60,21 @@ namespace ImmunologyTD.Rendering
         /// burst back out. The cytokine heat tint lands here too.</summary>
         public static Color InfectedByBacteriumColor => Palette.HostInfectedBact;
 
+        /// <summary>Sprint 23: what an infected cell brightens toward as
+        /// immune cells build recognition pressure on it.</summary>
+        public static Color RecognitionColor => Palette.FxQuietKill;
+
+        /// <summary>How far the lerp goes at full pressure. Short of 1 on
+        /// purpose -- the cell must still read as infected right up to the
+        /// moment it is cleared, or the player loses track of the threat
+        /// while watching the meter.</summary>
+        public const float RecognitionBlendMax = 0.65f;
+
+        /// <summary>Pressure at which the cell takes the recognition collar.
+        /// Half-way, so the collar means "this one is going to be dealt
+        /// with" rather than "someone walked past it once".</summary>
+        public const float RecognitionCollarAt = 0.5f;
+
         /// <summary>DEBRIS: a dead host cell. Desaturated grey-brown, darker
         /// and colder than living tissue -- necrotic, not merely empty. It
         /// has to be told apart from bare ground at a glance, which is why
@@ -159,6 +174,14 @@ namespace ImmunologyTD.Rendering
                     var pathogen = tissueGrid.GetOccupantAt(coord);
                     if (ShowsAsPathogenItself(pathogen)) baseColor = PathogenColor;
 
+                    // Sprint 23: recognition pressure on an infected cell.
+                    // Two-stage read -- the cell brightens continuously as
+                    // pressure builds, then takes a collar once it is more
+                    // than half-recognised. A tint alone was too quiet on a
+                    // cell that is already colour-coded for being infected.
+                    float stress = hostState == HostState.Infected
+                        ? tissueGrid.GetInfectionStress(coord) : 0f;
+
                     // Sprint 13: the host-state sprite alongside the colour.
                     if (isHostGround[col, row])
                     {
@@ -166,7 +189,13 @@ namespace ImmunologyTD.Rendering
                             hostState == HostState.Healthy ? SpriteShapes.HostCell :
                             hostState == HostState.Dead    ? SpriteShapes.Debris :
                             hostState == HostState.Empty   ? SpriteShapes.EmptyPit :
+                            stress >= RecognitionCollarAt ? SpriteShapes.HostCellRecognised :
                             bacterial ? SpriteShapes.HostCellInfectedBacterial : SpriteShapes.HostCellInfectedViral;
+                    }
+
+                    if (stress > 0f)
+                    {
+                        baseColor = Color.Lerp(baseColor, RecognitionColor, stress * RecognitionBlendMax);
                     }
 
                     // Sprint 13: a tiny deterministic per-cell value jitter so

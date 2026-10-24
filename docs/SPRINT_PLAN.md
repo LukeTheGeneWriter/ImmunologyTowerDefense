@@ -1,137 +1,135 @@
-# Sprint Plan — Sprint 22: the invasion rework
+# Sprint Plan — Sprint 23: the adaptive and unconventional roster
 
 ## Recent sprints
 
-- **Sprint 19** — peristalsis, velvet villi, Peyer's patch, crypts.
 - **Sprint 20** — one palette, two looks; Classic later retired.
-- **Sprint 21** — cartoon organs, light UI cards, shop tray, plate frame,
-  knowledge HUD. Director: **"TRANSFORMATIVE."** Closed; the bone marrow
-  second pass is queued in `BACKLOG.md`, not reopened.
+- **Sprint 21** — cartoon organs, light UI cards, shop tray, knowledge HUD.
+  Director: **"TRANSFORMATIVE."**
+- **Sprint 22** — the invasion rework: milling, plaques, secretory IgA,
+  in-lumen replication, barrier death, sentinel sloughing. Director played
+  it; the blister reads, but **he never perceived IgA**.
 
-## Direction (Director, 2026-10-14, extended 2026-10-18)
+## Direction (Director, 2026-10-25)
 
-The orderly queue at the wall goes away. Pathogens should **mill around a
-breach spot**, secretory **IgA** should trap them there, and that opens
-**proximity-based ingress**, **spatial mucus sloughing** and **dead barrier
-cells that pass bacteria but block viruses**.
+Open with research, then build. The Director asked for parallel research
+agents on proliferation, phagocytosis rates and relative cell speeds
+before adding cytotoxic T cells, B cells and NK cells, on the reasoning
+that **getting the cells right first lets rounds be designed against a
+stable roster**, rather than discovering a game-breaking unit later.
 
-On 2026-10-18 he added **in-lumen bacterial replication**, damped by
-density and by IgA, and resolved the IgA/crowding tension himself:
-secretory IgA is two-headed, so it **ties one pathogen to another**, and
-the resulting bulk cannot reach the epithelium.
+Six research passes ran against PubMed and Consensus
+(`docs/research/`, distilled into `docs/CELL_KINETICS_REFERENCE.md`).
+Four Director decisions came out of them:
 
-**`GAME_DESIGN.md` §1b is LOCKED**, which is why this sprint designed
-before it built.
+1. **All four cells land this sprint** — CTL, B cell, NK, γδ T. (The head
+   session flagged that four thins each mechanic; the Director chose four
+   anyway, and the scope below reflects that.)
+2. **A CTL is a buyable tower licensed by knowledge** — bought whenever,
+   dark until ~10%.
+3. **B cells field plasma cells that emit visible antibodies**, with
+   tertiary lymphoid organs as a later upgrade.
+4. **NK held for the research**, then settled: an IFN-γ macrophage
+   amplifier, ungated, named "NK cell (ILC1)".
+5. **Rebalance the inverted recognition numbers, and add the cooperation
+   bonus and a visible stress meter.**
+6. **The MHC-I stealth pathogen is designed, not built** — it goes with
+   round design.
 
-## What the design pass produced
+## What the research changed
 
-- `docs/INVASION_REWORK_SPEC.md` (1,848 lines) + six mocks in
-  `docs/art/invasion_*.png`. §12 holds the Director's decisions and
-  **supersedes** the spec's own fork list.
-- `docs/IGA_REFERENCE.md` (880 lines, 36 DOIs) — the immunology, checked
-  against the literature rather than against memory. It **corrected two of
-  the Director's five stated claims** and the head session's own
-  recommendation on sloughing.
+The research did not merely supply numbers; it changed two towers and
+found one live defect.
 
-## Scope
+- **NK was the wrong shape.** Intestinal NK/ILC1s are less cytotoxic and
+  higher IFN-γ than blood NK; the clearest in vivo result is NK cutting
+  *intramacrophage* Salmonella. Built as an amplifier, not a killer.
+- **γδ IELs are not hunters.** Interception and barrier repair, with a
+  63% invasion reduction behind it.
+- **Our innate recognition was ~800× too generous**, and inverted against
+  a real CTL. §4b said innate immunity is bad at intracellular infection;
+  the number said the opposite.
 
-1. **`GutWall`** replacing `GutInterface`: continuous `(s, d)` positions in
-   the mucus band, milling, a triangular-kernel crowd field, and **plaques**
-   that own members, charge visibly, and rupture.
-2. **In-lumen replication** (bacteria only), damped by nutrient competition
-   from crowding. **No IgA rate brake** — see §12.1 D1.
-3. **Secretory IgA** at the 70% knowledge rung: two-stage *coated* →
-   *cross-linked*, with daughters **born enchained**, so crowding above 70%
-   flips from threat to sink.
-4. **Barrier-cell death** as a **weak spot, not a hole** (§12.1 D2), with
-   the virus asymmetry intact: no living cell means nothing to infect.
-5. **Sentinel-goblet-cell sloughing** — automatic, local, triggered by the
-   crowd field at a crypt, spreading to neighbours, expelling not killing
-   (§12.1 D4).
-6. **Player agency on the wall**: tower-targetable plaques, purchasable
-   repair (§12.1 D3).
-7. **`Sprint22Verification`** (12 checks, including an explicit anti-trickle
-   regression), plus the deliberate revision of `MapVerification`.
-8. **Docs**: rewrite §1b's steps 1–2, and `INTERFACE.md`.
+## Scope — all delivered
 
-## Not in scope
+1. **Four `UnitKind`s**, each with its own profile, price, sprite, speed
+   and emission cadence.
+2. **`QuietKill`** — the CTL's real mechanic: the host cell survives.
+3. **Recognition as a cumulative, visible, cooperative meter**, replacing
+   the hidden per-tick roll; superadditive at 3+ attackers (Halle 2016).
+4. **Innate recognition rebalanced** 0.03/0.02 → 0.003/0.002; cytotoxic at
+   0.03, a ~10× gap.
+5. **IFN-γ aura** — the NK/ILC1 tower's primary output.
+6. **γδ wall patrol and repair**, reusing Sprint 22's wall API.
+7. **Plasma cells and drifting antibody objects**, pooled, reusing the IgA
+   coating state.
+8. **Knowledge licensing** — the first mechanic that reads the ledger and
+   changes behaviour rather than the HUD.
+9. **`Sprint23Verification`** — 50 checks, seeded.
+10. **Docs**: `CELL_KINETICS_REFERENCE.md`, `docs/research/`, §4c.
 
-- A **player-aimed** purge: that is the type-2 "weep-and-sweep" response,
-  which is adaptive and belongs on the knowledge ladder. `BACKLOG.md`.
-- IgA blocking plasmid/resistance transfer; IgA1 protease vs. IgA2;
-  commensal colonisation resistance — all real, all queued
-  (`IGA_REFERENCE.md` §4).
-- Bone marrow second pass; leukocyte rolling; the DC antigen dot.
-- The `SimulationDriver` refactor and the headless strategy harness.
+## Two seams that had to be fixed first
 
-## Corrections this sprint is carrying
+- **`ProfileFor`/`PoolFor` were binary ternaries.** A third tissue kind was
+  not a compile error — it was a silent wrong answer handing a CTL
+  neutrophil stats and a neutrophil sprite. Now a dictionary, with a
+  harness check.
+- **`IsAdaptive` conflated two properties.** It meant both "node-resident,
+  no tissue profile" and "needs the adaptive subsystem". A CTL is adaptive
+  *and* tissue-roaming — the first cell that is both. Split into
+  `IsNodeResident` and `IsKnowledgeGated`.
 
-- **The board is 25 × 10, not 100 × 40** — 10 interface lanes, not 40.
-  `INTERFACE.md` stated the wrong number as fact and `BoardConfig`'s own
-  comments contradicted its defaults; both fixed 2026-10-18. This is
-  *why* a lane is too coarse a unit for "a stretch of wall".
-- **sIgA does not make pathogens easier to phagocytose** in the lumen; it
-  is non-inflammatory and the lumen has no patrolling phagocytes. The gut's
-  answer is **flush, not eat**, so the bonus moves tissue-side.
-- **Crowding damps replication through nutrient competition**, not quorum
-  sensing. Same number, correct reason.
+## Deviations, all deliberate and noted in code
 
-## Deviations from the spec (all small, all noted in code)
+- **The dendritic cell stayed at speed 3** though the research says 2.
+  Sprint 14 raised it so its patrol oscillation reads inside a round, and
+  a legibility decision beats a ratio this close to the literature's own
+  noise floor (three labs disagree by 3× on the same measurement).
+- **γδ T is speed 1, against its real ratio.** It is tissue-*resident*;
+  search speed is beside the point and a fast number would read as another
+  hunter.
+- **Antibody secretion is ~1/s, not ~1,000/s.** The real rate is
+  unusable — what survives compression is the *shape*: a factory running
+  continuously rather than a fighter landing blows.
+- **Recognition became a meter rather than staying a roll.** Expected
+  time-to-clear is identical; the change buys legibility and makes
+  cooperation expressible.
 
-- **IgA chain membership is uncapped; the BULK saturates instead.** The
-  spec capped a chain at 9 members and said "past this a new clump forms".
-  Every way of implementing that leaked: refusing the daughter left it
-  free, coated and gripping (and a free coated organism still charges a
-  plaque, so the armed wall breached MORE than a naive one); giving it a
-  chain of its own produced one-member "chains" linked to nothing; moving
-  the parent out to pair with it shredded established chains. Bulk
-  saturation is what the cap was for, and it is physically truer.
-- **Coating raised 0.18 -> 0.30 /s.** Bacteria erode the wall they grip,
-  eroded wall charges 1.4x faster, and at 0.18 IgA only just won the race
-  -- so the armed wall breached on some runs and not others. The
-  Director's ruling is that the rung is "an unambiguous reward, never a
-  trap". Playtest number.
-- **Only bacteria graze the epithelium.** Virions were chewing through a
-  segment in four seconds and thereby locking themselves out of it.
-- **The plaque blister is a disc, not an arc.** The spec's arc rendered
-  as a sideways crescent; caught in the magnified dump before a build was
-  spent.
-- **Sentinel sloughing is innate and free**, with the shop row buying
-  amplification. The spec gated the whole mechanic behind the purchase;
-  the research (Birchenough 2016) describes an innate response, and the
-  Director's fork 7 answer was that an unmanaged wall self-cleans.
+## A defect found on the way
+
+**The Sprint 22 secretory-IgA rung was never flipped to `Built`.** For a
+whole sprint — including the playtest where the Director reported never
+perceiving IgA — the HUD labelled a live mechanic "planned". Fixed, and
+`Sprint21Verification.RunHonesty` now pins the built set in both
+directions so a rung can be neither flipped early nor forgotten.
+
+This does not by itself explain the IgA miss (the mechanic is driven by
+`IgaTuning.KnowledgePercent`, not by the flag), but it means the one piece
+of UI that would have told him IgA had arrived was saying the opposite.
+It belongs alongside `PLAYTEST_LOG.md`'s three candidate causes.
 
 ## Stopping point
 
-- [x] All seven build items in, per spec + §12.
-- [x] 15 harnesses green (550 checks), no warnings. Sprint22Verification
-      is **seeded** -- several of these mechanics are races, and an
-      unseeded race passes alone and fails in the suite, which is how two
-      real bugs were found.
-- [x] New sprites checked magnified before a build was spent (one was
-      wrong, and was fixed).
-- [x] WebGL build served for the Director (9,198,052 bytes, 0 errors).
-- [x] **The Director's eye** (2026-10-19, verbatim in `PLAYTEST_LOG.md`):
-      the blister **reads**; the mill, the wall's safety after IgA, and
-      round 1 with replication are all good. **He never perceived IgA** --
-      "overshadowed by the relative strength of the macrophages."
-
-**Sprint 22 is closed.** The IgA miss is triaged in `PLAYTEST_LOG.md`
-with three candidate causes to check in order; the likeliest is that
-knowledge never reached 70% in that session, in which case the rung never
-fired and there was nothing to see.
+- [x] All ten scope items in.
+- [x] **16 harnesses green, 603 checks**, no warnings. `Sprint23Verification`
+      is seeded.
+- [x] New sprites checked magnified before a build was spent — **two were
+      wrong**: the granules were invisible (white-on-white in an
+      alpha-carried silhouette) and the γδ cell read as a **face**, which
+      the Director ruled out in Sprint 20. Both fixed before building.
+- [ ] WebGL build served for the Director.
+- [ ] The Director's eye.
 
 ## What to watch for in the playtest
 
-1. **Does the blister read?** It is the one thing that replaced a hidden
-   roll, and the whole case for the charge model rests on it being
-   legible mid-round without being studied.
-2. **Does earning IgA feel like a reward?** The design's best moment is
-   meant to be a charging blister deflating as its members turn pearly,
-   raft up and drift away. If that lands, the rung works.
-3. **Is the mill alive or is it noise?** It should read as organisms stuck
-   in moving slime, not as jitter.
-4. **Is the wall too safe once IgA is up?** Stated as a residual risk in
-   the spec; the lever is the coat rate, not the mechanic.
-5. **Does round 1 feel different now that bacteria replicate?** There is
-   finally something to watch and act on before anything is at the wall.
+1. **Does the quiet kill read?** The thing to notice is not that
+   infections clear — it is that *the tissue survives being cleared*. If
+   that does not land, the whole innate/adaptive investment arc is
+   invisible.
+2. **Does the recognition meter read mid-round** without being studied?
+   Same bar the blister had to clear in Sprint 22.
+3. **Is the NK cell's buff legible**, or does it feel like nothing? An
+   amplifier is inherently harder to perceive than a killer — this is the
+   biggest legibility risk in the sprint.
+4. **Is innate-only play now too punishing** against intracellular
+   infection? The rebalance is tenfold and deliberately harsh.
+5. **Are four new towers too many to read at once** in the shop tray?

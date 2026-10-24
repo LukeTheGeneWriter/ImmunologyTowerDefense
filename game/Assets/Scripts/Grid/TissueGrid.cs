@@ -84,6 +84,36 @@ namespace ImmunologyTD.Grid
         private readonly float[,] hostHealth;
         private readonly PathogenAgent[,] intracellular;
         private readonly float[,] infectionStartTime;
+
+        /// <summary>
+        /// Sprint 23. **Recognition pressure on an infected cell, 0..1.**
+        /// Replaces the per-tick coin flip that used to decide whether a
+        /// unit in contact spotted the infection.
+        ///
+        /// Why a meter and not a roll: Sprint 22's whole lesson was that the
+        /// plaque blister READ because it replaced a hidden roll with
+        /// something the player could watch fill. This is the same move for
+        /// the same reason. The expected time-to-kill is unchanged -- a roll
+        /// at p per tick and an accumulator at p per tick both clear in
+        /// 1/p ticks on average -- so this is a legibility change, not a
+        /// balance change.
+        ///
+        /// It also makes CTL COOPERATION expressible, which a single roll
+        /// could not. Halle 2016 (Immunity, 10.1016/j.immuni.2016.01.010)
+        /// measured p(target death) = 0.01 / 0.15 / 0.28 for 0 / 1 / 2 CTL
+        /// contacts, significantly superadditive at 3 and 5, with a median
+        /// 3.5 contacts and ~50 min of cumulative contact per kill. Killing
+        /// in vivo is a sum of attempts by several cells, not one event.
+        /// </summary>
+        private readonly float[,] infectionStress;
+
+        /// <summary>Sprint 23. Attackers in contact with each infected cell
+        /// during the PREVIOUS tick. Read (not written) when a unit computes
+        /// its cooperation bonus, so the bonus does not depend on the order
+        /// units happen to tick in -- an ordering dependence would make the
+        /// mechanic irreproducible in a seeded harness.</summary>
+        private readonly int[,] attackersLastTick;
+        private readonly int[,] attackersThisTick;
         private readonly float[,] debrisAmount;
 
         /// <summary>What killed the cell whose debris sits here, or null.
@@ -129,6 +159,9 @@ namespace ImmunologyTD.Grid
             hostHealth = new float[cols, rows];
             intracellular = new PathogenAgent[cols, rows];
             infectionStartTime = new float[cols, rows];
+            infectionStress = new float[cols, rows];
+            attackersLastTick = new int[cols, rows];
+            attackersThisTick = new int[cols, rows];
             debrisAmount = new float[cols, rows];
             debrisAntigen = new PathogenClass?[cols, rows];
             emptySince = new float[cols, rows];
@@ -207,6 +240,77 @@ namespace ImmunologyTD.Grid
         /// The firebreak against dead ground is emergent from this plus the
         /// free-virus death timer -- there is deliberately no firebreak
         /// check anywhere in this codebase.</summary>
+        /// <summary>Sprint 23: recognition pressure on this cell, 0..1. The
+        /// renderer draws it as a filling meter; 0 on anything uninfected.</summary>
+        public float GetInfectionStress(CoarseCoord c) =>
+            board.InCoarseBounds(c) ? infectionStress[c.Column, c.Row] : 0f;
+
+        /// <summary>Sprint 23: how many units were in contact with this
+        /// infected cell last tick. Drives the cooperation bonus.</summary>
+        public int AttackersLastTick(CoarseCoord c)
+        {
+            if (!board.InCoarseBounds(c)) return 0;
+            return attackersLastTick[c.Column, c.Row];
+        }
+
+        /// <summary>Sprint 23: a unit declares it is in contact with this
+        /// infected cell this tick. Counted for NEXT tick's bonus.</summary>
+        public void NoteAttacker(CoarseCoord c, float currentTime)
+        {
+            if (!board.InCoarseBounds(c)) return;
+            BeginTickIfNeeded(currentTime);
+            attackersThisTick[c.Column, c.Row]++;
+        }
+
+        /// <summary>
+        /// Sprint 23. Rolls the attacker census over when the logical tick
+        /// index advances.
+        ///
+        /// **Why it is driven by a timestamp rather than a central call:**
+        /// every `SearchUnit` runs its own `Update` and ticks on its own
+        /// accumulator, so there is no one place that means "a tick just
+        /// started" for all of them. Deriving the tick index from the shared
+        /// round clock makes the swap happen exactly once per tick no matter
+        /// who asks first, and works identically under a headless harness
+        /// driving a simulated clock.
+        /// </summary>
+        private void BeginTickIfNeeded(float currentTime)
+        {
+            long tick = (long)(currentTime / BoardConfig.TickIntervalSeconds);
+            if (tick == censusTick) return;
+            censusTick = tick;
+
+            System.Array.Copy(attackersThisTick, attackersLastTick, attackersThisTick.Length);
+            System.Array.Clear(attackersThisTick, 0, attackersThisTick.Length);
+        }
+
+        private long censusTick = -1;
+
+        /// <summary>
+        /// Sprint 23: add recognition pressure. Returns true on the tick the
+        /// meter fills, which is the caller's cue to perform its kill --
+        /// quiet or loud, which this class deliberately does not decide.
+        /// </summary>
+        public bool AddInfectionStress(CoarseCoord c, float amount)
+        {
+            if (!board.InCoarseBounds(c)) return false;
+            if (host[c.Column, c.Row] != HostState.Infected) return false;
+            if (amount <= 0f) return false;
+
+            infectionStress[c.Column, c.Row] += amount;
+            if (infectionStress[c.Column, c.Row] < 1f) return false;
+
+            infectionStress[c.Column, c.Row] = 0f;
+            return true;
+        }
+
+        private void ClearInfectionStress(CoarseCoord c)
+        {
+            infectionStress[c.Column, c.Row] = 0f;
+            attackersLastTick[c.Column, c.Row] = 0;
+            attackersThisTick[c.Column, c.Row] = 0;
+        }
+
         public bool IsHealthyHost(CoarseCoord c) => GetHostState(c) == HostState.Healthy;
 
         /// <summary>Debris blocks regrowth (GAME_DESIGN.md section 1c). Only
@@ -242,6 +346,7 @@ namespace ImmunologyTD.Grid
             host[c.Column, c.Row] = HostState.Infected;
             intracellular[c.Column, c.Row] = pathogen;
             infectionStartTime[c.Column, c.Row] = startTime;
+            ClearInfectionStress(c); // a fresh infection starts unrecognised
             HealthyCount--;
             InfectedCount++;
             return true;
@@ -265,6 +370,7 @@ namespace ImmunologyTD.Grid
             host[c.Column, c.Row] = HostState.Healthy;
             intracellular[c.Column, c.Row] = null;
             infectionStartTime[c.Column, c.Row] = -1f;
+            ClearInfectionStress(c);
             InfectedCount--;
             HealthyCount++;
             return true;
@@ -298,6 +404,7 @@ namespace ImmunologyTD.Grid
 
             if (previous == HostState.Healthy) HealthyCount--;
             else if (previous == HostState.Infected) InfectedCount--;
+            ClearInfectionStress(c);
 
             // Whatever was living inside dies with the cell -- GAME_DESIGN.md
             // section 4a's whole point about innate clearing of intracellular
@@ -581,6 +688,19 @@ namespace ImmunologyTD.Grid
                 for (int row = 0; row < board.Rows; row++)
                 {
                     var c = new CoarseCoord(col, row);
+
+                    // Sprint 23: an infected cell nobody is working on sheds
+                    // recognition pressure, so a passing brush cannot bank
+                    // toward a kill indefinitely.
+                    if (host[col, row] == HostState.Infected
+                        && infectionStress[col, row] > 0f
+                        && attackersLastTick[col, row] == 0)
+                    {
+                        infectionStress[col, row] = Mathf.Max(
+                            0f,
+                            infectionStress[col, row] - TissueTuning.InfectionStressDecayPerSecond * elapsed);
+                    }
+
                     switch (host[col, row])
                     {
                         case HostState.Dead:

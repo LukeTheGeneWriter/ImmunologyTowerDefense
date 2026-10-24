@@ -244,6 +244,31 @@ namespace ImmunologyTD.Grid
             return new Vector3(x, y, 0f);
         }
 
+        /// <summary>Sprint 23: the inverse of <see cref="FineToWorld"/>.
+        /// Added for the drifting antibody, which is the first thing in the
+        /// game that moves in CONTINUOUS world space and then has to ask
+        /// which grid cell it is standing in -- every other mobile object
+        /// owns a lattice coordinate and tweens its sprite toward it.
+        /// The result may be out of bounds; callers check.</summary>
+        public FineCoord WorldToFine(Vector3 world)
+        {
+            int col = Mathf.FloorToInt((world.x + BoardWorldWidth * 0.5f) / FineTileWorldSize);
+            int row = Mathf.FloorToInt((BoardWorldHeight * 0.5f - world.y) / FineTileWorldSize);
+            return new FineCoord(col, row);
+        }
+
+        /// <summary>Sprint 23: world position to the coarse cell containing
+        /// it. Floor-divides rather than going through <see cref="FineCoord.
+        /// ToCoarse"/> so a negative fine coordinate does not round toward
+        /// zero and land back on the board.</summary>
+        public CoarseCoord WorldToCoarse(Vector3 world)
+        {
+            var f = WorldToFine(world);
+            return new CoarseCoord(
+                Mathf.FloorToInt(f.Column / (float)FineSubdivision),
+                Mathf.FloorToInt(f.Row / (float)FineSubdivision));
+        }
+
         public FineCoord CoarseCenterFine(CoarseCoord c) => new FineCoord(
             c.Column * FineSubdivision + FineSubdivision / 2,
             c.Row * FineSubdivision + FineSubdivision / 2);

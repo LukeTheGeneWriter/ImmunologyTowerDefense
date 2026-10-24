@@ -114,6 +114,9 @@ namespace ImmunologyTD.Rendering
         public static Color CryptPocket    => C(0.96f, 0.74f, 0.74f);
         public static Color Paneth         => C(1.00f, 0.45f, 0.55f);
 
+        /// <summary>Sprint 23: a free antibody drifting in tissue.</summary>
+        public static Color Antibody       => C(0.72f, 0.84f, 1.00f);
+
         // ---- FX (keep pairwise distinct -- see class comment) -------------
         public static Color FxDegranulation => C(1.00f, 0.78f, 0.10f);
         public static Color FxBreach        => C(1.00f, 0.30f, 0.15f);
@@ -121,5 +124,30 @@ namespace ImmunologyTD.Rendering
         public static Color FxStressKill    => C(1.00f, 0.25f, 0.70f);
         /// <summary>Sky cyan -- off green, which is the bacterium.</summary>
         public static Color FxKnowledge     => C(0.15f, 0.80f, 1.00f);
+
+        /// <summary>Sprint 23: the CTL's PRECISE kill -- the pathogen dies
+        /// and the host cell lives. Pale lavender-white, deliberately the
+        /// calmest burst on the board: it is the visual opposite of
+        /// <see cref="FxStressKill"/>'s violent magenta, and the contrast
+        /// between the two IS the innate/adaptive distinction as the player
+        /// experiences it.</summary>
+        public static Color FxQuietKill     => C(0.86f, 0.82f, 1.00f);
+
+        /// <summary>Sprint 23: an NK/ILC1 cell's IFN-gamma pulse activating
+        /// the macrophages around it. Warm amber-white -- it is a BUFF, so
+        /// it must not read as a kill; every other burst on the board is
+        /// something dying.</summary>
+        public static Color FxIfnGamma      => C(1.00f, 0.88f, 0.55f);
+
+        /// <summary>Sprint 23: an antibody landing on a pathogen. Close to
+        /// <see cref="IgaCoat"/> deliberately -- tissue antibody and luminal
+        /// IgA are the same molecule doing the same job in two compartments,
+        /// and the player should read them as one idea.</summary>
+        public static Color FxOpsonisation  => C(0.80f, 0.90f, 1.00f);
+
+        /// <summary>Sprint 23: a gamma-delta IEL mending the barrier. Fresh
+        /// green -- the only burst on the board that means something was
+        /// BUILT rather than destroyed.</summary>
+        public static Color FxRepair        => C(0.45f, 0.90f, 0.55f);
     }
 }

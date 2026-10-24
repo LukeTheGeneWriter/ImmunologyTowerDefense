@@ -1,12 +1,10 @@
-# Session Handoff — 2026-10-19 (Sprint 22 shipped the invasion rework; next: playtest, rounds, pathogens)
+# Session Handoff — 2026-10-25 (Sprint 23 shipped the adaptive roster; next: rounds and pathogens)
 
 A checkpoint written by the head session. **This is a living file:
 overwrite it at the next checkpoint rather than accumulating dated
 copies.** It is not one of `WORKFLOW.md` §3's canonical docs; if it
 contradicts `SPRINT_PLAN.md`, `ENGINE_STATUS.md` or `INTERFACE.md`, those
 win.
-
-It is written to be read cold, on **either** machine.
 
 ## First: which machine are you on?
 
@@ -24,122 +22,99 @@ It is written to be read cold, on **either** machine.
 "Web Build Support") before it opens the project. Opening it in 6000.5.8f1
 would try to downgrade the project.
 
-## What shipped this session (2026-10-13 → 14, all on the Linux machine)
+## What shipped this session (2026-10-25, Linux machine)
 
-| Sprint | What | Director's verdict |
+**Sprint 23: four new towers, and only one of them is a killer.**
+
+The Director asked for research first — six parallel passes against PubMed
+and Consensus — on the reasoning that getting the cells right lets rounds
+be designed against a stable roster. The research changed two towers
+before a line was written, and found one live defect.
+
+| Tower | Gated | Its job |
 |---|---|---|
-| — | First WebGL build on 6000.6.4f1 (the upgrade and `tools/unity.sh webgl` proven) | — |
-| 18 | All 12 progenitor upgrade rows wired; adaptive ones per-tower; clonal expansion also raises the rate (the cap alone was inert) | (moved on) |
-| 19 | Peristalsis (surge-and-pause bolus, same transit time); opaque round bolus; velvet villi; Peyer's patch + buyable M-cell sampling; real crypts | "Nice job!" |
-| 20 | `Palette.cs`; the "daylight cartoon" look from `docs/ART_DIRECTION.md`; baked outlines; pathogen size floor; F10 A/B | "Looks great. Excellent call on no faces." |
-| 21 | Classic retired; cartoon organs; light UI cards in screen gutters; shop tray; plate frame + band tabs; **knowledge HUD** (`docs/COSMETIC_PASS_SPEC.md`) | **"TRANSFORMATIVE."** Loves the flying knowledge tokens; the node looks great; **the bone may need a second pass** |
+| Cytotoxic T | ~10% knowledge | Precise kill — **the host cell survives** |
+| NK cell (ILC1) | no | **IFN-γ: upgrades nearby macrophages**; weak kill |
+| γδ T (IEL) | no | Wall patrol + **the only tower that repairs** |
+| B cell → plasma cells | ~20% knowledge | Drifting **antibodies** that coat pathogens |
 
-The process that produced 19–21 is now written up in
-`AGENT_HANDBOOK.md` → Dispatch practices: design agent → spec + PIL
-mocks → Director decisions via `AskUserQuestion` → inline build, sprites
-checked magnified before building. **Reuse it for any visual work.**
+Read `GAME_DESIGN.md` §4c first — it is the source of truth for all four.
+The evidence is in `docs/CELL_KINETICS_REFERENCE.md`, with the six
+unabridged passes in `docs/research/`.
 
-## Where Sprint 22 left things (2026-10-18/19, Linux machine)
+### The ideas the sprint rests on
 
-**Sprint 22 shipped the invasion rework.** `GAME_DESIGN.md` §1b is
-rewritten and **re-locked** -- steps 1 and 2 replaced, steps 3-5
-untouched. Read that section first; it is the source of truth now.
+- **The CTL's mechanic is not damage.** It is `QuietKill`: the enterocyte
+  is still standing afterwards. If a later session collapses the quiet
+  branch into the loud one, every test about infections clearing still
+  passes and the entire reason to buy adaptive immunity silently vanishes.
+  `Sprint23Verification.RunQuietKillSparesTheHostCell` guards it.
+- **The NK cell is an amplifier, not a competitor.** Building it as a
+  cheap CTL was the obvious design and the wrong biology, and it would
+  have cheapened the ~10% rung. Do **not** give it a clonal-expansion
+  upgrade — human NK proliferation is unchanged during acute infection.
+- **Recognition is a visible cumulative meter**, not a hidden roll, and
+  cooperation is superadditive (Halle 2016). Same reasoning that made
+  Sprint 22's blister work.
+- **Innate recognition was ~800× too generous** and is now ~10× *slower*
+  than cytotoxic. §4b always said innate immunity is bad at intracellular
+  infection; the number had said the opposite since Sprint 6.
 
-Two docs underpin it and are worth reading before touching the wall:
+### Two seams fixed first, worth not re-breaking
 
-- `docs/INVASION_REWORK_SPEC.md` -- the design. **Its §12 carries the
-  Director's decisions and supersedes its own fork list**, so read §12
-  before trusting anything earlier in the file.
-- `docs/IGA_REFERENCE.md` -- the immunology, 36 DOIs, every citation
-  resolved against PubMed. It corrected two of the Director's five
-  stated claims and one of the head session's recommendations.
+- **`ProfileFor`/`PoolFor` were binary ternaries.** A third tissue kind was
+  a *silent wrong answer*, not a compile error. Now a dictionary.
+- **`IsAdaptive` conflated two properties** and a CTL is the first cell
+  that is both adaptive and tissue-roaming. Split into `IsNodeResident`
+  and `IsKnowledgeGated`. Keep them separate.
 
-### The one idea the whole wall rests on
+### A defect found on the way, relevant to the IgA mystery
 
-Under IgA, **a bacterium's own replication is what traps it**. IgA does
-not slow bacteria (Moor 2017, Nature 544:498-502): it cross-links
-DAUGHTER cells as they divide, because classical agglutination needs
-densities real infections never reach. Links break over time (Bansept
-2019), so it is a race -- divide faster than your links break and you
-build your own cage.
+**The Sprint 22 secretory-IgA rung was never flipped to `Built`.** For a
+whole sprint — including the playtest where the Director reported never
+perceiving IgA — the HUD labelled a live mechanic "planned". It does not
+by itself explain the miss (the mechanic reads `IgaTuning.KnowledgePercent`,
+not the flag), but the one piece of UI that would have told him IgA had
+arrived was saying the opposite. Add it to `PLAYTEST_LOG.md`'s three
+candidate causes.
 
-What that buys: **nothing in the game ever decides which pathogen
-deserves IgA.** Fast replicators trap themselves hardest; the physics
-does the targeting. There is deliberately NO field anywhere for an IgA
-penalty on division rate. If a future session adds one, the observable
-(free numbers stop growing) will survive and the reason will be a lie.
+## Open questions the Director has not ruled on
 
-### Other invariants a later session must not "simplify"
+1. **Per-species recognition.** A CTL currently ignores species below 10%,
+   so your CTLs walk past a novel pathogen. Biologically right, harsher.
+   `KnowledgeLicence.PerSpeciesRecognition` flips it in one write.
+2. **What one round is in biological time.** Two research passes
+   disagreed — 1 day vs 2 days. Belongs with round design.
+3. **The 8-bit barcode ceilings the species roster at ~8–10** before tags
+   start teaching two species at once. This bites *before* new pathogens
+   ship. 16 bits at r≤2 recommended. §5c's claim that the Hamming
+   threshold is the dial to reach for first is backwards.
 
-- **`IngressCrowdFloor`.** Charge accrues at `(members - floor) * rate`,
-  so one or two adherents accrue nothing forever. A trickle is
-  arithmetically impossible, not merely unlikely. `MapVerification.
-  RunNoTrickle` exists to stop anyone removing it.
-- **One ingress mechanic, not two.** The Director chose "dead wall is a
-  weak spot, not a hole": it charges faster, it does not let bacteria
-  walk through.
-- **No killing in the lumen, anywhere.** IgA excludes, sloughing expels.
-  Secretory IgA is non-inflammatory, inhibits IgG-driven complement, and
-  the lumen has no patrolling phagocytes. The gut's answer is flush, not
-  eat. The "easier to deal with" bonus lives in `ReceiveDamage`, behind
-  the wall.
-- **Seed the harness.** `Sprint22Verification` calls `Random.InitState`.
-  Several mechanics are races, and an unseeded race gives a harness that
-  passes alone and fails in the suite -- which is how two real bugs were
-  found.
+## What is queued next
 
-### What is queued next
+1. **Round design and new pathogens** — the thing this sprint was clearing
+   the way for. `BACKLOG.md`'s Sprint 23 section has the corrections that
+   should land alongside (clonal expansion is on the wrong knob; the ~30%
+   memory rung is specified backwards).
+2. **The MHC-I stealth pathogen** — designed, not built. Under real MHC-I
+   downmodulation CTL killing goes to *exactly zero*, so it is a sourced
+   hard counter only the NK cell answers. Build it as a cliff; there must
+   be no graded stealth stat.
+3. **B cells → tertiary lymphoid organs** (the Director's idea), with the
+   cited drawback: gut TLOs obstruct lymphatic outflow toward the node.
+4. Bone marrow second pass, still queued from Sprint 21.
 
-1. **DONE -- he played it 2026-10-19.** The blister reads; the mill,
-   the post-IgA wall and round 1 are all good. **He never perceived
-   IgA**, "overshadowed by the relative strength of the macrophages."
-   `PLAYTEST_LOG.md` triages that into three candidate causes to check
-   IN ORDER -- the likeliest being that knowledge never reached 70%, so
-   the rung never fired. **Do not tune `IgaTuning` before checking.**
-2. **Round planning and new pathogens**, which the rework was blocking.
-   Both now have a wall model to design against, and the barrier
-   asymmetry gives a mixed round a real decision.
-3. **The `SimulationDriver` refactor and the headless strategy harness**
-   (§2a below, unchanged). Sprint 22 makes this more valuable: the wall
-   now has numbers worth sweeping (coat rate, crowd floor, charge rate),
-   and several are explicitly flagged as playtest-set.
-4. **Bone marrow second pass**, still queued from Sprint 21.
-5. `BACKLOG.md` carries eight further real IgA mechanics the research
-   surfaced -- blocking plasmid transfer between enemy lineages, IgA1
-   protease vs. IgA2, antigenic escape, and more.
+## State of the code
 
-## State of the code (one-liners; details in `ENGINE_STATUS.md` / `INTERFACE.md`)
+- **16 harnesses, 603 checks**, green as of Sprint 23's final commit.
+  `Sprint23Verification` is seeded.
+- New roster numbers: `UnitProfile` defaults in `GameBootstrap`,
+  cross-kind values in `Units/UnitTuning`, antibody in
+  `Adaptive/AntibodyTuning`, licensing in `Adaptive/KnowledgeLicence`.
+- `GutWall.Current` and `KnowledgeLicence.Ledger` are new process-global,
+  null-safe statics, same pattern as `GutWallFeatures.Current`.
+- **Two sprite traps** cost a rebuild each and are written up in
+  `BACKLOG.md`: `InnerShade` with a multiplier above 1 is a no-op on these
+  white-silhouette sprites, and the γδ cell's first draft read as a
+  **face**. Always dump and look before building.
 
-- **All colours** are in `Rendering/Palette.cs` (Daylight only). New
-  colours go there.
-- **UI** is UI Toolkit from code (`UI/`): light cards via `UiTheme`, the
-  Nunito font in `Assets/Resources/Fonts/`, and screen-gutter docks.
-  `KnowledgeView` + `KnowledgeWatcher` drive the knowledge HUD.
-- **Organs** are `Rendering/OrganShapes` canvases; UI and marrow sprites
-  are in `Rendering/SpriteShapes.Ui.cs`.
-- **The wall** is `Grid/GutWall` (Sprint 22; `GutInterface` is deleted):
-  the mill, the crowd field, plaques, barrier segments, IgA and luminal
-  replication. Numbers live in `InvasionTuning`, `IgaTuning` and
-  `BarrierTuning`. `Grid/GutWallFeatures` still owns the Peyer's patch,
-  M cells and crypts; `Pathogens/Peristalsis` the squeeze.
-- **The board is 25 x 10, not 100 x 40** -- ten interface lanes. Corrected
-  in `INTERFACE.md` and `BoardConfig`'s comments on 2026-10-18; both had
-  asserted 40 for several sprints. `MapVerification` builds its own
-  100x40 rig, which is why nothing caught it.
-- **15 harnesses, 550 checks**; `tools/unity.sh verify` green as of
-  Sprint 22's final commit. `Sprint22Verification` is seeded.
-
-## For whichever session picks this up
-
-Read `CLAUDE.md` and `WORKFLOW.md`, then this file, then `PLAYTEST_LOG.md`
-(the newest entries) and `BACKLOG.md` (Sprints 18–21 sections). **Opening move for the next session, set by the Director on 2026-10-19:**
-ask him about **new cell types and upgrades** -- he has ideas to
-suggest -- and **review how the upgrades currently work** alongside that
-conversation. Start there, not with the wall.
-
-Useful context to have ready for that conversation: all 12 progenitor
-upgrade rows were wired in Sprint 18, `ShopLedger` / `ShopTuning` hold the
-shop rows, and `BACKLOG.md`'s oldest open question is still Round 1's
-economy and whether a "forced opening" is a goal. The IgA miss above may
-also turn out to be a round-design problem rather than an IgA one, which
-is adjacent to this conversation.

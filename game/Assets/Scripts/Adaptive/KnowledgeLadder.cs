@@ -54,15 +54,33 @@ namespace ImmunologyTD.Adaptive
         /// the end of every ladder, permanently "planned" for now.</summary>
         public const float CapstonePercent = 90f;
 
-        /// <summary>The rungs, ascending by threshold. None is built yet.</summary>
+        /// <summary>
+        /// The rungs, ascending by threshold. The `built` flag is what the
+        /// HUD reads to decide whether a reached rung shows solid or with
+        /// the "designed, not built" hatch.
+        ///
+        /// **Sprint 23 flipped three of them, one of which was overdue.**
+        /// Secretory IgA shipped in Sprint 22 but its flag was never
+        /// flipped, so the HUD went on calling it *planned* even once a
+        /// species passed 70% and the mechanic was really running. That is
+        /// worth remembering next to `PLAYTEST_LOG.md`'s open question about
+        /// why the Director never perceived IgA: whatever else was true, the
+        /// one piece of UI that would have told him it had arrived was
+        /// saying the opposite.
+        ///
+        /// If you build a rung's mechanic, flip its flag in the same commit.
+        /// `Sprint21Verification.RunHonesty` pins the exact set both ways --
+        /// it fails if a built rung is still marked planned AND if an
+        /// unbuilt one is marked built.
+        /// </summary>
         public static readonly Rung[] Rungs =
         {
-            new Rung(KnowledgeCapability.CytotoxicTCells,        10f, "CTL"),
-            new Rung(KnowledgeCapability.NeutralizingAntibodies, 20f, "NeutAb"),
+            new Rung(KnowledgeCapability.CytotoxicTCells,        10f, "CTL",    built: true),  // Sprint 23
+            new Rung(KnowledgeCapability.NeutralizingAntibodies, 20f, "NeutAb", built: true),  // Sprint 23
             new Rung(KnowledgeCapability.MemoryTCells,           30f, "MemT"),
             new Rung(KnowledgeCapability.FcReceptor,             45f, "FcR"),
             new Rung(KnowledgeCapability.Complement,             60f, "Compl"),
-            new Rung(KnowledgeCapability.SecretoryIgA,           70f, "IgA"),
+            new Rung(KnowledgeCapability.SecretoryIgA,           70f, "IgA",    built: true),  // Sprint 22
         };
 
         /// <summary>True once <paramref name="knowledgePercent"/> has reached

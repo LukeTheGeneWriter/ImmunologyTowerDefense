@@ -8,7 +8,34 @@ namespace ImmunologyTD.Units
     /// (<c>DendriticCell</c> / <c>Lymphocyte</c>) via <c>AdaptiveDirector</c>
     /// rather than a SearchUnit. All four share the same 5 marrow slots
     /// (GAME_DESIGN.md §1c/§2a -- marrow real estate is the constraint).</summary>
-    public enum UnitKind { Macrophage, Neutrophil, DendriticCell, HelperT }
+    /// <summary>
+    /// Sprint 23 appends four kinds; **ordinals of the existing four are
+    /// load-bearing** (serialized slots, saved shop state), so new kinds go
+    /// on the end, never in the middle.
+    ///
+    /// The four new ones are deliberately NOT four flavours of "killer" --
+    /// the Sprint 23 research (docs/CELL_KINETICS_REFERENCE.md) found that
+    /// only the CTL is primarily a killer:
+    ///  - CytotoxicT -- precise QUIET kill of an infected cell, knowledge-gated.
+    ///  - NaturalKiller -- "NK cell (ILC1)". Mostly an IFN-gamma AMPLIFIER of
+    ///    nearby macrophages, with a weak quiet kill of its own. Intestinal
+    ///    NK/ILC1s are published as less cytotoxic and higher IFN-gamma than
+    ///    blood NK cells, so a straight "cheap CTL" would be wrong.
+    ///  - GammaDeltaT -- intraepithelial patroller: barrier integrity and
+    ///    repair at the wall, NOT tissue DPS.
+    ///  - PlasmaCell -- sessile antibody factory emitted by a B-cell tower.
+    /// </summary>
+    public enum UnitKind
+    {
+        Macrophage,
+        Neutrophil,
+        DendriticCell,
+        HelperT,
+        CytotoxicT,
+        NaturalKiller,
+        GammaDeltaT,
+        PlasmaCell,
+    }
 
     /// <summary>
     /// Per-unit-type tuning. Each type gets its own configurable speed in
@@ -77,6 +104,61 @@ namespace ImmunologyTD.Units
         /// intracellular infection at all. Per-tower mutable, never a const
         /// (§6d), so an upgrade or a new unit kind is a one-field write.</summary>
         [Min(0f)] public float StressSenseChancePerTick = 0f;
+
+        /// <summary>Sprint 23. **The CTL's entire reason for existing.**
+        /// False = the stress-sense kill is LOUD: the host cell dies with the
+        /// pathogen inside it (necrosis, collateral, fibrosis feed). True =
+        /// QUIET: the intracellular pathogen is destroyed and **the host cell
+        /// survives**, per GAME_DESIGN.md §5's ~10% rung ("precise kill of an
+        /// infected cell -- no collateral, no necrotic DAMP").
+        ///
+        /// Note the mechanic is NOT "more damage" -- it is that the enterocyte
+        /// is still standing afterwards. That is what the player is buying
+        /// when they invest in adaptive immunity, and it is the only reason
+        /// innate-only play hits a tissue-damage ceiling.</summary>
+        public bool QuietKill = false;
+
+        /// <summary>Sprint 23. Per-tick chance this unit's IFN-gamma aura
+        /// upgrades a macrophage it is near -- the NK/ILC1 tower's PRIMARY
+        /// job, not a side effect. 0 = this kind has no aura.
+        ///
+        /// Research (docs/CELL_KINETICS_REFERENCE.md): human intestinal NK
+        /// cells are published as less cytotoxic and higher IFN-gamma than
+        /// blood NK cells, and the clearest in vivo demonstration of NK
+        /// function anywhere is NK cells cutting *intramacrophage* Salmonella
+        /// load. So the honest NK tower makes macrophages better rather than
+        /// competing with them.</summary>
+        [Min(0f)] public float IfnGammaAuraChancePerTick = 0f;
+
+        /// <summary>Sprint 23. Radius in COARSE cells over which the above
+        /// aura reaches. 0 with a non-zero chance means "same cell only".</summary>
+        [Min(0)] public int IfnGammaAuraCoarseRadius = 0;
+
+        /// <summary>Sprint 23. How many coarse cells of wall this kind
+        /// patrols from, and how hard it holds that wall together. 0 = this
+        /// kind does not interact with the barrier at all, which is every
+        /// kind except the intraepithelial gamma-delta T cell.
+        ///
+        /// The research is unusually specific here: gamma-delta IELs
+        /// converge on the enterocyte *currently being touched by bacteria*,
+        /// migration-defective gamma-delta cells are as useless as having
+        /// none at all, and increasing their intercalation cut bacterial
+        /// invasion by ~63% (Edelblum 2015). So the mechanic is
+        /// INTERCEPTION AND REPAIR at the wall, not damage -- a gamma-delta
+        /// tower built as another hunter would have been the obvious game
+        /// design and a straightforward misreading of the cell.</summary>
+        [Min(0f)] public float BarrierPatrolRadiusCells = 0f;
+
+        /// <summary>Seconds between this kind's barrier repair attempts.
+        /// 0 = never repairs.</summary>
+        [Min(0f)] public float BarrierRepairIntervalSeconds = 0f;
+
+        /// <summary>Sprint 23. Seconds between antibody secretions for a
+        /// unit of this kind. 0 = this kind secretes nothing, which is how
+        /// "only plasma cells make antibody" falls out with no kind check in
+        /// SearchUnit -- the same trick EfferocytosisDebrisPerTick uses to
+        /// keep debris clearance a macrophage job.</summary>
+        [Min(0f)] public float AntibodySecretionIntervalSeconds = 0f;
 
         /// <summary>Debris cleared per logical tick while a unit of this kind
         /// stands on a dead cell -- efferocytosis, the macrophage's real

@@ -1332,6 +1332,34 @@ namespace ImmunologyTD.Pathogens
         /// half-updated cell. That is why this does not release anything: it
         /// only tears down its own state and returns to the pool.
         /// </summary>
+        /// <summary>
+        /// Sprint 23. **The quiet kill** (GAME_DESIGN.md §5, ~10% rung):
+        /// this pathogen is destroyed inside its host cell and *the host
+        /// cell survives*. The teardown is identical to
+        /// <see cref="OnHostCellDestroyed"/> -- what differs is entirely on
+        /// the grid side, where the caller used
+        /// <c>TissueGrid.ReleaseIntracellular</c> (cell -> Healthy) instead
+        /// of <c>KillHostCell</c> (cell -> Dead + debris).
+        ///
+        /// Kept as a separate, identically-shaped method rather than a bool
+        /// on the other one, because the two have opposite consequences for
+        /// the tissue and a reader should not have to trace an argument to
+        /// find out which happened. Same contract: the caller has ALREADY
+        /// detached this agent from the host layer.
+        ///
+        /// Note the knock-on: a quiet kill leaves **no debris**, so it also
+        /// yields no antigen for a dendritic cell to sample. Precision costs
+        /// you the thing you learn from -- which is a real tension in the
+        /// design, not an oversight, and is worth watching in a playtest.
+        /// </summary>
+        public void OnPreciselyKilled()
+        {
+            if (State == PathogenState.Cleared) return;
+            State = PathogenState.Cleared;
+            IsIntracellular = false;
+            onExit?.Invoke(this);
+        }
+
         public void OnHostCellDestroyed()
         {
             if (State == PathogenState.Cleared) return;

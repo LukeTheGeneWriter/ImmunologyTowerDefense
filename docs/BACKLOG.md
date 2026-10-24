@@ -985,3 +985,76 @@ The buy panels and the upgrade framework landed well. Two items:
   and a CSV report.
 - **Bone marrow second pass**: "technically correct" but not loved; match
   the node.
+
+## Sprint 23 — queued from the roster research (2026-10-25)
+
+The six research passes (`docs/research/`) surfaced more than the sprint
+built. These are the ones with real evidence behind them, roughly in order
+of how much they would add.
+
+### Towers with a mechanic nothing else covers
+- **ILC3 — epithelial resilience, and the best innate memory in the gut.**
+  Dispensable at low pathogen load, *indispensable* at high load (Araujo
+  2024) — a tower whose value scales with wave pressure, which is an
+  unusual and good shape. Genuinely trained for months after one encounter
+  (Serafini 2022), better evidenced than NK "memory".
+- **Treg — two separable mechanics.** Suppression (lower the collateral
+  coefficient) and *repair*, which is triggered by IL-18/IL-33 alarmins
+  rather than TCR (Arpaia 2015). A tower powered by your own loud kills is
+  a natural fibrosis counterweight.
+- **Mast cell** — converts host-cell death signals into a tissue-wide
+  state change in minutes.
+- **Eosinophil** — only if parasites ship; kills larval stages, not
+  adults, and carries real collateral.
+
+### Upgrades
+- **B cells → tertiary lymphoid organ** (the Director's idea). The player
+  *matures a pre-seeded cryptopatch* rather than placing a follicle
+  anywhere; saturates at ~4–6 follicles ≈ one Peyer's patch; and the
+  drawback is cited, not invented — gut TLOs obstruct lymphatic outflow
+  toward the node, so the follicle built to bypass the DC shuttle blocks
+  it, and resists regression once mature.
+- **Cytokine-induced memory-like NK** — a consumable priming ability with
+  clinical-trial backing, species-agnostic and knowledge-free. An innate
+  progression axis that does not borrow from the ladder.
+- **Fc receptor (~45% rung) should be worth 2–10x, not 100x** — three
+  small stacked effects on three axes (uptake rate, intracellular
+  survival, oxidative burst), not one big multiplier.
+
+### Corrections to existing design
+- **Clonal expansion is on the wrong knob.** Fast and slow T-cell subsets
+  differ by only ~1.4x in cycle length — too small to feel — but two extra
+  days of dividing is 64-fold. The upgrade should extend *how long a tower
+  keeps emitting*, not the rate. The current ×(1+0.5·level) exceeds the
+  physiological maximum at level 1.
+- **The ~30% memory rung is specified backwards.** Naive cells out-expand
+  memory cells *per cell*. Memory wins on starting numbers (~1,000–5,000x),
+  onset (<1 day) and gentler contraction — so the CTL burst should be a
+  **pre-stocked pool with zero ramp**, not a rate or cap boost.
+- **Do not give NK a clonal-expansion upgrade.** Human NK proliferation is
+  unchanged during acute infection.
+- **Affinity maturation against whole organisms tops out at 10–15x**, not
+  1,000x (the big number is a hapten artefact), so antibody rungs should
+  stay modest.
+- **Knowledge should be able to fall** — up to half of all germinal-centre
+  B cells die every 6h. And the mutation discount should be large: one flu
+  cluster transition took vaccine effectiveness from 40–60% to 7%.
+- **The 8-bit barcode is the binding constraint, not the Hamming
+  threshold** — §5c says the opposite. 8 bits ceilings the species roster
+  at ~8–10 before tags teach two species at once, which **matters before
+  new pathogens ship**. 16 bits at r≤2 is the recommended compromise.
+- **Stress-sensor towers should cost fibrosis for killing stressed-but-
+  uninfected cells** — ER-stressed epithelium up-regulates NKG2D ligands
+  and gets killed, causing spontaneous enteritis (Hosomi 2017). A sourced
+  drawback for the whole recognition mechanic.
+
+### Rendering
+- **The viral inclusion body is invisible.** `HostCellInfectedViral` draws
+  it with `FillDisc` inside an already-opaque white silhouette, so it
+  renders as a blank rounded square — the viral/bacterial distinction
+  currently rests entirely on colour. (The bacterial stipple does show.)
+  Found in the Sprint 23 magnified sprite dump. One-line fix, but it
+  changes existing art, so it needs the Director's eye.
+- **`InnerShade` with a multiplier above 1 is a no-op** on these white-
+  silhouette sprites. `LargeBacterium`'s "soft highlight" at 1.15 does
+  nothing. Any future "highlight" has to be carved as a darker surround.

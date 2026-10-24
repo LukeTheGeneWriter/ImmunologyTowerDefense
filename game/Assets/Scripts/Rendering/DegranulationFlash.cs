@@ -84,6 +84,25 @@ namespace ImmunologyTD.Rendering
         /// tissue board so it must read on its own.</summary>
         public static Color KnowledgeMatchColor => Palette.FxKnowledge;
 
+        /// <summary>Sprint 23: a cytotoxic cell's PRECISE kill -- pathogen
+        /// destroyed, host cell left alive. Played smaller and calmer than
+        /// <see cref="StressKillColor"/> on purpose: the player should be
+        /// able to tell at a glance whether an infection was excised or the
+        /// tissue was blown up to get at it.</summary>
+        public static Color QuietKillColor => Palette.FxQuietKill;
+
+        /// <summary>Sprint 23: an NK/ILC1's IFN-gamma pulse. Drawn WIDE and
+        /// slow -- it covers the aura radius, so the player can see which
+        /// macrophages were caught by it.</summary>
+        public static Color IfnGammaColor => Palette.FxIfnGamma;
+
+        /// <summary>Sprint 23: an antibody landing and coating a pathogen.
+        /// Small and quick -- this happens often, so it must not shout.</summary>
+        public static Color OpsonisationColor => Palette.FxOpsonisation;
+
+        /// <summary>Sprint 23: barrier repair by a gamma-delta IEL.</summary>
+        public static Color RepairColor => Palette.FxRepair;
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;
@@ -146,6 +165,13 @@ namespace ImmunologyTD.Rendering
             if (Same(c, EfferocytosisColor))  { durationSeconds = 0.55f; startScale = 0.30f; endScale = 1.3f; return SpriteShapes.EffeBloom; }
             if (Same(c, StressKillColor))     { durationSeconds = 0.45f; startScale = 0.35f; endScale = 1.6f; return SpriteShapes.StressRing; }
             if (Same(c, KnowledgeMatchColor)) { durationSeconds = 0.50f; startScale = 0.30f; endScale = 1.4f; return SpriteShapes.KnowledgeRing; }
+            // Sprint 23: quiet kill -- quick, small, tidy. Reuses the stress
+            // ring shape at a fraction of the scale and duration, so the two
+            // outcomes are legibly the same EVENT with opposite characters.
+            if (Same(c, QuietKillColor))      { durationSeconds = 0.28f; startScale = 0.25f; endScale = 0.85f; return SpriteShapes.StressRing; }
+            if (Same(c, IfnGammaColor))       { durationSeconds = 0.70f; startScale = 0.20f; endScale = 1.0f; return SpriteShapes.KnowledgeRing; }
+            if (Same(c, OpsonisationColor))   { durationSeconds = 0.22f; startScale = 0.30f; endScale = 0.75f; return SpriteShapes.KnowledgeRing; }
+            if (Same(c, RepairColor))         { durationSeconds = 0.60f; startScale = 0.25f; endScale = 1.2f; return SpriteShapes.EffeBloom; }
             // default = neutrophil degranulation
             durationSeconds = 0.40f; startScale = 0.35f; endScale = 1.6f;
             return SpriteShapes.GranuleBurst;

@@ -49,11 +49,18 @@ namespace ImmunologyTD.Bootstrap
             // Judgment call, mechanics-first (see docs/TEAM_RETRO.md).
             EfferocytosisDebrisPerTick = 0.05f,
             // GAME_DESIGN.md §4b: generic stress sensing, deliberately weak.
-            // At the 0.12s tick, 0.03/tick is ~1-in-4 per second -- a
-            // macrophage that parks on an infected cell catches it in a few
-            // seconds on average, but a patrol that only brushes past
-            // usually misses. Judgment call, mechanics-first.
-            StressSenseChancePerTick = 0.03f
+            //
+            // **Sprint 23 cut this 0.03 -> 0.003** (Director, 2026-10-25).
+            // 0.03/tick meant a mean 4.0s of contact to clear an infected
+            // cell -- while a real CTL, which actually HAS MHC-I-restricted
+            // recognition, kills with p=0.15 per ~9-minute contact (Halle
+            // 2016, Immunity, 10.1016/j.immuni.2016.01.010, two-photon in
+            // vivo). Our macrophage, which has no such recognition at all,
+            // was clearing infections ~800x faster than a real CTL. §4b says
+            // in plain language that established intracellular infection is
+            // "the thing innate immunity is *bad at*, on purpose"; the number
+            // never implemented the sentence. 0.003 = a mean ~40s of contact.
+            StressSenseChancePerTick = 0.003f
         };
 
         [SerializeField]
@@ -61,7 +68,11 @@ namespace ImmunologyTD.Bootstrap
         {
             Kind = UnitKind.Neutrophil,
             DisplayName = "Neutrophil",
-            FineTilesPerTick = 3,
+            // Sprint 23: 3 -> 5. Measured interstitial neutrophil crawling is
+            // ~7.3 um/min (Zinselmeyer 2008) against a tissue macrophage's
+            // ~1 um/min (van den Bos 2020) -- a 7-10x gap where the game was
+            // showing 3x. 5 is the ceiling of the useful integer ladder.
+            FineTilesPerTick = 5,
             FootprintFineTiles = 3,
             Color = new Color(0.93f, 0.74f, 0.30f), // Sprint 13: nudged amber -> gold, away from hazard-orange
 
@@ -73,8 +84,125 @@ namespace ImmunologyTD.Bootstrap
             EfferocytosisDebrisPerTick = 0f, // neutrophils do not clear debris -- macrophage's job (section 1c)
             // Slightly weaker than the macrophage's -- a neutrophil is a
             // blunter instrument -- but non-zero: it is still an innate cell
-            // that can stumble onto a stressed cell. Judgment call.
-            StressSenseChancePerTick = 0.02f
+            // that can stumble onto a stressed cell.
+            // Sprint 23: 0.02 -> 0.002, same rescale as the macrophage above.
+            StressSenseChancePerTick = 0.002f
+        };
+
+        // ---------------------------------------------------------------
+        // Sprint 23 -- the adaptive and unconventional roster.
+        // Every number below is sourced in docs/CELL_KINETICS_REFERENCE.md.
+        // Speeds come from that doc's ratio table, which normalises measured
+        // two-photon velocities against the macrophage at 1.
+        // ---------------------------------------------------------------
+
+        /// <summary>The ~10% knowledge rung made flesh. Its mechanic is NOT
+        /// damage -- it is <see cref="UnitProfile.QuietKill"/>: the enterocyte
+        /// survives. Licensed per species by the knowledge ledger.</summary>
+        [SerializeField]
+        private UnitProfile cytotoxicTProfile = new UnitProfile
+        {
+            Kind = UnitKind.CytotoxicT,
+            DisplayName = "Cytotoxic T",
+            // Effector CD8 in mouse small-intestinal villi: 6.5 um/min
+            // (Torres 2023 eLife, 10.7554/eLife.84916) ~= 6x the macrophage;
+            // compressed to 3 because the integer ladder tops out at 5 and
+            // the neutrophil needs the top rung.
+            FineTilesPerTick = 3,
+            FootprintFineTiles = 3,
+            Color = new Color(0.78f, 0.26f, 0.32f),
+            MaxActiveChildren = 8,
+            KillLimit = 16,
+            DegranulatesOnDepletion = false,
+            DegranulationBurstMultiplier = 0f,
+            ContactRadiusFineTiles = 2,
+            EfferocytosisDebrisPerTick = 0f,
+            // 10x the (rebalanced) macrophage: a mean ~4s of contact. The
+            // Director's call was a 10-15x gap, explicitly not more -- past
+            // ~20x the innate roll stops reading as a mechanic at all.
+            StressSenseChancePerTick = 0.03f,
+            QuietKill = true,
+        };
+
+        /// <summary>"NK cell (ILC1)". **Primarily a macrophage amplifier.**
+        /// Intestinal NK/ILC1s are published as less cytotoxic and higher
+        /// IFN-gamma than blood NK cells, and ILC1s lack perforin and
+        /// granzyme B outright -- so the weak kill is the side job and the
+        /// aura is the tower.</summary>
+        [SerializeField]
+        private UnitProfile naturalKillerProfile = new UnitProfile
+        {
+            Kind = UnitKind.NaturalKiller,
+            DisplayName = "NK cell (ILC1)",
+            FineTilesPerTick = 3, // 6-7 um/min, Garrod 2007 PNAS
+            FootprintFineTiles = 3,
+            Color = new Color(0.46f, 0.30f, 0.62f),
+            MaxActiveChildren = 6,
+            KillLimit = 10,
+            DegranulatesOnDepletion = false,
+            DegranulationBurstMultiplier = 0f,
+            ContactRadiusFineTiles = 2,
+            EfferocytosisDebrisPerTick = 0f,
+            // A THIRD of the CTL's, and quiet. Needs no knowledge, but it is
+            // blind to an infected cell that keeps its MHC-I up -- which is
+            // the CTL's job and, later, the stealth pathogen's counter.
+            StressSenseChancePerTick = 0.01f,
+            QuietKill = true,
+            // The real tower: upgrade the macrophages around it.
+            IfnGammaAuraChancePerTick = 0.02f,
+            IfnGammaAuraCoarseRadius = 3,
+        };
+
+        /// <summary>Intraepithelial gamma-delta T cell. **Not DPS.** It
+        /// patrols the wall, intercepts adherents before they get in, and
+        /// repairs the barrier. Needs no priming -- the one T cell that can
+        /// exist before the lymph node is online (GAME_DESIGN.md §4).</summary>
+        [SerializeField]
+        private UnitProfile gammaDeltaTProfile = new UnitProfile
+        {
+            Kind = UnitKind.GammaDeltaT,
+            DisplayName = "gd T (IEL)",
+            // Deliberately 1, against the real ratio: it is tissue-RESIDENT,
+            // already at the wall, so search speed is beside the point and a
+            // high number would read as "another fast hunter".
+            FineTilesPerTick = 1,
+            FootprintFineTiles = 3,
+            Color = new Color(0.20f, 0.58f, 0.46f),
+            MaxActiveChildren = 6,
+            KillLimit = 12,
+            DegranulatesOnDepletion = false,
+            DegranulationBurstMultiplier = 0f,
+            ContactRadiusFineTiles = 3, // it reaches along the epithelium
+            EfferocytosisDebrisPerTick = 0f,
+            // Modest, and quiet -- it is a surveillance cell, and Edelblum
+            // 2015 shows its value is interception and barrier integrity,
+            // not kill throughput.
+            StressSenseChancePerTick = 0.008f,
+            QuietKill = true,
+            // Its real job: hold the wall and mend it.
+            BarrierPatrolRadiusCells = 2.0f,
+            BarrierRepairIntervalSeconds = 3.5f,
+        };
+
+        /// <summary>Sessile antibody factory emitted by the B-cell tower.
+        /// Motility is inversely related to antibody-secretion capacity
+        /// (Rakhymzhan 2024), so a working plasma cell does not move.</summary>
+        [SerializeField]
+        private UnitProfile plasmaCellProfile = new UnitProfile
+        {
+            Kind = UnitKind.PlasmaCell,
+            DisplayName = "Plasma cell",
+            FineTilesPerTick = 0, // sessile
+            FootprintFineTiles = 3,
+            Color = new Color(0.92f, 0.55f, 0.20f),
+            MaxActiveChildren = 5,
+            KillLimit = 9999, // it never kills; depletion is by lifespan
+            DegranulatesOnDepletion = false,
+            DegranulationBurstMultiplier = 0f,
+            ContactRadiusFineTiles = 1,
+            EfferocytosisDebrisPerTick = 0f,
+            StressSenseChancePerTick = 0f, // no recognition of its own
+            AntibodySecretionIntervalSeconds = 1.1f, // its entire job
         };
 
         /// <summary>Bone marrow slot count -- unchanged from Sprint 2, a
@@ -151,6 +279,11 @@ namespace ImmunologyTD.Bootstrap
             ImmunologyTD.Rendering.SpriteShapes.Prewarm();
             macrophageProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Macrophage;
             neutrophilProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.Neutrophil;
+            // Sprint 23 roster.
+            cytotoxicTProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.CytotoxicT;
+            naturalKillerProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.NaturalKiller;
+            gammaDeltaTProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.GammaDeltaT;
+            plasmaCellProfile.Shape = ImmunologyTD.Rendering.SpriteShapes.PlasmaCell;
             tissueGrid = new TissueGrid(board);
             // Sprint 19: the Peyer's patch + crypts. Created before the lumen
             // renderer binds (it leaves the patch lanes bare of villi).
@@ -160,6 +293,7 @@ namespace ImmunologyTD.Bootstrap
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
             gutWall = new GutWall(board, tissueGrid, tally);
+            GutWall.Current = gutWall; // Sprint 23: gamma-delta IELs reach the wall through this
 
             // Sprint 7: the ATP economy + round loop (GAME_DESIGN.md §5b/§5d/§6c).
             EconomyTuning.ResetToDefaults();
@@ -170,6 +304,11 @@ namespace ImmunologyTD.Bootstrap
             // (GAME_DESIGN.md §5a/§5c). Knowledge % persists for the run.
             AdaptiveTuning.ResetToDefaults();
             knowledge = new KnowledgeLedger();
+            // Sprint 23: the first thing in the game that reads knowledge and
+            // changes BEHAVIOUR rather than just the HUD readout. Process-
+            // global and null-safe, so harnesses that never set it keep
+            // licensing everything exactly as before.
+            ImmunologyTD.Adaptive.KnowledgeLicence.Ledger = knowledge;
             // Secretory IgA is the only capability that acts in the lumen, so
             // the wall needs to see knowledge directly (KnowledgeLadder's 70%
             // rung).
@@ -212,6 +351,7 @@ namespace ImmunologyTD.Bootstrap
             var rounds = BuildRoundController(boneMarrow);
 
             BuildDegranulationFlashPool();
+            BuildAntibodyPool();
             BuildUiRoot(layout, boneMarrow, rounds, adaptive);
 
             Debug.Log(
@@ -555,12 +695,30 @@ namespace ImmunologyTD.Bootstrap
         {
             var go = new GameObject("BoneMarrowManager");
             var manager = go.AddComponent<BoneMarrowManager>();
+
+            // Sprint 23: the four new kinds are all TISSUE-roaming, so they
+            // register here rather than through the AdaptiveDirector -- a
+            // cytotoxic T cell is adaptive but it does its work on the board,
+            // not in the lymph node. See BoneMarrowManager.IsNodeResident vs
+            // IsKnowledgeGated for why that distinction needed two predicates.
+            var extras = new[]
+            {
+                new BoneMarrowManager.TissueKindRegistration
+                    { Profile = cytotoxicTProfile, Pool = BuildUnitPool(cytotoxicTProfile) },
+                new BoneMarrowManager.TissueKindRegistration
+                    { Profile = naturalKillerProfile, Pool = BuildUnitPool(naturalKillerProfile) },
+                new BoneMarrowManager.TissueKindRegistration
+                    { Profile = gammaDeltaTProfile, Pool = BuildUnitPool(gammaDeltaTProfile) },
+                new BoneMarrowManager.TissueKindRegistration
+                    { Profile = plasmaCellProfile, Pool = BuildUnitPool(plasmaCellProfile) },
+            };
+
             manager.Initialize(
                 board, tissueGrid, cytokineField,
                 macrophageProfile, macrophagePool,
                 neutrophilProfile, neutrophilPool,
                 layout.MarrowSlotPositions, layout.MarrowSlotSize,
-                wallet, adaptive);
+                wallet, adaptive, extras);
             return manager;
         }
 
@@ -609,6 +767,25 @@ namespace ImmunologyTD.Bootstrap
             var rounds = go.AddComponent<RoundController>();
             rounds.Initialize(wallet, pathogenSpawner, tally, boneMarrow);
             return rounds;
+        }
+
+        /// <summary>Sprint 23: the plasma cell's antibody pool. Pooled from
+        /// first implementation per GAME_DESIGN.md §8's non-negotiable
+        /// performance requirement -- several plasma cells secreting ~1/s
+        /// with a 4.5s lifespan puts a few dozen in flight at once, and
+        /// these are the smallest, most numerous objects on the board.</summary>
+        private void BuildAntibodyPool()
+        {
+            var template = new GameObject("AntibodyTemplate");
+            var tsr = template.AddComponent<SpriteRenderer>();
+            tsr.sortingOrder = 12; // above host cells, below the HUD
+            template.AddComponent<ImmunologyTD.Adaptive.Antibody>();
+            template.SetActive(false);
+
+            var poolGo = new GameObject("AntibodyPool");
+            var pool = poolGo.AddComponent<PrefabPool>();
+            pool.SetPrefab(template);
+            ImmunologyTD.Adaptive.Antibody.Configure(pool);
         }
 
         private void BuildDegranulationFlashPool()
