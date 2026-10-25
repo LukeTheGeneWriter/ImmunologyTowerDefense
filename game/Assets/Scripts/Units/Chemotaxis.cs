@@ -103,21 +103,53 @@ namespace ImmunologyTD.Units
         /// harness without a board or any GameObjects.
         /// </summary>
         public static float CrowdPenaltyAt(FineCoord at, FineCoord[] crowd, int count)
+            => CrowdPenaltyAt(at, crowd, null, count);
+
+        /// <summary>
+        /// Crowd penalty with per-neighbour weights (1 for own kind, less
+        /// for another kind). Pass null weights for all-own-kind.
+        /// </summary>
+        public static float CrowdPenaltyAt(FineCoord at, FineCoord[] crowd, float[] weights, int count)
         {
             if (crowd == null || count <= 0) return 0f;
             if (UnitTuning.RepulsionStrength <= 0f) return 0f;
 
-            int radius = Mathf.Max(0, UnitTuning.RepulsionRadiusFineTiles);
-            int near = 0;
+            float radius = Mathf.Max(1f, UnitTuning.RepulsionRadiusFineTiles);
+
+            // **Distance-weighted, not a head count.**
+            //
+            // Sprint 28 counted neighbours inside a radius and penalised the
+            // surplus. That saturated: a cell one tile away counted exactly
+            // as much as one six tiles away, so once a cell had stepped out
+            // of the bucket there was nothing pushing it further, and the
+            // four candidate steps of a single move all sat inside nearly
+            // the same neighbourhood. Measured, raising the strength a
+            // HUNDRED-fold changed nothing past a certain point -- cells
+            // settled into tight triples and stopped.
+            //
+            // A falling kernel gives a real gradient at the scale of one
+            // step: moving a single tile away measurably lowers the sum, so
+            // cells keep easing apart instead of locking at a threshold.
+            float crowding = 0f;
             for (int i = 0; i < count && i < crowd.Length; i++)
             {
-                int dc = Mathf.Abs(crowd[i].Column - at.Column);
-                int dr = Mathf.Abs(crowd[i].Row - at.Row);
-                if (Mathf.Max(dc, dr) <= radius) near++;
+                float dc = crowd[i].Column - at.Column;
+                float dr = crowd[i].Row - at.Row;
+                float d = Mathf.Sqrt(dc * dc + dr * dr);
+                if (d >= radius) continue;
+
+                float falloff = Mathf.Pow(1f - d / radius,
+                                          Mathf.Max(0.05f, UnitTuning.RepulsionFalloffPower));
+                float w = (weights != null && i < weights.Length) ? weights[i] : 1f;
+                crowding += w * falloff;
             }
 
-            int surplus = near - Mathf.Max(0, UnitTuning.RepulsionFreeCompanions);
-            if (surplus <= 0) return 0f;
+            // The free allowance is still what keeps cooperation alive: a
+            // couple of close companions cost nothing, so three cells can
+            // converge on one target -- the number Sprint 23's bonus
+            // rewards -- and only the excess is pushed away.
+            float surplus = crowding - Mathf.Max(0f, UnitTuning.RepulsionFreeCompanions);
+            if (surplus <= 0f) return 0f;
 
             return UnitTuning.RepulsionStrength
                    * Mathf.Pow(surplus, Mathf.Max(0.01f, UnitTuning.RepulsionExponent));
@@ -131,7 +163,8 @@ namespace ImmunologyTD.Units
             FineCoord[] candidateBuffer,
             float[] weightBuffer,
             FineCoord[] crowdBuffer = null,
-            int crowdCount = 0)
+            int crowdCount = 0,
+            float[] crowdWeights = null)
         {
             int validCount = 0;
             float maxValue = float.NegativeInfinity;
@@ -148,7 +181,7 @@ namespace ImmunologyTD.Units
                 // direction simply looks less attractive than an empty one
                 // rather than being forbidden. A cell with nowhere better to
                 // go will still go there.
-                value -= CrowdPenaltyAt(candidate, crowdBuffer, crowdCount);
+                value -= CrowdPenaltyAt(candidate, crowdBuffer, crowdWeights, crowdCount);
                 weightBuffer[validCount] = value; // raw value for now; exponentiated below
                 if (value > maxValue) maxValue = value;
                 validCount++;

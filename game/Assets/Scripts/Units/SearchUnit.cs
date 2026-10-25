@@ -381,6 +381,7 @@ namespace ImmunologyTD.Units
         /// tick. Reused, so stepping allocates nothing -- a unit takes up to
         /// five steps per tick and there are dozens of units.</summary>
         private readonly FineCoord[] crowdBuffer = new FineCoord[MaxCrowdSampled];
+        private readonly float[] crowdWeights = new float[MaxCrowdSampled];
         private int crowdCount;
 
         /// <summary>Ceiling on neighbours sampled for crowding. Well above
@@ -408,12 +409,18 @@ namespace ImmunologyTD.Units
             {
                 var other = live[i];
                 if (other == null || other == this) continue;
-                if (other.profile == null || other.profile.Kind != profile.Kind) continue;
+                if (other.profile == null) continue;
 
                 int dc = Mathf.Abs(other.Current.Column - Current.Column);
                 int dr = Mathf.Abs(other.Current.Row - Current.Row);
                 if (Mathf.Max(dc, dr) > gate) continue;
 
+                // Sprint 31: other kinds count too, at reduced weight.
+                // Ignoring them entirely left the actual complaint
+                // unanswered -- a macrophage would walk into a pile of
+                // neutrophils because none of them were its own kind.
+                bool sameKind = other.profile.Kind == profile.Kind;
+                crowdWeights[crowdCount] = sameKind ? 1f : UnitTuning.RepulsionCrossKindWeight;
                 crowdBuffer[crowdCount++] = other.Current;
             }
         }
@@ -422,7 +429,7 @@ namespace ImmunologyTD.Units
         {
             Current = Chemotaxis.ChooseNextStep(
                 Current, board, cytokineField, CytokineToggle.Enabled, candidateBuffer, weightBuffer,
-                crowdBuffer, crowdCount);
+                crowdBuffer, crowdCount, crowdWeights);
         }
 
         /// <summary>

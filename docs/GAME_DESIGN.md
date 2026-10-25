@@ -1844,10 +1844,35 @@ one pathogen is fine and realistic; eight neutrophils on it is the bug.
 
 | Dial | Default | What it does |
 |---|---|---|
+| `RepulsionRadiusFineTiles` | **14** | How far a cell notices others. **The dominant lever** — see below. |
+| `RepulsionFalloffPower` | **1.0** | Shape of the distance falloff, `(1 - d/R)^p`. Low keeps pressure out to the full radius; high makes distant neighbours nearly free and cells bunch. |
+| `RepulsionStrength` | **6.4** | Scale, in cytokine units. 0 disables it. |
 | `RepulsionFreeCompanions` | 2 | Companions tolerated for free. **Two, so three cells can converge** — exactly the number Sprint 23's cooperation bonus rewards. |
-| `RepulsionExponent` | 1.6 | Penalty rises as `surplus^exponent`. Above 1 = forgiving at first, sharp later: the fourth cell is barely discouraged, the eighth is strongly pushed off. |
-| `RepulsionStrength` | 0.55 | Scale, in cytokine units. 0 disables it. |
-| `RepulsionRadiusFineTiles` | 6 | How far a cell notices its own kind. |
+| `RepulsionCrossKindWeight` | **0.5** | How much a neighbour of a *different* kind counts. |
+| `RepulsionExponent` | 1.6 | Penalty rises as `surplus^exponent` — forgiving at first, sharp later. |
+
+> **Retuned in Sprint 31 after the Director reported clumping was still
+> serious.** The Sprint 28 version was distance-BLIND: it counted
+> neighbours inside a radius, so a cell one tile away weighed exactly as
+> much as one six tiles away. That gave a cell almost the same score for
+> all four candidate steps, and a constant offset across every candidate
+> **cancels out of a softmax**. Measured, raising the strength a
+> hundredfold moved cells no further at all.
+>
+> It also only counted a cell's OWN kind, so a macrophage walked straight
+> into a pile of neutrophils.
+>
+> Measured on a single-source dogpile, 12 cells (`ClumpDiagnostic`):
+>
+> | | Mean spacing | Worst slot |
+> |---|---|---|
+> | Repulsion off | 0.74 tiles | 12 of 12 |
+> | Sprint 28 | 2.05 | 12 of 12 |
+> | **Sprint 31** | **10.94** | **3 of 12** |
+>
+> Three in the worst slot is exactly the free allowance — the cooperation
+> the design wants, and nothing beyond it. **Radius, not strength, is the
+> lever**: radius alone took mean spacing from 4.4 to 10.2.
 
 **Both extremes are worse than the middle, and that is measured, not
 assumed.** Kienle found that disabling the swarm brake let neutrophils

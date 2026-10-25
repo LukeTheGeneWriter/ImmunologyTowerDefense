@@ -1075,3 +1075,34 @@ averages 1.0 against a ceiling of 5. "+8 kills before the cell is spent"
 costs 40 ATP and changes nothing. Measured, not argued -- the numbers are
 in the diagnostic. Not yet acted on; it needs a decision about cell
 turnover rather than a quiet number change.
+
+## Sprint 31 -- 2026-10-25
+The clumping is actually fixed this time, and there are numbers to show it.
+
+Sprint 28's crowd desensitisation was working far less than it looked.
+It counted how many neighbours sat inside a radius, which made it
+**distance-blind**: a cell one tile away counted exactly as much as one
+six tiles away. So all four of a cell's possible steps scored nearly the
+same, and a penalty that is equal in every direction cancels out
+completely. Measured, turning the strength up a hundredfold moved cells no
+further at all. It also only ever noticed a cell's *own* kind, so a
+macrophage would walk straight into a pile of neutrophils.
+
+Now the penalty falls off smoothly with distance, so stepping away always
+helps, and other cell types count too at half weight.
+
+Measured on a dogpile of 12 cells around one signal:
+
+| | Mean spacing | Most in one slot |
+|---|---|---|
+| Repulsion off | 0.74 tiles | 12 of 12 |
+| Sprint 28 | 2.05 tiles | 12 of 12 |
+| **Now** | **10.94 tiles** | **3 of 12** |
+
+Three in the worst slot is exactly the free allowance -- the cooperation
+the design wants and nothing beyond it, since three cells converging is
+what the kill bonus rewards.
+
+The surprise was that **radius mattered far more than strength**: widening
+it alone took mean spacing from 4.4 to 10.2 tiles, while strength had
+almost no effect until the shape was fixed.

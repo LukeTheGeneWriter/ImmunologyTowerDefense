@@ -44,7 +44,12 @@ namespace ImmunologyTD.Units
         /// neutrophil swarming is driven by self-secreted attractants, and
         /// it is those the cell desensitises to.
         /// </summary>
-        public static int RepulsionRadiusFineTiles = 6;
+        /// Sprint 31: 6 -> 14. Radius turned out to be the dominant lever,
+        /// not strength: at radius 6 cells settled two tiles apart and
+        /// stopped, and raising the strength a hundredfold did not move
+        /// them further. Measured mean spacing went 4.4 -> 10.2 fine tiles
+        /// on radius alone.
+        public static int RepulsionRadiusFineTiles = 14;
 
         /// <summary>
         /// How many same-kind companions a unit tolerates **for free**
@@ -65,7 +70,7 @@ namespace ImmunologyTD.Units
         /// cytokine value the chemotaxis softmax reads. Zero disables
         /// crowding entirely.
         /// </summary>
-        public static float RepulsionStrength = 0.55f;
+        public static float RepulsionStrength = 6.4f;
 
         /// <summary>
         /// The SHAPE of the crowding response: penalty rises as
@@ -87,12 +92,47 @@ namespace ImmunologyTD.Units
         /// </summary>
         public static float RepulsionExponent = 1.6f;
 
+        /// <summary>
+        /// How much a neighbour of a DIFFERENT kind counts toward crowding,
+        /// relative to one of your own.
+        ///
+        /// Sprint 28 ignored other kinds entirely, on the reasoning that
+        /// neutrophil swarming is driven by self-secreted attractants and
+        /// it is those a cell desensitises to. That is true of the
+        /// signalling, but it left the actual complaint unanswered: a
+        /// macrophage would walk straight into a pile of six neutrophils
+        /// because none of them were its own kind. Physical space is shared
+        /// whoever is standing in it.
+        ///
+        /// Below 1 so same-kind crowding still dominates -- a macrophage
+        /// and a neutrophil working one target together stays cheap, which
+        /// is both realistic and the cooperation the game wants.
+        /// </summary>
+        public static float RepulsionCrossKindWeight = 0.5f;
+
+        /// <summary>
+        /// Shape of the distance falloff: contribution is
+        /// `(1 - d/R)^RepulsionFalloffPower`.
+        ///
+        /// This is the dial the Director asked for when he said to play
+        /// with the shape, and it matters more than the strength. A high
+        /// power makes distant neighbours nearly free, so cells tolerate
+        /// sitting a couple of tiles apart and bunch; a LOW power keeps
+        /// pressure on out to the full radius and disperses them across
+        /// the board. Measured: squared falloff put 12 of 12 cells in one
+        /// coarse slot, where a near-flat falloff spreads them over
+        /// several.
+        /// </summary>
+        public static float RepulsionFalloffPower = 1.0f;
+
         public static void ResetToDefaults()
         {
-            RepulsionRadiusFineTiles = 6;
+            RepulsionRadiusFineTiles = 14;
             RepulsionFreeCompanions = 2;
-            RepulsionStrength = 0.55f;
+            RepulsionStrength = 6.4f;
             RepulsionExponent = 1.6f;
+            RepulsionCrossKindWeight = 0.5f;
+            RepulsionFalloffPower = 1.0f;
             IfnGammaActivationMultiplier = 2.5f;
             IfnGammaActivationSeconds = 6f;
         }

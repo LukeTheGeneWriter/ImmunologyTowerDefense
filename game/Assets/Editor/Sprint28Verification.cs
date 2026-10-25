@@ -39,6 +39,7 @@ public static class Sprint28Verification
         RunPenaltyIsLocal();
         RunDisableable();
         RunCrowdedCellsSpreadOut();
+        RunPenaltyHasAGradient();
         RunMarrowIsTwoWide();
 
         if (failures > 0)
@@ -216,6 +217,50 @@ public static class Sprint28Verification
             Object.DestroyImmediate(go);
             UnitTuning.ResetToDefaults();
         }
+    }
+
+    // =================================================================
+    // 6b. The penalty must FALL OFF WITH DISTANCE
+    // =================================================================
+    private static void RunPenaltyHasAGradient()
+    {
+        Debug.Log("[Sprint28Verification] --- The penalty has a gradient ---");
+        UnitTuning.ResetToDefaults();
+
+        // Sprint 31 added this, because Sprint 28's own tests all passed
+        // while the feature was quietly saturating. The penalty counted
+        // neighbours inside a radius and was otherwise distance-blind, so
+        // every one of a cell's four candidate steps scored almost the
+        // same -- and a constant offset across all candidates cancels out
+        // of a softmax. Measured, cells settled into tight clumps and
+        // raising the strength a HUNDREDFOLD moved them no further.
+        //
+        // So: assert the shape, not just the outcome. A cell standing in a
+        // pile must see a strictly better score each tile it steps away,
+        // all the way out to the radius.
+        var pile = new FineCoord(200, 100);
+        int n = 8;
+        var crowd = new FineCoord[n];
+        for (int i = 0; i < n; i++) crowd[i] = pile;
+
+        float atCentre = Chemotaxis.CrowdPenaltyAt(pile, crowd, n);
+        float oneAway = Chemotaxis.CrowdPenaltyAt(new FineCoord(201, 100), crowd, n);
+        float halfWay = Chemotaxis.CrowdPenaltyAt(
+            new FineCoord(200 + UnitTuning.RepulsionRadiusFineTiles / 2, 100), crowd, n);
+        float outside = Chemotaxis.CrowdPenaltyAt(
+            new FineCoord(200 + UnitTuning.RepulsionRadiusFineTiles + 1, 100), crowd, n);
+
+        Check($"standing in a pile is penalised ({atCentre:F2})", atCentre > 0f);
+        Check($"one tile out is strictly better ({oneAway:F2} < {atCentre:F2})",
+            oneAway < atCentre);
+        Check($"and it keeps improving with distance ({halfWay:F2} < {oneAway:F2})",
+            halfWay < oneAway);
+        Check("beyond the radius it costs nothing", outside <= 0f);
+
+        // The step-scale gradient is the thing that actually moves a cell.
+        // If this is ~0 the feature is inert however large the strength.
+        float perTile = atCentre - oneAway;
+        Check($"the one-tile gradient is meaningful ({perTile:F2})", perTile > 0.05f);
     }
 
     // =================================================================
