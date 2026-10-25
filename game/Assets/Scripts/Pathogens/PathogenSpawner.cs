@@ -452,6 +452,20 @@ namespace ImmunologyTD.Pathogens
             // itself; a contact-chain virus never can (that cell is infected).
             if (!needsHealthyHost && TrySpawnAt(source, species, needsHealthyHost, currentTime)) return true;
 
+            // Sprint 30: a viral focus drifts toward the BASE rather than
+            // wandering evenly. Cell-to-cell spread is not directional in
+            // itself; what makes an infection dangerous is that it reaches
+            // the basal side and disseminates, and this is the game's
+            // compression of that. Try the base-ward neighbour first, most
+            // of the time -- not always, or a focus marches in a straight
+            // line and reads as a worm rather than an infection.
+            if (SpeciesRoster.ClassOf(species) == PathogenClass.IntracellularVirus
+                && Random.value < InvasionTuning.VirusSpreadBaseBias)
+            {
+                var inward = board.OffsetInAxisFrame(source, -1, 0);
+                if (TrySpawnAt(inward, species, needsHealthyHost, currentTime)) return true;
+            }
+
             var order = new[] { 0, 1, 2, 3 };
             for (int i = 3; i > 0; i--)
             {

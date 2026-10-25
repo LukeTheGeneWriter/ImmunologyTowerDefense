@@ -377,6 +377,8 @@ namespace ImmunologyTD.Pathogens
             State = PathogenState.Lumen;
             InterfacePosition = -1;
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             contactFlashTimer = 0f;
             lastSpreadAttemptTime = float.NegativeInfinity;
 
@@ -420,6 +422,8 @@ namespace ImmunologyTD.Pathogens
             AssignVirusTraits();
             InterfacePosition = -1;
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             contactFlashTimer = 0f;
             lastSpreadAttemptTime = float.NegativeInfinity;
 
@@ -905,6 +909,8 @@ namespace ImmunologyTD.Pathogens
             CurrentCoarse = slot;
             Current = board.CoarseCenterFine(slot);
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             lastSpreadAttemptTime = float.NegativeInfinity;
             SettleIntoTissue(slot, currentTime);
             MoveTo(board.CoarseToWorldCenter(slot), InvasionTuning.TissueStepIntervalSeconds * 0.5f);
@@ -1009,6 +1015,8 @@ namespace ImmunologyTD.Pathogens
             IsIntracellular = true;
             infectionStartTime = currentTime;
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             burnoutRolled = false;
             willBurnOut = false;
             lastSpreadAttemptTime = float.NegativeInfinity;
@@ -1374,6 +1382,13 @@ namespace ImmunologyTD.Pathogens
 
             if (currentTime - infectionStartTime < IncubationSeconds) return;
 
+            // Sprint 30: dissemination comes AFTER incubation. Placing it
+            // before the gate let a virus on the basal row break through in
+            // the dissemination delay alone, skipping incubation entirely
+            // and making viruses far faster than the design intends --
+            // caught by Sprint30Verification on its first run.
+            if (TickDissemination(currentTime)) return;
+
             if (virusBuds)
             {
                 if (currentTime - lastBudTime < InvasionTuning.VirusBuddingIntervalSeconds) return;
@@ -1385,15 +1400,69 @@ namespace ImmunologyTD.Pathogens
                 return;
             }
 
-            // Contact-chain: one hop, then done.
-            if (hasSpread) return;
+            // Sprint 30: a spread BUDGET, not a one-hop flag. One hop ever
+            // meant a focus reached two cells and stopped, which is why a
+            // virus that breached the wall just sat there.
+            if (spreadsUsed >= InvasionTuning.VirusSpreadBudget) return;
             if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
             lastSpreadAttemptTime = currentTime;
             if (onSpawnNear != null && onSpawnNear(CurrentCoarse, Species, false, currentTime))
             {
+                spreadsUsed++;
                 hasSpread = true;
             }
         }
+
+        /// <summary>
+        /// Sprint 30 -- **dissemination**, the only way a virus reaches the
+        /// base.
+        ///
+        /// An intracellular virus cannot walk: it has no movement code at
+        /// all, by design (§4b -- its spread is TickCombat's job). Before
+        /// this, that meant it also had no path to the base, so a virus
+        /// could never cost the player a life however long it was left
+        /// alone. A diagnostic found zero of 150 viruses reaching the base
+        /// from tissue, against 150 of 150 bacteria.
+        ///
+        /// The honest mechanism is not to make virions walk, but to model
+        /// what actually threatens a host: a focus that reaches the BASAL
+        /// side of the epithelium crosses out of it and into the body. So
+        /// an infected cell sitting in the base-most row of the tissue band
+        /// disseminates after a visible delay.
+        ///
+        /// The delay is the point. It gives a cytotoxic cell arriving late
+        /// something to save, which is exactly the tension the knowledge
+        /// ladder is supposed to create.
+        /// </summary>
+        private bool TickDissemination(float currentTime)
+        {
+            if (!IsIntracellular) return false;
+            if (board.AxisIndex(CurrentCoarse) > board.TissueBaseEdgeAxisIndex) return false;
+
+            if (disseminatingSince < 0f)
+            {
+                disseminatingSince = currentTime;
+                return false;
+            }
+            if (currentTime - disseminatingSince < InvasionTuning.VirusDisseminationSeconds) return false;
+
+            // Through. The host cell is left dead behind it.
+            var at = CurrentCoarse;
+            tissueGrid.ReleaseIntracellular(at);
+            tissueGrid.KillHostCell(at, Species);
+            IsIntracellular = false;
+            if (tally != null) tally.ReachedBase++;
+            State = PathogenState.Cleared;
+            onExit?.Invoke(this);
+            return true;
+        }
+
+        /// <summary>When this infection first sat in the base-most tissue
+        /// row. -1 until then.</summary>
+        private float disseminatingSince = -1f;
+
+        /// <summary>Daughter infections seeded so far.</summary>
+        private int spreadsUsed;
 
         /// <summary>
         /// Sprint 24 -- **rotavirus NSP4**, a genuine viral enterotoxin.
@@ -1449,6 +1518,8 @@ namespace ImmunologyTD.Pathogens
             IsIntracellular = false;
             freeSinceTime = currentTime;
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             tissueGrid.TryClaimOccupant(at, this, currentTime);
             ApplyRestColorForCurrentClass();
             // Spill one more free virion alongside this one.
@@ -1601,6 +1672,8 @@ namespace ImmunologyTD.Pathogens
             adhesionRefractoryUntil = float.NegativeInfinity;
             contactFlashTimer = 0f;
             hasSpread = false;
+            spreadsUsed = 0;
+            disseminatingSince = -1f;
             lastSpreadAttemptTime = float.NegativeInfinity;
             lastReplicationTime = 0f;
             broodCount = 0;

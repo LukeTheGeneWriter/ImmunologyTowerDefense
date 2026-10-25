@@ -1040,3 +1040,38 @@ a trade-off as a pure win. "Tissue residency (M2)" leaned on a binary the
 field published a consensus paper to discourage.
 
 21 harnesses green, 752 checks.
+
+## Sprint 30 -- 2026-10-25
+Viruses can get through now. They never could before -- not rarely, never.
+
+The Director reported viruses never breaking through "even when a burst
+happens". It turned out not to be a balance problem. An intracellular
+virus has no movement code at all, by design, and nothing else gave it a
+way inward: a diagnostic found **zero of 150** viruses reaching the base
+from tissue against 150 of 150 bacteria, with 142 still sitting in their
+original cell after three simulated minutes. A virus could damage tissue
+indefinitely but could never cost you a life.
+
+Two fixes, neither of which makes virions walk:
+
+- **Spread is budgeted instead of one-shot.** It used to be a single hop
+  ever, so an infection reached two cells and stopped forever. A focus now
+  keeps seeding daughters, biased toward the base, so left alone it
+  marches inward.
+- **Dissemination.** An infection that reaches the base-most row of tissue
+  crosses out of the epithelium after a short delay. The delay is
+  deliberate: it is what gives a cytotoxic cell arriving late something to
+  save.
+
+Measured on the real board: one unanswered focus crosses the tissue band
+and reaches the base in about three minutes, seeding roughly 110
+infections on the way. That is incubation-bound, so incubation is the dial
+if it should be faster.
+
+**Also measured, and not good news:** the kill-limit upgrade rows are
+inert. A macrophage averages 0.9 kills in a 45-second round against a
+ceiling of 20, and never reaches it even over four rounds; a neutrophil
+averages 1.0 against a ceiling of 5. "+8 kills before the cell is spent"
+costs 40 ATP and changes nothing. Measured, not argued -- the numbers are
+in the diagnostic. Not yet acted on; it needs a decision about cell
+turnover rather than a quiet number change.

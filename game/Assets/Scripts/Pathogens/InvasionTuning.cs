@@ -341,6 +341,49 @@ namespace ImmunologyTD.Pathogens
         /// cheaply is longer and more visible.</summary>
         public static float IntracellularEntryChance = 0.12f;
 
+        // -- Sprint 30: how a viral infection actually threatens the base --
+
+        /// <summary>
+        /// How many daughter infections one infected cell may seed over its
+        /// life.
+        ///
+        /// **This replaces a one-hop-ever flag**, which is why viruses were
+        /// harmless. A focus could reach two cells and then stop forever, so
+        /// an infection that breached the wall simply sat there: a
+        /// diagnostic run found 142 of 150 viruses still in their original
+        /// cell after three simulated minutes, and ZERO ever reaching the
+        /// base. A virus could not cost the player a life by construction.
+        ///
+        /// Kept small. This is a branching process -- at a budget of 3 with
+        /// a short cooldown, an unanswered focus expands steadily, which is
+        /// the threat; much higher and it is a screen-filling explosion no
+        /// amount of searching could answer.
+        /// </summary>
+        public static int VirusSpreadBudget = 3;
+
+        /// <summary>
+        /// Chance a spread attempt targets the neighbour toward the BASE
+        /// rather than a random one.
+        ///
+        /// Cell-to-cell spread through epithelium is not directional in
+        /// itself; what makes an infection dangerous to the host is that it
+        /// eventually reaches the basal side and disseminates. This bias is
+        /// the game's compression of that: the focus wanders, but it drifts
+        /// inward, so an unanswered infection becomes a race rather than a
+        /// stain. Below 1 on purpose -- a perfectly straight march would be
+        /// a worm, not an infection.
+        /// </summary>
+        public static float VirusSpreadBaseBias = 0.65f;
+
+        /// <summary>
+        /// Seconds an infected cell at the base edge of the tissue band
+        /// takes to disseminate -- the virus crossing out of the epithelium
+        /// into the body. This is the only way a virus reaches the base,
+        /// and it is deliberately a visible delay rather than instant, so
+        /// a late cytotoxic kill can still save the round.
+        /// </summary>
+        public static float VirusDisseminationSeconds = 5f;
+
         /// <summary>Seconds between an intracellular bacterium's replication
         /// events while inside a host cell (GAME_DESIGN.md §4b). Each event
         /// drains <see cref="IntracellularDrainPerReplication"/> from the
@@ -439,6 +482,9 @@ namespace ImmunologyTD.Pathogens
             VirusBurnoutMinSeconds = 8f;
             VirusBurnoutMaxSeconds = 25f;
             IntracellularEntryChance = 0.12f;
+            VirusSpreadBudget = 3;
+            VirusSpreadBaseBias = 0.65f;
+            VirusDisseminationSeconds = 5f;
             IntracellularReplicationIntervalSeconds = 3f;
             IntracellularDrainPerReplication = 2.5f;
             IntracellularMaxBrood = 6;

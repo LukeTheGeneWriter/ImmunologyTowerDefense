@@ -712,6 +712,29 @@ damage — combat targets the pathogen directly. Mechanically simpler than
 the intracellular case, and closest to what Sprint 1's original adhesion
 model already does (a pathogen claiming a coarse slot).
 
+> **Viruses can reach the base as of Sprint 30 — before it, they could
+> not, at all.** An intracellular virus has no movement code by design
+> (its spread is §4b's job, not a walk), and nothing gave it any other
+> path inward. A diagnostic found **0 of 150** viruses dropped into tissue
+> ever reaching the base against 150 of 150 bacteria, with 142 still in
+> their original cell after three simulated minutes. A virus could not
+> cost the player a life by construction.
+>
+> Two mechanics fix it, and neither makes virions walk:
+> - **Spread is budgeted, not one-shot.** It was a single hop *ever*, so a
+>   focus reached two cells and stopped. Each infection may now seed
+>   `VirusSpreadBudget` daughters, biased base-ward
+>   (`VirusSpreadBaseBias`), so an unanswered focus marches inward.
+> - **Dissemination.** An infection sitting in the base-most tissue row
+>   crosses out of the epithelium after `VirusDisseminationSeconds`. That
+>   delay is the point: it gives a late cytotoxic cell something to save.
+>
+> Measured on real geometry: one unanswered focus crosses the 13-cell
+> tissue band and reaches the base in **~185 s**, seeding ~110 infections
+> on the way. That time is almost exactly 12 hops × the 15 s incubation,
+> so **the march is incubation-bound** — that is the lever if it should be
+> faster, not the spread budget.
+
 **Viral spread.** An intracellular virus left uncleared through an
 **incubation period** spreads to an adjacent uninfected coarse slot,
 infecting a second cell — genuine cell-to-cell viral spread, not just the
