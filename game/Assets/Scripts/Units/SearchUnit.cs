@@ -309,38 +309,38 @@ namespace ImmunologyTD.Units
 
             if (!tissueGrid.AddInfectionStress(coarse, rate)) return false;
 
-            // The meter filled. What happens now is the whole innate/adaptive
-            // distinction, and it is decided by one per-tower flag.
+            // The meter filled, so the infected cell dies.
+            //
+            // **It dies either way.** An infected cell is the infection's
+            // shell -- the only route to an intracellular pathogen is
+            // through the cell that is housing it, and no immune cell
+            // sterilises one and walks away. What the innate/adaptive
+            // distinction actually decides is the MANNER of death, and
+            // that is what this flag selects:
+            //
+            //   apoptotic -- a cytotoxic cell (CTL, NK, gamma-delta) induces
+            //     programmed death. The target is packaged into
+            //     membrane-bound bodies and cleared tidily. No spill, no
+            //     DAMP, little debris, so the ground regrows quickly.
+            //
+            //   necrotic -- an innate cell with no specific recognition can
+            //     only damage the cell to death. Contents spill, the mess
+            //     has to be cleared before anything can regrow, and it is
+            //     what fibrosis will feed on when §6 is built.
+            //
+            // An earlier version of this code had the apoptotic branch spare
+            // the enterocyte entirely. That was wrong biology -- a cytotoxic
+            // T cell recognises and kills the infected CELL -- and it is
+            // corrected here.
             var worldCenter = board.CoarseToWorldCenter(coarse);
-            if (tuning.QuietKill)
-            {
-                // Precise kill (GAME_DESIGN.md §5, ~10% rung): the pathogen
-                // dies and **the enterocyte is still standing**. No debris,
-                // no DAMP, nothing for fibrosis to feed on. Detach from the
-                // grid first, then tell the agent -- same ordering contract
-                // as KillHostCell/OnHostCellDestroyed.
-                tissueGrid.ReleaseIntracellular(coarse);
-                resident.OnPreciselyKilled();
-                RegisterKill();
-                DegranulationFlash.Play(
-                    worldCenter,
-                    BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * 1.1f,
-                    DegranulationFlash.QuietKillColor);
-                return true;
-            }
+            bool apoptotic = tuning.ApoptoticKill;
 
-            // Loud necrotic kill: cell + everything inside, no pathogen
-            // released. KillHostCell notifies the resident via
-            // OnHostCellDestroyed. Credit this unit -- it did the work.
-            // (The DAMP that a loud death should broadcast -- extra innate
-            // recruitment, fibrosis feed -- is GAME_DESIGN.md §6, not built;
-            // for now "loud" is the flash.)
-            tissueGrid.KillHostCell(coarse);
+            tissueGrid.KillHostCell(coarse, null, apoptotic);
             RegisterKill();
             DegranulationFlash.Play(
                 worldCenter,
-                BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * 1.5f,
-                DegranulationFlash.StressKillColor);
+                BoardConfig.FineTileWorldSize * BoardConfig.FineSubdivision * (apoptotic ? 1.1f : 1.5f),
+                apoptotic ? DegranulationFlash.ApoptosisColor : DegranulationFlash.StressKillColor);
             return true;
         }
 

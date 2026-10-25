@@ -79,6 +79,24 @@ namespace ImmunologyTD.Grid
         public static float InfectionStressDecayPerSecond = 0.15f;
 
         /// <summary>
+        /// Debris left by an APOPTOTIC kill, as a fraction of a necrotic
+        /// one. Sprint 23, corrected 2026-10-25.
+        ///
+        /// This fraction *is* the reward for adaptive immunity. A cytotoxic
+        /// cell does not spare the infected enterocyte -- nothing does, the
+        /// cell is the infection's shell and it has to go. What it spares is
+        /// the NEIGHBOURHOOD: an apoptotic cell is packaged and cleared
+        /// instead of spilling, so the ground underneath is free to regrow
+        /// roughly three times sooner than after a necrotic kill.
+        ///
+        /// If this is ever raised to 1.0 the quiet and loud paths become
+        /// indistinguishable and the entire case for buying cytotoxic cells
+        /// quietly evaporates, while every test about infections clearing
+        /// still passes. Sprint23Verification pins it.
+        /// </summary>
+        public static float ApoptoticDebrisFraction = 0.3f;
+
+        /// <summary>
         /// Multiplier on each attacker's stress contribution, indexed by how
         /// many units were in contact last tick (clamped to the last entry).
         ///
@@ -111,6 +129,7 @@ namespace ImmunologyTD.Grid
             DebrisSelfDissipationSeconds = 60f;
             SweepIntervalSeconds = 0.25f;
             InfectionStressDecayPerSecond = 0.15f;
+            ApoptoticDebrisFraction = 0.3f;
             CooperationMultiplier = new[] { 0f, 1f, 1.9f, 3.5f, 4.5f };
         }
     }

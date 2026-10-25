@@ -125,13 +125,14 @@ namespace ImmunologyTD.Rendering
         /// <summary>Sky cyan -- off green, which is the bacterium.</summary>
         public static Color FxKnowledge     => C(0.15f, 0.80f, 1.00f);
 
-        /// <summary>Sprint 23: the CTL's PRECISE kill -- the pathogen dies
-        /// and the host cell lives. Pale lavender-white, deliberately the
-        /// calmest burst on the board: it is the visual opposite of
-        /// <see cref="FxStressKill"/>'s violent magenta, and the contrast
-        /// between the two IS the innate/adaptive distinction as the player
-        /// experiences it.</summary>
-        public static Color FxQuietKill     => C(0.86f, 0.82f, 1.00f);
+        /// <summary>Sprint 23: an APOPTOTIC kill -- a cytotoxic cell
+        /// inducing programmed death in an infected cell. Pale
+        /// lavender-white, deliberately the calmest burst on the board: the
+        /// visual opposite of <see cref="FxStressKill"/>'s violent magenta.
+        /// The contrast between the two is the innate/adaptive distinction
+        /// as the player experiences it -- the same event, one of them
+        /// tidy and one of them a mess.</summary>
+        public static Color FxApoptosis     => C(0.86f, 0.82f, 1.00f);
 
         /// <summary>Sprint 23: an NK/ILC1 cell's IFN-gamma pulse activating
         /// the macrophages around it. Warm amber-white -- it is a BUFF, so

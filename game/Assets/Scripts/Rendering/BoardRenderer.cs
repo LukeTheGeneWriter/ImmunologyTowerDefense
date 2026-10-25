@@ -62,7 +62,7 @@ namespace ImmunologyTD.Rendering
 
         /// <summary>Sprint 23: what an infected cell brightens toward as
         /// immune cells build recognition pressure on it.</summary>
-        public static Color RecognitionColor => Palette.FxQuietKill;
+        public static Color RecognitionColor => Palette.FxApoptosis;
 
         /// <summary>How far the lerp goes at full pressure. Short of 1 on
         /// purpose -- the cell must still read as infected right up to the

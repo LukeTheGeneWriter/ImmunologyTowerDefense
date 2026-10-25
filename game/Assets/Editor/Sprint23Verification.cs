@@ -20,11 +20,15 @@ using UnityEngine;
 ///     have been handed neutrophil stats and a neutrophil sprite, and the
 ///     game would have looked almost right.
 ///
-///  2. **The quiet kill leaves the host cell alive.** That is the entire
-///     mechanic of the ~10% rung -- not more damage, a surviving enterocyte.
-///     If someone later "simplifies" the quiet branch into the loud one,
-///     the observable (the infection clears) survives and the reason the
-///     player bought the tower does not.
+///  2. **An apoptotic kill leaves the tissue recoverable.** The infected
+///     cell dies either way -- it is the infection's shell, and killing it
+///     is the only route to what is inside. What the ~10% rung buys is the
+///     MANNER of death: a cytotoxic cell induces apoptosis, leaving a small
+///     tidy pile, where an innate cell damages the cell to death and leaves
+///     a full necrotic spill that must be cleared before anything regrows.
+///     If someone later collapses the apoptotic branch into the necrotic
+///     one, the observable (the infection clears) survives and the reason
+///     the player bought the tower does not.
 ///
 ///  3. **A knowledge-gated tower emits nothing while unlicensed.** This is
 ///     the first mechanic in the game that reads KnowledgeLedger and changes
@@ -48,8 +52,8 @@ public static class Sprint23Verification
 
         RunPredicatesAreOrthogonal();
         RunEveryTissueKindHasItsOwnProfile();
-        RunQuietKillSparesTheHostCell();
-        RunLoudKillStillKillsTheCell();
+        RunApoptoticKillIsCleanerNotGentler();
+        RunNecroticKillLeavesAMess();
         RunStressMeterAccumulates();
         RunCooperationIsSuperadditive();
         RunUnlicensedTowerEmitsNothing();
@@ -113,7 +117,7 @@ public static class Sprint23Verification
         return rig;
     }
 
-    private static UnitProfile Profile(UnitKind kind, float stressSense, bool quiet)
+    private static UnitProfile Profile(UnitKind kind, float stressSense, bool apoptotic)
     {
         return new UnitProfile
         {
@@ -125,7 +129,7 @@ public static class Sprint23Verification
             KillLimit = 999,
             ContactRadiusFineTiles = 3,
             StressSenseChancePerTick = stressSense,
-            QuietKill = quiet,
+            ApoptoticKill = apoptotic,
         };
     }
 
@@ -228,8 +232,8 @@ public static class Sprint23Verification
             // not whatever the old ternary's fallback branch returned.
             manager.PlaceTower(0, UnitKind.CytotoxicT);
             var tuning = manager.GetTuning(0);
-            Check("a CTL tower seeds the CTL's QuietKill, not the neutrophil's",
-                tuning != null && tuning.QuietKill);
+            Check("a CTL tower seeds the CTL's ApoptoticKill, not the neutrophil's",
+                tuning != null && tuning.ApoptoticKill);
             Check("a CTL tower seeds the CTL's stress-sense rate",
                 tuning != null && Mathf.Approximately(tuning.StressSenseChancePerTick, 0.03f));
 
@@ -244,43 +248,54 @@ public static class Sprint23Verification
     // =================================================================
     // 3 + 4. Quiet vs loud -- the heart of the sprint
     // =================================================================
-    private static void RunQuietKillSparesTheHostCell()
+    private static void RunApoptoticKillIsCleanerNotGentler()
     {
-        Debug.Log("[Sprint23Verification] --- Quiet kill ---");
+        Debug.Log("[Sprint23Verification] --- Apoptotic kill ---");
 
-        var rig = BuildRig("Quiet");
+        var rig = BuildRig("Apoptotic");
         try
         {
             var cell = new CoarseCoord(50, 20);
             rig.Grid.SeedHostState(cell, HostState.Healthy, 0f);
-            var agent = InfectedAt(rig, cell, PathogenClass.IntracellularVirus, 0f);
+            InfectedAt(rig, cell, PathogenClass.IntracellularVirus, 0f);
 
             Check("precondition: the cell is infected",
                 rig.Grid.GetHostState(cell) == HostState.Infected);
 
-            // A CTL with a huge rate so the meter fills on the first tick.
             var ctl = UnitAt(rig, Profile(UnitKind.CytotoxicT, 2f, true), CentreOf(rig, cell));
 
             bool fired = false;
             for (int i = 0; i < 20 && !fired; i++) fired = ctl.CheckStressSense(i * 0.12f);
 
-            Check("the quiet kill fired", fired);
-            // THE check: the enterocyte is still standing.
-            Check("the host cell SURVIVES a quiet kill",
-                rig.Grid.GetHostState(cell) == HostState.Healthy);
-            Check("the pathogen is gone",
+            Check("the apoptotic kill fired", fired);
+
+            // The correction: the infected cell DIES. A cytotoxic T cell
+            // recognises and kills the infected cell -- it does not
+            // sterilise one and walk away.
+            Check("the infected cell dies -- the shell goes too",
+                rig.Grid.GetHostState(cell) == HostState.Dead);
+            Check("the pathogen dies with it",
                 rig.Grid.GetIntracellularAt(cell) == null);
-            Check("no debris is left (nothing for fibrosis, nothing for a DC)",
-                rig.Grid.GetDebrisAmount(cell) <= 0f);
+
+            // ...but cleanly. This fraction is the actual reward.
+            float debris = rig.Grid.GetDebrisAmount(cell);
+            Check("it leaves only a small tidy pile, not a necrotic spill",
+                debris > 0f && debris < TissueGrid.FullDebris * 0.5f);
+
+            // Antigen survives: apoptotic cells are the classic substrate
+            // for cross-presentation, so precision does NOT cost the player
+            // the thing they learn from.
+            Check("antigen is still recorded for a dendritic cell to sample",
+                rig.Grid.GetDebrisAntigen(cell) != null);
         }
         finally { rig.Dispose(); }
     }
 
-    private static void RunLoudKillStillKillsTheCell()
+    private static void RunNecroticKillLeavesAMess()
     {
-        Debug.Log("[Sprint23Verification] --- Loud kill ---");
+        Debug.Log("[Sprint23Verification] --- Necrotic kill ---");
 
-        var rig = BuildRig("Loud");
+        var rig = BuildRig("Necrotic");
         try
         {
             var cell = new CoarseCoord(50, 20);
@@ -292,11 +307,17 @@ public static class Sprint23Verification
             bool fired = false;
             for (int i = 0; i < 20 && !fired; i++) fired = mac.CheckStressSense(i * 0.12f);
 
-            Check("the loud kill fired", fired);
-            Check("the host cell DIES on a loud kill (the innate cost)",
-                rig.Grid.GetHostState(cell) == HostState.Dead);
-            Check("debris is left behind (antigen for a DC to sample)",
-                rig.Grid.GetDebrisAmount(cell) > 0f);
+            Check("the necrotic kill fired", fired);
+            Check("the host cell dies", rig.Grid.GetHostState(cell) == HostState.Dead);
+            Check("and leaves a FULL debris pile",
+                Mathf.Approximately(rig.Grid.GetDebrisAmount(cell), TissueGrid.FullDebris));
+
+            // The comparison is the mechanic. If these two ever become equal
+            // the whole case for cytotoxic towers is gone, silently.
+            float necrotic = rig.Grid.GetDebrisAmount(cell);
+            float apoptoticExpected = TissueGrid.FullDebris * TissueTuning.ApoptoticDebrisFraction;
+            Check("an innate kill leaves meaningfully more mess than a cytotoxic one",
+                necrotic > apoptoticExpected * 2f);
         }
         finally { rig.Dispose(); }
     }

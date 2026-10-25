@@ -354,13 +354,20 @@ namespace ImmunologyTD.Grid
 
         /// <summary>
         /// Detaches the intracellular pathogen without killing the cell --
-        /// `Infected -> Healthy`. Currently unused by production code and
-        /// kept deliberately: GAME_DESIGN.md section 1c says killing an
-        /// intracellular pathogen flips the host "toward `Dead` or `Healthy`
-        /// depending on how much damage the cell took," and adaptive
-        /// immunity's precise MHC-I killing (section 4a, ~10% knowledge) is
-        /// the case that will want this. Innate clearing always kills the
-        /// cell -- see <see cref="KillHostCell"/>.
+        /// `Infected -> Healthy`. **Unused by production code.**
+        ///
+        /// Sprint 23 briefly used this for the cytotoxic T cell, on the
+        /// mistaken idea that a CTL excises a pathogen and leaves the
+        /// enterocyte alive. It does not -- a CTL recognises and kills the
+        /// infected cell, because the cell is the only route to anything
+        /// living inside it. That code is gone; cytotoxic kills now go
+        /// through <see cref="KillHostCell"/> with `apoptotic: true`.
+        ///
+        /// Kept because GAME_DESIGN.md §1c does allow for an infection
+        /// resolving toward `Healthy` -- an infection that burns out, or a
+        /// cell that clears a virus by intrinsic/interferon-driven means
+        /// rather than by being killed. That is a real thing and this is
+        /// where it would land. It is NOT the cytotoxic path.
         /// </summary>
         public bool ReleaseIntracellular(CoarseCoord c)
         {
@@ -396,7 +403,24 @@ namespace ImmunologyTD.Grid
         /// before-kill paths (brood burst, burn-out) have already dropped
         /// the resident and must pass the class explicitly.
         /// </summary>
-        public bool KillHostCell(CoarseCoord c, PathogenClass? antigen = null)
+        /// <param name="apoptotic">
+        /// Sprint 23 (corrected 2026-10-25). **The cell dies either way.**
+        /// This says HOW.
+        ///
+        /// A cytotoxic cell -- CTL, NK, gamma-delta -- kills by inducing
+        /// APOPTOSIS: the target is packaged into membrane-bound bodies and
+        /// cleared tidily, without spilling its contents. An innate cell
+        /// with no specific recognition has to damage the cell to death
+        /// instead, which is NECROTIC: contents spill, DAMPs are released,
+        /// neighbours are injured, and the mess is what fibrosis feeds on.
+        ///
+        /// So the adaptive payoff is not that the enterocyte survives -- it
+        /// does not, and an earlier version of this code wrongly claimed it
+        /// did. The payoff is that **the tissue recovers instead of
+        /// scarring**: an apoptotic death leaves a small, quickly-cleared
+        /// pile, so the ground is free to regrow far sooner.
+        /// </param>
+        public bool KillHostCell(CoarseCoord c, PathogenClass? antigen = null, bool apoptotic = false)
         {
             if (!IsHostGround(c)) return false;
             var previous = host[c.Column, c.Row];
@@ -417,7 +441,13 @@ namespace ImmunologyTD.Grid
             intracellular[c.Column, c.Row] = null;
             infectionStartTime[c.Column, c.Row] = -1f;
             hostHealth[c.Column, c.Row] = 0f;
-            debrisAmount[c.Column, c.Row] = FullDebris;
+            // Apoptotic death leaves apoptotic BODIES -- membrane-bound,
+            // small, rapidly cleared -- rather than a full necrotic spill.
+            // The antigen is still recorded either way: apoptotic cells are
+            // the classic substrate for cross-presentation, so a precise
+            // kill does NOT cost the player the thing they learn from.
+            debrisAmount[c.Column, c.Row] =
+                apoptotic ? FullDebris * TissueTuning.ApoptoticDebrisFraction : FullDebris;
             debrisAntigen[c.Column, c.Row] = antigen ?? resident?.Class;
             emptySince[c.Column, c.Row] = -1f;
             DeadCount++;

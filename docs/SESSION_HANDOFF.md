@@ -33,7 +33,7 @@ before a line was written, and found one live defect.
 
 | Tower | Gated | Its job |
 |---|---|---|
-| Cytotoxic T | ~10% knowledge | Precise kill — **the host cell survives** |
+| Cytotoxic T | ~10% knowledge | Kills the infected cell by **apoptosis** — clean, tissue recovers |
 | NK cell (ILC1) | no | **IFN-γ: upgrades nearby macrophages**; weak kill |
 | γδ T (IEL) | no | Wall patrol + **the only tower that repairs** |
 | B cell → plasma cells | ~20% knowledge | Drifting **antibodies** that coat pathogens |
@@ -44,11 +44,17 @@ unabridged passes in `docs/research/`.
 
 ### The ideas the sprint rests on
 
-- **The CTL's mechanic is not damage.** It is `QuietKill`: the enterocyte
-  is still standing afterwards. If a later session collapses the quiet
-  branch into the loud one, every test about infections clearing still
-  passes and the entire reason to buy adaptive immunity silently vanishes.
-  `Sprint23Verification.RunQuietKillSparesTheHostCell` guards it.
+- **The CTL's mechanic is not damage, and not sparing the cell.** An
+  infected cell is the infection's shell and dies either way. `ApoptoticKill`
+  decides HOW: packaged and cleared (little debris, fast regrowth) versus
+  damaged to death (full debris, slow regrowth, fibrosis feed). If a later
+  session collapses the apoptotic branch into the necrotic one, every test
+  about infections clearing still passes and the entire reason to buy
+  adaptive immunity silently vanishes.
+  `Sprint23Verification.RunNecroticKillLeavesAMess` pins the comparison.
+  **This shipped wrong once** -- as "the enterocyte survives" -- and the
+  Director caught it the same day. A CTL recognises and kills the infected
+  cell; it does not excise a pathogen and leave the cell alive.
 - **The NK cell is an amplifier, not a competitor.** Building it as a
   cheap CTL was the obvious design and the wrong biology, and it would
   have cheapened the ~10% rung. Do **not** give it a clonal-expansion
@@ -106,7 +112,7 @@ candidate causes.
 
 ## State of the code
 
-- **16 harnesses, 603 checks**, green as of Sprint 23's final commit.
+- **16 harnesses, 605 checks**, green as of Sprint 23's final commit.
   `Sprint23Verification` is seeded.
 - New roster numbers: `UnitProfile` defaults in `GameBootstrap`,
   cross-kind values in `Units/UnitTuning`, antibody in

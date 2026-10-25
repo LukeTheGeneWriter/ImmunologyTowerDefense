@@ -71,6 +71,12 @@ which became mechanics:
    intracellular infection; the number never implemented the sentence.
    Sprint 23 cut innate recognition tenfold and set cytotoxic recognition
    ~10× above it.
+
+   **Note on what a CTL then does** (corrected 2026-10-25): it kills the
+   infected cell. Halle measured *target cell death*, not pathogen
+   clearance inside a surviving cell. The adaptive advantage is apoptotic
+   versus necrotic death — a clean, packaged death that the tissue
+   recovers from — not a cell that lives through it.
 2. **Under viral MHC-I downmodulation, CTLs failed entirely** — per-capita
    kill rate to exactly 0.0, contact frequency from 38% to 1%. The CTL's
    weakness is a **cliff, not a slope**. Consequence for design: there

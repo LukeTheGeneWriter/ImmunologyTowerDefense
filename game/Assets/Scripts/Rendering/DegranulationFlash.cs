@@ -84,12 +84,12 @@ namespace ImmunologyTD.Rendering
         /// tissue board so it must read on its own.</summary>
         public static Color KnowledgeMatchColor => Palette.FxKnowledge;
 
-        /// <summary>Sprint 23: a cytotoxic cell's PRECISE kill -- pathogen
-        /// destroyed, host cell left alive. Played smaller and calmer than
+        /// <summary>Sprint 23: a cytotoxic cell killing an infected cell by
+        /// APOPTOSIS. Played smaller and calmer than
         /// <see cref="StressKillColor"/> on purpose: the player should be
-        /// able to tell at a glance whether an infection was excised or the
-        /// tissue was blown up to get at it.</summary>
-        public static Color QuietKillColor => Palette.FxQuietKill;
+        /// able to tell at a glance whether a cell was taken down cleanly
+        /// or blown apart to get at what was inside it.</summary>
+        public static Color ApoptosisColor => Palette.FxApoptosis;
 
         /// <summary>Sprint 23: an NK/ILC1's IFN-gamma pulse. Drawn WIDE and
         /// slow -- it covers the aura radius, so the player can see which
@@ -168,7 +168,7 @@ namespace ImmunologyTD.Rendering
             // Sprint 23: quiet kill -- quick, small, tidy. Reuses the stress
             // ring shape at a fraction of the scale and duration, so the two
             // outcomes are legibly the same EVENT with opposite characters.
-            if (Same(c, QuietKillColor))      { durationSeconds = 0.28f; startScale = 0.25f; endScale = 0.85f; return SpriteShapes.StressRing; }
+            if (Same(c, ApoptosisColor))      { durationSeconds = 0.28f; startScale = 0.25f; endScale = 0.85f; return SpriteShapes.StressRing; }
             if (Same(c, IfnGammaColor))       { durationSeconds = 0.70f; startScale = 0.20f; endScale = 1.0f; return SpriteShapes.KnowledgeRing; }
             if (Same(c, OpsonisationColor))   { durationSeconds = 0.22f; startScale = 0.30f; endScale = 0.75f; return SpriteShapes.KnowledgeRing; }
             if (Same(c, RepairColor))         { durationSeconds = 0.60f; startScale = 0.25f; endScale = 1.2f; return SpriteShapes.EffeBloom; }

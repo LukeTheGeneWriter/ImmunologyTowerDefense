@@ -105,18 +105,28 @@ namespace ImmunologyTD.Units
         /// (§6d), so an upgrade or a new unit kind is a one-field write.</summary>
         [Min(0f)] public float StressSenseChancePerTick = 0f;
 
-        /// <summary>Sprint 23. **The CTL's entire reason for existing.**
-        /// False = the stress-sense kill is LOUD: the host cell dies with the
-        /// pathogen inside it (necrosis, collateral, fibrosis feed). True =
-        /// QUIET: the intracellular pathogen is destroyed and **the host cell
-        /// survives**, per GAME_DESIGN.md §5's ~10% rung ("precise kill of an
-        /// infected cell -- no collateral, no necrotic DAMP").
+        /// <summary>Sprint 23 (corrected 2026-10-25). **How this kind kills
+        /// an infected cell** -- not whether the cell dies, which it always
+        /// does.
         ///
-        /// Note the mechanic is NOT "more damage" -- it is that the enterocyte
-        /// is still standing afterwards. That is what the player is buying
-        /// when they invest in adaptive immunity, and it is the only reason
-        /// innate-only play hits a tissue-damage ceiling.</summary>
-        public bool QuietKill = false;
+        /// True = APOPTOTIC. A cytotoxic cell (CTL, NK, gamma-delta)
+        /// recognises the infected cell and induces programmed death: the
+        /// target is packaged into membrane-bound bodies and cleared
+        /// tidily, so almost nothing is left to clean up and the ground
+        /// regrows quickly.
+        ///
+        /// False = NECROTIC. An innate cell with no specific recognition can
+        /// only damage the cell to death. Contents spill, the debris has to
+        /// be cleared before the ground recovers, and it is what fibrosis
+        /// will feed on.
+        ///
+        /// **The original version of this field was wrong.** It spared the
+        /// host cell outright, on the mistaken idea that a cytotoxic T cell
+        /// excises a pathogen and leaves the enterocyte alive. It does not:
+        /// it kills the shell, which is the only way to reach anything
+        /// living inside one. The adaptive payoff is the tissue RECOVERING,
+        /// not the cell surviving.</summary>
+        public bool ApoptoticKill = false;
 
         /// <summary>Sprint 23. Per-tick chance this unit's IFN-gamma aura
         /// upgrades a macrophage it is near -- the NK/ILC1 tower's PRIMARY

@@ -756,11 +756,14 @@ Consensus, at the Director's request, on the reasoning that getting the
 cells right first lets rounds be designed against a stable roster. The
 research changed two of the four towers before a line was written.
 
-- **Cytotoxic T cell** (~10% knowledge). Its mechanic is not damage --
-  it is that **the infected cell survives being cleared**. Innate cells
-  have to destroy a cell to reach what is inside it; a CTL excises the
-  pathogen and leaves the enterocyte standing. That contrast is the whole
-  reason to invest in adaptive immunity.
+- **Cytotoxic T cell** (~10% knowledge). It recognises an infected cell
+  and kills it -- by **apoptosis**, which is clean. Innate cells can only
+  damage a cell to death, which spills its contents and leaves a mess the
+  tissue has to clear before it can regrow. The infected cell dies either
+  way; what adaptive immunity buys is that **the tissue recovers instead
+  of scarring**. (Shipped first, for a few hours, as "the enterocyte
+  survives" -- wrong biology, caught by the Director the same day and
+  corrected before the entry was final.)
 - **NK cell (ILC1)**, buyable from round 1. Mostly an **IFN-gamma
   amplifier that upgrades the macrophages around it**, with a weak precise
   kill of its own. The research is clear that intestinal NK cells are less
@@ -797,4 +800,4 @@ Fixed on the way: **the Sprint 22 secretory-IgA rung was never marked
 built**, so for a whole sprint -- including the playtest where the Director
 reported never perceiving IgA -- the HUD called a live mechanic "planned".
 
-16 harnesses green, 603 checks. WebGL build 9,222,409 bytes, 0 errors.
+16 harnesses green, 605 checks. WebGL build 9,222,409 bytes, 0 errors.

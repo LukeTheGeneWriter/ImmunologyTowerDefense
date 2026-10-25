@@ -97,7 +97,7 @@ namespace ImmunologyTD.Bootstrap
         // ---------------------------------------------------------------
 
         /// <summary>The ~10% knowledge rung made flesh. Its mechanic is NOT
-        /// damage -- it is <see cref="UnitProfile.QuietKill"/>: the enterocyte
+        /// damage -- it is <see cref="UnitProfile.ApoptoticKill"/>: the enterocyte
         /// survives. Licensed per species by the knowledge ledger.</summary>
         [SerializeField]
         private UnitProfile cytotoxicTProfile = new UnitProfile
@@ -121,7 +121,7 @@ namespace ImmunologyTD.Bootstrap
             // Director's call was a 10-15x gap, explicitly not more -- past
             // ~20x the innate roll stops reading as a mechanic at all.
             StressSenseChancePerTick = 0.03f,
-            QuietKill = true,
+            ApoptoticKill = true,
         };
 
         /// <summary>"NK cell (ILC1)". **Primarily a macrophage amplifier.**
@@ -147,7 +147,7 @@ namespace ImmunologyTD.Bootstrap
             // blind to an infected cell that keeps its MHC-I up -- which is
             // the CTL's job and, later, the stealth pathogen's counter.
             StressSenseChancePerTick = 0.01f,
-            QuietKill = true,
+            ApoptoticKill = true,
             // The real tower: upgrade the macrophages around it.
             IfnGammaAuraChancePerTick = 0.02f,
             IfnGammaAuraCoarseRadius = 3,
@@ -178,7 +178,7 @@ namespace ImmunologyTD.Bootstrap
             // 2015 shows its value is interception and barrier integrity,
             // not kill throughput.
             StressSenseChancePerTick = 0.008f,
-            QuietKill = true,
+            ApoptoticKill = true,
             // Its real job: hold the wall and mend it.
             BarrierPatrolRadiusCells = 2.0f,
             BarrierRepairIntervalSeconds = 3.5f,

@@ -53,7 +53,11 @@ found one live defect.
 
 1. **Four `UnitKind`s**, each with its own profile, price, sprite, speed
    and emission cadence.
-2. **`QuietKill`** — the CTL's real mechanic: the host cell survives.
+2. **`ApoptoticKill`** — the CTL recognises and kills the infected cell,
+   but by apoptosis: a small tidy pile instead of a necrotic spill, so the
+   tissue recovers instead of scarring. (Shipped first as "the host cell
+   survives", which was wrong biology; corrected the same day on the
+   Director's catch.)
 3. **Recognition as a cumulative, visible, cooperative meter**, replacing
    the hidden per-tick roll; superadditive at 3+ attackers (Halle 2016).
 4. **Innate recognition rebalanced** 0.03/0.02 → 0.003/0.002; cytotoxic at
@@ -110,7 +114,7 @@ It belongs alongside `PLAYTEST_LOG.md`'s three candidate causes.
 ## Stopping point
 
 - [x] All ten scope items in.
-- [x] **16 harnesses green, 603 checks**, no warnings. `Sprint23Verification`
+- [x] **16 harnesses green, 605 checks**, no warnings. `Sprint23Verification`
       is seeded.
 - [x] New sprites checked magnified before a build was spent — **two were
       wrong**: the granules were invisible (white-on-white in an
@@ -121,10 +125,11 @@ It belongs alongside `PLAYTEST_LOG.md`'s three candidate causes.
 
 ## What to watch for in the playtest
 
-1. **Does the quiet kill read?** The thing to notice is not that
-   infections clear — it is that *the tissue survives being cleared*. If
-   that does not land, the whole innate/adaptive investment arc is
-   invisible.
+1. **Does the apoptotic kill read?** The thing to notice is not that
+   infections clear, and not that cells survive — they do not. It is that
+   *the ground comes back* after a cytotoxic sweep and stays a debris
+   field after an innate one. If that contrast does not land, the whole
+   innate/adaptive investment arc is invisible.
 2. **Does the recognition meter read mid-round** without being studied?
    Same bar the blister had to clear in Sprint 22.
 3. **Is the NK cell's buff legible**, or does it feel like nothing? An

@@ -80,12 +80,13 @@ namespace ImmunologyTD.Units
         /// plasma cells / higher titre" upgrade is one field write.</summary>
         public float AntibodySecretionIntervalSeconds;
 
-        /// <summary>Sprint 23: true = this unit's stress-sense kill spares the
-        /// host cell (GAME_DESIGN.md §5, ~10% rung). Per-tower and mutable
-        /// like everything else here, so a future upgrade could in principle
-        /// teach a kind precision -- which is exactly what the knowledge
-        /// ladder is.</summary>
-        public bool QuietKill;
+        /// <summary>Sprint 23: true = this unit kills an infected cell by
+        /// inducing APOPTOSIS (clean, little debris, fast recovery); false =
+        /// necrotic damage-to-death (full debris, slow recovery, fibrosis
+        /// feed). The cell dies either way. Per-tower and mutable like
+        /// everything else here, so a future upgrade could teach a kind
+        /// precision -- which is exactly what the knowledge ladder is.</summary>
+        public bool ApoptoticKill;
 
         /// <summary>Sprint 23: per-tick chance of IFN-gamma-upgrading a nearby
         /// macrophage, and the coarse radius it reaches. The NK/ILC1 tower's
@@ -111,7 +112,7 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick,
             StressSenseChancePerTick = profile.StressSenseChancePerTick,
             FineTilesPerTick = profile.FineTilesPerTick,
-            QuietKill = profile.QuietKill,
+            ApoptoticKill = profile.ApoptoticKill,
             AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds,
             BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells,
             BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds,
@@ -132,7 +133,7 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = profile.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = profile.StressSenseChancePerTick;
             FineTilesPerTick = profile.FineTilesPerTick;
-            QuietKill = profile.QuietKill;
+            ApoptoticKill = profile.ApoptoticKill;
             AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds;
             BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells;
             BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds;
@@ -152,7 +153,7 @@ namespace ImmunologyTD.Units
             EfferocytosisDebrisPerTick = other.EfferocytosisDebrisPerTick;
             StressSenseChancePerTick = other.StressSenseChancePerTick;
             FineTilesPerTick = other.FineTilesPerTick;
-            QuietKill = other.QuietKill;
+            ApoptoticKill = other.ApoptoticKill;
             AntibodySecretionIntervalSeconds = other.AntibodySecretionIntervalSeconds;
             BarrierPatrolRadiusCells = other.BarrierPatrolRadiusCells;
             BarrierRepairIntervalSeconds = other.BarrierRepairIntervalSeconds;

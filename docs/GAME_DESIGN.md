@@ -830,28 +830,67 @@ it. Each tower here answers a threat the others cannot.
 
 | Tower | Gated? | Speed | Its actual job |
 |---|---|---|---|
-| **Cytotoxic T cell** | ~10% knowledge | 3 | Precise kill of an infected cell — *the host cell survives* |
+| **Cytotoxic T cell** | ~10% knowledge | 3 | Recognises and kills an infected cell by **apoptosis** — clean, so the tissue recovers |
 | **NK cell (ILC1)** | no — innate | 3 | IFN-γ: **upgrades nearby macrophages**; weak precise kill of its own |
 | **γδ T cell (IEL)** | no — tissue-resident | 1 | Patrols the wall: intercepts adherents, **repairs the barrier** |
 | **B cell** → plasma cells | ~20% knowledge | 0 (sessile) | Secretes drifting **antibodies** that coat extracellular pathogens |
 
-### The CTL's mechanic is not damage — it is that the enterocyte lives
+### The CTL kills the cell — what it buys is a clean death
 
-The ~10% rung buys `QuietKill`. An innate cell clearing an intracellular
-infection destroys the host cell to reach it (loud, leaves debris, feeds
-fibrosis). A cytotoxic cell excises the pathogen and the cell is still
-standing.
+**Corrected 2026-10-25 (Director).** An earlier version of this section
+said a cytotoxic T cell excises the pathogen and leaves the enterocyte
+alive. That is wrong. A CTL recognises peptide-MHC-I on an infected cell
+and **kills the cell** — perforin and granzymes, inducing apoptosis.
+Nothing sterilises a cell and walks away: the cell is the infection's
+shell, and killing it is the only route to anything living inside.
 
-So the *observable* a player should learn to read is not "infections clear
-faster" — it is **the tissue stops being destroyed to save it**. If a
-later session ever collapses the quiet branch into the loud one, every
-test about infections clearing still passes and the entire reason to
-invest in adaptive immunity silently disappears.
-`Sprint23Verification.RunQuietKillSparesTheHostCell` exists for that.
+So every route to an intracellular infection kills the host cell. What
+differs is **how it dies**, and that is a real and consequential
+difference rather than a cosmetic one:
 
-A quiet kill leaves **no debris** — and debris is the antigen source
-(§1c). Precision costs you the thing you learn from. That tension is
-deliberate and unmeasured; watch it in playtest.
+| | Apoptotic (CTL, NK, γδ) | Necrotic (macrophage, neutrophil) |
+|---|---|---|
+| Trigger | Specific recognition — peptide-MHC-I, or stress ligands | Generic damage until the cell fails |
+| Cell contents | Packaged into membrane-bound bodies | Spilled |
+| Debris left | ~30% of a full pile | A full pile |
+| Neighbours | Untouched | Injured; DAMPs released |
+| Tissue outcome | Regrows quickly | Slow, and feeds fibrosis (§6) |
+
+**So the adaptive payoff is that the tissue recovers instead of scarring**
+— not that the cell survives. That is the observable a player should learn
+to read: after a cytotoxic sweep the ground comes back; after an innate
+one it is a field of debris.
+
+`TissueTuning.ApoptoticDebrisFraction` is the whole reward in one number.
+If it is ever raised to 1.0 the two paths become indistinguishable, every
+test about infections clearing still passes, and the case for buying
+cytotoxic cells silently evaporates.
+`Sprint23Verification.RunNecroticKillLeavesAMess` pins the comparison.
+
+**Apoptotic death does not cost the player antigen.** Apoptotic cells are
+the classic substrate for cross-presentation, so the debris still carries
+the species tag for a dendritic cell to sample. (An earlier draft claimed
+precision costs you what you learn from; it does not.)
+
+### Specific recognition vs stress sensing — two routes, same outcome
+
+The three cytotoxic kinds reach an infected cell by different means, and
+that is what keeps them from being redundant:
+
+- **Cytotoxic T cell — specific recognition.** Reads a peptide presented
+  on MHC-I, so it acts only on species the adaptive system has
+  characterised. This is the route that matters against **viruses** and,
+  in the wider biology, tumours.
+- **NK/ILC1 and γδ IEL — stress sensing.** Read induced stress ligands
+  (NKG2D ligands such as MICA/MICB and the ULBPs) and missing-self. No
+  antigen, no priming, no knowledge required. Stress display is strongly
+  associated with viral infection, which is why these two also skew
+  antiviral despite being innate.
+
+The gap between them is the game's hard counter: a virus that
+**downregulates MHC-I** blinds the CTL completely — measured per-capita
+kill rate of *exactly* zero — while stress sensing still sees it. That
+pathogen is designed and not yet built.
 
 ### Recognition is a visible cumulative meter, not a hidden roll
 
@@ -1018,7 +1057,7 @@ nothing else. Each capability's real mechanic is its own later sprint.
 
 | Knowledge | Capability | Mechanic (Director's note) |
 |---|---|---|
-| ~10% | **Cytotoxic T cells** | precise kill of an infected cell — no collateral, no necrotic DAMP (the *quiet* version of §4b's stress-sense kill). MHC-I restricted recognition. **Built in Sprint 23.** |
+| ~10% | **Cytotoxic T cells** | MHC-I-restricted recognition, then an **apoptotic** kill of the infected cell — no spill, no necrotic DAMP, little debris, so the tissue recovers instead of scarring. The cell still dies; the *manner* is the reward. **Built in Sprint 23.** |
 | ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). **Built in Sprint 23** as plasma-cell-secreted antibody that coats pathogens in tissue, reusing the §6b coating state. |
 | ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
