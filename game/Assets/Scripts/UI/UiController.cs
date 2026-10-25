@@ -137,7 +137,13 @@ namespace ImmunologyTD.UI
             // surface lives in the gutters above and below the board, so
             // nothing permanent covers it -- HUD top-right, knowledge
             // bottom-left (under the lymph node), the shop tray
-            // bottom-right, the debug readout top-left. Only on-demand
+            // Sprint 28: the body shop moved to the TOP LEFT (Director) and
+            // the debug readout took the vacated bottom-right. The shop is
+            // read far more often than the readout, and the top-left corner
+            // is the one the eye lands on first; the readout is a toggled
+            // developer surface and is hidden by default, so it loses
+            // nothing by moving.
+            // Only on-demand
             // surfaces float over the board (picker, upgrade panel,
             // expanded knowledge card, tooltips).
             var topRight = Dock(root, Align.FlexEnd, Justify.FlexStart);
@@ -148,7 +154,7 @@ namespace ImmunologyTD.UI
             floatLayer = Dock(root, Align.FlexStart, Justify.FlexStart);
 
             hud = new HudView(topRight, StartRound);
-            shopView = new ShopView(bottomRight);
+            shopView = new ShopView(topLeft);
             shopView.Bind(shop, wallet);
             knowledgeView = new KnowledgeView(bottomLeft, floatLayer);
             if (pendingNode.HasValue) knowledgeView.Bind(knowledge, pendingNode.Value.world, pendingNode.Value.flash);
@@ -158,7 +164,7 @@ namespace ImmunologyTD.UI
             upgrade = new UpgradePanelView(floatLayer, ClearSelection);
             picker = new TowerPickerView(floatLayer, ClearSelection);
 
-            debug = new DebugReadoutView(topLeft);
+            debug = new DebugReadoutView(bottomRight);
             debug.Bind(board, macrophageSpeed, neutrophilSpeed, marrow, gutWall, tally,
                        spawner, knowledge, adaptive);
 

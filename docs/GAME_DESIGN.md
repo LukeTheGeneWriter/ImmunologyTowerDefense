@@ -1780,6 +1780,45 @@ antibody is about 10 nm, so it remains ~400× oversized. A large
 improvement on one-antibody-per-cell-slot and worth having, but the
 hardest difficulty tier shouldn't claim the board is to scale.
 
+### Crowd desensitisation — the anti-swarm (Director, 2026-10-25)
+
+**The problem.** Every innate cell reads the same cytokine field, so they
+all walked to the same pathogen. The Director's report: macrophages and
+neutrophils "move in a swarm and let bacteria through all the time" — one
+dogpile and a wide-open wall.
+
+**What it is not: physical repulsion.** Cells are not billiard balls, and
+a bounce would have broken the cooperation Sprint 23 built. What is
+modelled instead is the real mechanism. Neutrophil swarming is
+*self-limiting*: GPCR desensitisation acts as negative feedback that stops
+migration once a cell senses high concentrations of the self-secreted
+attractants that started the swarm (Kienle 2021, *Science*). **A crowded
+cell stops finding the crowd attractive.**
+
+Implemented as a penalty subtracted from each candidate step's cytokine
+reading *before* the chemotaxis softmax, so a crowded direction merely
+looks less attractive than an empty one — a cell with nowhere better to go
+will still go there. Same-kind only: a macrophage and a neutrophil working
+one pathogen is fine and realistic; eight neutrophils on it is the bug.
+
+**The shape is the design**, and it has to thread a needle:
+
+| Dial | Default | What it does |
+|---|---|---|
+| `RepulsionFreeCompanions` | 2 | Companions tolerated for free. **Two, so three cells can converge** — exactly the number Sprint 23's cooperation bonus rewards. |
+| `RepulsionExponent` | 1.6 | Penalty rises as `surplus^exponent`. Above 1 = forgiving at first, sharp later: the fourth cell is barely discouraged, the eighth is strongly pushed off. |
+| `RepulsionStrength` | 0.55 | Scale, in cytokine units. 0 disables it. |
+| `RepulsionRadiusFineTiles` | 6 | How far a cell notices its own kind. |
+
+**Both extremes are worse than the middle, and that is measured, not
+assumed.** Kienle found that disabling the swarm brake let neutrophils
+scan *more* tissue but made bacterial clearance **worse**, because
+containment of proliferating bacteria broke down. Turning
+`RepulsionStrength` up until cells never cluster would reproduce exactly
+that failure in the game: better coverage, worse killing.
+`Sprint28Verification` pins the free allowance at ≥2 so a future tuning
+pass cannot quietly make the cooperation bonus unreachable.
+
 ### Chemotaxis on the lattice
 
 The textbook model of chemotaxis *is* a biased random walk —

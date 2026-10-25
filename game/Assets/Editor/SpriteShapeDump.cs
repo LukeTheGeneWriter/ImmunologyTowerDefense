@@ -56,11 +56,21 @@ public static class SpriteShapeDump
         // the marrow is laid out for EconomyTuning.MarrowMaxSlots now, and a
         // dump that shows five pads would hide exactly the crowding this is
         // meant to catch.
+        // Sprint 28: mirror the real 2-wide grid, or the dump shows a
+        // layout the game does not use.
         int padCount = ImmunologyTD.Economy.EconomyTuning.MarrowMaxSlots;
+        const int padCols = 2;
+        int padRows = Mathf.CeilToInt(padCount / (float)padCols);
+        float padPitch = 0.95f;
+        float padCol = 0.93f;   // matches GameBootstrap: (pad + 0.50*pad)
         var pads = new Vector2[padCount];
         for (int i = 0; i < padCount; i++)
-            pads[i] = new Vector2(0f, ((padCount - 1) * 0.5f - i) * 0.95f);
-        var m = OrganShapes.BuildMarrow(new Vector2(2.2f, 4.85f + 0.95f * (padCount - 5)), pads, 0.76f, 0.95f);
+        {
+            int r = i / padCols, c = i % padCols;
+            pads[i] = new Vector2((c == 0 ? -padCol : padCol) * 0.5f,
+                                  ((padRows - 1) * 0.5f - r) * padPitch);
+        }
+        var m = OrganShapes.BuildMarrow(new Vector2(2.4f, (padRows - 1) * padPitch + 1.6f), pads, 0.62f, padPitch);
         var n = OrganShapes.BuildNode(new Vector2(3.6f, 2.2f));
         foreach (var (name, sp) in new[] { ("Organ_MarrowShadow", m.Shadow), ("Organ_MarrowSpace", m.Space), ("Organ_MarrowBone", m.Bone),
                                            ("Organ_NodeShadow", n.Shadow), ("Organ_NodeVessels", n.Vessels), ("Organ_NodeBody", n.Body), ("Organ_NodeFollicles", n.Follicles) })

@@ -217,6 +217,7 @@ namespace ImmunologyTD.Units
             if (board == null) return;
 
             tickStartWorld = transform.position;
+            RefreshCrowd(); // Sprint 28: once per tick, not once per step
             // Sprint 18: per-tower speed (an upgrade target), profile as fallback.
             int steps = tuning.FineTilesPerTick > 0 ? tuning.FineTilesPerTick : profile.FineTilesPerTick;
             for (int i = 0; i < steps; i++)
@@ -376,10 +377,52 @@ namespace ImmunologyTD.Units
             return true;
         }
 
+        /// <summary>Same-kind neighbours near this unit, refreshed once per
+        /// tick. Reused, so stepping allocates nothing -- a unit takes up to
+        /// five steps per tick and there are dozens of units.</summary>
+        private readonly FineCoord[] crowdBuffer = new FineCoord[MaxCrowdSampled];
+        private int crowdCount;
+
+        /// <summary>Ceiling on neighbours sampled for crowding. Well above
+        /// any kind's MaxActiveChildren, so it never silently truncates --
+        /// it is a guard, not a tuning knob.</summary>
+        private const int MaxCrowdSampled = 32;
+
+        /// <summary>
+        /// Sprint 28: gather same-kind neighbours for crowd desensitisation.
+        ///
+        /// Once per TICK rather than once per step: a unit takes up to five
+        /// steps a tick, the answer barely changes between them, and doing
+        /// it per step was five times the cost for no behavioural gain.
+        /// </summary>
+        private void RefreshCrowd()
+        {
+            crowdCount = 0;
+            if (UnitTuning.RepulsionStrength <= 0f || profile == null) return;
+
+            // Generous gate: anything that could matter after this tick's
+            // movement. Cheaper than a distance test per candidate later.
+            int gate = UnitTuning.RepulsionRadiusFineTiles + BoardConfig.FineSubdivision;
+
+            for (int i = 0; i < live.Count && crowdCount < MaxCrowdSampled; i++)
+            {
+                var other = live[i];
+                if (other == null || other == this) continue;
+                if (other.profile == null || other.profile.Kind != profile.Kind) continue;
+
+                int dc = Mathf.Abs(other.Current.Column - Current.Column);
+                int dr = Mathf.Abs(other.Current.Row - Current.Row);
+                if (Mathf.Max(dc, dr) > gate) continue;
+
+                crowdBuffer[crowdCount++] = other.Current;
+            }
+        }
+
         private void StepOnce()
         {
             Current = Chemotaxis.ChooseNextStep(
-                Current, board, cytokineField, CytokineToggle.Enabled, candidateBuffer, weightBuffer);
+                Current, board, cytokineField, CytokineToggle.Enabled, candidateBuffer, weightBuffer,
+                crowdBuffer, crowdCount);
         }
 
         /// <summary>

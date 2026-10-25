@@ -421,8 +421,15 @@ namespace ImmunologyTD.Bootstrap
             float marrowRegionH = baseRect.height * 0.62f;
             float lymphRegionH = baseRect.height * 0.30f;
 
+            // Sprint 28: the bone holds its niches in a 2-wide grid
+            // (Director). Eight pads in one column made each one tiny and
+            // left the bone a tall thin sliver; two columns of four keeps
+            // the pads big and the bone a readable block.
+            const int MarrowColumns = 2;
+            int marrowRows = Mathf.CeilToInt(BoneMarrowSlotCount / (float)MarrowColumns);
+
             float marrowCenterX = baseRect.center.x;
-            float pitch = marrowRegionH / BoneMarrowSlotCount;
+            float pitch = marrowRegionH / marrowRows;
             // Square slots: cap the size against the band's WIDTH too, so a
             // narrow base band shrinks the slots rather than overflowing
             // sideways. Whatever the pitch does not spend on the slot is the
@@ -432,23 +439,41 @@ namespace ImmunologyTD.Bootstrap
             // of its size; spending more of the pitch on the pad and less on
             // the gap claws some of that back. The bone reads as packed,
             // which is what a full marrow should look like anyway.
-            float marrowSlotSize = Mathf.Min(pitch * 0.86f, baseRect.width * 0.62f);
+            // Width now has to fit TWO pads plus the gap between them, so
+            // the horizontal cap is per-column rather than the whole band.
+            float marrowSlotSize = Mathf.Min(pitch * 0.86f, baseRect.width * 0.34f);
 
             float topSlotY = innerTop - marrowSlotSize * 0.5f;
+            // 0.28 put the two cavities close enough that the bone drew
+            // them as one fused dumbbell -- caught in the magnified organ
+            // dump. Half a pad of air keeps them reading as two niches.
+            float columnGap = marrowSlotSize * 0.50f;
+            float columnOffset = (marrowSlotSize + columnGap) * 0.5f;
+
+            // Row-major, so index order still reads top-to-bottom and the
+            // bone fills as a growing block -- BoneMarrowManager converts
+            // the NEXT fatty niche in index order, and a column-major
+            // layout would make that look like it was skipping around.
             var slotPositions = new Vector3[BoneMarrowSlotCount];
             for (int i = 0; i < BoneMarrowSlotCount; i++)
             {
-                slotPositions[i] = new Vector3(marrowCenterX, topSlotY - i * pitch, 0f);
+                int row = i / MarrowColumns;
+                int col = i % MarrowColumns;
+                slotPositions[i] = new Vector3(
+                    marrowCenterX + (col == 0 ? -columnOffset : columnOffset),
+                    topSlotY - row * pitch,
+                    0f);
             }
 
-            float marrowStripHeight = (BoneMarrowSlotCount - 1) * pitch + marrowSlotSize;
-            float marrowCenterY = topSlotY - (BoneMarrowSlotCount - 1) * pitch * 0.5f;
+            float marrowStripHeight = (marrowRows - 1) * pitch + marrowSlotSize;
+            float marrowCenterY = topSlotY - (marrowRows - 1) * pitch * 0.5f;
 
             // Sprint 21 (spec §1.2): a wider block of bone (side lanes of
             // spongy holes either side of the pads). Height keeps 0.30 pitch
             // of margin (the spec's 0.15 let the end cavities break through).
             var marrowBackdropSize = new Vector2(
-                Mathf.Min(marrowSlotSize * 2.9f, baseRect.width * 0.50f),
+                Mathf.Min(marrowSlotSize * 2f + columnGap + marrowSlotSize * 1.6f,
+                          baseRect.width * 0.92f),
                 marrowStripHeight + pitch * 0.30f);
             var marrowBackdropCenter = new Vector3(marrowCenterX, marrowCenterY, 0f);
 
@@ -660,14 +685,25 @@ namespace ImmunologyTD.Bootstrap
         private static readonly Vector3 ShadowOffset = new Vector3(0.06f, -0.09f, 0f);
 
         /// <summary>Sprint 21 (spec §1.2): spongy bone -- cream struts round
-        /// salmon marrow spaces -- with a rounded cavity behind each of the
-        /// five steel build pads (BoneMarrowManager draws the pads).</summary>
+        /// salmon marrow spaces -- with a rounded cavity behind each steel
+        /// build pad (BoneMarrowManager draws the pads). Sprint 28: the pads
+        /// are a 2-wide grid, so the cavities are too.</summary>
         private void BuildBoneMarrowBackdrop(Layout layout)
         {
             var pads = new Vector2[layout.MarrowSlotPositions.Length];
             for (int i = 0; i < pads.Length; i++)
                 pads[i] = layout.MarrowSlotPositions[i] - layout.MarrowBackdropCenter;
-            float pitch = pads.Length > 1 ? Mathf.Abs(layout.MarrowSlotPositions[0].y - layout.MarrowSlotPositions[1].y) : 0f;
+            // ROW pitch, not the gap to the next index. With the Sprint 28
+            // 2-wide grid, slots 0 and 1 sit side by side in the same row,
+            // so the old "difference between the first two" read zero and
+            // the spongy lanes lost their spacing. Find the first slot on a
+            // different row instead.
+            float pitch = 0f;
+            for (int i = 1; i < layout.MarrowSlotPositions.Length; i++)
+            {
+                float dy = Mathf.Abs(layout.MarrowSlotPositions[0].y - layout.MarrowSlotPositions[i].y);
+                if (dy > 1e-4f) { pitch = dy; break; }
+            }
             var m = ImmunologyTD.Rendering.OrganShapes.BuildMarrow(layout.MarrowBackdropSize, pads, layout.MarrowSlotSize, pitch);
             var c = layout.MarrowBackdropCenter;
             BuildOrganLayer("BoneMarrowShadow", c + ShadowOffset, m.Shadow, ImmunologyTD.Rendering.Palette.OrganShadow, 1);

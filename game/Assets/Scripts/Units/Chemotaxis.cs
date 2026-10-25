@@ -76,13 +76,62 @@ namespace ImmunologyTD.Units
         /// are caller-owned (length >= 4) so this allocates nothing per
         /// call -- callers reuse the same arrays every tick/step.
         /// </summary>
+        /// <summary>
+        /// Sprint 28 -- **crowd desensitisation**, the anti-swarm.
+        ///
+        /// The problem it solves: macrophages and neutrophils all read the
+        /// same cytokine gradient, so they all walked to the same pathogen
+        /// and everything else strolled past untouched. The player saw one
+        /// dogpile and a wide-open wall.
+        ///
+        /// What it is NOT: physical repulsion. Cells are not billiard
+        /// balls, and a bounce would also break the cooperation the game
+        /// just built. What this models is the real mechanism -- neutrophil
+        /// swarming is self-limiting through GPCR desensitisation, a
+        /// negative feedback that stops migration once a cell senses high
+        /// concentrations of self-secreted attractant (Kienle 2021,
+        /// Science). A crowded cell stops finding the crowd attractive.
+        ///
+        /// The shape matters and is deliberately forgiving at the start:
+        /// <see cref="UnitTuning.RepulsionFreeCompanions"/> same-kind
+        /// neighbours cost nothing, so three cells can converge on one
+        /// target -- which is exactly the number Sprint 23's cooperation
+        /// bonus rewards -- and only the surplus beyond that is penalised,
+        /// rising as `surplus^exponent`.
+        ///
+        /// Pure and static so the shape can be asserted directly by a
+        /// harness without a board or any GameObjects.
+        /// </summary>
+        public static float CrowdPenaltyAt(FineCoord at, FineCoord[] crowd, int count)
+        {
+            if (crowd == null || count <= 0) return 0f;
+            if (UnitTuning.RepulsionStrength <= 0f) return 0f;
+
+            int radius = Mathf.Max(0, UnitTuning.RepulsionRadiusFineTiles);
+            int near = 0;
+            for (int i = 0; i < count && i < crowd.Length; i++)
+            {
+                int dc = Mathf.Abs(crowd[i].Column - at.Column);
+                int dr = Mathf.Abs(crowd[i].Row - at.Row);
+                if (Mathf.Max(dc, dr) <= radius) near++;
+            }
+
+            int surplus = near - Mathf.Max(0, UnitTuning.RepulsionFreeCompanions);
+            if (surplus <= 0) return 0f;
+
+            return UnitTuning.RepulsionStrength
+                   * Mathf.Pow(surplus, Mathf.Max(0.01f, UnitTuning.RepulsionExponent));
+        }
+
         public static FineCoord ChooseNextStep(
             FineCoord current,
             BoardConfig board,
             CytokineField cytokineField,
             bool cytokineEnabled,
             FineCoord[] candidateBuffer,
-            float[] weightBuffer)
+            float[] weightBuffer,
+            FineCoord[] crowdBuffer = null,
+            int crowdCount = 0)
         {
             int validCount = 0;
             float maxValue = float.NegativeInfinity;
@@ -94,6 +143,12 @@ namespace ImmunologyTD.Units
 
                 candidateBuffer[validCount] = candidate;
                 float value = cytokineEnabled ? cytokineField.SampleFine(candidate) : 0f;
+                // Sprint 28: crowding is subtracted BEFORE the softmax, in
+                // the same units as the cytokine reading, so a crowded
+                // direction simply looks less attractive than an empty one
+                // rather than being forbidden. A cell with nowhere better to
+                // go will still go there.
+                value -= CrowdPenaltyAt(candidate, crowdBuffer, crowdCount);
                 weightBuffer[validCount] = value; // raw value for now; exponentiated below
                 if (value > maxValue) maxValue = value;
                 validCount++;

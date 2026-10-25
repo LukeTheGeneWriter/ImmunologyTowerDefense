@@ -962,3 +962,40 @@ design, expressed slower and more permanently.
 GAME_DESIGN.md §2a's oldest open question is now closed.
 
 19 harnesses green, 689 checks.
+
+## Sprint 28 -- 2026-10-25
+Cells stop dogpiling, the marrow goes 2x4, and the shop moves to the top
+left.
+
+**The swarm is fixed, and not by bouncing cells off each other.** Every
+innate cell read the same cytokine field, so they all walked to the same
+pathogen and everything else strolled past. The fix models what actually
+stops a neutrophil swarm in life: cells desensitise to the self-secreted
+attractants that drew them in, so a crowded cell stops finding the crowd
+attractive. It is subtracted from the gradient reading rather than being a
+hard rule, so a cell with nowhere better to go will still go there.
+
+The shape matters more than the strength. **Two companions are free**, so
+three cells can still converge on one pathogen -- exactly the number the
+cooperation bonus rewards -- and only the surplus past that is pushed
+away, rising sharply as the pile grows. The fourth cell is barely
+discouraged; the eighth is firmly sent elsewhere. It is same-kind only: a
+macrophage and a neutrophil working one target together is fine, eight
+neutrophils is not.
+
+Worth knowing before anyone tunes this up: in life, disabling that brake
+lets neutrophils cover *more* ground but makes bacterial clearance
+*worse*, because they stop containing what they find. Both extremes are
+worse than the middle, so the harness pins the free allowance rather than
+trusting a future tuning pass.
+
+**The bone marrow is a 2x4 grid**, side by side. Eight niches in one
+column had squeezed each pad down to about two thirds of its old size; two
+columns of four doubled them instead -- they are now bigger than they ever
+were at five slots.
+
+**The body shop moved to the top left**, where the eye lands first. The
+debug readout took the vacated bottom-right corner; it is hidden by
+default and loses nothing by moving.
+
+20 harnesses green, 705 checks.
