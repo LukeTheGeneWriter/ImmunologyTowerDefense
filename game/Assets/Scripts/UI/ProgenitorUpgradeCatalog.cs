@@ -120,7 +120,7 @@ namespace ImmunologyTD.UI
                 case UnitKind.Neutrophil: return "fast · high collateral";
                 case UnitKind.DendriticCell: return "antigen shuttle to the node";
                 case UnitKind.CytotoxicT: return "precise kill · the cell survives";
-                case UnitKind.NaturalKiller: return "IFN-gamma · upgrades your macrophages";
+                case UnitKind.NaturalKiller: return "IFN-γ · upgrades your macrophages";
                 case UnitKind.GammaDeltaT: return "patrols the wall · repairs it";
                 case UnitKind.PlasmaCell: return "antibody factory · coats pathogens";
                 default: return "node resident · barcode match";
@@ -170,7 +170,7 @@ namespace ImmunologyTD.UI
                 // "NK cell", but the cell that actually dominates the human
                 // small-intestinal epithelium is an ILC1.
                 case UnitKind.NaturalKiller: return "NK cell (ILC1)";
-                case UnitKind.GammaDeltaT: return "Gamma-delta T (IEL)";
+                case UnitKind.GammaDeltaT: return "γδ T cell (IEL)";
                 case UnitKind.PlasmaCell: return "B cell";
                 default: return "Helper-T cell";
             }

@@ -55,41 +55,25 @@ namespace ImmunologyTD.UI
         // ---- font coverage ----------------------------------------
 
         /// <summary>
-        /// Sprint 25. Characters the shipped Nunito faces actually contain,
-        /// beyond printable ASCII.
+        /// True if every character of <paramref name="text"/> can actually
+        /// be drawn in the shipped UI font.
         ///
-        /// **This exists because of a real bug the Director found.** The
-        /// gamma-delta T cell's shop card was named "γδ T cell (IEL)" and
-        /// the NK card's blurb said "IFN-γ" -- and Nunito has no Greek
-        /// block at all, so both rendered as nothing. There is no error,
-        /// no warning, and no missing-glyph box in UI Toolkit: the text
-        /// simply is not there, which is why it survived a build, a sprite
-        /// dump and a playtest before anyone noticed.
-        ///
-        /// Every character here was checked against the actual font files.
-        /// Notably present: the middot the blurbs use everywhere, the
-        /// en/em dashes, the curly quotes, the multiplication sign.
-        /// Notably ABSENT: the whole Greek block, and the rightwards arrow
-        /// (the arrows in ProgenitorUpgradeCatalog's FieldLabel strings are
-        /// safe only because those render in the debug readout's monospace
-        /// OS font, never in Nunito).
+        /// **Coverage is generated from the font files themselves**
+        /// (<see cref="UiFontCoverage"/>, written by
+        /// tools/merge_greek_font.py), not hand-maintained. A hand-written
+        /// allowlist is how this went wrong in the first place: the code
+        /// believed a character was fine when the font had never contained
+        /// it, and UI Toolkit draws nothing at all for a missing glyph --
+        /// no warning, no error, no tofu box.
         /// </summary>
-        private const string ExtraRenderable = "\u00B7\u00A0\u00D7\u2013\u2014\u2018\u2019\u201C\u201D\u2026\u2212";
-
-        /// <summary>True if every character of <paramref name="text"/> can
-        /// actually be drawn in the shipped UI font. Used by
-        /// <c>Sprint25Verification</c> to assert that no player-facing
-        /// string silently disappears.</summary>
         public static bool IsRenderable(string text)
         {
             if (string.IsNullOrEmpty(text)) return true;
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c >= ' ' && c <= '~') continue;
                 if (c == '\n' || c == '\t') continue;
-                if (ExtraRenderable.IndexOf(c) >= 0) continue;
-                return false;
+                if (!UiFontCoverage.Contains(c)) return false;
             }
             return true;
         }
@@ -102,10 +86,8 @@ namespace ImmunologyTD.UI
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c >= ' ' && c <= '~') continue;
                 if (c == '\n' || c == '\t') continue;
-                if (ExtraRenderable.IndexOf(c) >= 0) continue;
-                return c;
+                if (!UiFontCoverage.Contains(c)) return c;
             }
             return '\0';
         }
@@ -118,9 +100,18 @@ namespace ImmunologyTD.UI
         {
             if (fontsLoaded) return;
             fontsLoaded = true;
-            regular = Resources.Load<Font>("Fonts/Nunito-Regular");
-            bold = Resources.Load<Font>("Fonts/Nunito-Bold");
-            black = Resources.Load<Font>("Fonts/Nunito-Black");
+            // Sprint 26: ImmunoSans = Nunito + the Greek block + scientific
+            // symbols (tools/merge_greek_font.py). Immunology is written in
+            // Greek and Nunito has none of it, so every "IFN-gamma" and
+            // "gamma-delta" label silently lost its letters. Nunito is still
+            // shipped beside it as the fallback and as the unmodified
+            // original; see Fonts/ImmunoSans-OFL.txt.
+            regular = Resources.Load<Font>("Fonts/ImmunoSans-Regular")
+                      ?? Resources.Load<Font>("Fonts/Nunito-Regular");
+            bold = Resources.Load<Font>("Fonts/ImmunoSans-Bold")
+                   ?? Resources.Load<Font>("Fonts/Nunito-Bold");
+            black = Resources.Load<Font>("Fonts/ImmunoSans-Black")
+                    ?? Resources.Load<Font>("Fonts/Nunito-Black");
             if (regular == null) regular = CreateOsFont(new[] { "Segoe UI", "Helvetica Neue", "Arial", "Liberation Sans" }, 14);
             if (bold == null) bold = regular;
             if (black == null) black = bold;

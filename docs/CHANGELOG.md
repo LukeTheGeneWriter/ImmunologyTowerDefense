@@ -895,3 +895,36 @@ stratified by a rotating cursor as well, so a wave spreads across the
 channel instead of clumping.
 
 18 harnesses green, 667 checks.
+
+## Sprint 26 -- 2026-10-25
+Greek, properly this time -- and the gamma-delta cell stopped being a
+bacterium.
+
+**The UI font now contains Greek.** Last sprint's fix for the missing
+characters was to spell them out ("IFN-gamma"), which was a workaround,
+not a fix: immunology is written in Greek and the next cytokine would have
+hit the same wall. The shipped face is now `ImmunoSans` -- Nunito with the
+whole Greek block and a set of scientific symbols merged in, built by
+`tools/merge_greek_font.py` from two SIL OFL donors. Donor glyphs are
+scaled to match Nunito's x-height so a gamma sits on the same optical line
+as the Latin around it. IFN-gamma and the gamma-delta T cell are written
+as IFN-γ and γδ again, and µ, ±, ≥, ≤, ≈, ≠ and the arrows all work too.
+
+The coverage list the audit checks against is now **generated from the
+font files** rather than written by hand -- a hand-kept allowlist is how
+this went wrong in the first place, with the code believing a character
+was fine when the font had never contained it.
+
+**The gamma-delta T cell was a drawing of a bacillus.** An elongated
+capsule with a long nucleus down the middle is a rod-shaped bacterium, on
+a board whose enemies are bacteria. It is now a squircle -- a cell
+flattened between two enterocytes, which is where it actually lives --
+with a scalloped edge cut into its silhouette for the face pressed against
+the basement membrane.
+
+Its colour was half the problem too: teal-green, sitting beside a green
+bacterium and a teal helper-T. It is now steel slate, the only desaturated
+unit on the board, so it separates by saturation instead of fighting for a
+hue on an already-crowded wheel.
+
+18 harnesses green, 668 checks.

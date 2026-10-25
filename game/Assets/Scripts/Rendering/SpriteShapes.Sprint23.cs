@@ -123,9 +123,25 @@ namespace ImmunologyTD.Rendering
         }
 
         private static Sprite gammaDeltaT;
-        /// <summary>Elongated on the threat axis: this cell lives squeezed
-        /// into the lateral space between two enterocytes, and the shape
-        /// should say "wedged in the wall", not "hunting in open tissue".</summary>
+        /// <summary>
+        /// Intraepithelial gamma-delta T cell.
+        ///
+        /// **Redrawn in Sprint 26: the first version read as a bacterium.**
+        /// It was an elongated capsule with a long nucleus down the middle,
+        /// which is, essentially, a drawing of a rod-shaped bacillus -- the
+        /// Director spotted it immediately. On a board where the enemies are
+        /// bacteria, an immune cell must never share their silhouette.
+        ///
+        /// So this is unmistakably a CELL now: the round lymphoid body its
+        /// cousins share (so it reads as family with the CTL and the NK),
+        /// with one feature neither of them has -- short dendritic feet
+        /// reaching off one side, because this cell lives wedged between
+        /// enterocytes and probes along the basement membrane.
+        ///
+        /// The feet are asymmetric and odd-numbered on purpose. Two
+        /// symmetric features on a round body read as eyes, which is how
+        /// the first draft of this sprite also managed to look like a face.
+        /// </summary>
         public static Sprite GammaDeltaT
         {
             get
@@ -133,19 +149,32 @@ namespace ImmunologyTD.Rendering
                 if (gammaDeltaT == null)
                 {
                     var b = NewBuffer();
-                    FillCapsule(b, C, C - 17f, C, C + 17f, 12f);
-                    // An ELONGATED nucleus running with the long axis, not a
-                    // round one: this cell is squeezed between two
-                    // enterocytes and its nucleus is squeezed with it.
-                    //
-                    // **Deliberately a single asymmetric feature.** The first
-                    // draft gave it two small symmetric processes and the
-                    // magnified dump showed it immediately as a FACE -- two
-                    // dots on an oval are eyes, and the Director ruled faces
-                    // out in Sprint 20. One off-axis process cannot pair.
-                    InnerShadeCapsule(b, C, C - 9f, C, C + 7f, 6.5f, 0.70f);
-                    InnerShade(b, C + 6f, C - 13f, 3.0f, 0.52f);
-                    RimShade(b, 1, 0.74f);
+
+                    // A SQUIRCLE, not a disc and not a capsule. This cell
+                    // lives wedged in the epithelium, flattened between two
+                    // enterocytes, and the softened-square body says that
+                    // at a glance. It also keeps it clear of both
+                    // neighbours in sprite-space: the CTL and NK are round
+                    // discs, and anything capsule-shaped reads as a
+                    // bacillus, which is what the first version did.
+                    FillRounded(b, C, C, 21f, 13f);
+
+                    // Lymphoid nucleus, large and slightly off-centre --
+                    // the family tell it shares with the CTL and the NK.
+                    InnerShade(b, C - 2f, C - 2f, 13f, 0.74f);
+
+                    // A scalloped edge on ONE side, cut into the
+                    // SILHOUETTE rather than drawn on as marks. This is the
+                    // face pressed against the basement membrane, and
+                    // making it part of the outline is what stops it
+                    // reading as decoration -- an earlier version put four
+                    // dots in a row here and the cell looked like a domino.
+                    FillDisc(b, C - 13f, C + 19f, 5.0f);
+                    FillDisc(b, C - 4.5f, C + 21f, 5.4f);
+                    FillDisc(b, C + 4.5f, C + 21f, 5.4f);
+                    FillDisc(b, C + 13f, C + 19f, 5.0f);
+
+                    RimShade(b, 1, 0.76f);
                     gammaDeltaT = Finish(b, 5);
                 }
                 return gammaDeltaT;

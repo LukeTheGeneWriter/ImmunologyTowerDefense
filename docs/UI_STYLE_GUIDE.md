@@ -256,3 +256,56 @@ above; it does not participate in `sortingOrder`. The root and the dock
 containers are `PickingMode.Ignore`, so a click that isn't on a panel
 falls through to the physics raycaster — **check that first if marrow slot
 clicks ever stop registering.**
+
+## Fonts and Greek (Sprint 26)
+
+**The shipped UI face is `ImmunoSans`**, not Nunito. It is Nunito with the
+Greek block and a set of scientific symbols merged in, built by
+`tools/merge_greek_font.py`. Nunito ships alongside it, unmodified, as the
+fallback and the original; licensing for all three sources is in
+`game/Assets/Resources/Fonts/ImmunoSans-OFL.txt`.
+
+**Why it exists.** Immunology is written in Greek — IFN-γ, γδ T cells,
+TNF-α, IL-1β — and Nunito contains no Greek at all. The game ships to
+WebGL, where there are no system fonts to fall back on, so the glyphs have
+to be in the file we ship. Donor glyphs are scaled to match Nunito's
+x-height (Noto's is ~11% larger) so a γ sits on the same optical line as
+the Latin beside it.
+
+**The failure mode this guards against is silent.** UI Toolkit does not
+warn, does not error and does not draw a missing-glyph box for an absent
+character — the text is simply not there. The γδ tower name and the NK
+card's "IFN-γ" blurb shipped that way, survived a build, a magnified
+sprite dump and a playtest, and were caught by eye.
+
+So: **never hand-maintain a list of "safe" characters.**
+`UI/UiFontCoverage.cs` is generated from the font files themselves by the
+merge script, and `Sprint25Verification` walks every player-facing string
+against it. If you change the shipped fonts, re-run the script; if you add
+a glyph the font lacks, the harness fails rather than the text vanishing.
+
+Present: the whole Greek block, µ, °, ±, ×, ÷, ≤, ≥, ≈, ≠, −, arrows,
+super/subscript digits, the middot and the dashes.
+Absent: Coptic, and unassigned Greek codepoints.
+
+## Cell silhouettes — keep immune cells off pathogen shapes
+
+Two rules learned the hard way, both from the γδ T cell:
+
+1. **No immune cell may share a pathogen's silhouette.** The first γδ
+   sprite was an elongated capsule with a long nucleus — which is a
+   drawing of a rod-shaped bacillus. On a board whose enemies are
+   bacteria, that is not a near-miss, it is the wrong cell. Capsules are
+   bacteria; immune cells are round, lobed, starred or squircular.
+2. **Check the colour against the pathogens too, not just the other
+   towers.** The same sprite was teal-green next to a green bacterium.
+   The fix was to separate by *saturation* rather than compete for a hue:
+   γδ is the only desaturated unit on the board.
+
+The quick test is `tools/unity.sh SpriteShapeDump.DumpAll` followed by a
+composite of every unit AND every pathogen, tinted, at both magnified and
+board scale. A sprite that only ever gets looked at alone will pass.
+
+**Known, unresolved:** the NK/ILC1 tower and the virion sit at nearly the
+same hue (both purple). They differ in saturation and silhouette and read
+acceptably today, but it is the next most likely confusion on the board.

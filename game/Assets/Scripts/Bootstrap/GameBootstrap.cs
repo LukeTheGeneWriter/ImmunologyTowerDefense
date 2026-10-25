@@ -179,7 +179,14 @@ namespace ImmunologyTD.Bootstrap
             // high number would read as "another fast hunter".
             FineTilesPerTick = 1,
             FootprintFineTiles = 3,
-            Color = new Color(0.20f, 0.58f, 0.46f),
+            // Sprint 26: was a teal-green, which sat in the same colour
+            // family as the green bacterium AND the teal helper-T -- part
+            // of why the Director read this cell as a bacterium. Steel
+            // slate is the only DESATURATED unit on the board, so it
+            // separates by saturation rather than fighting for a hue in an
+            // already-crowded wheel, and a muted guard reads as structural
+            // and resident, which is exactly what this cell is.
+            Color = new Color(0.42f, 0.52f, 0.62f),
             // Sprint 25: 6 -> 3. Tissue-resident wall patrol; three covering
             // different stretches is a real placement decision.
             MaxActiveChildren = 3,

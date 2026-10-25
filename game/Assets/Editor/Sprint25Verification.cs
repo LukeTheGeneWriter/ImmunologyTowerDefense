@@ -65,8 +65,15 @@ public static class Sprint25Verification
             bad.Count == 0);
 
         // And prove the guard itself works, or it is worthless.
-        Check("the guard rejects a Greek character", !UiTextAudit.IsRenderable("IFN-γ"));
-        Check("the guard accepts the middot the blurbs use", UiTextAudit.IsRenderable("a · b"));
+        // Sprint 26: Greek is now SUPPORTED (the shipped face carries the
+        // whole block), so the negative case needs a character the font
+        // genuinely lacks -- a CJK ideograph will do.
+        Check("the guard rejects a character the font lacks",
+            !UiTextAudit.IsRenderable("CD4 中"));
+        Check("the guard accepts the middot the blurbs use",
+            UiTextAudit.IsRenderable("a · b"));
+        Check("Greek is renderable now -- the whole point of the merged face",
+            UiTextAudit.IsRenderable("IFN-γ · γδ T · TNF-α · IL-1β"));
     }
 
     // =================================================================
