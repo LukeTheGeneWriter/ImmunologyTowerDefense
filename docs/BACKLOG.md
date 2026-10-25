@@ -1058,3 +1058,78 @@ of how much they would add.
 - **`InnerShade` with a multiplier above 1 is a no-op** on these white-
   silhouette sprites. `LargeBacterium`'s "soft highlight" at 1.15 does
   nothing. Any future "highlight" has to be carved as a darker surround.
+
+## Open after Sprint 31 (2026-10-25)
+
+### BUG: immune cells walk out of the tissue into the blood
+**Director-reported, diagnosed, not fixed.** At the start of a round,
+cells drift past the base-side edge of the tissue band and into the blood.
+
+Cause, confirmed by reading the movement path: **nothing constrains an
+immune cell to the tissue band.** `Chemotaxis.ChooseNextStep` rejects a
+candidate step only on `board.InFineBounds` — the whole board — and
+`SearchUnit` applies no band test of its own. Pathogens have this
+discipline (`StepTissue` checks `BandAtAxisIndex` and refuses to step into
+the lumen); immune cells never got the equivalent.
+
+It shows up *at the beginning* because of where cells enter. §2a's rung-1
+entry puts them at the tissue's **base-side edge**, directly against the
+blood band, and at round start there is no cytokine gradient yet — so
+they random-walk, and half the available directions are out of bounds
+conceptually but legal mechanically.
+
+Fix shape: a band check in the candidate loop, almost certainly in
+`Chemotaxis.ChooseNextStep` so every mover inherits it. Two things to get
+right rather than assume:
+- **The lymph node is in the base band.** Dendritic cells and lymphocytes
+  legitimately travel there, so the constraint cannot be a blanket "no
+  immune cell leaves tissue" — it needs to be per-kind, or applied only to
+  the tissue-roaming kinds.
+- A cell already outside the band must be able to walk back in, or a
+  constraint added mid-round would strand whoever is already out.
+
+### Measured: the kill-limit upgrade rows are inert
+`KillLimitDiagnostic` (menu: ImmunologyTD/Diagnose). A macrophage averages
+**0.9 kills** in a 45s round against a ceiling of 20 and never reaches it
+even over 180s; a neutrophil averages 1.0 against a ceiling of 5. So
+"+8 kills before the cell is spent" costs 40 ATP and changes nothing.
+
+This is the third dead upgrade found by the same pattern — a ceiling that
+never binds. **Not fixed because it is not a number change:** innate cells
+die *only* on reaching KillLimit, so lowering the limits is really a
+decision about whether the innate population should turn over at all.
+Doing it would also thin the board further, on top of Sprint 31's
+dispersal. Needs a Director call.
+
+### Virus march speed is incubation-bound
+One unanswered viral focus crosses the tissue band in ~185s (`VirusDiagnostic`).
+That is 12 hops × the 15s `IncubationSeconds`, so **incubation is the
+lever**, not `VirusSpreadBudget`. Left alone pending the Director's read
+now that viruses can actually land.
+
+### Designed, not built
+- **Epithelial extrusion** — infected enterocytes expelled into the lumen:
+  no debris, no antigen for the DC shuttle, and the organism handed back
+  to the lumen alive. Worth ~100× intraepithelial load in vivo, and the
+  host's best anti-*Salmonella* defence. Parked to build alongside the
+  dsRNA fork, since both turn on how an infected cell dies.
+- **The messy death branch** — ZBP1/MLKL necroptosis as a purchasable
+  alternative to the clean OAS/RNase L death already shipped. Buy a faster
+  kill, pay in debris and fibrosis.
+- **MHC-I stealth pathogen** (CMV-shaped) — zeroes cytotoxic T cells
+  entirely, answerable only by stress-sensing NK/γδ. Build as a cliff:
+  partial MHC-I loss does nothing in reality.
+- **§4a correction** — "the brood bursts out" is wrong for *Salmonella*;
+  the infected cell is extruded into the lumen. Two independent research
+  passes agreed.
+- **§4a correction** — adjacent-tile spread is reserved for viruses, which
+  is wrong for *Shigella* and *Listeria* (actin-tail motility).
+
+### Diagnostics available (menu: ImmunologyTD/Diagnose)
+Not part of `tools/unity.sh verify` — run them by hand when a balance
+question comes up, so the answer is measured rather than argued:
+- **Why do cells still clump?** — sweeps repulsion shape, reports mean
+  spacing and worst-slot occupancy.
+- **Is the kill-limit row inert?** — kills achieved per cell per round.
+- **Where do viruses die?** — adhesion, tissue fate, dissemination, and
+  whether a focus marches.

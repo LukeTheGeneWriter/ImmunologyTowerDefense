@@ -1,4 +1,4 @@
-# Session Handoff — 2026-10-25 (Sprint 23 shipped the adaptive roster; next: rounds and pathogens)
+# Session Handoff — 2026-10-25 (Sprints 23–31: the roster, the pathogens, the upgrades)
 
 A checkpoint written by the head session. **This is a living file:
 overwrite it at the next checkpoint rather than accumulating dated
@@ -24,103 +24,85 @@ would try to downgrade the project.
 
 ## What shipped this session (2026-10-25, Linux machine)
 
-**Sprint 23: four new towers, and only one of them is a killer.**
+Nine sprints in one sitting. The game went from four cell types and three
+nameless pathogen classes to a full roster with named organisms, working
+upgrades and a measured economy.
 
-The Director asked for research first — six parallel passes against PubMed
-and Consensus — on the reasoning that getting the cells right lets rounds
-be designed against a stable roster. The research changed two towers
-before a line was written, and found one live defect.
+| Sprint | What |
+|---|---|
+| 23 | Cytotoxic T, NK/ILC1, γδ IEL, B cell → plasma cells + antibodies |
+| 24 | Named pathogen **species**; rotavirus, *Vibrio cholerae*, A/E *E. coli* |
+| 25 | Finished the class→species jump; smaller populations; complement to the shop; lumen lane-changing |
+| 26 | Greek in the font (ImmunoSans); γδ sprite redrawn |
+| 27 | Bone marrow expansion — fatty niches you buy by clicking |
+| 28 | Crowd desensitisation; 2×4 marrow; shop to the top left |
+| 29 | The upgrade pass — four empty towers filled, four dead shop rows woken, 10-bit barcode, memory T cells |
+| 30 | **Viruses can reach the base** — they previously could not, at all |
+| 31 | Clumping fixed properly, with measurements |
 
-| Tower | Gated | Its job |
-|---|---|---|
-| Cytotoxic T | ~10% knowledge | Kills the infected cell by **apoptosis** — clean, tissue recovers |
-| NK cell (ILC1) | no | **IFN-γ: upgrades nearby macrophages**; weak kill |
-| γδ T (IEL) | no | Wall patrol + **the only tower that repairs** |
-| B cell → plasma cells | ~20% knowledge | Drifting **antibodies** that coat pathogens |
+**21 harnesses, 768 checks, green.** WebGL builds clean.
 
-Read `GAME_DESIGN.md` §4c first — it is the source of truth for all four.
-The evidence is in `docs/CELL_KINETICS_REFERENCE.md`, with the six
-unabridged passes in `docs/research/`.
+## The habit that produced most of the value
 
-### The ideas the sprint rests on
+**Measure before tuning.** Four separate times this session, a
+"balance problem" turned out to be a structural one, and tuning would
+have made it worse:
 
-- **The CTL's mechanic is not damage, and not sparing the cell.** An
-  infected cell is the infection's shell and dies either way. `ApoptoticKill`
-  decides HOW: packaged and cleared (little debris, fast regrowth) versus
-  damaged to death (full debris, slow regrowth, fibrosis feed). If a later
-  session collapses the apoptotic branch into the necrotic one, every test
-  about infections clearing still passes and the entire reason to buy
-  adaptive immunity silently vanishes.
-  `Sprint23Verification.RunNecroticKillLeavesAMess` pins the comparison.
-  **This shipped wrong once** -- as "the enterocyte survives" -- and the
-  Director caught it the same day. A CTL recognises and kills the infected
-  cell; it does not excise a pathogen and leave the cell alive.
-- **The NK cell is an amplifier, not a competitor.** Building it as a
-  cheap CTL was the obvious design and the wrong biology, and it would
-  have cheapened the ~10% rung. Do **not** give it a clonal-expansion
-  upgrade — human NK proliferation is unchanged during acute infection.
-- **Recognition is a visible cumulative meter**, not a hidden roll, and
-  cooperation is superadditive (Halle 2016). Same reasoning that made
-  Sprint 22's blister work.
-- **Innate recognition was ~800× too generous** and is now ~10× *slower*
-  than cytotoxic. §4b always said innate immunity is bad at intracellular
-  infection; the number had said the opposite since Sprint 6.
+- Viruses "too weak" → they had **no path to the base at all** (0/150).
+- Clumping "needs more repulsion" → the penalty was distance-blind, and
+  100× strength changed nothing.
+- The kill-limit upgrade → macrophages average 0.9 kills against a
+  ceiling of 20. Inert.
+- The 8-bit barcode's separation guarantee → **mathematically
+  unreachable**, not merely unmet.
 
-### Two seams fixed first, worth not re-breaking
+The three diagnostics under `ImmunologyTD/Diagnose` exist for exactly
+this. They are not in `verify`; run them by hand when a balance question
+comes up.
 
-- **`ProfileFor`/`PoolFor` were binary ternaries.** A third tissue kind was
-  a *silent wrong answer*, not a compile error. Now a dictionary.
-- **`IsAdaptive` conflated two properties** and a CTL is the first cell
-  that is both adaptive and tissue-roaming. Split into `IsNodeResident`
-  and `IsKnowledgeGated`. Keep them separate.
+## Second habit worth keeping: assert the property, not a proxy
 
-### A defect found on the way, relevant to the IgA mystery
+Several tests passed for sprints while the thing they described was
+false — the barcode separation rule, and Sprint 28's dispersal checks
+which a random walk would have satisfied. Where it matters now, the
+harness enumerates the real property (every tag in the barcode space;
+the penalty's gradient one tile out).
 
-**The Sprint 22 secretory-IgA rung was never flipped to `Built`.** For a
-whole sprint — including the playtest where the Director reported never
-perceiving IgA — the HUD labelled a live mechanic "planned". It does not
-by itself explain the miss (the mechanic reads `IgaTuning.KnowledgePercent`,
-not the flag), but the one piece of UI that would have told him IgA had
-arrived was saying the opposite. Add it to `PLAYTEST_LOG.md`'s three
-candidate causes.
+## Open, in rough priority order
 
-## Open questions the Director has not ruled on
+Full detail in `BACKLOG.md` under "Open after Sprint 31".
 
-1. **Per-species recognition.** A CTL currently ignores species below 10%,
-   so your CTLs walk past a novel pathogen. Biologically right, harsher.
-   `KnowledgeLicence.PerSpeciesRecognition` flips it in one write.
-2. **What one round is in biological time.** Two research passes
-   disagreed — 1 day vs 2 days. Belongs with round design.
-3. **The 8-bit barcode ceilings the species roster at ~8–10** before tags
-   start teaching two species at once. This bites *before* new pathogens
-   ship. 16 bits at r≤2 recommended. §5c's claim that the Hamming
-   threshold is the dial to reach for first is backwards.
+1. **BUG — immune cells walk out of the tissue into the blood** at round
+   start. Director-reported, diagnosed, not fixed. Nothing constrains an
+   immune cell to the tissue band: `Chemotaxis.ChooseNextStep` tests only
+   `InFineBounds`. Careful — the lymph node is *in* the base band, so DCs
+   and lymphocytes legitimately go there; the fix must be per-kind.
+2. **Kill-limit rows are inert** (measured). Fixing means deciding whether
+   innate cells should turn over at all — a Director call, not a number.
+3. **Round design and new pathogens** — the thing the last several sprints
+   were clearing the way for. The shortlist is ranked and cited in
+   `PATHOGEN_ROSTER.md`; astrovirus is the standout (breach with no
+   infection and no stress signal — it defeats the whole detection stack
+   by not being detectable).
+4. **Epithelial extrusion** + the messy-death fork, designed not built.
+5. Virus march speed is incubation-bound (~185s) if it still reads slow.
 
-## What is queued next
+## Where things live now
 
-1. **Round design and new pathogens** — the thing this sprint was clearing
-   the way for. `BACKLOG.md`'s Sprint 23 section has the corrections that
-   should land alongside (clonal expansion is on the wrong knob; the ~30%
-   memory rung is specified backwards).
-2. **The MHC-I stealth pathogen** — designed, not built. Under real MHC-I
-   downmodulation CTL killing goes to *exactly zero*, so it is a sourced
-   hard counter only the NK cell answers. Build it as a cliff; there must
-   be no graded stealth stat.
-3. **B cells → tertiary lymphoid organs** (the Director's idea), with the
-   cited drawback: gut TLOs obstruct lymphatic outflow toward the node.
-4. Bone marrow second pass, still queued from Sprint 21.
+- `docs/PATHOGEN_ROSTER.md` — named organisms, the shortlist, rejections.
+- `docs/CELL_KINETICS_REFERENCE.md` — the numbers behind the roster.
+- `docs/research/` — 11 unabridged research passes, ~250 resolved
+  citations. Research INPUTS, not design; `GAME_DESIGN.md` wins conflicts.
+- `Grid/HostDefence.cs` — the body shop's host-side effects.
+- `Units/UnitTuning.cs` — cross-kind numbers (crowding, IFN-γ).
+- `Pathogens/PathogenSpecies.cs` — the species roster and its traits.
 
-## State of the code
+## Two traps this session fell into twice each
 
-- **16 harnesses, 605 checks**, green as of Sprint 23's final commit.
-  `Sprint23Verification` is seeded.
-- New roster numbers: `UnitProfile` defaults in `GameBootstrap`,
-  cross-kind values in `Units/UnitTuning`, antibody in
-  `Adaptive/AntibodyTuning`, licensing in `Adaptive/KnowledgeLicence`.
-- `GutWall.Current` and `KnowledgeLicence.Ledger` are new process-global,
-  null-safe statics, same pattern as `GutWallFeatures.Current`.
-- **Two sprite traps** cost a rebuild each and are written up in
-  `BACKLOG.md`: `InnerShade` with a multiplier above 1 is a no-op on these
-  white-silhouette sprites, and the γδ cell's first draft read as a
-  **face**. Always dump and look before building.
-
+- **A sprite that only gets looked at alone will pass.** The γδ cell
+  shipped as a rod-shaped bacterium, and intermediate drafts read as a
+  rabbit and a domino. Always dump magnified AND composite against the
+  *pathogens*, not just the other towers.
+- **An upgrade that writes nothing still charges.** Three dead upgrades
+  found so far, all the same shape: a ceiling that never binds. Any new
+  cap-style row needs its steady state checked first.
