@@ -19,27 +19,85 @@ namespace ImmunologyTD.Adaptive
     {
         // -- The barcode (GAME_DESIGN.md §5c) --
 
-        /// <summary>Barcode length is fixed at 8 bits by the Director
-        /// (§5c). Not a tuning knob -- here as a named constant so callers
-        /// don't sprinkle literal 8s / 255s around.</summary>
-        public const int BarcodeBits = 8;
+        /// <summary>
+        /// Barcode length. **Sprint 29: 8 -> 10 bits** (Director).
+        ///
+        /// Eight bits could not hold the roster honestly. For a helper-T tag
+        /// within radius r of one species to be within r of AT MOST one,
+        /// species tags must be at least 2r+1 apart -- 5 at the shipped
+        /// r=2. An exhaustive search of the 8-bit space finds at most FOUR
+        /// tags that far apart, and there are six species, so the property
+        /// the code claimed was not merely unmet but unreachable. At 8 bits
+        /// 21.9% of helper-T tags were teaching two species by accident.
+        ///
+        /// Ten bits fits all six at a minimum distance of SIX, so at r=2
+        /// cross-teaching is exactly zero and cross-reactivity becomes a
+        /// thing the player can buy (the avidity row takes r to 3) rather
+        /// than an accident of tag choice.
+        /// </summary>
+        public const int BarcodeBits = 10;
 
-        /// <summary>A DC:helper-T pairing teaches iff the Hamming distance
-        /// between the two 8-bit tags is at most this. 2 => "at least 6 of 8
-        /// bits agree" => 37/256 ≈ 14.5% of random pairings teach. §5c names
-        /// a Hamming threshold as the dial to reach for before changing
-        /// barcode length; 0 would be exact-match (1/256).</summary>
+        /// <summary>
+        /// A DC:helper-T pairing teaches iff the Hamming distance between
+        /// the two tags is at most this.
+        ///
+        /// At 10 bits, r=2 means 56/1024 ≈ **5.47%** of random pairings
+        /// teach, and -- because the species tags sit 6 apart -- a teaching
+        /// pairing teaches exactly one species. The avidity upgrade raises
+        /// it to 3 (17.19%, and 25.4% of tags then teach two species),
+        /// which is cross-reactivity bought deliberately.
+        ///
+        /// **Correction to §5c:** that section says the Hamming threshold
+        /// is the dial to reach for before changing barcode length. That is
+        /// backwards -- length is the binding constraint, and no threshold
+        /// could have fixed the 8-bit roster.
+        /// </summary>
         public static int MatchMaxHammingDistance = 2;
 
         // -- Knowledge (GAME_DESIGN.md §5) --
 
-        /// <summary>Percentage points a single matching pairing adds to that
-        /// species' knowledge. Placeholder -- §5's threshold ladder isn't
-        /// wired this sprint, so this only drives the HUD number.</summary>
-        public static float KnowledgePerMatch = 3f;
+        /// <summary>
+        /// Percentage points a single matching pairing adds to that
+        /// species' knowledge.
+        ///
+        /// **Sprint 29: 3 -> 8.** Widening the barcode to 10 bits made a
+        /// match 2.64x rarer (14.45% -> 5.47%), which would have slowed the
+        /// whole adaptive ramp by the same factor. Scaling the reward by
+        /// that ratio keeps the pace the game was tuned around, and the
+        /// side effect is an improvement: teaching is now a rarer, larger
+        /// event, which reads far better on the HUD than a constant drip.
+        /// </summary>
+        public static float KnowledgePerMatch = 8f;
 
         /// <summary>Knowledge is a 0..this percentage.</summary>
         public static float KnowledgeMax = 100f;
+
+        // -- Sprint 29: memory recall (Director) ------------------------
+
+        /// <summary>
+        /// **Memory T cells, as the game can honestly express them.**
+        ///
+        /// A helper-T pairing that would otherwise MISS gets a second
+        /// chance, with probability `bonus x (knowledge of that species /
+        /// KnowledgeMax)`. So the better the system already knows an
+        /// organism, the more readily it recognises it again -- knowledge
+        /// stands in for "how many times we have seen this before", which
+        /// is the Director's framing and the only proxy the game has.
+        ///
+        /// Why this shape and not a burst of cells: three independent
+        /// research passes found the ~30% memory rung's "spawn a burst of
+        /// CTLs" specification backwards. Day-8 effector numbers are
+        /// invariant to how much memory you start with, and the onset of
+        /// division is indistinguishable from naive. Memory's real
+        /// advantages are a far larger starting precursor pool and zero
+        /// lead time -- which is exactly "you recognise it immediately",
+        /// not "you make more of it".
+        ///
+        /// 0 disables it. Only the memory-T upgrade raises a tower's share
+        /// of this; the base is 0 so an un-upgraded node behaves exactly as
+        /// it did before.
+        /// </summary>
+        public static float MemoryRecallBonus = 0.55f;
 
         // -- Antigens are per SPECIES (Sprint 24), and live on the
         //    species roster rather than here, because a tag is a property of
@@ -50,7 +108,7 @@ namespace ImmunologyTD.Adaptive
         //    "knowledge is per species" stays meaningful. The MATCH RATE
         //    (37/256) depends only on the threshold, not the values. --
 
-        public static byte AntigenForSpecies(PathogenSpecies s) => SpeciesRoster.Get(s).Antigen;
+        public static int AntigenForSpecies(PathogenSpecies s) => SpeciesRoster.Get(s).Antigen;
 
         // -- The dendritic cell (GAME_DESIGN.md §5a) --
 
@@ -181,7 +239,8 @@ namespace ImmunologyTD.Adaptive
         {
             MatchMaxHammingDistance = 2;
             SpeciesRoster.ResetToDefaults();
-            KnowledgePerMatch = 3f;
+            KnowledgePerMatch = 8f;
+            MemoryRecallBonus = 0.55f;
             KnowledgeMax = 100f;
             DcPresentationsPerCargo = 4;
             DcDebrisSamplePerBite = 0.34f;

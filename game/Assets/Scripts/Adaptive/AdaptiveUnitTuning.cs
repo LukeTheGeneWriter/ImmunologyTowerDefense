@@ -67,6 +67,25 @@ namespace ImmunologyTD.Adaptive
                 ? AdaptiveTuning.DcDebrisSamplePerBite
                 : Mathf.Max(DcDebrisBiteFloor, AdaptiveTuning.DcDebrisSamplePerBite - t.DcDebrisBiteReduction);
 
+        /// <summary>Sprint 29: levels of the memory-T row on this tower.
+        /// Each level adds a share of <see cref="AdaptiveTuning.MemoryRecallBonus"/>,
+        /// scaled by how well the species is already known.</summary>
+        public int MemoryRecallLevel;
+
+        /// <summary>Probability that a MISSED pairing is rescued by memory,
+        /// given current knowledge of the cargo's species (0..1 of
+        /// KnowledgeMax). Zero without the upgrade, so an un-upgraded node
+        /// is unchanged.</summary>
+        public static float MemoryRecallChance(AdaptiveUnitTuning t, float knowledgeFraction)
+        {
+            if (t == null || t.MemoryRecallLevel <= 0) return 0f;
+            float perLevel = AdaptiveTuning.MemoryRecallBonus / MemoryRecallCap;
+            return Mathf.Clamp01(perLevel * t.MemoryRecallLevel) * Mathf.Clamp01(knowledgeFraction);
+        }
+
+        /// <summary>Levels at which the memory row reaches the full bonus.</summary>
+        public const int MemoryRecallCap = 3;
+
         public static int MatchMaxHammingDistance(AdaptiveUnitTuning t) =>
             t == null
                 ? AdaptiveTuning.MatchMaxHammingDistance

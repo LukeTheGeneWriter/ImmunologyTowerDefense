@@ -479,7 +479,11 @@ namespace ImmunologyTD.Units
             var pathogen = tissueGrid.GetAttackableAt(coarse);
             if (pathogen == null) return false;
             if (!WithinContactRange(pathogen.Current)) return false;
-            pathogen.ReceiveDamage(PathogenAgent.ContactDamagePerHit * ActivationMultiplier, this);
+            // Sprint 29: complement opsonisation -- a coated target is
+            // easier for a phagocyte to finish. Marking, never lysis.
+            pathogen.ReceiveDamage(
+                PathogenAgent.ContactDamagePerHit * ActivationMultiplier
+                    * ImmunologyTD.Grid.HostDefence.OpsonisationDamageMultiplier, this);
             return true;
         }
 
@@ -594,7 +598,8 @@ namespace ImmunologyTD.Units
             nextSecretionAt = currentTime + interval;
 
             return ImmunologyTD.Adaptive.Antibody.Secrete(
-                board.FineToWorld(Current), board, tissueGrid);
+                board.FineToWorld(Current), board, tissueGrid,
+                tuning.AntibodyLifespanBonusSeconds);
         }
 
         /// <summary>Round-clock time this unit's IFN-gamma activation lapses.</summary>

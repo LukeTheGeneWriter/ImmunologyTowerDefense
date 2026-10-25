@@ -144,6 +144,17 @@ namespace ImmunologyTD.Units
         /// aura reaches. 0 with a non-zero chance means "same cell only".</summary>
         [Min(0)] public int IfnGammaAuraCoarseRadius = 0;
 
+        /// <summary>Sprint 29. Extra seconds this kind's secreted antibody
+        /// survives before it is spent.
+        ///
+        /// The upgrade behind it is **secretory component** -- the piece of
+        /// pIgR that stays bound to dimeric IgA when it is transported into
+        /// the gut, and which protects it from proteolysis out there. It is
+        /// the defining feature of the gut's antibody, so it is the honest
+        /// third lever for a plasma-cell tower after export rate and cell
+        /// count.</summary>
+        [Min(0f)] public float AntibodyLifespanBonusSeconds = 0f;
+
         /// <summary>Sprint 23. How many coarse cells of wall this kind
         /// patrols from, and how hard it holds that wall together. 0 = this
         /// kind does not interact with the barrier at all, which is every

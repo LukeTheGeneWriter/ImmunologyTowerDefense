@@ -47,6 +47,26 @@ namespace ImmunologyTD.Units
         public const int MatchDistancePerLevel = 1;
         public const float LifespanCutPerLevel = 4f;
 
+        // -- Sprint 29: the four towers that shipped with no upgrades --
+
+        public const float CtlGranzymePerLevel = 0.012f;
+        public const int CtlSpeedPerLevel = 1;
+        public const int CtlSynapseReach = 1;
+
+        public const float NkAuraRatePerLevel = 0.008f;
+        public const int NkAuraRadiusPerLevel = 1;
+        public const float NkNkg2dBonus = 0.008f;
+
+        public const float GdPatrolPerLevel = 0.6f;
+        public const float GdRepairCutPerLevel = 0.55f;
+        public const float GdRepairFloor = 1.6f;
+        public const int GdNichePerLevel = 1;
+
+        public const float PlasmaIgaCutPerLevel = 0.25f;
+        public const float PlasmaSecretionFloor = 0.35f;
+        public const float PlasmaSecretoryComponentPerLevel = 1.5f;
+        public const int PlasmaNichePerLevel = 1;
+
         /// <summary>Write row <paramref name="row"/>'s effect at
         /// <paramref name="level"/> onto one tower's tuning.
         /// <paramref name="profile"/> is the innate kind's defaults (null for
@@ -89,6 +109,39 @@ namespace ImmunologyTD.Units
                     }
                     else if (row == 1) adaptive.MatchDistanceBonus = MatchDistancePerLevel * level;
                     else if (row == 2) adaptive.LymphocyteLifespanReduction = LifespanCutPerLevel * level;
+                    else if (row == 3) adaptive.MemoryRecallLevel = level;
+                    break;
+
+                case UnitKind.CytotoxicT:
+                    if (tuning == null || profile == null) return;
+                    if (row == 0) tuning.StressSenseChancePerTick = profile.StressSenseChancePerTick + CtlGranzymePerLevel * level;
+                    else if (row == 1) tuning.FineTilesPerTick = profile.FineTilesPerTick + CtlSpeedPerLevel * level;
+                    else if (row == 2) tuning.ContactRadiusFineTiles = profile.ContactRadiusFineTiles + CtlSynapseReach * level;
+                    break;
+
+                case UnitKind.NaturalKiller:
+                    if (tuning == null || profile == null) return;
+                    if (row == 0) tuning.IfnGammaAuraChancePerTick = profile.IfnGammaAuraChancePerTick + NkAuraRatePerLevel * level;
+                    else if (row == 1) tuning.IfnGammaAuraCoarseRadius = profile.IfnGammaAuraCoarseRadius + NkAuraRadiusPerLevel * level;
+                    else if (row == 2) tuning.StressSenseChancePerTick = profile.StressSenseChancePerTick + NkNkg2dBonus * level;
+                    break;
+
+                case UnitKind.GammaDeltaT:
+                    if (tuning == null || profile == null) return;
+                    if (row == 0) tuning.BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells + GdPatrolPerLevel * level;
+                    else if (row == 1) tuning.BarrierRepairIntervalSeconds =
+                        Mathf.Max(GdRepairFloor, profile.BarrierRepairIntervalSeconds - GdRepairCutPerLevel * level);
+                    else if (row == 2) tuning.MaxActiveChildren = profile.MaxActiveChildren + GdNichePerLevel * level;
+                    break;
+
+                case UnitKind.PlasmaCell:
+                    if (tuning == null || profile == null) return;
+                    if (row == 0) tuning.AntibodySecretionIntervalSeconds = Mathf.Max(
+                        PlasmaSecretionFloor,
+                        profile.AntibodySecretionIntervalSeconds - PlasmaIgaCutPerLevel * level);
+                    else if (row == 1) tuning.AntibodyLifespanBonusSeconds =
+                        profile.AntibodyLifespanBonusSeconds + PlasmaSecretoryComponentPerLevel * level;
+                    else if (row == 2) tuning.MaxActiveChildren = profile.MaxActiveChildren + PlasmaNichePerLevel * level;
                     break;
             }
         }

@@ -21,12 +21,14 @@ namespace ImmunologyTD.Pathogens
     /// the pre-existing generic content and every harness that spoke in
     /// classes keeps meaning exactly what it meant before.
     ///
-    /// Roster size warning (docs/CELL_KINETICS_REFERENCE.md): the 8-bit
-    /// antigen barcode ceilings the useful roster at roughly 8-10 species
-    /// before two species start teaching each other by accident. We are at
-    /// six. Past about eight, the barcode needs to grow to 16 bits -- and
-    /// note §5c's claim that the Hamming threshold is the dial to reach for
-    /// first is backwards; length is the binding constraint.
+    /// **Roster size.** Species tags must sit at least 2r+1 apart (5 at
+    /// the shipped match radius of 2) or one helper-T cell teaches two
+    /// species at once. Sprint 29 measured the real ceiling by exhaustive
+    /// search rather than estimating it: **8 bits admits at most FOUR such
+    /// tags**, which is why the six-species 8-bit set was cross-teaching
+    /// 21.9% of the time. At 10 bits these six sit 6 apart with headroom.
+    /// Before adding a species, re-run the search for the WHOLE set -- see
+    /// SpeciesProfile.Antigen.
     /// </summary>
     public enum PathogenSpecies
     {
@@ -75,8 +77,22 @@ namespace ImmunologyTD.Pathogens
         public string DisplayName;
         public string ShortName;
 
-        /// <summary>The 8-bit antigen barcode (§5c).</summary>
-        public byte Antigen;
+        /// <summary>
+        /// The antigen barcode (§5c), <see cref="AdaptiveTuning.BarcodeBits"/>
+        /// bits wide. Sprint 29 widened it from 8 to 10.
+        ///
+        /// **The whole set is chosen together, not one tag at a time.**
+        /// Tags must be at least 2r+1 apart (5 at the shipped r=2) for a
+        /// helper-T cell to teach at most one species. These six sit at a
+        /// minimum distance of SIX, found by exhaustive search, which also
+        /// leaves headroom for the avidity upgrade to raise r to 3.
+        ///
+        /// Adding a species means re-running that search for the whole set,
+        /// not picking a tag that "looks far enough" from the others --
+        /// which is exactly how the 8-bit set ended up with 21.9% of
+        /// helper-T tags teaching two species by accident.
+        /// </summary>
+        public int Antigen;
 
         // -- Traits. Zero/false = "behave like the generic". --
 
@@ -158,7 +174,7 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.IntracellularVirus,
                 DisplayName = "Virus",
                 ShortName = "Virus",
-                Antigen = 0b01011100,
+                Antigen = 0b0000000000,
                 FlushResistance = 1f,
             };
 
@@ -168,7 +184,7 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.IntracellularBacterium,
                 DisplayName = "Intracellular bacterium",
                 ShortName = "Intra",
-                Antigen = 0b10100011,
+                Antigen = 0b0000111111,
                 FlushResistance = 1f,
             };
 
@@ -178,7 +194,7 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "Gut bacterium",
                 ShortName = "Bact",
-                Antigen = 0b11110000,
+                Antigen = 0b0111000111,
                 FlushResistance = 1f,
             };
 
@@ -194,16 +210,8 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.IntracellularVirus,
                 DisplayName = "Rotavirus",
                 ShortName = "Rota",
-                // >=4 bits from every other tag, so one species' lessons do
-                // not accidentally teach another (§5c's separation rule).
-                //
-                // This was 0b00110011 and the Sprint 24 harness rejected it:
-                // only 2 bits from the generic intracellular bacterium, so
-                // the two would have taught each other. Caught at species
-                // SIX, which is exactly the roster ceiling the research
-                // predicted -- hand-picking separable 8-bit tags gets hard
-                // fast, and past ~8-10 species the barcode has to grow.
-                Antigen = 0b00001111,
+                // Part of the Sprint 29 10-bit set (min distance 6).
+                Antigen = 0b1011011001,
                 VillusTipTropismCells = 3,
                 // NSP4: a real viral enterotoxin. Harm spreads to cells the
                 // virus never enters, which is why rotavirus damage outruns
@@ -222,7 +230,7 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "Vibrio cholerae",
                 ShortName = "Vibrio",
-                Antigen = 0b01100110,
+                Antigen = 0b1101101010,
                 ToxinFieldStrength = 0.9f,
                 ToxinFieldRadiusCells = 2.5f,
                 FlushResistance = 1f,
@@ -238,7 +246,7 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "A/E E. coli",
                 ShortName = "AEEC",
-                Antigen = 0b10011001,
+                Antigen = 0b1110110100,
                 InflammationFuelFactor = 1.6f,
                 FlushResistance = 2.2f,
             };

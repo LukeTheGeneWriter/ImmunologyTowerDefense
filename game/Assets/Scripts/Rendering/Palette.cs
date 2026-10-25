@@ -157,5 +157,11 @@ namespace ImmunologyTD.Rendering
         /// green -- the only burst on the board that means something was
         /// BUILT rather than destroyed.</summary>
         public static Color FxRepair        => C(0.45f, 0.90f, 0.55f);
+
+        /// <summary>Sprint 29: a pairing rescued by MEMORY rather than by
+        /// barcode luck. Deeper and warmer than the ordinary knowledge
+        /// flash, because "we have met this before" should feel different
+        /// from "we got lucky".</summary>
+        public static Color FxMemoryRecall  => C(0.55f, 0.45f, 1.00f);
     }
 }

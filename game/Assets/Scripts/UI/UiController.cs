@@ -246,6 +246,15 @@ namespace ImmunologyTD.UI
                     if (gutWall != null)
                         gutWall.MucusTurnoverLevel = shop.LevelOf(ShopItem.BarrierMucusTurnover);
                 }
+
+                // Sprint 29: the four host rows that used to take ATP and do
+                // nothing. They are no longer hatched "planned" in the shop.
+                ImmunologyTD.Grid.HostDefence.ViralEntryLevel = shop.LevelOf(ShopItem.HostReducedViralEntry);
+                ImmunologyTD.Grid.HostDefence.GlycocalyxLevel = shop.LevelOf(ShopItem.HostBacterialResistance);
+                ImmunologyTD.Grid.HostDefence.DsRnaSensorLevel = shop.LevelOf(ShopItem.HostDsRnaSensor);
+                ImmunologyTD.Grid.HostDefence.ComplementLevel = shop.LevelOf(ShopItem.ComplementBaseline);
+                {
+                }
             }
 
             hud.Refresh(wallet, rounds, spawner);

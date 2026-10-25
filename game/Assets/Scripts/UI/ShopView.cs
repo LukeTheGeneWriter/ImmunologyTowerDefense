@@ -44,14 +44,14 @@ namespace ImmunologyTD.UI
             new Entry { Item = ShopItem.BarrierMucusTurnover, Name = "Mucus turnover", Short = "Mucus\nturnover",
                 Effect = "Flush pathogens stuck at the gut wall back into the lumen.",
                 Icon = (b, s) => UiTheme.Layer(b, SpriteShapes.IconDroplet, new Color(0.55f, 0.82f, 0.96f), s) },
-            new Entry { Item = ShopItem.HostDsRnaSensor, Name = "Host dsRNA sensor", Short = "dsRNA\nsensor",
+            new Entry { Item = ShopItem.HostDsRnaSensor, Real = true, Name = "Host dsRNA sensor", Short = "dsRNA\nsensor",
                 Effect = "Infected host cells self-destruct and call dendritic cells.",
                 Icon = (b, s) =>
                 {
                     UiTheme.Layer(b, SpriteShapes.HostCellInfectedViral, Palette.HostInfectedViral, s, 0.85f);
                     UiTheme.Layer(b, SpriteShapes.BreachStar, Palette.FxStressKill, s, 0.55f, 0.20f, -0.20f);
                 } },
-            new Entry { Item = ShopItem.HostReducedViralEntry, Name = "Harden vs viral entry", Short = "Block viral\nentry",
+            new Entry { Item = ShopItem.HostReducedViralEntry, Real = true, Name = "Harden vs viral entry", Short = "Block viral\nentry",
                 Effect = "A virion is less likely to get inside a host cell.",
                 Icon = (b, s) =>
                 {
@@ -59,7 +59,7 @@ namespace ImmunologyTD.UI
                     UiTheme.Layer(b, SpriteShapes.Virion, Palette.Virion, s, 0.50f, 0.18f, -0.18f);
                     UiTheme.Layer(b, SpriteShapes.IconBlock, new Color(0.85f, 0.12f, 0.16f), s, 0.55f, 0.18f, -0.18f);
                 } },
-            new Entry { Item = ShopItem.HostBacterialResistance, Name = "Bacterial resistance", Short = "Bacterial\nresistance",
+            new Entry { Item = ShopItem.HostBacterialResistance, Real = true, Name = "Glycocalyx (MUC17)", Short = "Glyco-\ncalyx",
                 Effect = "Host cells take less damage from a grazing bacterium.",
                 Icon = (b, s) =>
                 {
@@ -67,7 +67,7 @@ namespace ImmunologyTD.UI
                     UiTheme.Layer(b, SpriteShapes.LargeBacterium, Palette.Bacterium, s, 0.50f, 0.18f, -0.18f);
                     UiTheme.Layer(b, SpriteShapes.IconBlock, new Color(0.85f, 0.12f, 0.16f), s, 0.55f, 0.18f, -0.18f);
                 } },
-            new Entry { Item = ShopItem.ComplementBaseline, Name = "Complement", Short = "Comple-\nment",
+            new Entry { Item = ShopItem.ComplementBaseline, Real = true, Name = "Complement", Short = "Comple-\nment",
                 Effect = "Raises baseline C3 in the gut: arrivals get coated and marked for a phagocyte.",
                 Icon = (b, s) =>
                 {

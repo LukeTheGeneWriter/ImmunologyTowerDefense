@@ -10,7 +10,14 @@ namespace ImmunologyTD.Adaptive
     /// large enough that a match reads as specificity rather than a
     /// formality.
     ///
-    /// A tag is a plain <see cref="byte"/> (0..255). This class is the
+    /// A tag is a plain <see cref="int"/> holding
+    /// <see cref="AdaptiveTuning.BarcodeBits"/> bits. **Sprint 29 widened
+    /// it from 8 bits to 10** (Director): at 8 bits, six species could not
+    /// be kept far enough apart for a helper-T tag to teach at most one of
+    /// them -- that needs a pairwise distance of 2r+1 = 5, and an
+    /// exhaustive search shows 8 bits admits at most FOUR such tags. Ten
+    /// bits fits all six at a minimum distance of 6, with room to grow.
+    /// This class is the
     /// side-effect-free math on tags -- pulled out like
     /// <see cref="Units.Chemotaxis"/> so Assets/Editor/AdaptiveVerification.cs
     /// can assert it directly without any GameObjects.
@@ -20,13 +27,14 @@ namespace ImmunologyTD.Adaptive
         /// <summary>A fresh random 8-bit tag. Every helper-T cell is born
         /// with one of these (§5c step 1); every meeting re-rolls nothing --
         /// the tag is fixed for that cell's life.</summary>
-        public static byte RandomTag() => (byte)UnityEngine.Random.Range(0, 256);
+        public static int RandomTag() =>
+            UnityEngine.Random.Range(0, 1 << AdaptiveTuning.BarcodeBits);
 
         /// <summary>Number of bit positions at which two tags differ --
         /// popcount(a XOR b). 0 = identical, 8 = complementary. Manual
-        /// 8-iteration loop rather than System.Numerics.BitOperations, which
+        /// bit-by-bit loop rather than System.Numerics.BitOperations, which
         /// isn't guaranteed on Unity's scripting runtime.</summary>
-        public static int HammingDistance(byte a, byte b)
+        public static int HammingDistance(int a, int b)
         {
             int x = a ^ b;
             int count = 0;
@@ -43,13 +51,13 @@ namespace ImmunologyTD.Adaptive
         /// <see cref="AdaptiveTuning.MatchMaxHammingDistance"/>. At the
         /// default threshold of 2 this is 37 of 256 possible partner tags
         /// (C(8,0)+C(8,1)+C(8,2)), ≈ 14.5% of random pairings.</summary>
-        public static bool IsMatch(byte a, byte b) =>
+        public static bool IsMatch(int a, int b) =>
             HammingDistance(a, b) <= AdaptiveTuning.MatchMaxHammingDistance;
 
         /// <summary>Sprint 18: the same test against an explicit tolerance --
         /// a helper-T's own, which its tower's "TCR affinity maturation"
         /// upgrade can widen.</summary>
-        public static bool IsMatch(byte a, byte b, int maxHammingDistance) =>
+        public static bool IsMatch(int a, int b, int maxHammingDistance) =>
             HammingDistance(a, b) <= maxHammingDistance;
 
         /// <summary>The fixed antigen a given pathogen class presents.
@@ -58,6 +66,6 @@ namespace ImmunologyTD.Adaptive
         /// <summary>Sprint 24: the tag of a NAMED species. This is the one
         /// new code should use -- two species sharing a class have different
         /// tags, which is the whole point.</summary>
-        public static byte ForSpecies(PathogenSpecies s) => AdaptiveTuning.AntigenForSpecies(s);
+        public static int ForSpecies(PathogenSpecies s) => AdaptiveTuning.AntigenForSpecies(s);
     }
 }

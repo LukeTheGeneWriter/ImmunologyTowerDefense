@@ -62,7 +62,8 @@ namespace ImmunologyTD.Adaptive
         /// in a random direction. Returns false (harmlessly) when no pool is
         /// configured.
         /// </summary>
-        public static bool Secrete(Vector3 worldPosition, BoardConfig board, TissueGrid tissueGrid)
+        public static bool Secrete(Vector3 worldPosition, BoardConfig board, TissueGrid tissueGrid,
+            float lifespanBonusSeconds = 0f)
         {
             if (pool == null || board == null) return false;
 
@@ -72,11 +73,12 @@ namespace ImmunologyTD.Adaptive
             var ab = go.GetComponent<Antibody>();
             if (ab == null) { pool.Release(go); return false; }
 
-            ab.Launch(worldPosition, board, tissueGrid);
+            ab.Launch(worldPosition, board, tissueGrid, lifespanBonusSeconds);
             return true;
         }
 
-        private void Launch(Vector3 worldPosition, BoardConfig boardConfig, TissueGrid grid)
+        private void Launch(Vector3 worldPosition, BoardConfig boardConfig, TissueGrid grid,
+            float lifespanBonusSeconds)
         {
             board = boardConfig;
             tissueGrid = grid;
@@ -89,7 +91,8 @@ namespace ImmunologyTD.Adaptive
             velocity = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f)
                        * AntibodyTuning.DriftWorldUnitsPerSecond;
 
-            dieAt = ImmunologyTD.Rounds.RoundClock.Time + AntibodyTuning.LifespanSeconds;
+            dieAt = ImmunologyTD.Rounds.RoundClock.Time
+                    + AntibodyTuning.LifespanSeconds + Mathf.Max(0f, lifespanBonusSeconds);
 
             if (sr == null) sr = GetComponent<SpriteRenderer>();
             if (sr != null)

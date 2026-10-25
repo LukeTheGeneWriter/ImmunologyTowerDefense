@@ -999,3 +999,44 @@ debug readout took the vacated bottom-right corner; it is hidden by
 default and loses nothing by moving.
 
 20 harnesses green, 705 checks.
+
+## Sprint 29 -- 2026-10-25
+The upgrade pass. Four research agents went through every progenitor row
+and every shop item; what came back was mostly corrections.
+
+**Four towers had no upgrades at all.** Cytotoxic T, NK/ILC1, gamma-delta
+and the B cell all shipped with an empty upgrade panel. They now have
+three rows each, every one writing a field that already existed.
+
+**Four shop rows were taking your ATP and doing nothing.** The dsRNA
+sensor, viral-entry hardening, bacterial resistance and complement were
+all hatched "planned" and wired to nothing. All four are live now:
+infected cells can self-destruct cleanly, viral entry can be hardened,
+grazing damage can be blunted, and opsonisation makes your innate cells
+hit harder.
+
+**The barcode went from 8 bits to 10, because the old one could not do
+what the code claimed.** For a helper-T cell to teach at most one species,
+tags must be at least 5 bits apart at the current match radius -- and an
+exhaustive search shows 8 bits admits only FOUR such tags, against six
+species. So 21.9% of helper-T tags were quietly teaching two species at
+once. At 10 bits all six sit 6 apart, accidental cross-teaching is zero,
+and cross-reactivity becomes something you buy instead of something that
+just happens.
+
+**Memory T cells, as you asked for them.** A node meeting that misses on
+barcode alone now gets a second chance, scaled by how well that species is
+already known -- knowledge standing in for how many times you have met it.
+Built that way rather than as a burst of cells because three separate
+research passes found the burst framing backwards: memory wins on zero
+lead time and a bigger standing pool, not faster proliferation.
+
+**Naming corrections, all of them text players read.** "TCR affinity
+maturation" was wrong -- T cells cannot somatically hypermutate; it is
+functional avidity maturation. "Macropinocytosis rate" described uptake,
+which is switched off exactly when a dendritic cell leaves for the node,
+and it contradicted the same tower's other row. "Rapid recirculation" sold
+a trade-off as a pure win. "Tissue residency (M2)" leaned on a binary the
+field published a consensus paper to discourage.
+
+21 harnesses green, 752 checks.

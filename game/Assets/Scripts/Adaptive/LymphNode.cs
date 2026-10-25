@@ -17,7 +17,7 @@ namespace ImmunologyTD.Adaptive
         FineCoord NodePos { get; }
 
         /// <summary>The antigen barcode this DC is carrying.</summary>
-        byte Cargo { get; }
+        int Cargo { get; }
 
         /// <summary>The species that antigen belongs to -- the knowledge key.</summary>
         PathogenSpecies CargoClass { get; }
@@ -207,9 +207,30 @@ namespace ImmunologyTD.Adaptive
                 var p = pairs[i];
                 pairs.RemoveAt(i);
 
-                bool taught = p.Visitor != null && p.Resident != null &&
-                              p.Visitor.HasCargo &&
+                bool viable = p.Visitor != null && p.Resident != null && p.Visitor.HasCargo;
+                bool taught = viable &&
                               Antigen.IsMatch(p.Visitor.Cargo, p.Resident.Tag, p.Resident.MatchMaxHammingDistance);
+
+                // Sprint 29 -- **memory recall.** A pairing that missed on
+                // barcode alone gets a second chance, with a probability
+                // scaled by how well this species is already known. The
+                // better you know an organism, the more readily you
+                // recognise it again.
+                //
+                // Knowledge stands in for "how many times have we seen this
+                // before", which is the only such counter the game keeps.
+                // It is deliberately NOT a burst of new cells: three
+                // research passes independently found that framing
+                // backwards -- memory's real advantage is zero lead time
+                // and a bigger standing precursor pool, not faster
+                // proliferation.
+                bool recalled = false;
+                if (viable && !taught)
+                {
+                    float known = knowledge.Get(p.Visitor.CargoClass) / AdaptiveTuning.KnowledgeMax;
+                    float chance = AdaptiveUnitTuning.MemoryRecallChance(p.Resident.Tuning, known);
+                    if (chance > 0f && Random.value < chance) { taught = true; recalled = true; }
+                }
 
                 if (p.Visitor != null) { p.Visitor.Frozen = false; p.Visitor.OnPairingResolved(taught); }
                 if (p.Resident != null) p.Resident.Frozen = false;
@@ -219,8 +240,10 @@ namespace ImmunologyTD.Adaptive
                     knowledge.Add(p.Visitor.CargoClass, AdaptiveTuning.KnowledgePerMatch);
                     DegranulationFlash.Play(
                         NodeToWorld(p.Resident.Node),
-                        AgentWorldSize * 2.2f,
-                        DegranulationFlash.KnowledgeMatchColor);
+                        AgentWorldSize * (recalled ? 2.8f : 2.2f),
+                        recalled
+                            ? DegranulationFlash.MemoryRecallColor
+                            : DegranulationFlash.KnowledgeMatchColor);
                 }
             }
         }

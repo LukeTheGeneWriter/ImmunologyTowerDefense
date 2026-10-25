@@ -83,7 +83,7 @@ namespace ImmunologyTD.Adaptive
         /// <summary>Node-local fine position (InNode).</summary>
         public FineCoord NodePos { get; private set; }
 
-        public byte Cargo { get; private set; }
+        public int Cargo { get; private set; }
         public PathogenSpecies CargoClass { get; private set; }
         public bool HasCargo { get; private set; }
         public bool Frozen { get; set; }

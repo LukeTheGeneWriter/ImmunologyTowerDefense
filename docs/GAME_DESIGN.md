@@ -1072,6 +1072,22 @@ a late round meets a naive adaptive system.
 > Hamming threshold is the dial to reach for before barcode length is
 > **backwards**: length is the binding constraint.
 
+> **The barcode is 10 bits, not 8 (Sprint 29).** For a helper-T tag within
+> radius *r* of one species to be within *r* of at most one, species tags
+> must be at least 2*r*+1 apart — 5 at the shipped *r*=2. An exhaustive
+> search shows **8 bits admits at most four such tags**, and there are six
+> species, so the property the code claimed was not merely unmet but
+> unreachable: 21.9% of helper-T tags were teaching two species by
+> accident. Ten bits fits all six at distance 6, so cross-teaching at the
+> default radius is exactly zero, and **cross-reactivity becomes something
+> the player buys** (the avidity row takes *r* to 3) rather than an
+> accident of tag choice.
+>
+> Knowledge-per-match rose 3 → 8 to absorb the 2.64× drop in match rate.
+> **§5c's claim that the Hamming threshold is the dial to reach for before
+> barcode length is backwards** — length is the binding constraint, and no
+> threshold could have fixed the 8-bit roster.
+
 **Pathogen mutation applies a discrete step-change discount** to that
 species' knowledge percentage. An event, not continuous erosion. This is
 the abstraction's main payoff: antigenic change becomes a single legible
@@ -1106,7 +1122,7 @@ nothing else. Each capability's real mechanic is its own later sprint.
 |---|---|---|
 | ~10% | **Cytotoxic T cells** | MHC-I-restricted recognition, then an **apoptotic** kill of the infected cell — no spill, no necrotic DAMP, little debris, so the tissue recovers instead of scarring. The cell still dies; the *manner* is the reward. **Built in Sprint 23.** |
 | ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). **Built in Sprint 23** as plasma-cell-secreted antibody that coats pathogens in tissue, reusing the §6b coating state. |
-| ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
+| ~30% | **Memory T cells** | **Re-specified in Sprint 29.** A burst of CTLs is the wrong shape: three independent research passes found day-8 effector numbers are invariant to how much memory you start with, and the onset of division is indistinguishable from naive. Memory's real advantages are a far larger standing precursor pool and **zero lead time**. Built as a helper-T upgrade row: a pairing that misses on barcode alone is rescued with a probability scaled by how well that species is already known — knowledge standing in for "how many times have we seen this before" (Director, 2026-10-25). |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
 | ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. **Built in Sprint 22.** Two stages: a *coated* organism is slower, pacified and more fragile behind the wall; two coated organisms of the same species are **cross-linked** into a raft that cannot reach the epithelium and is swept away. Crucially, a coated bacterium still divides at full rate and its **daughter is born attached to it**, so under IgA replication is what traps it. Nothing out here is killed. |
 

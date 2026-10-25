@@ -81,17 +81,48 @@ public static class AdaptiveVerification
         Check("threshold 0 -> only an exact match teaches", Antigen.IsMatch(0x2A, 0x2A) && !Antigen.IsMatch(0x2A, 0x2B));
         AdaptiveTuning.ResetToDefaults();
 
-        // The three species antigens are distinct and >= 4 bits apart, so a
-        // helper-T within distance 2 of one is within distance 2 of at most
-        // one -- "knowledge is per species" stays meaningful.
-        byte v = Antigen.ForSpecies(PathogenSpecies.GenericVirus);
-        byte b = Antigen.ForSpecies(PathogenSpecies.GenericIntracellularBacterium);
-        byte l = Antigen.ForSpecies(PathogenSpecies.GenericLargeBacterium);
-        Check("species antigens are distinct", v != b && b != l && v != l);
-        Check("species antigens are >= 4 bits apart",
-            Antigen.HammingDistance(v, b) >= 4 &&
-            Antigen.HammingDistance(b, l) >= 4 &&
-            Antigen.HammingDistance(v, l) >= 4);
+        // Sprint 29: assert the PROPERTY, not a proxy for it.
+        //
+        // The old version checked that three tags were ">= 4 bits apart,
+        // so a helper-T within distance 2 of one is within 2 of at most
+        // one". That justification is simply false -- separating by d
+        // guarantees a unique match only when d >= 2r+1, which is 5 at
+        // r=2, not 4. The test passed for two sprints while the property
+        // it described was violated for 21.9% of helper-T tags.
+        //
+        // So this now enumerates every tag in the barcode space and counts
+        // how many species each one would teach. That cannot drift from
+        // the claim, because it IS the claim.
+        var all = (PathogenSpecies[])System.Enum.GetValues(typeof(PathogenSpecies));
+
+        int distinct = 0;
+        for (int i = 0; i < all.Length; i++)
+            for (int j = i + 1; j < all.Length; j++)
+                if (Antigen.ForSpecies(all[i]) != Antigen.ForSpecies(all[j])) distinct++;
+        Check("every species antigen is distinct",
+            distinct == all.Length * (all.Length - 1) / 2);
+
+        int required = 2 * AdaptiveTuning.MatchMaxHammingDistance + 1;
+        int worst = int.MaxValue;
+        for (int i = 0; i < all.Length; i++)
+            for (int j = i + 1; j < all.Length; j++)
+                worst = Mathf.Min(worst, Antigen.HammingDistance(
+                    Antigen.ForSpecies(all[i]), Antigen.ForSpecies(all[j])));
+        Check($"species tags are >= 2r+1 = {required} bits apart (worst pair {worst})",
+            worst >= required);
+
+        int space = 1 << AdaptiveTuning.BarcodeBits;
+        int ambiguous = 0;
+        for (int tag = 0; tag < space; tag++)
+        {
+            int teaches = 0;
+            for (int i = 0; i < all.Length; i++)
+                if (Antigen.HammingDistance(tag, Antigen.ForSpecies(all[i]))
+                    <= AdaptiveTuning.MatchMaxHammingDistance) teaches++;
+            if (teaches > 1) ambiguous++;
+        }
+        Check($"no helper-T tag can teach two species at once ({ambiguous}/{space} ambiguous)",
+            ambiguous == 0);
     }
 
     // =================================================================

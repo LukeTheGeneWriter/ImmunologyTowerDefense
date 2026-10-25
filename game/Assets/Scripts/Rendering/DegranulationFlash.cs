@@ -108,6 +108,9 @@ namespace ImmunologyTD.Rendering
         /// single purchase in the game and should land like one.</summary>
         public static Color ReconversionColor => Palette.MarrowFat;
 
+        /// <summary>Sprint 29: a node pairing rescued by memory recall.</summary>
+        public static Color MemoryRecallColor => Palette.FxMemoryRecall;
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;
@@ -178,6 +181,7 @@ namespace ImmunologyTD.Rendering
             if (Same(c, OpsonisationColor))   { durationSeconds = 0.22f; startScale = 0.30f; endScale = 0.75f; return SpriteShapes.KnowledgeRing; }
             if (Same(c, RepairColor))         { durationSeconds = 0.60f; startScale = 0.25f; endScale = 1.2f; return SpriteShapes.EffeBloom; }
             if (Same(c, ReconversionColor))   { durationSeconds = 0.85f; startScale = 0.20f; endScale = 1.5f; return SpriteShapes.BirthPuff; }
+            if (Same(c, MemoryRecallColor))   { durationSeconds = 0.65f; startScale = 0.25f; endScale = 1.6f; return SpriteShapes.KnowledgeRing; }
             // default = neutrophil degranulation
             durationSeconds = 0.40f; startScale = 0.35f; endScale = 1.6f;
             return SpriteShapes.GranuleBurst;

@@ -1111,7 +1111,8 @@ namespace ImmunologyTD.Pathogens
             }
 
             if (tissueGrid.IsHealthyHost(CurrentCoarse) &&
-                Random.value < InvasionTuning.IntracellularEntryChance * VirulenceScale &&
+                Random.value < InvasionTuning.IntracellularEntryChance * VirulenceScale
+                    * HostDefence.ViralEntryMultiplier &&
                 tissueGrid.TryInfect(CurrentCoarse, this, currentTime))
             {
                 tissueGrid.ReleaseOccupant(CurrentCoarse);
@@ -1170,8 +1171,11 @@ namespace ImmunologyTD.Pathogens
             // InvasionTuning.LargeBacteriumHostDamagePerStep.
             if (Class == PathogenClass.LargeBacterium)
             {
+                // Sprint 29: the MUC17 glycocalyx shop row blunts grazing,
+                // and blunts it MORE where the wall is already inflamed.
                 tissueGrid.DamageHostCell(CurrentCoarse,
-                    InvasionTuning.LargeBacteriumHostDamagePerStep * VirulenceScale, Species);
+                    InvasionTuning.LargeBacteriumHostDamagePerStep * VirulenceScale
+                        * HostDefence.GrazeDamageMultiplier(board, CurrentCoarse), Species);
             }
 
             StepTissue();
@@ -1355,6 +1359,18 @@ namespace ImmunologyTD.Pathogens
             }
 
             TickEnterotoxin(currentTime);
+
+            // Sprint 29 -- the dsRNA sensor shop row. The infected cell
+            // recognises replicating RNA and kills itself before the virus
+            // finishes. APOPTOTIC, so the tissue recovers: the executioner
+            // here is OAS/RNase L via caspase-3, not a necrotic burst.
+            float selfDestruct = HostDefence.DsRnaSelfDestructChance;
+            if (selfDestruct > 0f && Random.value < selfDestruct)
+            {
+                var at = CurrentCoarse;
+                tissueGrid.KillHostCell(at, Species, apoptotic: true);
+                return;
+            }
 
             if (currentTime - infectionStartTime < IncubationSeconds) return;
 

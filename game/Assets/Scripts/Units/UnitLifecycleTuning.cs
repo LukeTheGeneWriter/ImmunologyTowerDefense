@@ -69,6 +69,10 @@ namespace ImmunologyTD.Units
         /// 0 = cannot sense intracellular infection.</summary>
         public float StressSenseChancePerTick;
 
+        /// <summary>Sprint 29: extra seconds a secreted antibody survives
+        /// (secretory component). Per-tower, so it is one field write.</summary>
+        public float AntibodyLifespanBonusSeconds;
+
         /// <summary>Sprint 23: wall patrol radius and repair cadence. Both
         /// per-tower and mutable, so "my gamma-delta cells hold a wider
         /// stretch" is a one-field upgrade when that work lands.</summary>
@@ -114,6 +118,7 @@ namespace ImmunologyTD.Units
             FineTilesPerTick = profile.FineTilesPerTick,
             ApoptoticKill = profile.ApoptoticKill,
             AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds,
+            AntibodyLifespanBonusSeconds = profile.AntibodyLifespanBonusSeconds,
             BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells,
             BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds,
             IfnGammaAuraChancePerTick = profile.IfnGammaAuraChancePerTick,
@@ -135,6 +140,7 @@ namespace ImmunologyTD.Units
             FineTilesPerTick = profile.FineTilesPerTick;
             ApoptoticKill = profile.ApoptoticKill;
             AntibodySecretionIntervalSeconds = profile.AntibodySecretionIntervalSeconds;
+            AntibodyLifespanBonusSeconds = profile.AntibodyLifespanBonusSeconds;
             BarrierPatrolRadiusCells = profile.BarrierPatrolRadiusCells;
             BarrierRepairIntervalSeconds = profile.BarrierRepairIntervalSeconds;
             IfnGammaAuraChancePerTick = profile.IfnGammaAuraChancePerTick;
@@ -155,6 +161,7 @@ namespace ImmunologyTD.Units
             FineTilesPerTick = other.FineTilesPerTick;
             ApoptoticKill = other.ApoptoticKill;
             AntibodySecretionIntervalSeconds = other.AntibodySecretionIntervalSeconds;
+            AntibodyLifespanBonusSeconds = other.AntibodyLifespanBonusSeconds;
             BarrierPatrolRadiusCells = other.BarrierPatrolRadiusCells;
             BarrierRepairIntervalSeconds = other.BarrierRepairIntervalSeconds;
             IfnGammaAuraChancePerTick = other.IfnGammaAuraChancePerTick;

@@ -47,8 +47,13 @@ namespace ImmunologyTD.UI
             new Row("Efferocytic capacity",
                     "Clears debris markedly faster — frees dead ground to regrow.",
                     "UnitLifecycleTuning.EfferocytosisDebrisPerTick 0.05 → +0.03/lvl", 30, 3),
-            new Row("Tissue residency (M2)",
-                    "+8 kills before the cell retires quietly. A longer-lived line.",
+            // Sprint 29: was "Tissue residency (M2)". M1/M2 as discrete
+            // states is something the field published a consensus paper to
+            // discourage, and the row's actual effect is a kill count, which
+            // has nothing to do with ontogeny. What polarisation really
+            // trades is arginine — NOS2 (killing) against ARG1 (repair).
+            new Row("Sustained respiratory burst",
+                    "+8 kills before the cell is spent. A longer-working line.",
                     "UnitLifecycleTuning.KillLimit 20 → +8/lvl", 40, 3),
             new Row("Pseudopod reach",
                     "The cell touches — and clears — pathogens one tile further out.",
@@ -70,13 +75,24 @@ namespace ImmunologyTD.UI
 
         private static readonly Row[] DendriticCell =
         {
-            new Row("Macropinocytosis rate",
+            // Sprint 29: was "Macropinocytosis rate", which is uptake — and
+            // uptake is switched OFF when a DC matures and leaves for the
+            // node, so it cannot be what makes a trip worth more. It also
+            // contradicted this tower's third row, which sells REDUCED
+            // uptake as a benefit. What actually extends a trip is how long
+            // peptide-MHC-II survives on the surface (10h → >100h on
+            // maturation).
+            new Row("pMHC-II stabilisation",
                     "Each trip to the node is worth more presentations before the cell goes back for antigen.",
                     "AdaptiveUnitTuning.DcPresentationsBonus: DcPresentationsPerCargo 4 → +2/lvl", 35, 3),
             new Row("CCR7 expression",
                     "The cell migrates faster — antigen reaches the node sooner.",
                     "AdaptiveUnitTuning.DcFineTilesBonus: DcFineTilesPerTick 3 → +1/lvl", 40, 3),
-            new Row("Antigen-sparing sampling",
+            // Sprint 29: renamed. Dendritic cells are deliberately
+            // protease-POOR — they preserve antigen where a macrophage
+            // destroys it — which is the real reason the two compete for
+            // the same debris.
+            new Row("Limited lysosomal proteolysis",
                     "Takes a smaller bite of each debris pile — leaves more for macrophage clearance.",
                     "AdaptiveUnitTuning.DcDebrisBiteReduction: DcDebrisSamplePerBite 0.34 → −0.08/lvl, floor 0.1", 30, 3),
         };
@@ -86,12 +102,117 @@ namespace ImmunologyTD.UI
             new Row("Clonal expansion",
                     "Proliferates faster and holds more helper-T cells in the node — a busier node teaches faster.",
                     "per-tower MaxActiveChildren 4 → +2/lvl, emission rate ×(1 + 0.5·lvl)", 35, 3),
-            new Row("TCR affinity maturation",
-                    "A near-miss barcode still teaches — more pairings count.",
-                    "AdaptiveUnitTuning.MatchDistanceBonus: MatchMaxHammingDistance 2 → +1/lvl, cap 4", 45, 2),
-            new Row("Rapid recirculation",
-                    "Shorter helper-T lifespan — the repertoire refreshes faster, so you are less often stuck with no match.",
+            // Sprint 29: was "TCR affinity maturation", which is wrong —
+            // T cells cannot somatically hypermutate; affinity maturation
+            // is a B-cell germinal-centre process. The real phenomenon is
+            // functional AVIDITY maturation, which rose >50x in vivo with
+            // no change in TCR affinity at all.
+            //
+            // Cap dropped 2 → 1. At 10 bits this takes the match radius
+            // from 2 to 3: the rate goes 5.47% → 17.19% AND cross-reactive
+            // teaching appears (25.4% of tags then teach two species). A
+            // second level would take r to 4, where 100% of tags teach
+            // more than one species and specificity collapses entirely.
+            new Row("Functional avidity maturation",
+                    "A near-miss barcode still teaches — and one meeting can inform two species at once.",
+                    "AdaptiveUnitTuning.MatchDistanceBonus: MatchMaxHammingDistance 2 → 3", 45, 1),
+            // Sprint 29: was "Rapid recirculation", advertised as a pure
+            // win. Nodes refresh because cells LEAVE ALIVE (transit 10–20h),
+            // naive T cells are the long-lived compartment, and faster
+            // egress measurably REDUCES priming. The copy now states the
+            // trade instead of hiding it.
+            new Row("Lymph-node egress (S1P)",
+                    "Cells cycle out sooner, refreshing the repertoire — but each one has less time to find its match.",
                     "AdaptiveUnitTuning.LymphocyteLifespanReduction: LymphocyteLifespanSeconds 20 → −4/lvl, floor 6", 30, 3),
+            // Sprint 29, the Director's memory row.
+            new Row("Memory T cells",
+                    "The better you already know a pathogen, the more readily a meeting recognises it again.",
+                    "AdaptiveUnitTuning.MemoryRecallLevel → +1/lvl (scales with that species' knowledge)", 50, 3),
+        };
+
+        // =============================================================
+        // Sprint 29: the four towers that shipped with an empty upgrade
+        // panel. Every row writes one field that already exists.
+        // =============================================================
+
+        private static readonly Row[] CytotoxicT =
+        {
+            // Granzyme B loading is the real lever on how fast a synapse
+            // kills. Deliberately NOT a kill-count row: an in vivo CTL
+            // already kills 2–16 targets a day, and the tower is at that
+            // ceiling, so raising a kill limit would buy nothing.
+            new Row("Granzyme B loading",
+                    "Recognises and kills an infected cell faster once it is in contact.",
+                    "UnitLifecycleTuning.StressSenseChancePerTick 0.03 → +0.012/lvl", 45, 3),
+            new Row("Interstitial patrol",
+                    "Covers ground faster between targets.",
+                    "UnitLifecycleTuning.FineTilesPerTick 3 → +1/lvl", 40, 2),
+            new Row("Immunological synapse reach",
+                    "Engages infected cells one tile further out.",
+                    "UnitLifecycleTuning.ContactRadiusFineTiles 2 → 3", 45, 1),
+        };
+
+        private static readonly Row[] NaturalKiller =
+        {
+            // Three orthogonal rows: aura RATE, aura RADIUS, own killing.
+            // No population row — NK proliferation is unchanged during
+            // acute infection, so a clonal-expansion shape would be a lie.
+            new Row("IL-15 priming",
+                    "Pulses its interferon signal more often.",
+                    "UnitLifecycleTuning.IfnGammaAuraChancePerTick 0.02 → +0.008/lvl", 40, 2),
+            new Row("IFN-γ diffusion",
+                    "The interferon field reaches further — more macrophages caught per pulse.",
+                    "UnitLifecycleTuning.IfnGammaAuraCoarseRadius 3 → +1/lvl", 45, 2),
+            // Cap 1 on purpose: NKG2D up also means killing stressed-but-
+            // UNINFECTED enterocytes, and more than one level would start
+            // eroding the ~10% knowledge rung's reason to exist.
+            new Row("NKG2D expression",
+                    "Senses stressed cells more readily — including some that are merely stressed.",
+                    "UnitLifecycleTuning.StressSenseChancePerTick 0.01 → 0.018", 45, 1),
+        };
+
+        private static readonly Row[] GammaDeltaT =
+        {
+            new Row("Occludin-dependent intercalation",
+                    "Patrols a wider stretch of wall.",
+                    "UnitLifecycleTuning.BarrierPatrolRadiusCells 2.0 → +0.6/lvl", 35, 3),
+            new Row("KGF-1 (FGF7) delivery",
+                    "Mends dead barrier segments faster.",
+                    "UnitLifecycleTuning.BarrierRepairIntervalSeconds 3.5 → −0.55/lvl", 40, 3),
+            // The drawback row. Level 1 is physiology; level 2 crosses a
+            // cited threshold — villous atrophy needs IL-15 raised in BOTH
+            // epithelium and lamina propria, so the second level is exactly
+            // where the game should start charging for it.
+            new Row("IL-15 trans-presentation",
+                    "Holds more γδ cells in the epithelium. Past the first level the wall itself starts to suffer.",
+                    "UnitLifecycleTuning.MaxActiveChildren 3 → +1/lvl (level 2 damages the barrier)", 45, 2),
+        };
+
+        private static readonly Row[] PlasmaCell =
+        {
+            // Three rows, three DIFFERENT fields. An earlier draft had two
+            // of them cutting the secretion interval, which would have made
+            // whichever was bought second silently erase the first --
+            // exactly the dead-upgrade failure this sprint exists to fix.
+            //
+            // Dimeric IgA is the measured ~15x improvement and is the gut's
+            // isotype. Affinity maturation against a whole organism, by
+            // contrast, shows no further gain after about day 6, so it is
+            // deliberately NOT a row here.
+            new Row("Polymeric IgA assembly",
+                    "Antibody is assembled and exported faster.",
+                    "UnitLifecycleTuning.AntibodySecretionIntervalSeconds 1.1 → −0.25/lvl, floor 0.35", 45, 2),
+            // Secretory component is the piece of pIgR that stays bound to
+            // IgA after transport and protects it from proteolysis in the
+            // gut -- the defining feature of the antibody out there.
+            new Row("Secretory component",
+                    "Each antibody survives longer before it is spent.",
+                    "UnitLifecycleTuning.AntibodyLifespanBonusSeconds → +1.5s/lvl", 40, 2),
+            // NOT a lifespan row for the CELL: plasma cells have no
+            // lifespan field, so one would have been inert on arrival.
+            new Row("Eosinophil-supported niche",
+                    "Holds more plasma cells in the tissue at once.",
+                    "UnitLifecycleTuning.MaxActiveChildren 2 → +1/lvl", 40, 2),
         };
 
         private static readonly Row[] None = new Row[0];
@@ -104,6 +225,10 @@ namespace ImmunologyTD.UI
                 case UnitKind.Neutrophil: return Neutrophil;
                 case UnitKind.DendriticCell: return DendriticCell;
                 case UnitKind.HelperT: return HelperT;
+                case UnitKind.CytotoxicT: return CytotoxicT;
+                case UnitKind.NaturalKiller: return NaturalKiller;
+                case UnitKind.GammaDeltaT: return GammaDeltaT;
+                case UnitKind.PlasmaCell: return PlasmaCell;
                 default: return None;
             }
         }

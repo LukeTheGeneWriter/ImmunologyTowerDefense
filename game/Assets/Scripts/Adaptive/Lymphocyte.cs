@@ -34,7 +34,7 @@ namespace ImmunologyTD.Adaptive
         /// <summary>This cell's fixed 8-bit antigen receptor. Set at birth,
         /// never re-rolled. A DC:helper-T pairing teaches iff
         /// <see cref="Antigen.IsMatch"/> of this and the DC's cargo.</summary>
-        public byte Tag { get; private set; }
+        public int Tag { get; private set; }
 
         /// <summary>Node-local fine-tile position.</summary>
         public FineCoord Node { get; private set; }
@@ -62,7 +62,7 @@ namespace ImmunologyTD.Adaptive
         private Vector3 tweenEnd;
         private float tweenTimer;
 
-        public void Initialize(LymphNode node, byte tag, FineCoord start, float bornAt,
+        public void Initialize(LymphNode node, int tag, FineCoord start, float bornAt,
             System.Action<Lymphocyte> onDespawn, AdaptiveUnitTuning tuning = null)
         {
             Tuning = tuning;
