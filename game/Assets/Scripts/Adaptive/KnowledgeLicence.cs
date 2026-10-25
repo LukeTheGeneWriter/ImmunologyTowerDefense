@@ -70,15 +70,20 @@ namespace ImmunologyTD.Adaptive
             if (rung == null) return true;
             if (ledger == null) return true;
 
-            for (int s = 0; s < PathogenClassCount; s++)
+            // Sprint 25: iterate SPECIES. This read PathogenClassCount and
+            // cast to PathogenClass, which meant a tower could only ever be
+            // licensed by one of the three generics -- so learning
+            // rotavirus to 100% would never have switched a CTL tower on.
+            // A leftover from the half-finished class->species migration.
+            for (int i = 0; i < SpeciesRoster.Count; i++)
             {
-                if (KnowledgeLadder.IsUnlocked(rung.Value, ledger.Get((PathogenClass)s))) return true;
+                if (KnowledgeLadder.IsUnlocked(rung.Value, ledger.Get((PathogenSpecies)i))) return true;
             }
             return false;
         }
 
         /// <summary>True if a unit of this kind may act on this species.</summary>
-        public static bool RecognisesSpecies(UnitKind kind, PathogenClass species, KnowledgeLedger ledger)
+        public static bool RecognisesSpecies(UnitKind kind, PathogenSpecies species, KnowledgeLedger ledger)
         {
             var rung = RungFor(kind);
             if (rung == null) return true;            // innate: no licence needed
@@ -87,15 +92,10 @@ namespace ImmunologyTD.Adaptive
             return KnowledgeLadder.IsUnlocked(rung.Value, ledger.Get(species));
         }
 
-        /// <summary>Number of values in <see cref="PathogenClass"/>. Cached
-        /// because this is read on a per-tick path.</summary>
-        public static readonly int PathogenClassCount =
-            System.Enum.GetValues(typeof(PathogenClass)).Length;
-
         /// <summary>Convenience overloads reading <see cref="Ledger"/>.</summary>
         public static bool IsTowerLicensed(UnitKind kind) => IsTowerLicensed(kind, Ledger);
 
-        public static bool RecognisesSpecies(UnitKind kind, PathogenClass species) =>
+        public static bool RecognisesSpecies(UnitKind kind, PathogenSpecies species) =>
             RecognisesSpecies(kind, species, Ledger);
 
         public static void ResetToDefaults()

@@ -52,9 +52,6 @@ namespace ImmunologyTD.Adaptive
 
         public static byte AntigenForSpecies(PathogenSpecies s) => SpeciesRoster.Get(s).Antigen;
 
-        public static byte AntigenForClass(PathogenClass c) =>
-            AntigenForSpecies(SpeciesRoster.GenericFor(c));
-
         // -- The dendritic cell (GAME_DESIGN.md §5a) --
 
         /// <summary>How many helper-T pairings one antigen cargo is good for
@@ -166,8 +163,19 @@ namespace ImmunologyTD.Adaptive
         /// <summary>Per-progenitor ceiling on simultaneously-alive children,
         /// same role as UnitLifecycleTuning.MaxActiveChildren for the innate
         /// towers.</summary>
-        public static int DcMaxActiveChildren = 4;
-        public static int LymphocyteMaxActiveChildren = 8;
+        /// <summary>Sprint 25: the Director's board-legibility pass cut
+        /// every progenitor's standing population. DCs 4 -> 3.</summary>
+        public static int DcMaxActiveChildren = 3;
+
+        /// <summary>Sprint 25: 8 -> 4, and this one is the important change.
+        /// A helper-T niche's steady state is lifespan / interval = 20 / 3.5
+        /// ~= 5.7, so a cap of 8 **never bound** and clonal expansion's cap
+        /// component bought literally nothing (the Sprint 18 note spotted
+        /// this and compensated by raising the emission RATE instead). At 4
+        /// the cap binds, so the upgrade now buys both halves of what it
+        /// claims to. General rule, restated: check a cap binds at default
+        /// numbers, or the upgrade is decoration.</summary>
+        public static int LymphocyteMaxActiveChildren = 4;
 
         public static void ResetToDefaults()
         {
@@ -193,8 +201,8 @@ namespace ImmunologyTD.Adaptive
             BCellEmissionIntervalSeconds = 4.5f;
             NaturalKillerEmissionIntervalSeconds = 6f;
             GammaDeltaTEmissionIntervalSeconds = 7f;
-            DcMaxActiveChildren = 4;
-            LymphocyteMaxActiveChildren = 8;
+            DcMaxActiveChildren = 3;
+            LymphocyteMaxActiveChildren = 4;
         }
     }
 }

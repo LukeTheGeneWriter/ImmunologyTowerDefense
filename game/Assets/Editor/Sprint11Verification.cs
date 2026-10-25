@@ -171,7 +171,11 @@ public static class Sprint11Verification
 
     private static void RunKnowledgeLadder()
     {
-        Check("six rungs", KnowledgeLadder.Rungs.Length == 6);
+        // Sprint 25: five, not six. Complement left the ladder and became
+        // a body upgrade in the shop -- it is structural (gut C3 is locally
+        // made and alternative-pathway, so antibody does not trigger it),
+        // and a per-species knowledge ladder said the opposite.
+        Check("five rungs", KnowledgeLadder.Rungs.Length == 5);
 
         bool ascending = true;
         for (int i = 1; i < KnowledgeLadder.Rungs.Length; i++)
@@ -187,7 +191,7 @@ public static class Sprint11Verification
             KnowledgeLadder.UnlockedCount(34f) == 3
             && KnowledgeLadder.IsUnlocked(KnowledgeCapability.MemoryTCells, 34f)
             && !KnowledgeLadder.IsUnlocked(KnowledgeCapability.FcReceptor, 34f));
-        Check("all six unlocked at 100%", KnowledgeLadder.UnlockedCount(100f) == 6
+        Check("all five unlocked at 100%", KnowledgeLadder.UnlockedCount(100f) == 5
             && KnowledgeLadder.IsUnlocked(KnowledgeCapability.SecretoryIgA, 100f));
 
         bool monotonic = true;

@@ -55,8 +55,6 @@ namespace ImmunologyTD.Adaptive
         /// <summary>The fixed antigen a given pathogen class presents.
         /// Species key = <see cref="PathogenClass"/> until a real
         /// species roster exists (SPRINT_PLAN.md item 1).</summary>
-        public static byte ForClass(PathogenClass c) => AdaptiveTuning.AntigenForClass(c);
-
         /// <summary>Sprint 24: the tag of a NAMED species. This is the one
         /// new code should use -- two species sharing a class have different
         /// tags, which is the whole point.</summary>

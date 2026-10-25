@@ -40,6 +40,17 @@ namespace ImmunologyTD.Economy
         /// follicle. **Real effect** (GutWallFeatures.MCellLevel). Level
         /// scales the sampling rate. Appended last so earlier ordinals hold.</summary>
         MCellSampling,
+
+        /// <summary>Sprint 25: **complement**, moved off the knowledge
+        /// ladder because it is structural rather than learned (Director,
+        /// 2026-10-25). Raises the baseline level of locally-made C3 in the
+        /// gut, which coats arrivals and marks them for a phagocyte --
+        /// opsonisation and recruitment, NOT direct lysis, because the gut
+        /// lacks membrane-attack-complex components. Repeatable: Wu 2024
+        /// found basal C3 level correlates directly with protection, so
+        /// "more baseline complement" is exactly the right shape for a
+        /// stacking body upgrade.</summary>
+        ComplementBaseline,
     }
 
     /// <summary>
@@ -59,6 +70,7 @@ namespace ImmunologyTD.Economy
         public static int CryptBasePrice = 25;
         public static int CytokineSensingUpgradeBasePrice = 35;
         public static int MCellSamplingBasePrice = 40;
+        public static int ComplementBaselineBasePrice = 50;
 
         /// <summary>Each subsequent level of the same item costs
         /// <c>basePrice * (1 + PriceGrowthPerLevel * currentLevel)</c>.</summary>
@@ -78,6 +90,7 @@ namespace ImmunologyTD.Economy
                 case ShopItem.HostBacterialResistance: return HostBacterialResistanceBasePrice;
                 case ShopItem.CytokineSensingUpgrade: return CytokineSensingUpgradeBasePrice;
                 case ShopItem.MCellSampling: return MCellSamplingBasePrice;
+                case ShopItem.ComplementBaseline: return ComplementBaselineBasePrice;
                 default: return CryptBasePrice;
             }
         }
@@ -119,6 +132,7 @@ namespace ImmunologyTD.Economy
             CryptBasePrice = 25;
             CytokineSensingUpgradeBasePrice = 35;
             MCellSamplingBasePrice = 40;
+            ComplementBaselineBasePrice = 50;
             PriceGrowthPerLevel = 0.6f;
             ProgenitorUpgradeBasePrice = 35;
         }

@@ -100,7 +100,7 @@ public static class Sprint22Verification
         rig.Knowledge = new KnowledgeLedger();
         if (knowledgePercent > 0f)
         {
-            rig.Knowledge.Add(PathogenClass.LargeBacterium, knowledgePercent);
+            rig.Knowledge.Add(PathogenSpecies.GenericLargeBacterium, knowledgePercent);
             rig.Wall.BindKnowledge(rig.Knowledge);
         }
 

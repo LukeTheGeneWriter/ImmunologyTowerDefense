@@ -37,12 +37,16 @@ namespace ImmunologyTD.UI
         public readonly VisualElement Root;
         public VisualElement Expanded => expanded;
 
-        private const int SpeciesCount = KnowledgeWatcher.Species;
+        private static int SpeciesCount => KnowledgeWatcher.Species;
         private const float TrackW = 160f;
         private const int TokenPool = 6;
         private const int RibbonQueue = 8;
 
-        private static readonly string[] Names = { "Virus", "Intracellular bacterium", "Large bacterium" };
+        /// <summary>Sprint 25: names come from the species roster, so a new
+        /// organism appears in the HUD the moment it is added rather than
+        /// needing a parallel list kept in sync by hand.</summary>
+        private static string NameOf(int s) =>
+            ImmunologyTD.Pathogens.SpeciesRoster.NameOf((ImmunologyTD.Pathogens.PathogenSpecies)s);
         private static readonly string[] PctText = BuildPct();
 
         private static readonly (string name, string effect)[] RungInfo =
@@ -85,7 +89,7 @@ namespace ImmunologyTD.UI
             public float Delta;
         }
 
-        private readonly Card[] cards = new Card[SpeciesCount];
+        private readonly Card[] cards = new Card[ImmunologyTD.Pathogens.SpeciesRoster.Count];
         private readonly Token[] tokens = new Token[TokenPool];
         private readonly VisualElement floatLayer;
         private readonly VisualElement expanded;
@@ -200,7 +204,7 @@ namespace ImmunologyTD.UI
             {
                 watcher.Prime(ledger);
                 for (int s = 0; s < SpeciesCount; s++)
-                    cards[s].Shown = cards[s].Target = ledger.Get((ImmunologyTD.Pathogens.PathogenClass)s);
+                    cards[s].Shown = cards[s].Target = ledger.Get((ImmunologyTD.Pathogens.PathogenSpecies)s);
             }
         }
 
@@ -208,7 +212,12 @@ namespace ImmunologyTD.UI
         // Construction
         // ------------------------------------------------------------------
 
-        private static Color SpeciesColor(int s) => s == 0 ? Palette.Virion : Palette.Bacterium;
+        /// <summary>Sprint 25: colour follows the species' CLASS, so a
+        /// newly-added organism gets a sensible colour with no edit here.</summary>
+        private static Color SpeciesColor(int s) =>
+            ImmunologyTD.Pathogens.SpeciesRoster.ClassOf((ImmunologyTD.Pathogens.PathogenSpecies)s)
+                == ImmunologyTD.Pathogens.PathogenClass.IntracellularVirus
+                ? Palette.Virion : Palette.Bacterium;
 
         private static VisualElement SpeciesIcon(int s, float size)
         {
@@ -254,7 +263,7 @@ namespace ImmunologyTD.UI
             disc.pickingMode = PickingMode.Ignore;
             disc.Add(SpeciesIcon(s, 36));
             top.Add(disc);
-            var name = UiTheme.Text(Names[s], 12, UiTheme.Ink, Weight.Black);
+            var name = UiTheme.Text(NameOf(s), 12, UiTheme.Ink, Weight.Black);
             name.style.whiteSpace = WhiteSpace.Normal;
             name.style.flexShrink = 1;
             name.style.marginLeft = 6;
@@ -377,7 +386,7 @@ namespace ImmunologyTD.UI
             int s = expandedSpecies;
             if (s < 0) return;
             float pct = cards[s].Target;
-            expandedTitle.text = $"{Names[s]}  ·  {PctText[Mathf.Clamp(Mathf.FloorToInt(pct), 0, 100)]} known";
+            expandedTitle.text = $"{NameOf(s)}  ·  {PctText[Mathf.Clamp(Mathf.FloorToInt(pct), 0, 100)]} known";
             var rungs = KnowledgeLadder.Rungs;
             int next = NextRungIndex(pct);
             for (int i = 0; i < expandedRows.Length; i++)
@@ -599,7 +608,7 @@ namespace ImmunologyTD.UI
                 ribbonCount--;
                 var rung = KnowledgeLadder.Rungs[r];
                 ribbonStripe.style.backgroundColor = SpeciesColor(s);
-                ribbonTop.text = $"Learned · {Names[s]} {Mathf.RoundToInt(rung.ThresholdPercent)}%".ToUpperInvariant();
+                ribbonTop.text = $"Learned · {NameOf(s)} {Mathf.RoundToInt(rung.ThresholdPercent)}%".ToUpperInvariant();
                 ribbonName.text = RungInfo[r].name;
                 UiTheme.Show(ribbonPlanned, !rung.Built);
                 UiTheme.Show(ribbon, true);

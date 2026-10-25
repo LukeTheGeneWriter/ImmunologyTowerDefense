@@ -67,6 +67,13 @@ namespace ImmunologyTD.UI
                     UiTheme.Layer(b, SpriteShapes.LargeBacterium, Palette.Bacterium, s, 0.50f, 0.18f, -0.18f);
                     UiTheme.Layer(b, SpriteShapes.IconBlock, new Color(0.85f, 0.12f, 0.16f), s, 0.55f, 0.18f, -0.18f);
                 } },
+            new Entry { Item = ShopItem.ComplementBaseline, Name = "Complement", Short = "Comple-\nment",
+                Effect = "Raises baseline C3 in the gut: arrivals get coated and marked for a phagocyte.",
+                Icon = (b, s) =>
+                {
+                    UiTheme.Layer(b, SpriteShapes.LargeBacterium, Palette.Bacterium, s, 0.80f);
+                    UiTheme.Layer(b, SpriteShapes.KnowledgeRing, Palette.FxOpsonisation, s, 1.00f);
+                } },
             new Entry { Item = ShopItem.Crypt, Name = "Crypt", Short = "Crypt", Real = true,
                 Effect = "A stem-cell niche at the gut wall. Nearby tissue regrows faster.",
                 Icon = (b, s) =>

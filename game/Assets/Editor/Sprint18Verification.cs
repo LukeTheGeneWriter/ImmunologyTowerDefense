@@ -216,8 +216,17 @@ public static class Sprint18Verification
             AdaptiveTuning.MatchMaxHammingDistance == 2 && Mathf.Approximately(AdaptiveTuning.LymphocyteLifespanSeconds, 20f));
 
         Buy(rig, 2, 0);
-        Check("helper-T clonal expansion: cap 8 -> 12 and rate x1.5",
-            rig.Marrow.GetTuning(2).MaxActiveChildren == 12 && Mathf.Approximately(t.EmissionRateMultiplier, 1.5f));
+        // Sprint 25: base cap 8 -> 4 and the step 4 -> 2, so one level is
+        // 4 -> 6. Asserted against the live constants rather than literals,
+        // so a future population pass cannot silently make this upgrade
+        // meaningless again -- which is exactly what the old numbers did
+        // (a cap of 8 never bound, so the cap half of this upgrade bought
+        // nothing until Sprint 18 compensated with the rate).
+        int expectedCap = AdaptiveTuning.LymphocyteMaxActiveChildren
+                          + ProgenitorUpgrades.ClonalCapPerLevel;
+        Check($"helper-T clonal expansion: cap {AdaptiveTuning.LymphocyteMaxActiveChildren} -> {expectedCap} and rate x1.5",
+            rig.Marrow.GetTuning(2).MaxActiveChildren == expectedCap
+            && Mathf.Approximately(t.EmissionRateMultiplier, 1.5f));
         for (int i = 0; i < 3; i++) Buy(rig, 2, 1);
         Check("helper-T TCR affinity: match distance 2 -> 4, ceiling holds at 4",
             AdaptiveUnitTuning.MatchMaxHammingDistance(t) == AdaptiveUnitTuning.MatchDistanceCeiling);

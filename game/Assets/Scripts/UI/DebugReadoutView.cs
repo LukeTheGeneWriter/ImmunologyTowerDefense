@@ -114,9 +114,14 @@ namespace ImmunologyTD.UI
             sb.Append(BuildPathogenLine()).Append('\n');
             sb.Append(BuildInvasionLine()).Append("\n\n");
             sb.Append(BuildKnowledgeHeader()).Append('\n');
-            sb.Append(BuildLadderLine(PathogenClass.IntracellularVirus, "virus")).Append('\n');
-            sb.Append(BuildLadderLine(PathogenClass.IntracellularBacterium, "bacterium")).Append('\n');
-            sb.Append(BuildLadderLine(PathogenClass.LargeBacterium, "large-bac")).Append("\n\n");
+            // Sprint 25: every named species, from the roster -- a new
+            // organism shows up here with no edit.
+            for (int i = 0; i < SpeciesRoster.Count; i++)
+            {
+                var sp = (PathogenSpecies)i;
+                sb.Append(BuildLadderLine(sp, SpeciesRoster.ShortNameOf(sp))).Append('\n');
+            }
+            sb.Append('\n');
             sb.Append(BuildPerformanceLine());
 
             string wiring = BuildWiringLine(selectedSlot);
@@ -155,7 +160,7 @@ namespace ImmunologyTD.UI
             return $"KNOWLEDGE per species -- ladder rungs unlock nothing yet, display only:{node}";
         }
 
-        private string BuildLadderLine(PathogenClass species, string label)
+        private string BuildLadderLine(PathogenSpecies species, string label)
         {
             if (knowledge == null) return string.Empty;
             float pct = knowledge.Get(species);

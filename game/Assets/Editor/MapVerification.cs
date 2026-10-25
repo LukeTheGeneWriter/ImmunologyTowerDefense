@@ -247,8 +247,15 @@ public static class MapVerification
         agent.SimulationTick(InvasionTuning.LumenStepIntervalSeconds, 0f);
         Check($"One step moves it along the flow axis (cross {startCross} -> {rig.Board.CrossIndex(agent.CurrentCoarse)})",
             rig.Board.CrossIndex(agent.CurrentCoarse) == startCross + rig.Board.FlowCrossStep);
-        Check("...without changing its distance from the wall",
-            rig.Board.AxisIndex(agent.CurrentCoarse) == startAxis);
+        // Sprint 25: this used to assert the depth NEVER changed. It now
+        // deliberately can -- organisms mix across the channel, because a
+        // fixed depth meant a pathogen's whole fate was decided by one
+        // spawn roll it could never escape. What must still hold is that
+        // mixing is at most one cell per step, so flow stays the dominant
+        // motion and nothing teleports across the lumen.
+        int axisDrift = Mathf.Abs(rig.Board.AxisIndex(agent.CurrentCoarse) - startAxis);
+        Check($"...and changes its distance from the wall by at most one cell (moved {axisDrift})",
+            axisDrift <= 1);
 
         // Carry it all the way down the channel.
         float t = 0f;

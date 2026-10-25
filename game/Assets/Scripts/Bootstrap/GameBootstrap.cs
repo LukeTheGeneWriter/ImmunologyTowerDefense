@@ -38,7 +38,11 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 1,
             FootprintFineTiles = 5,
             Color = new Color(0.30f, 0.40f, 0.80f),
-            MaxActiveChildren = 10,
+            // Sprint 25: 10 -> 4. The Director's call -- fewer cells on the board so
+            // each one is legible and each upgrade is felt. A macrophage line
+            // of four that you have invested in should beat ten that you have
+            // not.
+            MaxActiveChildren = 4,
             KillLimit = 20,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
@@ -76,7 +80,10 @@ namespace ImmunologyTD.Bootstrap
             FootprintFineTiles = 3,
             Color = new Color(0.93f, 0.74f, 0.30f), // Sprint 13: nudged amber -> gold, away from hazard-orange
 
-            MaxActiveChildren = 10,
+            // Sprint 25: 10 -> 5. Kept the highest of any kind: the neutrophil is
+            // the cheap abundant one and should still read as a swarm next to
+            // a macrophage line, just a smaller one.
+            MaxActiveChildren = 5,
             KillLimit = 5,
             DegranulatesOnDepletion = true,
             DegranulationBurstMultiplier = 3f,
@@ -111,7 +118,10 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 3,
             FootprintFineTiles = 3,
             Color = new Color(0.78f, 0.26f, 0.32f),
-            MaxActiveChildren = 8,
+            // Sprint 25: 8 -> 3. Expensive, knowledge-gated, and precise -- three
+            // of these working a cell together is the cooperation bonus's
+            // intended shape, not a crowd.
+            MaxActiveChildren = 3,
             KillLimit = 16,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
@@ -137,7 +147,9 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 3, // 6-7 um/min, Garrod 2007 PNAS
             FootprintFineTiles = 3,
             Color = new Color(0.46f, 0.30f, 0.62f),
-            MaxActiveChildren = 6,
+            // Sprint 25: 6 -> 3. Its output is an aura, so its value scales with
+            // POSITION rather than headcount.
+            MaxActiveChildren = 3,
             KillLimit = 10,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
@@ -168,7 +180,9 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 1,
             FootprintFineTiles = 3,
             Color = new Color(0.20f, 0.58f, 0.46f),
-            MaxActiveChildren = 6,
+            // Sprint 25: 6 -> 3. Tissue-resident wall patrol; three covering
+            // different stretches is a real placement decision.
+            MaxActiveChildren = 3,
             KillLimit = 12,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
@@ -195,7 +209,9 @@ namespace ImmunologyTD.Bootstrap
             FineTilesPerTick = 0, // sessile
             FootprintFineTiles = 3,
             Color = new Color(0.92f, 0.55f, 0.20f),
-            MaxActiveChildren = 5,
+            // Sprint 25: 5 -> 2. Sessile factories -- the antibodies are the
+            // visible population, not the plasma cells themselves.
+            MaxActiveChildren = 2,
             KillLimit = 9999, // it never kills; depletion is by lifespan
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,

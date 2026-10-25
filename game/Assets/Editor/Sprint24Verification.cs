@@ -125,9 +125,11 @@ public static class Sprint24Verification
         Check("...nor about an unrelated species",
             Mathf.Approximately(k.Get(PathogenSpecies.VibrioCholerae), 0f));
 
-        // The class-keyed bridge still means "the generic one".
-        k.Add(PathogenClass.IntracellularVirus, 20f);
-        Check("the class-keyed overload resolves to that class's generic",
+        // Sprint 25: the class-keyed ledger overloads are GONE. Knowledge
+        // can only be addressed by species now, so there is no longer a way
+        // for a caller to accidentally teach "all viruses at once".
+        k.Add(PathogenSpecies.GenericVirus, 20f);
+        Check("teaching the generic virus leaves rotavirus untouched",
             Mathf.Approximately(k.Get(PathogenSpecies.GenericVirus), 20f)
             && Mathf.Approximately(k.Get(PathogenSpecies.Rotavirus), 50f));
 

@@ -1077,25 +1077,28 @@ nothing else. Each capability's real mechanic is its own later sprint.
 | ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). **Built in Sprint 23** as plasma-cell-secreted antibody that coats pathogens in tissue, reusing the §6b coating state. |
 | ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
-| ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. **⚠ Probably wrong for a gut map — see below. Not built.** |
 | ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. **Built in Sprint 22.** Two stages: a *coated* organism is slower, pacified and more fragile behind the wall; two coated organisms of the same species are **cross-linked** into a raft that cannot reach the epithelium and is swept away. Crucially, a coated bacterium still divides at full rate and its **daughter is born attached to it**, so under IgA replication is what traps it. Nothing out here is killed. |
 
-> **⚠ The ~60% rung is contested (2026-10-25).** Wu et al., *Cell* 2024
-> ([DOI](https://doi.org/10.1016/j.cell.2023.12.036)) reports that the gut
-> **lacks membrane-attack-complex components**, which is how commensals
-> survive C3 deposition — so "antibody destroys the membrane with no
-> immune cell present" may simply not happen in this setting. Two further
-> corrections: luminal C3 deposition is alternative-pathway (unchanged in
-> C1q-deficient mice), so *antibody* is not the trigger either; and
-> Gram-positives are structurally MAC-proof regardless (Joiner 1983,
-> ~10,000 C9 bound without killing).
+> **Complement left this ladder (Director, 2026-10-25).** It is now a
+> **body upgrade in the shop**, because it is *structural rather than
+> learned*: gut C3 is made locally by stromal cells and deposits through
+> the **alternative** pathway, which antibody does not trigger (Wu 2024,
+> *Cell* — luminal C3 deposition is unchanged in C1q-deficient mice). A
+> per-species knowledge ladder said the opposite, that you learn your way
+> to complement one pathogen at a time.
 >
-> **Caveat, and it is a real one:** that paper is a *colon* study — the
-> small intestine is untested, not confirmed — and nobody has replicated
-> its C5–C9 survey. The recommended re-spec is **opsonisation + phagocyte
-> recruitment**, with direct lysis moved to inflamed, barrier-breached
-> tissue where MAC does appear and attacks the host epithelium. **Awaiting
-> a Director decision**; full write-up in `docs/PATHOGEN_ROSTER.md`.
+> The move also fixes a wording that was wrong for this map. The gut lacks
+> membrane-attack-complex components, so "antibody destroys the membrane
+> with no immune cell present" does not happen here; as a body upgrade it
+> is re-specified as what the gut actually does — **opsonise, and recruit a
+> phagocyte to finish it**. Wu 2024 found basal C3 correlates directly with
+> protection, which is exactly the shape of a stacking body upgrade.
+>
+> Residual uncertainty, recorded honestly: that paper is a **colon** study,
+> the small intestine is untested, and nobody has replicated its C5–C9
+> survey. Full write-up in `docs/PATHOGEN_ROSTER.md`. If a direct-lysis
+> beat is ever wanted, its honest home is inflamed, barrier-breached
+> tissue, where MAC does appear — and attacks the host epithelium.
 
 The **~90% "specific sensing" capstone** (antibody-coated pathogens
 become chemotactic beacons) is not in the Director's six — treat it as the
@@ -1118,6 +1121,42 @@ answer to "how do you defend the lumen." Also gives the bone marrow's
 memory-storage role a visible payoff.
 
 Open question on mutation interacting with banked memory — see `BACKLOG.md`.
+
+## 5e. Lumen traffic — lane changing and spawn spread (Sprint 25)
+
+**Organisms mix across the channel as they drift.** Before Sprint 25 a
+pathogen's depth was fixed from spawn to exit: it entered in a lane and
+rode that lane to the excretion end. Because adhesion probability falls
+off exponentially with distance from the wall (§1b step 1), that meant an
+organism's entire fate was decided by a single spawn roll it could never
+escape — near lanes were lethal, far lanes were scenery, and the player
+could affect neither. It also *looked* wrong: the channel visibly
+stratified into packed rows and empty ones.
+
+Real luminal contents are not laminar at this scale. Peristalsis actively
+mixes the bolus — which the game already models as surges (§1a) — and that
+mixing is what repeatedly re-presents organisms to the mucus surface
+instead of letting the mid-channel ones coast past untouched.
+
+Two differences fall out of it for free, and both are real:
+
+- **Motile organisms mix more and bias toward the wall.** Bacteria are
+  flagellated and swim toward the mucus layer; virions are passive
+  particles that go where the fluid puts them. So a bacterium works its
+  way to the epithelium and a virion only arrives there by luck.
+- **Mixing is at most one cell per step**, so flow stays the dominant
+  motion. `MapVerification` pins that bound — the old assertion that depth
+  *never* changes was replaced by one that it changes by at most one.
+
+**Spawn depth is stratified, not random.** A rotating cursor walks every
+depth in turn, so a wave spreads across the channel by construction.
+Uniform random is even *in expectation*, but a wave is a handful of
+organisms and at that sample size random clumps badly — which is the other
+half of what made the channel look stratified. There is deliberately **no
+jitter** on top of the cursor: the first version added one and the harness
+caught it undoing the very spread it existed to vary (a wave of ten
+covered six depths). Variety between waves comes free, because the cursor
+runs continuously and a wave rarely divides the channel depth evenly.
 
 ## 5a. How knowledge is actually earned — the DC shuttle — LOCKED (Director, 2026-08-21)
 

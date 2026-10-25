@@ -428,14 +428,14 @@ public static class Sprint23Verification
             Check("a gamma-delta tower IS licensed at 0% (tissue-resident, unprimed)",
                 KnowledgeLicence.IsTowerLicensed(UnitKind.GammaDeltaT));
 
-            ledger.Add(PathogenClass.IntracellularVirus, 12f);
+            ledger.Add(PathogenSpecies.GenericVirus, 12f);
             Check("one species past 10% licenses the CTL tower",
                 KnowledgeLicence.IsTowerLicensed(UnitKind.CytotoxicT));
 
             // The B cell waits on a higher rung than the CTL.
             Check("the B-cell tower is still dark at 12% (its rung is 20%)",
                 !KnowledgeLicence.IsTowerLicensed(UnitKind.PlasmaCell));
-            ledger.Add(PathogenClass.IntracellularVirus, 10f);
+            ledger.Add(PathogenSpecies.GenericVirus, 10f);
             Check("and licenses at 22%",
                 KnowledgeLicence.IsTowerLicensed(UnitKind.PlasmaCell));
         }
@@ -452,14 +452,14 @@ public static class Sprint23Verification
         try
         {
             // The virus is known; the bacterium is not.
-            ledger.Add(PathogenClass.IntracellularVirus, 40f);
+            ledger.Add(PathogenSpecies.GenericVirus, 40f);
 
             Check("a CTL recognises the characterised species",
-                KnowledgeLicence.RecognisesSpecies(UnitKind.CytotoxicT, PathogenClass.IntracellularVirus));
+                KnowledgeLicence.RecognisesSpecies(UnitKind.CytotoxicT, PathogenSpecies.GenericVirus));
             Check("a CTL is BLIND to an uncharacterised species (MHC-I restriction)",
-                !KnowledgeLicence.RecognisesSpecies(UnitKind.CytotoxicT, PathogenClass.IntracellularBacterium));
+                !KnowledgeLicence.RecognisesSpecies(UnitKind.CytotoxicT, PathogenSpecies.GenericIntracellularBacterium));
             Check("an NK cell sees both -- it needs no antigen",
-                KnowledgeLicence.RecognisesSpecies(UnitKind.NaturalKiller, PathogenClass.IntracellularBacterium));
+                KnowledgeLicence.RecognisesSpecies(UnitKind.NaturalKiller, PathogenSpecies.GenericIntracellularBacterium));
 
             // And prove it in the simulation, not just the predicate.
             var cell = new CoarseCoord(50, 20);

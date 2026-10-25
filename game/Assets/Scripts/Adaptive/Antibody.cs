@@ -135,7 +135,7 @@ namespace ImmunologyTD.Adaptive
             // Species specificity: antibody is raised against what the
             // adaptive system has actually characterised.
             if (!KnowledgeLicence.RecognisesSpecies(
-                    ImmunologyTD.Units.UnitKind.PlasmaCell, target.Class))
+                    ImmunologyTD.Units.UnitKind.PlasmaCell, target.Species))
             {
                 return false;
             }

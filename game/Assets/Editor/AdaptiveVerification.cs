@@ -84,9 +84,9 @@ public static class AdaptiveVerification
         // The three species antigens are distinct and >= 4 bits apart, so a
         // helper-T within distance 2 of one is within distance 2 of at most
         // one -- "knowledge is per species" stays meaningful.
-        byte v = Antigen.ForClass(PathogenClass.IntracellularVirus);
-        byte b = Antigen.ForClass(PathogenClass.IntracellularBacterium);
-        byte l = Antigen.ForClass(PathogenClass.LargeBacterium);
+        byte v = Antigen.ForSpecies(PathogenSpecies.GenericVirus);
+        byte b = Antigen.ForSpecies(PathogenSpecies.GenericIntracellularBacterium);
+        byte l = Antigen.ForSpecies(PathogenSpecies.GenericLargeBacterium);
         Check("species antigens are distinct", v != b && b != l && v != l);
         Check("species antigens are >= 4 bits apart",
             Antigen.HammingDistance(v, b) >= 4 &&
@@ -104,27 +104,27 @@ public static class AdaptiveVerification
         var k = new KnowledgeLedger();
 
         Check("fresh ledger reads 0 for every species",
-            k.Get(PathogenClass.IntracellularVirus) == 0f &&
-            k.Get(PathogenClass.IntracellularBacterium) == 0f &&
-            k.Get(PathogenClass.LargeBacterium) == 0f);
+            k.Get(PathogenSpecies.GenericVirus) == 0f &&
+            k.Get(PathogenSpecies.GenericIntracellularBacterium) == 0f &&
+            k.Get(PathogenSpecies.GenericLargeBacterium) == 0f);
 
         int rev0 = k.Revision;
-        k.Add(PathogenClass.IntracellularVirus, 30f);
+        k.Add(PathogenSpecies.GenericVirus, 30f);
         Check("Add is per species (virus 30, bacterium still 0)",
-            Mathf.Approximately(k.Get(PathogenClass.IntracellularVirus), 30f) &&
-            k.Get(PathogenClass.IntracellularBacterium) == 0f);
+            Mathf.Approximately(k.Get(PathogenSpecies.GenericVirus), 30f) &&
+            k.Get(PathogenSpecies.GenericIntracellularBacterium) == 0f);
         Check("Revision advanced on Add", k.Revision > rev0);
 
-        k.Add(PathogenClass.IntracellularVirus, 999f);
+        k.Add(PathogenSpecies.GenericVirus, 999f);
         Check("clamped at KnowledgeMax",
-            Mathf.Approximately(k.Get(PathogenClass.IntracellularVirus), AdaptiveTuning.KnowledgeMax));
+            Mathf.Approximately(k.Get(PathogenSpecies.GenericVirus), AdaptiveTuning.KnowledgeMax));
 
-        k.Add(PathogenClass.IntracellularVirus, -999f);
-        Check("clamped at 0 from below", k.Get(PathogenClass.IntracellularVirus) == 0f);
+        k.Add(PathogenSpecies.GenericVirus, -999f);
+        Check("clamped at 0 from below", k.Get(PathogenSpecies.GenericVirus) == 0f);
 
-        k.Add(PathogenClass.LargeBacterium, 12f);
+        k.Add(PathogenSpecies.GenericLargeBacterium, 12f);
         k.Reset();
-        Check("Reset zeroes every species", k.Get(PathogenClass.LargeBacterium) == 0f);
+        Check("Reset zeroes every species", k.Get(PathogenSpecies.GenericLargeBacterium) == 0f);
     }
 
     // =================================================================
@@ -257,10 +257,10 @@ public static class AdaptiveVerification
         Check("shuttle: DC visited the node, spent its cargo, and is pacing tissue again",
             dcA.State == DendriticCellState.PatrolTissue && !dcA.HasCargo);
         Check("shuttle: a MATCHING pairing raised virus knowledge by exactly KnowledgePerMatch",
-            Mathf.Approximately(rigA.Knowledge.Get(PathogenClass.IntracellularVirus), AdaptiveTuning.KnowledgePerMatch));
+            Mathf.Approximately(rigA.Knowledge.Get(PathogenSpecies.GenericVirus), AdaptiveTuning.KnowledgePerMatch));
         Check("shuttle: it taught NOTHING about the other species",
-            rigA.Knowledge.Get(PathogenClass.IntracellularBacterium) == 0f &&
-            rigA.Knowledge.Get(PathogenClass.LargeBacterium) == 0f);
+            rigA.Knowledge.Get(PathogenSpecies.GenericIntracellularBacterium) == 0f &&
+            rigA.Knowledge.Get(PathogenSpecies.GenericLargeBacterium) == 0f);
         rigA.Dispose();
 
         // -- non-matching pairing: freeze happened, cargo spent, taught nothing --
@@ -269,7 +269,7 @@ public static class AdaptiveVerification
         Check("shuttle (no match): DC still completed its pairing cycle and is pacing again",
             dcB.State == DendriticCellState.PatrolTissue && !dcB.HasCargo);
         Check("shuttle (no match): knowledge stayed at 0",
-            rigB.Knowledge.Get(PathogenClass.LargeBacterium) == 0f);
+            rigB.Knowledge.Get(PathogenSpecies.GenericLargeBacterium) == 0f);
         rigB.Dispose();
 
         AdaptiveTuning.ResetToDefaults();

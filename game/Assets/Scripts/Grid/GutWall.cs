@@ -731,7 +731,7 @@ namespace ImmunologyTD.Grid
 
                 if (!p.IsCoated
                     && p.WallD <= IgaTuning.ReachDepthCells
-                    && knowledge.Get(p.Class) >= IgaTuning.KnowledgePercent
+                    && knowledge.Get(p.Species) >= IgaTuning.KnowledgePercent
                     && Random.value < coatP)
                 {
                     p.SetCoated(true);

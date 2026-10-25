@@ -27,7 +27,11 @@ namespace ImmunologyTD.UI
             public int RungIndex;     // KnowledgeLadder.Rungs index (Unlock)
         }
 
-        public const int Species = 3;
+        /// <summary>Sprint 25: every NAMED species, not the three classes.
+        /// Was a hardcoded 3, which meant the knowledge HUD could never
+        /// show rotavirus or vibrio however much the player learned about
+        /// them -- the ledger tracked them and nothing displayed them.</summary>
+        public static int Species => ImmunologyTD.Pathogens.SpeciesRoster.Count;
         public const int MaxEvents = 16;
 
         private readonly float[] last = new float[Species];
@@ -43,7 +47,7 @@ namespace ImmunologyTD.UI
         {
             for (int s = 0; s < Species; s++)
             {
-                last[s] = ledger.Get((ImmunologyTD.Pathogens.PathogenClass)s);
+                last[s] = ledger.Get((ImmunologyTD.Pathogens.PathogenSpecies)s);
                 lastUnlocked[s] = KnowledgeLadder.UnlockedCount(last[s]);
             }
             lastRevision = ledger.Revision;
@@ -62,7 +66,7 @@ namespace ImmunologyTD.UI
 
             for (int s = 0; s < Species; s++)
             {
-                float now = ledger.Get((ImmunologyTD.Pathogens.PathogenClass)s);
+                float now = ledger.Get((ImmunologyTD.Pathogens.PathogenSpecies)s);
                 float d = now - last[s];
                 if (d > 1e-4f) Push(Kind.Match, s, d, -1);
                 else if (d < -1e-4f) Push(Kind.Loss, s, d, -1);

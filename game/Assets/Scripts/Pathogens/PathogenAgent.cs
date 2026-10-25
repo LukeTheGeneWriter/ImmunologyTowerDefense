@@ -371,8 +371,7 @@ namespace ImmunologyTD.Pathogens
             // through. With no override it's the Sprint 4 random-depth spawn
             // at the upstream end.
             CurrentCoarse = lumenCellOverride ?? board.CoarseFromAxis(
-                Random.Range(board.LumenNearWallAxisIndex, board.AxisLength),
-                board.LumenEntryCrossIndex);
+                NextSpawnAxis(board), board.LumenEntryCrossIndex);
             Current = board.CoarseCenterFine(CurrentCoarse);
 
             State = PathogenState.Lumen;
@@ -615,6 +614,92 @@ namespace ImmunologyTD.Pathogens
         /// entry cell gets exactly one roll like every other cell rather
         /// than two.
         /// </summary>
+        /// <summary>
+        /// Sprint 25 -- **stratified spawn depth.**
+        ///
+        /// A rotating cursor across the channel's depth instead of
+        /// `Random.Range`. Uniform random is even *in expectation*, but a
+        /// wave is only a handful of organisms, and at that sample size
+        /// random clumps badly -- which is what the Director saw as some
+        /// rows packed and others empty from the moment a wave entered.
+        ///
+        /// The cursor walks every depth in turn, so a wave of N spreads
+        /// across the channel by construction.
+        ///
+        /// **Deliberately no random jitter on top.** The first version added
+        /// a 35% one-cell wobble to stop waves stencilling an identical
+        /// ladder, and the harness caught it immediately: the wobble
+        /// collided with the cursor and a wave of ten covered only six
+        /// distinct depths -- it undid the spread it was there to vary.
+        /// Variety between waves comes free anyway, because the cursor runs
+        /// continuously and a wave's size rarely divides the channel depth
+        /// evenly, so each wave starts at a different phase.
+        ///
+        /// Process-static on purpose: it is a property of the channel, not
+        /// of any one organism, and it costs nothing to reset.
+        /// </summary>
+        private static int spawnAxisCursor;
+
+        public static void ResetSpawnPattern() => spawnAxisCursor = 0;
+
+        private static int NextSpawnAxis(BoardConfig board)
+        {
+            int lo = board.LumenNearWallAxisIndex;
+            int span = board.AxisLength - lo;
+            if (span <= 1) return lo;
+
+            int pick = lo + (spawnAxisCursor % span);
+            spawnAxisCursor++;
+            return pick;
+        }
+
+        /// <summary>
+        /// Sprint 25 -- **lane changing in the lumen.**
+        ///
+        /// Returns the axis (depth) index this organism should occupy after
+        /// this step. Most steps return the current one; sometimes the
+        /// organism crosses one cell toward or away from the gut wall.
+        ///
+        /// Before this, depth was fixed from spawn to exit, so adhesion odds
+        /// -- which fall off exponentially with distance from the wall --
+        /// were decided entirely by one spawn roll the organism could never
+        /// escape. Near lanes were lethal, far lanes were scenery, and the
+        /// channel visibly stratified into packed rows and empty ones.
+        ///
+        /// Motile organisms (bacteria) mix more and bias toward the wall,
+        /// because they are flagellated and swim toward the mucus. Virions
+        /// are passive and go where the fluid puts them, so they only reach
+        /// the wall by luck -- a real distinction between the two, free.
+        /// </summary>
+        private int NextLumenAxis()
+        {
+            int axis = board.AxisIndex(CurrentCoarse);
+
+            bool motile = Class != PathogenClass.IntracellularVirus;
+            float chance = InvasionTuning.LumenLaneChangeChance
+                           * (motile ? InvasionTuning.MotileLaneChangeMultiplier : 1f);
+            if (Random.value >= chance) return axis;
+
+            // Wallward is DECREASING axis index: LumenNearWallAxisIndex is
+            // the channel cell closest to the epithelium.
+            float wallward = motile ? 0.5f + 0.5f * InvasionTuning.MotileWallwardBias : 0.5f;
+            int delta = Random.value < wallward ? -1 : +1;
+
+            int candidate = axis + delta;
+            // Stay inside the lumen channel. A bounce rather than a clamp,
+            // so an organism pinned at an edge still mixes instead of
+            // sticking there for the rest of its journey.
+            if (candidate < board.LumenNearWallAxisIndex || candidate >= board.AxisLength)
+            {
+                candidate = axis - delta;
+            }
+            if (candidate < board.LumenNearWallAxisIndex || candidate >= board.AxisLength)
+            {
+                return axis; // channel is one cell deep; nowhere to go
+            }
+            return candidate;
+        }
+
         private void StepLumen(float currentTime)
         {
             int nextCross = board.CrossIndex(CurrentCoarse) + board.FlowCrossStep;
@@ -625,7 +710,13 @@ namespace ImmunologyTD.Pathogens
                 return;
             }
 
-            CurrentCoarse = board.CoarseFromAxis(board.AxisIndex(CurrentCoarse), nextCross);
+            // Sprint 25: the organism may also shift ACROSS the channel on
+            // this step -- see TryChangeLane. Resolved before the move so a
+            // single MoveTo carries both components and the sprite glides
+            // diagonally rather than stepping twice.
+            int nextAxis = NextLumenAxis();
+
+            CurrentCoarse = board.CoarseFromAxis(nextAxis, nextCross);
             Current = board.CoarseCenterFine(CurrentCoarse);
             MoveTo(board.CoarseToWorldCenter(CurrentCoarse), InvasionTuning.LumenStepIntervalSeconds);
 

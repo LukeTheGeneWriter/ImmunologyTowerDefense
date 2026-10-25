@@ -54,29 +54,29 @@ public static class Sprint21Verification
     private static void RunWatcher()
     {
         var ledger = new KnowledgeLedger();
-        ledger.Add(PathogenClass.IntracellularVirus, 6f);
+        ledger.Add(PathogenSpecies.GenericVirus, 6f);
         var w = new KnowledgeWatcher();
         Check("first poll primes and fires nothing (no replay of earlier matches)", w.Poll(ledger) == 0);
         Check("no change -> no events", w.Poll(ledger) == 0);
 
-        ledger.Add(PathogenClass.IntracellularVirus, 3f);   // 9%: no rung
+        ledger.Add(PathogenSpecies.GenericVirus, 3f);   // 9%: no rung
         int n = w.Poll(ledger);
         Check("a +3% teach is exactly one Match", n == 1 && w.Events[0].Kind == KnowledgeWatcher.Kind.Match
               && w.Events[0].Species == (int)PathogenClass.IntracellularVirus && Mathf.Approximately(w.Events[0].Delta, 3f));
 
-        ledger.Add(PathogenClass.IntracellularVirus, 3f);   // 12%: crosses CTL at 10
+        ledger.Add(PathogenSpecies.GenericVirus, 3f);   // 12%: crosses CTL at 10
         n = w.Poll(ledger);
         Check("crossing 10% is a Match plus an Unlock of rung 0 (CTL)",
             n == 2 && w.Events[0].Kind == KnowledgeWatcher.Kind.Match &&
             w.Events[1].Kind == KnowledgeWatcher.Kind.Unlock && w.Events[1].RungIndex == 0);
 
-        ledger.Add(PathogenClass.LargeBacterium, 31f);       // 0 -> 31: crosses 10, 20, 30
+        ledger.Add(PathogenSpecies.GenericLargeBacterium, 31f);       // 0 -> 31: crosses 10, 20, 30
         n = w.Poll(ledger);
         int unlocks = 0, lastRung = -1;
         for (int i = 0; i < n; i++) if (w.Events[i].Kind == KnowledgeWatcher.Kind.Unlock) { unlocks++; lastRung = w.Events[i].RungIndex; }
         Check("a jump across three thresholds is three Unlocks, in order", unlocks == 3 && lastRung == 2);
 
-        ledger.Add(PathogenClass.LargeBacterium, -5f);
+        ledger.Add(PathogenSpecies.GenericLargeBacterium, -5f);
         n = w.Poll(ledger);
         Check("a drop is a Loss (the future mutation hook)", n == 1 && w.Events[0].Kind == KnowledgeWatcher.Kind.Loss);
     }
@@ -99,10 +99,17 @@ public static class Sprint21Verification
             built.Contains(KnowledgeCapability.NeutralizingAntibodies));
         Check("the secretory-IgA rung is built (Sprint 22)",
             built.Contains(KnowledgeCapability.SecretoryIgA));
-        Check("memory-T, Fc receptor and complement are still honestly 'planned'",
+        Check("memory-T and Fc receptor are still honestly 'planned'",
             !built.Contains(KnowledgeCapability.MemoryTCells)
-            && !built.Contains(KnowledgeCapability.FcReceptor)
-            && !built.Contains(KnowledgeCapability.Complement));
+            && !built.Contains(KnowledgeCapability.FcReceptor));
+
+        // Sprint 25: complement LEFT this ladder -- it is structural (gut C3
+        // is locally made and alternative-pathway, not antibody-triggered),
+        // so it is a body upgrade in the shop now. If someone puts it back
+        // on the ladder, that is a design regression, not a merge artefact.
+        foreach (var r in KnowledgeLadder.Rungs)
+            Check($"the ladder no longer carries complement ({r.ShortName})",
+                r.ShortName != "Compl");
         Check("the capstone sits at 90%, above the last rung",
             Mathf.Approximately(KnowledgeLadder.CapstonePercent, 90f) &&
             KnowledgeLadder.CapstonePercent > KnowledgeLadder.Rungs[KnowledgeLadder.Rungs.Length - 1].ThresholdPercent);

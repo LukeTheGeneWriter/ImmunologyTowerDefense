@@ -85,7 +85,7 @@ namespace ImmunologyTD.UI
         {
             new Row("Clonal expansion",
                     "Proliferates faster and holds more helper-T cells in the node — a busier node teaches faster.",
-                    "per-tower MaxActiveChildren 8 → +4/lvl, emission rate ×(1 + 0.5·lvl)", 35, 3),
+                    "per-tower MaxActiveChildren 4 → +2/lvl, emission rate ×(1 + 0.5·lvl)", 35, 3),
             new Row("TCR affinity maturation",
                     "A near-miss barcode still teaches — more pairings count.",
                     "AdaptiveUnitTuning.MatchDistanceBonus: MatchMaxHammingDistance 2 → +1/lvl, cap 4", 45, 2),
@@ -120,7 +120,7 @@ namespace ImmunologyTD.UI
                 case UnitKind.Neutrophil: return "fast · high collateral";
                 case UnitKind.DendriticCell: return "antigen shuttle to the node";
                 case UnitKind.CytotoxicT: return "precise kill · the cell survives";
-                case UnitKind.NaturalKiller: return "IFN-γ · upgrades your macrophages";
+                case UnitKind.NaturalKiller: return "IFN-gamma · upgrades your macrophages";
                 case UnitKind.GammaDeltaT: return "patrols the wall · repairs it";
                 case UnitKind.PlasmaCell: return "antibody factory · coats pathogens";
                 default: return "node resident · barcode match";
@@ -170,7 +170,7 @@ namespace ImmunologyTD.UI
                 // "NK cell", but the cell that actually dominates the human
                 // small-intestinal epithelium is an ILC1.
                 case UnitKind.NaturalKiller: return "NK cell (ILC1)";
-                case UnitKind.GammaDeltaT: return "γδ T cell (IEL)";
+                case UnitKind.GammaDeltaT: return "Gamma-delta T (IEL)";
                 case UnitKind.PlasmaCell: return "B cell";
                 default: return "Helper-T cell";
             }

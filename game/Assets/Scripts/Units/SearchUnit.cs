@@ -282,7 +282,7 @@ namespace ImmunologyTD.Units
             // characterised does nothing at all. Innate kinds are ungated
             // and this returns true for them immediately.
             if (!ImmunologyTD.Adaptive.KnowledgeLicence.RecognisesSpecies(
-                    profile.Kind, resident.Class))
+                    profile.Kind, resident.Species))
             {
                 return false;
             }

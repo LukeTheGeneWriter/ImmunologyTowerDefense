@@ -2,15 +2,31 @@ using System.Collections.Generic;
 
 namespace ImmunologyTD.Adaptive
 {
-    /// <summary>The six adaptive capabilities of GAME_DESIGN.md §5's
-    /// threshold ladder — the Director's roster (2026-08-29).</summary>
+    /// <summary>
+    /// The adaptive capabilities of GAME_DESIGN.md §5's threshold ladder —
+    /// the Director's roster (2026-08-29).
+    ///
+    /// **Complement left this ladder in Sprint 25** (Director, 2026-10-25)
+    /// and became a body upgrade in the shop instead. The reasoning is that
+    /// complement is **structural, not learned**: C3 in the gut is made
+    /// locally by stromal cells and deposits through the ALTERNATIVE
+    /// pathway, which antibody does not trigger (Wu 2024, Cell —
+    /// luminal C3 deposition is unchanged in C1q-deficient mice). Putting
+    /// it on a per-species knowledge ladder said the opposite — that you
+    /// learn your way to it, one pathogen at a time.
+    ///
+    /// It is also the rung whose original wording was wrong for this map:
+    /// the gut lacks membrane-attack-complex components, so "antibody
+    /// destroys the membrane with no immune cell present" does not happen
+    /// here. As a body upgrade it is re-specified as what the gut actually
+    /// does — opsonise, and recruit a phagocyte to finish it.
+    /// </summary>
     public enum KnowledgeCapability
     {
         CytotoxicTCells,        // ~10% -- precise kill of an infected cell, no collateral / no DAMP
         NeutralizingAntibodies, // ~20% -- reduced adhesion probability for a known species
         MemoryTCells,           // ~30% -- a burst of CTLs spawns when a known species is seen again
         FcReceptor,             // ~45% -- antibodies affix to innate cells (opsonisation)
-        Complement,             // ~60% -- antibody destroys the target membrane, no cell needed
         SecretoryIgA,           // ~70% -- antibody into the lumen, acts before adhesion
     }
 
@@ -79,7 +95,6 @@ namespace ImmunologyTD.Adaptive
             new Rung(KnowledgeCapability.NeutralizingAntibodies, 20f, "NeutAb", built: true),  // Sprint 23
             new Rung(KnowledgeCapability.MemoryTCells,           30f, "MemT"),
             new Rung(KnowledgeCapability.FcReceptor,             45f, "FcR"),
-            new Rung(KnowledgeCapability.Complement,             60f, "Compl"),
             new Rung(KnowledgeCapability.SecretoryIgA,           70f, "IgA",    built: true),  // Sprint 22
         };
 

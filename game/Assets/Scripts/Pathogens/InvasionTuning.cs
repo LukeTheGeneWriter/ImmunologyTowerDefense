@@ -29,6 +29,43 @@ namespace ImmunologyTD.Pathogens
         /// that a wave resolves inside a playtest.</summary>
         public static float LumenStepIntervalSeconds = 0.35f;
 
+        // -- Sprint 25: lateral mixing in the lumen ---------------------
+
+        /// <summary>
+        /// Per lumen step, the chance an organism shifts one coarse cell
+        /// across the channel (toward or away from the wall).
+        ///
+        /// **Why this had to exist.** Before it, a pathogen's depth was
+        /// fixed for its whole journey: it spawned in a lane and rode that
+        /// lane to the exit. Since adhesion probability falls off
+        /// exponentially with distance from the wall, that meant an
+        /// organism's entire fate was decided by one spawn roll it could
+        /// never escape -- the near lanes were lethal, the far lanes were
+        /// scenery, and the player could do nothing about either. It also
+        /// looked wrong: the channel visibly stratified, with some rows
+        /// packed and others empty all round.
+        ///
+        /// Real luminal contents are not laminar at this scale. Peristalsis
+        /// actively mixes the bolus (the game already models the surges),
+        /// and that mixing is what repeatedly re-presents organisms to the
+        /// mucus surface rather than letting the mid-channel ones coast.
+        /// </summary>
+        public static float LumenLaneChangeChance = 0.28f;
+
+        /// <summary>Multiplier on the above for motile organisms. Bacteria
+        /// are flagellated and actively swim toward the mucus layer;
+        /// virions are passive particles that go where the fluid puts them.
+        /// So a bacterium works its way to the wall and a virion only
+        /// arrives there by luck -- which is a real difference between them
+        /// and costs nothing to express.</summary>
+        public static float MotileLaneChangeMultiplier = 1.8f;
+
+        /// <summary>How strongly a motile organism's mixing is BIASED
+        /// toward the wall rather than symmetric. 0 = pure diffusion,
+        /// 1 = always wallward. Chemotaxis toward the mucus layer, kept
+        /// well below 1 so the channel still mixes both ways.</summary>
+        public static float MotileWallwardBias = 0.35f;
+
         // -- Proximity-gated adhesion (SPRINT_PLAN.md item 5) --
 
         /// <summary>Per-step adhesion chance for a pathogen hugging the gut
@@ -361,6 +398,9 @@ namespace ImmunologyTD.Pathogens
         public static void ResetToDefaults()
         {
             LumenStepIntervalSeconds = 0.35f;
+            LumenLaneChangeChance = 0.28f;
+            MotileLaneChangeMultiplier = 1.8f;
+            MotileWallwardBias = 0.35f;
             AdhesionChanceAtWall = 0.30f;
             AdhesionFalloffCells = 5f;
             FoodItemTransitSeconds = 30f;

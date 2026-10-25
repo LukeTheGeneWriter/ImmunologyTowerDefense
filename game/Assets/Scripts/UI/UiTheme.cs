@@ -52,6 +52,64 @@ namespace ImmunologyTD.UI
         /// <summary>Base spacing unit, px at the 1920x1080 reference.</summary>
         public const int S = 4;
 
+        // ---- font coverage ----------------------------------------
+
+        /// <summary>
+        /// Sprint 25. Characters the shipped Nunito faces actually contain,
+        /// beyond printable ASCII.
+        ///
+        /// **This exists because of a real bug the Director found.** The
+        /// gamma-delta T cell's shop card was named "γδ T cell (IEL)" and
+        /// the NK card's blurb said "IFN-γ" -- and Nunito has no Greek
+        /// block at all, so both rendered as nothing. There is no error,
+        /// no warning, and no missing-glyph box in UI Toolkit: the text
+        /// simply is not there, which is why it survived a build, a sprite
+        /// dump and a playtest before anyone noticed.
+        ///
+        /// Every character here was checked against the actual font files.
+        /// Notably present: the middot the blurbs use everywhere, the
+        /// en/em dashes, the curly quotes, the multiplication sign.
+        /// Notably ABSENT: the whole Greek block, and the rightwards arrow
+        /// (the arrows in ProgenitorUpgradeCatalog's FieldLabel strings are
+        /// safe only because those render in the debug readout's monospace
+        /// OS font, never in Nunito).
+        /// </summary>
+        private const string ExtraRenderable = "\u00B7\u00A0\u00D7\u2013\u2014\u2018\u2019\u201C\u201D\u2026\u2212";
+
+        /// <summary>True if every character of <paramref name="text"/> can
+        /// actually be drawn in the shipped UI font. Used by
+        /// <c>Sprint25Verification</c> to assert that no player-facing
+        /// string silently disappears.</summary>
+        public static bool IsRenderable(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return true;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c >= ' ' && c <= '~') continue;
+                if (c == '\n' || c == '\t') continue;
+                if (ExtraRenderable.IndexOf(c) >= 0) continue;
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>The first unrenderable character, for a failing test's
+        /// message. Returns '\0' when the string is fine.</summary>
+        public static char FirstUnrenderable(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return '\0';
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c >= ' ' && c <= '~') continue;
+                if (c == '\n' || c == '\t') continue;
+                if (ExtraRenderable.IndexOf(c) >= 0) continue;
+                return c;
+            }
+            return '\0';
+        }
+
         // ---- fonts ----
         private static Font regular, bold, black, mono;
         private static bool fontsLoaded;

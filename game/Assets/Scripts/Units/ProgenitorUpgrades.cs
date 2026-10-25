@@ -32,7 +32,11 @@ namespace ImmunologyTD.Units
         public const int DcSpeedPerLevel = 1;
         public const float DcBiteCutPerLevel = 0.08f;
         // Helper-T
-        public const int ClonalCapPerLevel = 4;
+        /// <summary>Sprint 25: 4 -> 2. The base cap fell from 8 to 4, so a
+        /// +4 step was now a doubling per level -- the upgrade would have
+        /// gone from meaningless (it never bound) straight to dominant. +2
+        /// on a base of 4 is a felt step that stays in proportion.</summary>
+        public const int ClonalCapPerLevel = 2;
         /// <summary>Clonal expansion also speeds this tower's helper-T
         /// production by (1 + this · level). Without it the cap bump alone is
         /// inert: at the default 20s lifespan and 3.5s interval a tower holds

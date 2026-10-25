@@ -848,3 +848,50 @@ Carried but not acted on: the ~60% complement rung is probably wrong for a
 gut map (the gut lacks MAC components), flagged in §5 awaiting a decision.
 
 17 harnesses green, 638 checks.
+
+## Sprint 25 -- 2026-10-25
+A refinement pass on the Director's notes. Six items, one of which was a
+bug that had already shipped.
+
+**The gamma-delta and NK cards were missing text.** Their labels contained
+real Greek characters -- "γδ T cell (IEL)" and "IFN-γ" -- and the shipped
+Nunito font has no Greek block at all. UI Toolkit does not warn, does not
+error and does not draw a missing-glyph box: the characters are simply
+absent. It survived a build and a playtest and was caught by eye. Fixed,
+and there is now a harness that walks every player-facing string and fails
+if any character cannot actually be drawn.
+
+**The species jump is finished.** Knowledge can no longer be addressed by
+pathogen class at all, so nothing can accidentally teach "every virus at
+once". This also fixed a live bug the half-migration had left: tower
+licensing iterated the three old classes, so learning rotavirus to 100%
+would never have switched a cytotoxic T cell progenitor on. The knowledge
+HUD and the debug readout now size themselves from the species roster, so
+a new organism appears in both the moment it is added.
+
+**Smaller standing armies.** Every progenitor's population cap came down
+-- macrophage 10 to 4, neutrophil 10 to 5, cytotoxic T 8 to 3, NK and
+gamma-delta 6 to 3, plasma cells 5 to 2, dendritic cells 4 to 3, helper T
+8 to 4. Fewer cells on the board means each one is legible and each
+upgrade is felt. The helper-T change matters most: a cap of 8 never bound
+(the niche's steady state is about 5.7), so clonal expansion's cap half
+had been buying literally nothing. At 4 it binds.
+
+**Complement moved from the knowledge ladder to the body shop.** It is
+structural, not learned -- gut C3 is made locally by stromal cells and
+deposits through the alternative pathway, which antibody does not trigger.
+It is also re-specified as what the gut actually does: opsonise and
+recruit a phagocyte, rather than lysing a membrane with no cell present,
+which does not happen in a gut that lacks membrane-attack-complex
+components.
+
+**Pathogens change lane in the lumen.** Depth used to be fixed from spawn
+to exit, so adhesion odds -- which fall off sharply with distance from the
+wall -- were decided by one spawn roll the organism could never escape.
+Near lanes were lethal, far lanes were scenery. Now organisms mix across
+the channel, with bacteria mixing more and biasing toward the wall because
+they swim, while virions drift where the fluid puts them. Spawn depth is
+stratified by a rotating cursor as well, so a wave spreads across the
+channel instead of clumping.
+
+18 harnesses green, 667 checks.

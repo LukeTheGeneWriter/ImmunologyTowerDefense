@@ -37,13 +37,6 @@ namespace ImmunologyTD.Adaptive
         /// <see cref="AdaptiveTuning.KnowledgeMax"/>.</summary>
         public float Get(PathogenSpecies species) => knowledge[(int)species];
 
-        /// <summary>Class-keyed convenience, resolving to that class's
-        /// generic species. Kept so pre-Sprint-24 code and harnesses that
-        /// legitimately mean "the generic one" keep working unchanged --
-        /// **not** a shortcut for new code, which should name its
-        /// species.</summary>
-        public float Get(PathogenClass klass) => Get(SpeciesRoster.GenericFor(klass));
-
         /// <summary>Adds <paramref name="amount"/> percentage points (may be
         /// negative, e.g. a future mutation discount), clamped to
         /// 0..KnowledgeMax. Returns the new value.</summary>
@@ -54,9 +47,6 @@ namespace ImmunologyTD.Adaptive
             Revision++;
             return knowledge[i];
         }
-
-        public float Add(PathogenClass klass, float amount) =>
-            Add(SpeciesRoster.GenericFor(klass), amount);
 
         /// <summary>The species the adaptive system knows most about, and by
         /// how much -- what a "which threat is characterised?" readout wants.</summary>
