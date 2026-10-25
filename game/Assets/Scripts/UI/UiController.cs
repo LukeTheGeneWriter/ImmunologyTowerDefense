@@ -74,6 +74,9 @@ namespace ImmunologyTD.UI
         private BandTabsView bandTabs;
         private readonly System.Collections.Generic.List<WorldLabelView> worldLabels =
             new System.Collections.Generic.List<WorldLabelView>();
+
+        /// <summary>Sprint 27: the price chip on the next fatty marrow pad.</summary>
+        private MarrowReconvertTag marrowTag;
         private readonly System.Collections.Generic.List<(Vector3 pos, string text)> pendingLabels =
             new System.Collections.Generic.List<(Vector3, string)>();
 
@@ -161,6 +164,10 @@ namespace ImmunologyTD.UI
 
             foreach (var (pos, text) in pendingLabels)
                 worldLabels.Add(new WorldLabelView(floatLayer, pos, text));
+
+            // Sprint 27: the price of the next marrow niche, pinned to the
+            // fatty pad it would convert.
+            if (marrow != null) marrowTag = new MarrowReconvertTag(floatLayer, marrow);
             pendingLabels.Clear();
 
             built = true;
@@ -254,6 +261,7 @@ namespace ImmunologyTD.UI
             RefreshSelection();
 
             for (int i = 0; i < worldLabels.Count; i++) worldLabels[i].Refresh(root.panel);
+            marrowTag?.Refresh(root.panel);
 
             debug.TickFrameCost();
             if (debugVisible) debug.Refresh(marrow != null && marrow.SelectedSlotIndex.HasValue

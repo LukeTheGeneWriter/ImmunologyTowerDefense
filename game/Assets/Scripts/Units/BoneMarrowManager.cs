@@ -7,7 +7,18 @@ using ImmunologyTD.Adaptive;
 
 namespace ImmunologyTD.Units
 {
-    public enum BoneMarrowSlotState { Empty, Placed }
+    /// <summary>
+    /// Sprint 27 adds <see cref="Fatty"/>: a niche that exists in the bone
+    /// but has not been reconverted to haematopoietic marrow yet.
+    ///
+    /// It is a real state rather than "slot doesn't exist" so the pads can
+    /// be drawn from the first frame. The player sees the unused capacity
+    /// sitting in the bone before they can afford it, which is how the
+    /// mechanic teaches itself -- and it is what marrow reconversion
+    /// actually looks like: G-CSF drives fatty marrow back to cellular in
+    /// patchy expansions, one region at a time.
+    /// </summary>
+    public enum BoneMarrowSlotState { Empty, Placed, Fatty }
 
     /// <summary>
     /// Sprint 2's real bone-marrow placement, replacing Sprint 1's
@@ -191,6 +202,13 @@ namespace ImmunologyTD.Units
         private static Color SelectionRimColor => Color.white;
 
         private static Color EmptySlotColor => Palette.PadSteel;
+
+        /// <summary>Sprint 27: an un-reconverted niche. Fatty marrow is
+        /// literally yellow, so this is the one place on the board where the
+        /// honest colour and the useful colour agree -- it reads as
+        /// "dormant, not broken", clearly different from a steel build pad
+        /// without looking like damage.</summary>
+        private static Color FattySlotColor => Palette.MarrowFat;
 
         private const float EmptyGlyphScale = 0.55f;
         private const float PlacedGlyphScale = 0.70f;
@@ -376,11 +394,114 @@ namespace ImmunologyTD.Units
                     WorldPosition = slotWorldPositions[i],
                 });
             }
+
+            // Sprint 27: the bone is laid out at full size from the start,
+            // but only the first few niches are haematopoietic. The rest are
+            // fatty marrow the player can see and buy.
+            UnlockedSlots = Mathf.Clamp(
+                ImmunologyTD.Economy.EconomyTuning.MarrowStartingSlots, 0, slots.Count);
+            for (int i = 0; i < slots.Count; i++)
+            {
+                slots[i].State = i < UnlockedSlots
+                    ? BoneMarrowSlotState.Empty
+                    : BoneMarrowSlotState.Fatty;
+                RefreshSlotVisual(i);
+            }
+        }
+
+        /// <summary>How many niches are reconverted and usable. Slots at or
+        /// beyond this index are <see cref="BoneMarrowSlotState.Fatty"/>.</summary>
+        public int UnlockedSlots { get; private set; }
+
+        /// <summary>Niches bought beyond the starting allowance -- what the
+        /// escalating price is indexed on.</summary>
+        public int ReconversionsBought =>
+            Mathf.Max(0, UnlockedSlots - ImmunologyTD.Economy.EconomyTuning.MarrowStartingSlots);
+
+        /// <summary>True when there is still fatty marrow left to convert.</summary>
+        public bool CanReconvert => UnlockedSlots < slots.Count;
+
+        /// <summary>ATP for the next niche, or 0 when the bone is full.</summary>
+        public int NextReconversionPrice =>
+            CanReconvert
+                ? ImmunologyTD.Economy.EconomyTuning.MarrowReconversionPrice(ReconversionsBought)
+                : 0;
+
+        /// <summary>Fired when a niche is reconverted, so the renderer can
+        /// restyle that pad and the HUD can react.</summary>
+        public event System.Action<int> SlotReconverted;
+
+        /// <summary>
+        /// Sprint 27: buy the next niche. Returns true if it happened.
+        ///
+        /// Deliberately converts the NEXT fatty slot in order rather than
+        /// the one clicked -- the bone fills from the top down, so the
+        /// player cannot leave gaps and the marrow reads as a single
+        /// growing column rather than a scatter.
+        /// </summary>
+        public bool TryReconvertNextSlot()
+        {
+            if (!CanReconvert) return false;
+            int price = NextReconversionPrice;
+            if (wallet != null && !wallet.TrySpend(price)) return false;
+
+            int index = UnlockedSlots;
+            UnlockedSlots++;
+            slots[index].State = BoneMarrowSlotState.Empty;
+            RefreshSlotVisual(index);
+
+            // Spending this much ATP should be unmistakable. Reuses the
+            // "cell born" burst the marrow already plays on emission, in
+            // the fat colour, so a reconversion reads as the bone coming
+            // alive at that spot rather than as a new kind of event.
+            ImmunologyTD.Rendering.DegranulationFlash.Play(
+                slots[index].WorldPosition,
+                slots[index].Visual != null
+                    ? slots[index].Visual.transform.lossyScale.x * 1.6f
+                    : 1f,
+                ImmunologyTD.Rendering.DegranulationFlash.ReconversionColor);
+
+            SlotReconverted?.Invoke(index);
+            return true;
+        }
+
+        /// <summary>Restyles one pad for its current state. Fatty pads get
+        /// the fat colour and a droplet glyph; a reconverted pad goes back
+        /// to steel and the plus.</summary>
+        private void RefreshSlotVisual(int index)
+        {
+            var slot = slots[index];
+            bool fatty = slot.State == BoneMarrowSlotState.Fatty;
+
+            if (slot.Visual != null)
+                slot.Visual.color = fatty ? FattySlotColor : EmptySlotColor;
+
+            if (slot.Glyph != null)
+            {
+                slot.Glyph.sprite = fatty
+                    ? ImmunologyTD.Rendering.SpriteShapes.IconDroplet
+                    : ImmunologyTD.Rendering.SpriteShapes.PlusGlyph;
+                slot.Glyph.color = fatty
+                    ? new Color(1f, 1f, 1f, 0.55f)
+                    : new Color(1f, 1f, 1f, 0.9f);
+                slot.Glyph.transform.localScale = Vector3.one * EmptyGlyphScale;
+            }
         }
 
         public void OnSlotClicked(int index)
         {
             if (index < 0 || index >= slots.Count) return;
+
+            // Clicking fatty marrow is the purchase. It is the only way to
+            // buy a niche (Director, 2026-10-25) -- the thing you are buying
+            // is visible on the board, so the click happens where the
+            // mechanic is rather than in a shop row.
+            if (slots[index].State == BoneMarrowSlotState.Fatty)
+            {
+                TryReconvertNextSlot();
+                return;
+            }
+
             SelectSlot(index);
         }
 
@@ -507,6 +628,11 @@ namespace ImmunologyTD.Units
         /// price chips. int.MaxValue with no wallet (harness: free).</summary>
         public int Balance => wallet == null ? int.MaxValue : wallet.Balance;
 
+        /// <summary>World position of a slot's pad, for anchoring a
+        /// world-space label to it.</summary>
+        public Vector3 SlotWorldPosition(int index) =>
+            index >= 0 && index < slots.Count ? slots[index].WorldPosition : Vector3.zero;
+
         /// <summary>Places a tower -- public so both the IMGUI picker
         /// buttons and a headless verification harness call the same real
         /// placement path. No-ops on an already-placed slot (no upgrade/
@@ -528,6 +654,10 @@ namespace ImmunologyTD.Units
             // null wallet (harness) keeps placement free. If the player
             // can't afford it, nothing happens -- the picker button is also
             // greyed out, this is belt-and-braces.
+            // Sprint 27: fatty marrow is not a build site. Clicking one buys
+            // the niche (OnSlotClicked); it can never host a tower directly.
+            if (slot.State == BoneMarrowSlotState.Fatty) return;
+
             if (wallet != null && !wallet.TrySpend(PriceFor(kind))) return;
 
             slot.State = BoneMarrowSlotState.Placed;

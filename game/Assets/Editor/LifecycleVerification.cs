@@ -611,16 +611,22 @@ public static class LifecycleVerification
         // 8a. Five towers, five simulated minutes, nothing ever dies.
         {
             var rig = BuildRig("long_static", 5);
-            for (int i = 0; i < 5; i++) rig.Manager.PlaceTower(i, i % 2 == 0 ? UnitKind.Macrophage : UnitKind.Neutrophil);
+            // Sprint 27: only the RECONVERTED niches are build sites -- the
+            // rest of the bone is fatty marrow. Drive this from the
+            // manager's own capacity rather than a literal, so a future
+            // change to the starting allowance cannot silently leave this
+            // test placing towers into marrow that will not take them.
+            int towers = rig.Manager.UnlockedSlots;
+            for (int i = 0; i < towers; i++) rig.Manager.PlaceTower(i, i % 2 == 0 ? UnitKind.Macrophage : UnitKind.Neutrophil);
 
             int ceiling = 0;
-            for (int i = 0; i < 5; i++) ceiling += rig.Manager.GetTuning(i).MaxActiveChildren;
+            for (int i = 0; i < towers; i++) ceiling += rig.Manager.GetTuning(i).MaxActiveChildren;
 
             const float dt = Dt;
             const float duration = 300f; // five simulated minutes
             for (int i = 0; i < duration / dt; i++) rig.Manager.Tick(dt);
 
-            int uncappedWouldBe = (int)(duration / BoneMarrowManager.EmissionIntervalSeconds) * 5;
+            int uncappedWouldBe = (int)(duration / BoneMarrowManager.EmissionIntervalSeconds) * towers;
             Debug.Log($"[LifecycleVerification] After {duration}s x 5 towers: {rig.Manager.TotalActiveUnits} active, {rig.Manager.EmittedCount} ever emitted. " +
                       $"Sprint 2 (no cap, no despawn) would have had {uncappedWouldBe} active by now.");
             Check($"Active unit count is bounded by towers x cap ({rig.Manager.TotalActiveUnits} <= {ceiling})",
@@ -635,10 +641,11 @@ public static class LifecycleVerification
         //     (banked emission timers dumping a burst on every death).
         {
             var rig = BuildRig("long_churn", 5);
-            for (int i = 0; i < 5; i++) rig.Manager.PlaceTower(i, i % 2 == 0 ? UnitKind.Macrophage : UnitKind.Neutrophil);
+            int towers = rig.Manager.UnlockedSlots;
+            for (int i = 0; i < towers; i++) rig.Manager.PlaceTower(i, i % 2 == 0 ? UnitKind.Macrophage : UnitKind.Neutrophil);
 
             int ceiling = 0;
-            for (int i = 0; i < 5; i++) ceiling += rig.Manager.GetTuning(i).MaxActiveChildren;
+            for (int i = 0; i < towers; i++) ceiling += rig.Manager.GetTuning(i).MaxActiveChildren;
 
             const float dt = Dt;
             const float duration = 300f;
@@ -652,7 +659,7 @@ public static class LifecycleVerification
                 rig.Manager.Tick(dt);
                 if (i % 10 == 0) // once per simulated second
                 {
-                    int slot = rng.Next(0, 5);
+                    int slot = rng.Next(0, towers);
                     var kids = rig.Manager.GetChildren(slot);
                     if (kids.Count > 0) DepleteThroughRealPath(kids[rng.Next(0, kids.Count)]);
                 }

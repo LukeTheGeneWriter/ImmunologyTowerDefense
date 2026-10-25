@@ -608,10 +608,41 @@ inert, the likely fix is an in-round player-triggered action (a manually
 placed cytokine signal, for instance), not restoring tissue placement. Not
 scoped; flagged so it isn't a surprise.
 
-### Open: bone marrow capacity
+### Bone marrow capacity — LOCKED (Director, 2026-10-25)
 
-Starting slot count and the ATP cost curve for expanding it — see
-`BACKLOG.md`.
+**Answered after the Director lost a run** and said the interesting part
+was having to think about where the ATP went. The design goal is therefore
+to *preserve* that pressure, not relieve it.
+
+- **Start with 4 niches, expand to 8.** One fewer than the game shipped
+  with, so the opening keeps the pressure that produced the good run, and
+  the first expansion is a real decision rather than a bonus.
+- **Escalating price: 80 / 140 / 200 / 260 ATP** (`base * (1 + 0.75 n)`).
+  Two rules the numbers have to satisfy, both pinned by
+  `Sprint27Verification`:
+  1. **The first niche costs more than the dearest tower.** Buying *room*
+     for a tower must never be cheaper than buying the tower, or the
+     optimal opening is always "expand first".
+  2. **The last niche costs more than three dear towers.** Otherwise late
+     ATP has no competing use and the end of a run stops being a choice.
+- **You buy it by clicking the fatty pad**, not from the shop. The bone is
+  laid out at full capacity from the first frame, and un-bought niches are
+  drawn as **fatty (yellow) marrow** with their price on them. The thing
+  you are buying is visible on the board before you can afford it, which
+  is how the mechanic teaches itself.
+- **The bone fills top-down.** Clicking any fatty pad converts the *next*
+  one in order, so the marrow reads as a single growing column and the
+  player cannot leave gaps.
+
+**The biology is real and worth keeping straight.** This is marrow
+*reconversion*: fatty marrow turning back into haematopoietic marrow under
+demand. G-CSF "stimulates marrow mitotic activity and induces marrow
+reconversion from fatty to cellular", appearing on imaging as "patchy
+expansions of baseline hematopoietic marrow" (Gu 2018, *Skeletal
+Radiology*, [DOI](https://doi.org/10.1007/s00256-018-3035-0)) — which is
+also why niches appear one at a time rather than the bone growing. It ties
+directly to §6c's emergency granulopoiesis: same signal, slower and more
+permanent expression of it.
 
 ## 3. Trafficking simplification — LOCKED (Director's ruling)
 

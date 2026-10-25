@@ -117,6 +117,13 @@ namespace ImmunologyTD.Rendering
         /// <summary>Sprint 23: a free antibody drifting in tissue.</summary>
         public static Color Antibody       => C(0.72f, 0.84f, 1.00f);
 
+        /// <summary>Sprint 27: fatty (yellow) marrow -- a niche that has not
+        /// been reconverted to haematopoietic marrow yet. Real yellow
+        /// marrow is yellow because it is fat, so here the accurate colour
+        /// and the readable one happen to be the same: dormant capacity,
+        /// clearly not a steel build pad and clearly not damage.</summary>
+        public static Color MarrowFat      => C(0.95f, 0.86f, 0.55f);
+
         // ---- FX (keep pairwise distinct -- see class comment) -------------
         public static Color FxDegranulation => C(1.00f, 0.78f, 0.10f);
         public static Color FxBreach        => C(1.00f, 0.30f, 0.15f);

@@ -928,3 +928,37 @@ unit on the board, so it separates by saturation instead of fighting for a
 hue on an already-crowded wheel.
 
 18 harnesses green, 668 checks.
+
+## Sprint 27 -- 2026-10-25
+You can expand the bone marrow now.
+
+The Director lost a run and said the interesting part was having to think
+about where the ATP went -- so this is built to keep that pressure rather
+than relieve it. **You start with four niches instead of five**, and can
+buy up to eight.
+
+**Un-bought niches are visible from the first frame**, drawn as fatty
+yellow marrow with the price sitting on the next one. You buy by clicking
+the pad itself rather than through a shop row, so the thing you are
+purchasing is on the board in front of you before you can afford it. The
+bone fills top-down, so it reads as one growing column rather than a
+scatter of gaps, and a reconversion lands with a warm burst because it is
+the most expensive single purchase in the game.
+
+**The price escalates: 80 / 140 / 200 / 260.** Two rules behind those
+numbers, both now pinned by tests. The first niche costs more than the
+dearest tower, because buying *room* for a tower must never be cheaper
+than buying the tower -- otherwise the best opening is always "expand
+first". And the last one costs more than three dear towers, so late ATP
+still has something to compete with.
+
+This is real biology, not a game abstraction with a biology label stuck on
+it: fatty marrow reconverting to haematopoietic marrow under G-CSF, which
+shows up on imaging as patchy expansions appearing one region at a time --
+which is also why niches arrive one at a time instead of the bone growing.
+It is the same signal as the emergency granulopoiesis already in the
+design, expressed slower and more permanently.
+
+GAME_DESIGN.md §2a's oldest open question is now closed.
+
+19 harnesses green, 689 checks.

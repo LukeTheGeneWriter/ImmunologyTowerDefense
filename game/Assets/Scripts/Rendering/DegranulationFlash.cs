@@ -103,6 +103,11 @@ namespace ImmunologyTD.Rendering
         /// <summary>Sprint 23: barrier repair by a gamma-delta IEL.</summary>
         public static Color RepairColor => Palette.FxRepair;
 
+        /// <summary>Sprint 27: fatty marrow reconverting into a working
+        /// progenitor niche. Warm and slow -- it is the most expensive
+        /// single purchase in the game and should land like one.</summary>
+        public static Color ReconversionColor => Palette.MarrowFat;
+
         private Color burstColor = GranuleBurstColor;
 
         private static PrefabPool pool;
@@ -172,6 +177,7 @@ namespace ImmunologyTD.Rendering
             if (Same(c, IfnGammaColor))       { durationSeconds = 0.70f; startScale = 0.20f; endScale = 1.0f; return SpriteShapes.KnowledgeRing; }
             if (Same(c, OpsonisationColor))   { durationSeconds = 0.22f; startScale = 0.30f; endScale = 0.75f; return SpriteShapes.KnowledgeRing; }
             if (Same(c, RepairColor))         { durationSeconds = 0.60f; startScale = 0.25f; endScale = 1.2f; return SpriteShapes.EffeBloom; }
+            if (Same(c, ReconversionColor))   { durationSeconds = 0.85f; startScale = 0.20f; endScale = 1.5f; return SpriteShapes.BirthPuff; }
             // default = neutrophil degranulation
             durationSeconds = 0.40f; startScale = 0.35f; endScale = 1.6f;
             return SpriteShapes.GranuleBurst;

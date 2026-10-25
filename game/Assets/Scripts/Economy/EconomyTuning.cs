@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace ImmunologyTD.Economy
 {
     /// <summary>
@@ -72,6 +74,40 @@ namespace ImmunologyTD.Economy
         /// the ~20% neutralising-antibody rung.</summary>
         public static int BCellPrice = 65;
 
+        // -- Sprint 27: bone marrow capacity (GAME_DESIGN.md §2a's oldest
+        //    open question, Director 2026-10-25) --
+
+        /// <summary>Progenitor niches available at the start of a run.
+        /// Four, down from five: the Director lost a run on five and valued
+        /// having to think about what to spend ATP on, so the opening keeps
+        /// that pressure and the first expansion is a real decision rather
+        /// than a bonus.</summary>
+        public static int MarrowStartingSlots = 4;
+
+        /// <summary>Hard ceiling on niches. The remaining pads are drawn as
+        /// FATTY marrow from the first frame, so the player can see the
+        /// unused capacity sitting in the bone before they can afford
+        /// it.</summary>
+        public static int MarrowMaxSlots = 8;
+
+        /// <summary>ATP for the first reconversion. Deliberately above the
+        /// most expensive tower (the CTL at 70): buying *room* for a tower
+        /// should never be cheaper than buying the tower.</summary>
+        public static int MarrowReconversionBasePrice = 80;
+
+        /// <summary>Each further niche costs
+        /// `base * (1 + growth * alreadyBought)`. At 0.75 the four
+        /// purchasable niches run 80 / 140 / 200 / 260 -- the last one costs
+        /// about as much as three towers, which is what stops "just buy
+        /// more slots" from being the answer to every problem.</summary>
+        public static float MarrowReconversionGrowth = 0.75f;
+
+        /// <summary>Price of the next niche, given how many have already
+        /// been bought beyond the starting allowance.</summary>
+        public static int MarrowReconversionPrice(int alreadyBought) =>
+            Mathf.Max(1, Mathf.RoundToInt(
+                MarrowReconversionBasePrice * (1f + MarrowReconversionGrowth * alreadyBought)));
+
         // -- Lives (GAME_DESIGN.md §6c) --
 
         public static int StartingLives = 100;
@@ -115,6 +151,10 @@ namespace ImmunologyTD.Economy
             NaturalKillerPrice = 45;
             GammaDeltaTPrice = 55;
             BCellPrice = 65;
+            MarrowStartingSlots = 4;
+            MarrowMaxSlots = 8;
+            MarrowReconversionBasePrice = 80;
+            MarrowReconversionGrowth = 0.75f;
             StartingLives = 100;
             LifeRegenRounds = 2;
             LifeRegenAmount = 1;

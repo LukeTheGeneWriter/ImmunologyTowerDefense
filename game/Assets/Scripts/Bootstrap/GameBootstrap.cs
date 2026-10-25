@@ -230,7 +230,14 @@ namespace ImmunologyTD.Bootstrap
 
         /// <summary>Bone marrow slot count -- unchanged from Sprint 2, a
         /// judgment call (see docs/TEAM_RETRO.md).</summary>
-        private const int BoneMarrowSlotCount = 5;
+        /// <summary>Sprint 27: the bone is laid out for the MAXIMUM number
+        /// of niches, not the starting number. The extra pads exist from the
+        /// first frame as fatty marrow, so the geometry never has to change
+        /// at runtime and the player can see the capacity they have not
+        /// bought yet. How many are haematopoietic at the start is
+        /// <c>EconomyTuning.MarrowStartingSlots</c>.</summary>
+        private static int BoneMarrowSlotCount =>
+            ImmunologyTD.Economy.EconomyTuning.MarrowMaxSlots;
 
         private BoardConfig board;
         private TissueGrid tissueGrid;
@@ -420,7 +427,12 @@ namespace ImmunologyTD.Bootstrap
             // narrow base band shrinks the slots rather than overflowing
             // sideways. Whatever the pitch does not spend on the slot is the
             // gap between slots.
-            float marrowSlotSize = Mathf.Min(pitch * 0.80f, baseRect.width * 0.62f);
+            // Sprint 27: 0.80 -> 0.86 of the pitch. Eight niches share the
+            // vertical budget five used to, so each pad lost about a third
+            // of its size; spending more of the pitch on the pad and less on
+            // the gap claws some of that back. The bone reads as packed,
+            // which is what a full marrow should look like anyway.
+            float marrowSlotSize = Mathf.Min(pitch * 0.86f, baseRect.width * 0.62f);
 
             float topSlotY = innerTop - marrowSlotSize * 0.5f;
             var slotPositions = new Vector3[BoneMarrowSlotCount];

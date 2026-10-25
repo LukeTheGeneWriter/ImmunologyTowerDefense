@@ -52,9 +52,15 @@ public static class SpriteShapeDump
 
         // Sprint 21: the organs are canvases built at boot, not SpriteShapes
         // properties -- dump them at representative 25x10-board sizes.
-        var pads = new Vector2[5];
-        for (int i = 0; i < 5; i++) pads[i] = new Vector2(0f, (2 - i) * 0.95f);
-        var m = OrganShapes.BuildMarrow(new Vector2(2.2f, 4.85f), pads, 0.76f, 0.95f);
+        // Sprint 27: dump the bone at its REAL capacity, not a hardcoded 5 --
+        // the marrow is laid out for EconomyTuning.MarrowMaxSlots now, and a
+        // dump that shows five pads would hide exactly the crowding this is
+        // meant to catch.
+        int padCount = ImmunologyTD.Economy.EconomyTuning.MarrowMaxSlots;
+        var pads = new Vector2[padCount];
+        for (int i = 0; i < padCount; i++)
+            pads[i] = new Vector2(0f, ((padCount - 1) * 0.5f - i) * 0.95f);
+        var m = OrganShapes.BuildMarrow(new Vector2(2.2f, 4.85f + 0.95f * (padCount - 5)), pads, 0.76f, 0.95f);
         var n = OrganShapes.BuildNode(new Vector2(3.6f, 2.2f));
         foreach (var (name, sp) in new[] { ("Organ_MarrowShadow", m.Shadow), ("Organ_MarrowSpace", m.Space), ("Organ_MarrowBone", m.Bone),
                                            ("Organ_NodeShadow", n.Shadow), ("Organ_NodeVessels", n.Vessels), ("Organ_NodeBody", n.Body), ("Organ_NodeFollicles", n.Follicles) })
