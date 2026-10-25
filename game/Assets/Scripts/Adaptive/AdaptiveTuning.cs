@@ -41,26 +41,19 @@ namespace ImmunologyTD.Adaptive
         /// <summary>Knowledge is a 0..this percentage.</summary>
         public static float KnowledgeMax = 100f;
 
-        // -- Per-class antigens (species key = PathogenClass for now; there
-        //    is no species roster yet -- see SPRINT_PLAN.md item 1). The
-        //    three values are >=4 bits apart so a helper-T within distance 2
-        //    of one is within distance 2 of at most one -- keeps "knowledge
-        //    is per species" meaningful. The MATCH RATE (37/256) does not
-        //    depend on the specific values, only on the threshold. --
+        // -- Antigens are per SPECIES (Sprint 24), and live on the
+        //    species roster rather than here, because a tag is a property of
+        //    an organism rather than a tuning knob. The separation rule the
+        //    old per-class tags followed still holds and still matters: tags
+        //    are kept >=4 bits apart, so a helper-T cell within Hamming
+        //    distance 2 of one species is within 2 of at most one, and
+        //    "knowledge is per species" stays meaningful. The MATCH RATE
+        //    (37/256) depends only on the threshold, not the values. --
 
-        public static byte VirusAntigen = 0b01011100;          // 92
-        public static byte BacteriumAntigen = 0b10100011;       // 163
-        public static byte LargeBacteriumAntigen = 0b11110000;  // 240
+        public static byte AntigenForSpecies(PathogenSpecies s) => SpeciesRoster.Get(s).Antigen;
 
-        public static byte AntigenForClass(PathogenClass c)
-        {
-            switch (c)
-            {
-                case PathogenClass.IntracellularVirus: return VirusAntigen;
-                case PathogenClass.IntracellularBacterium: return BacteriumAntigen;
-                default: return LargeBacteriumAntigen;
-            }
-        }
+        public static byte AntigenForClass(PathogenClass c) =>
+            AntigenForSpecies(SpeciesRoster.GenericFor(c));
 
         // -- The dendritic cell (GAME_DESIGN.md §5a) --
 
@@ -179,11 +172,9 @@ namespace ImmunologyTD.Adaptive
         public static void ResetToDefaults()
         {
             MatchMaxHammingDistance = 2;
+            SpeciesRoster.ResetToDefaults();
             KnowledgePerMatch = 3f;
             KnowledgeMax = 100f;
-            VirusAntigen = 0b01011100;
-            BacteriumAntigen = 0b10100011;
-            LargeBacteriumAntigen = 0b11110000;
             DcPresentationsPerCargo = 4;
             DcDebrisSamplePerBite = 0.34f;
             DcFineTilesPerTick = 3;

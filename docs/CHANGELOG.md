@@ -801,3 +801,50 @@ built**, so for a whole sprint -- including the playtest where the Director
 reported never perceiving IgA -- the HUD called a live mechanic "planned".
 
 16 harnesses green, 605 checks. WebGL build 9,222,409 bytes, 0 errors.
+
+## Sprint 24 -- 2026-10-25
+Pathogens got names, and three of them brought mechanics the game had no
+answer for.
+
+Four research passes against PubMed and Consensus produced ranked
+shortlists rather than catalogues, on one rule: **a species earns a slot
+by forcing a decision no existing enemy forces.** Full roster, including
+the shortlisted-but-unbuilt and the rejections, in
+`docs/PATHOGEN_ROSTER.md`.
+
+**Species are now a real thing.** Knowledge used to be keyed by pathogen
+CLASS -- three of them -- so learning about "intracellular virus" taught
+you about every virus that would ever arrive. §5 has always promised the
+opposite ("a new species arriving in a late round meets a naive adaptive
+system") and could not deliver it. Knowledge is now per named species.
+
+**Rotavirus.** Infects mature villus-tip enterocytes and **never the crypt
+stem cell**, so the crypt keeps repaving from below -- a plague that eats
+the wall but cannot touch the engine that rebuilds it. It also carries
+NSP4, a real viral enterotoxin, so infected cells poison healthy
+neighbours they never infect. The two compose: **the toxin reaches cells
+the virus is forbidden to enter.**
+
+**Vibrio cholerae.** The first enemy that wins **without killing
+anything**. It adheres and secretes; the wall under the field stays alive,
+keeps its slots, keeps blocking invasion, and stops being yours. Junctions
+loosen so plaques charge faster, and the damage releases lactate the
+organism feeds on. Clear the secretors and the subversion fades -- so
+clearing it feels like it achieved something, where killing cells would
+have left permanent holes.
+
+**A/E E. coli.** Respires the products of your own immune response, so a
+neutrophil-heavy clear **makes the survivors faster**. This inverts the
+assumption the whole game has run on. It was the one strategy the research
+found with no answer anywhere in the roster -- and it still has none,
+deliberately.
+
+Also: the antigen-separation check **caught a real collision** at species
+six -- rotavirus's first barcode sat 2 bits from the generic intracellular
+bacterium, so the two would have taught each other. That is the 8-bit
+roster ceiling arriving exactly where the research predicted.
+
+Carried but not acted on: the ~60% complement rung is probably wrong for a
+gut map (the gut lacks MAC components), flagged in §5 awaiting a decision.
+
+17 harnesses green, 638 checks.

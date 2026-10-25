@@ -6,8 +6,14 @@ namespace ImmunologyTD.Adaptive
     /// <summary>
     /// GAME_DESIGN.md §5's "percentage representing how well the adaptive
     /// system has characterised a pathogen" -- tracked **per pathogen
-    /// species, not globally** (§5). Species key is <see cref="PathogenClass"/>
-    /// for now (no roster yet).
+    /// species, not globally** (§5).
+    ///
+    /// **Sprint 24 made that true.** The key was <see cref="PathogenClass"/>,
+    /// of which there were three, so learning about "intracellular virus"
+    /// taught you about every virus that would ever arrive -- and §5's
+    /// stated consequence, that "a new species arriving in a late round
+    /// meets a naive adaptive system", could not happen. The key is now
+    /// <see cref="PathogenSpecies"/>.
     ///
     /// Plain reference type, per run, constructed by GameBootstrap and passed
     /// by reference -- same shape as <c>InvasionTally</c> / <c>AtpWallet</c>.
@@ -20,9 +26,8 @@ namespace ImmunologyTD.Adaptive
     /// </summary>
     public class KnowledgeLedger
     {
-        // Indexed by (int)PathogenClass. Three classes today; a switch to a
-        // real roster makes this a Dictionary keyed by species id.
-        private readonly float[] knowledge = new float[3];
+        // Indexed by (int)PathogenSpecies.
+        private readonly float[] knowledge = new float[SpeciesRoster.Count];
 
         /// <summary>Bumped on every change, so a poller (the HUD) can cheaply
         /// tell whether anything moved since last frame.</summary>
@@ -30,17 +35,38 @@ namespace ImmunologyTD.Adaptive
 
         /// <summary>Current knowledge of <paramref name="species"/>, 0..
         /// <see cref="AdaptiveTuning.KnowledgeMax"/>.</summary>
-        public float Get(PathogenClass species) => knowledge[(int)species];
+        public float Get(PathogenSpecies species) => knowledge[(int)species];
+
+        /// <summary>Class-keyed convenience, resolving to that class's
+        /// generic species. Kept so pre-Sprint-24 code and harnesses that
+        /// legitimately mean "the generic one" keep working unchanged --
+        /// **not** a shortcut for new code, which should name its
+        /// species.</summary>
+        public float Get(PathogenClass klass) => Get(SpeciesRoster.GenericFor(klass));
 
         /// <summary>Adds <paramref name="amount"/> percentage points (may be
         /// negative, e.g. a future mutation discount), clamped to
         /// 0..KnowledgeMax. Returns the new value.</summary>
-        public float Add(PathogenClass species, float amount)
+        public float Add(PathogenSpecies species, float amount)
         {
             int i = (int)species;
             knowledge[i] = Mathf.Clamp(knowledge[i] + amount, 0f, AdaptiveTuning.KnowledgeMax);
             Revision++;
             return knowledge[i];
+        }
+
+        public float Add(PathogenClass klass, float amount) =>
+            Add(SpeciesRoster.GenericFor(klass), amount);
+
+        /// <summary>The species the adaptive system knows most about, and by
+        /// how much -- what a "which threat is characterised?" readout wants.</summary>
+        public PathogenSpecies BestKnown(out float percent)
+        {
+            int best = 0;
+            for (int i = 1; i < knowledge.Length; i++)
+                if (knowledge[i] > knowledge[best]) best = i;
+            percent = knowledge[best];
+            return (PathogenSpecies)best;
         }
 
         public void Reset()

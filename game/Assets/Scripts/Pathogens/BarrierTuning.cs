@@ -147,8 +147,24 @@ namespace ImmunologyTD.Pathogens
         /// drifts clear of the wall it was just shed from.</summary>
         public static float SloughRefractorySeconds = 1.5f;
 
+        // -- Sprint 24: cholera toxin --
+
+        /// <summary>How much faster a plaque charges over fully-subverted
+        /// wall. Tight junctions loosen under cholera toxin (claudin-2 up,
+        /// tricellulin down), so the barrier is mechanically easier to get
+        /// through without a single cell having died. Playtest number.</summary>
+        public static float ToxinChargeBonus = 0.8f;
+
+        /// <summary>Fraction of toxin load shed per second once the
+        /// secretors are gone. Subversion is REVERSIBLE -- that is what
+        /// makes clearing a cholera crowd feel like it achieved something,
+        /// where killing cells would have left permanent holes.</summary>
+        public static float ToxinDecayPerSecond = 0.12f;
+
         public static void ResetToDefaults()
         {
+            ToxinChargeBonus = 0.8f;
+            ToxinDecayPerSecond = 0.12f;
             SegmentsPerLane = 2;
             SegmentMaxHealth = 10f;
             ErodedBelowHealth = 6f;

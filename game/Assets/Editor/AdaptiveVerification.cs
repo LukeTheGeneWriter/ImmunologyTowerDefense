@@ -139,9 +139,9 @@ public static class AdaptiveVerification
         var grid = new TissueGrid(board);
 
         var a = board.CoarseFromAxis(board.TissueBaseEdgeAxisIndex + 2, 3);
-        grid.KillHostCell(a, PathogenClass.LargeBacterium);
+        grid.KillHostCell(a, PathogenSpecies.GenericLargeBacterium);
         Check("KillHostCell records the antigen on the debris",
-            grid.GetDebrisAntigen(a) == PathogenClass.LargeBacterium);
+            grid.GetDebrisAntigen(a) == PathogenSpecies.GenericLargeBacterium);
         Check("...and leaves debris", grid.GetDebrisAmount(a) > 0f);
 
         grid.ClearDebris(a, TissueGrid.FullDebris, 0f);
@@ -216,7 +216,7 @@ public static class AdaptiveVerification
     /// -> a single pairing, re-seeding debris under it while it patrols so
     /// the sample is deterministic. Returns the DC. <paramref name="teaches"/>
     /// picks the always/never match threshold.</summary>
-    private static DendriticCell DriveOneShuttle(ShuttleRig rig, PathogenClass species, bool teaches)
+    private static DendriticCell DriveOneShuttle(ShuttleRig rig, PathogenSpecies species, bool teaches)
     {
         AdaptiveTuning.ResetToDefaults();
         AdaptiveTuning.DcPresentationsPerCargo = 1;         // one pairing spends the cargo
@@ -253,7 +253,7 @@ public static class AdaptiveVerification
     {
         // -- matching pairing raises knowledge by exactly one increment --
         var rigA = BuildShuttleRig();
-        var dcA = DriveOneShuttle(rigA, PathogenClass.IntracellularVirus, teaches: true);
+        var dcA = DriveOneShuttle(rigA, PathogenSpecies.GenericVirus, teaches: true);
         Check("shuttle: DC visited the node, spent its cargo, and is pacing tissue again",
             dcA.State == DendriticCellState.PatrolTissue && !dcA.HasCargo);
         Check("shuttle: a MATCHING pairing raised virus knowledge by exactly KnowledgePerMatch",
@@ -265,7 +265,7 @@ public static class AdaptiveVerification
 
         // -- non-matching pairing: freeze happened, cargo spent, taught nothing --
         var rigB = BuildShuttleRig();
-        var dcB = DriveOneShuttle(rigB, PathogenClass.LargeBacterium, teaches: false);
+        var dcB = DriveOneShuttle(rigB, PathogenSpecies.GenericLargeBacterium, teaches: false);
         Check("shuttle (no match): DC still completed its pairing cycle and is pacing again",
             dcB.State == DendriticCellState.PatrolTissue && !dcB.HasCargo);
         Check("shuttle (no match): knowledge stayed at 0",

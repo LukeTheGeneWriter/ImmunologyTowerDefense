@@ -1025,6 +1025,22 @@ Thresholds unlock capabilities rather than granting linear stat increases.
 **Tracked per pathogen species, not globally.** A new species arriving in
 a late round meets a naive adaptive system.
 
+> **True as of Sprint 24.** Until then the ledger was keyed by
+> `PathogenClass` -- three of them -- so learning about "intracellular
+> virus" taught you about every virus that would ever arrive, and the
+> sentence above could not happen. The key is now `PathogenSpecies`
+> (`docs/PATHOGEN_ROSTER.md`). `Sprint24Verification.RunKnowledgeIsPerSpecies`
+> pins it: rotavirus and the generic virus share a CLASS, and teaching one
+> must not teach the other.
+>
+> **Roster ceiling.** The 8-bit barcode (§5c) requires species tags >= 4
+> bits apart, and hand-picking separable tags already failed once at
+> species six -- rotavirus's first tag sat 2 bits from the generic
+> intracellular bacterium and the harness rejected it. Past roughly 8-10
+> species the barcode must grow to 16 bits. Note §5c's claim that the
+> Hamming threshold is the dial to reach for before barcode length is
+> **backwards**: length is the binding constraint.
+
 **Pathogen mutation applies a discrete step-change discount** to that
 species' knowledge percentage. An event, not continuous erosion. This is
 the abstraction's main payoff: antigenic change becomes a single legible
@@ -1061,8 +1077,25 @@ nothing else. Each capability's real mechanic is its own later sprint.
 | ~20% | **Neutralizing antibodies** | reduced adhesion probability for a known species (low-affinity antibody blocking adhesins). **Built in Sprint 23** as plasma-cell-secreted antibody that coats pathogens in tissue, reusing the §6b coating state. |
 | ~30% | **Memory T cells** | on re-encountering a known species, a quick **burst of CTLs** spawns to hunt it. (Supersedes the earlier "recall speed" proposal — the Director wants a concrete CTL burst, not just a shorter delay.) |
 | ~45% | **Fc receptor** | antibodies affix to innate cells — opsonisation / antibody-guided targeting, no specific sensing yet. |
-| ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. |
+| ~60% | **Complement activation** | antibody destroys the target's membrane **directly, with no immune cell present** — passive damage to a coated pathogen. **⚠ Probably wrong for a gut map — see below. Not built.** |
 | ~70% | **Secretory IgA** | antibody exported into the lumen, acting on a species **before adhesion is possible** (depth 0). The only capability that acts in the lumen. **Built in Sprint 22.** Two stages: a *coated* organism is slower, pacified and more fragile behind the wall; two coated organisms of the same species are **cross-linked** into a raft that cannot reach the epithelium and is swept away. Crucially, a coated bacterium still divides at full rate and its **daughter is born attached to it**, so under IgA replication is what traps it. Nothing out here is killed. |
+
+> **⚠ The ~60% rung is contested (2026-10-25).** Wu et al., *Cell* 2024
+> ([DOI](https://doi.org/10.1016/j.cell.2023.12.036)) reports that the gut
+> **lacks membrane-attack-complex components**, which is how commensals
+> survive C3 deposition — so "antibody destroys the membrane with no
+> immune cell present" may simply not happen in this setting. Two further
+> corrections: luminal C3 deposition is alternative-pathway (unchanged in
+> C1q-deficient mice), so *antibody* is not the trigger either; and
+> Gram-positives are structurally MAC-proof regardless (Joiner 1983,
+> ~10,000 C9 bound without killing).
+>
+> **Caveat, and it is a real one:** that paper is a *colon* study — the
+> small intestine is untested, not confirmed — and nobody has replicated
+> its C5–C9 survey. The recommended re-spec is **opsonisation + phagocyte
+> recruitment**, with direct lysis moved to inflamed, barrier-breached
+> tissue where MAC does appear and attacks the host epithelium. **Awaiting
+> a Director decision**; full write-up in `docs/PATHOGEN_ROSTER.md`.
 
 The **~90% "specific sensing" capstone** (antibody-coated pathogens
 become chemotactic beacons) is not in the Director's six — treat it as the

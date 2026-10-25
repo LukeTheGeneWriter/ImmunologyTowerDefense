@@ -103,6 +103,13 @@ namespace ImmunologyTD.Grid
         private readonly float[] crowd;
         private readonly Plaque[] plaques;
         private readonly BarrierSegment[] barrier;
+
+        /// <summary>Sprint 24: per-segment cholera-toxin load, 0..1. Parallel
+        /// to <see cref="barrier"/> -- a separate array rather than a field
+        /// on BarrierSegment because subversion is orthogonal to the
+        /// Intact/Eroded/Dead state machine: a perfectly healthy segment can
+        /// be fully subverted, and that is the whole mechanic.</summary>
+        private readonly float[] toxinLoad;
         private readonly float[] cryptReadyAt;
 
         /// <summary>Scratch buffer for a rupture's membership, reused so a
@@ -170,6 +177,7 @@ namespace ImmunologyTD.Grid
             plaques = new Plaque[Mathf.Max(1, InvasionTuning.MaxPlaques)];
 
             barrier = new BarrierSegment[Mathf.Max(1, board.CrossLength * Mathf.Max(1, BarrierTuning.SegmentsPerLane))];
+            toxinLoad = new float[barrier.Length];
             for (int i = 0; i < barrier.Length; i++)
                 barrier[i] = new BarrierSegment
                 {
@@ -528,7 +536,10 @@ namespace ImmunologyTD.Grid
                     // one ingress mechanic, not two.
                     float rate = (plaques[i].MemberCount - floor)
                                * InvasionTuning.ChargeRatePerCrowdUnit
-                               * BarrierChargeMultiplierAt(plaques[i].CentreS);
+                               * BarrierChargeMultiplierAt(plaques[i].CentreS)
+                               // Sprint 24: loosened tight junctions under a
+                               // cholera toxin field let a plaque charge faster.
+                               * (1f + BarrierTuning.ToxinChargeBonus * ToxinLoadAt(plaques[i].CentreS));
                     plaques[i].Charge += rate * deltaTime;
                     plaques[i].CentreS = Mathf.Lerp(plaques[i].CentreS, MemberCentroid(i), lerp);
                 }
@@ -995,12 +1006,116 @@ namespace ImmunologyTD.Grid
 
             float localCrowd = CrowdAt(p.WallS);
             interval *= 1f + IgaTuning.CrowdDamperStrength * localCrowd;
+
+            // Sprint 24 -- **inflammation as fuel.** The attaching-effacing
+            // E. coli respire what the host's own response produces: the
+            // oxidative burst generates nitrate and tetrathionate, which
+            // only a facultative anaerobe can use, so an inflamed stretch of
+            // wall is a better place to live than a quiet one.
+            //
+            // This inverts the assumption the whole game has run on so far
+            // -- that more immune response is always better -- and it is the
+            // one mechanic found in the Sprint 24 research with NO answer
+            // anywhere in the current roster. A neutrophil-heavy clear makes
+            // the survivors faster.
+            //
+            // Species that do not feed on inflammation have a factor of 0
+            // and are untouched, so no call site needs a species check.
+            float fuel = p.Profile.InflammationFuelFactor;
+            if (fuel > 0f)
+            {
+                interval /= 1f + fuel * LocalInflammation(p.WallS);
+            }
+
             return Mathf.Max(0.5f, interval);
         }
 
         /// <summary>The project's standard per-second-to-per-tick conversion,
         /// the same `1 - (1-p)^dt` shape GutWallFeatures.TrySample uses.
         /// </summary>
+        /// <summary>
+        /// Sprint 24 -- **cholera toxin.** A crowd of secretors subverts the
+        /// stretch of wall in front of it instead of eating it.
+        ///
+        /// Three composable effects, all from the real mechanism and none of
+        /// them a kill:
+        ///
+        ///  1. The segments under the field become **Subverted**: alive,
+        ///     still occupying their slots, still blocking invasion -- but
+        ///     secreting, so they are no longer doing the player's work.
+        ///  2. Tight junctions loosen (claudin-2 up, tricellulin down), so a
+        ///     plaque over subverted wall **charges faster**.
+        ///  3. The damage releases lactate the organism feeds on, so the
+        ///     field quietly **raises local replication** -- a visible,
+        ///     interruptible feedback loop rather than a flat debuff.
+        ///
+        /// The enterocyte lives through all of it. That is the point: this
+        /// is the one enemy on the board that wins without killing anything,
+        /// and the player's instinct to look for dying cells will miss it.
+        /// </summary>
+        public void ApplyToxinField(float centre, float strength, float radiusCells, float deltaTime)
+        {
+            if (strength <= 0f || deltaTime <= 0f) return;
+            int lo = SegmentIndexAt(centre - radiusCells);
+            int hi = SegmentIndexAt(centre + radiusCells);
+            for (int i = lo; i <= hi; i++)
+            {
+                // A dead segment has nothing left to subvert.
+                if (barrier[i].State == BarrierState.Dead) continue;
+                toxinLoad[i] = Mathf.Min(1f, toxinLoad[i] + strength * deltaTime);
+            }
+        }
+
+        /// <summary>How subverted the wall is at <paramref name="s"/>, 0..1.
+        /// The renderer tints by this and the charge rate scales with it.</summary>
+        public float ToxinLoadAt(float s) => toxinLoad[SegmentIndexAt(s)];
+
+        /// <summary>Toxin decays when the secretors are cleared -- the
+        /// subversion is reversible, which is what makes clearing a cholera
+        /// crowd feel like it accomplished something.</summary>
+        private void DecayToxin(float deltaTime)
+        {
+            for (int i = 0; i < toxinLoad.Length; i++)
+            {
+                if (toxinLoad[i] <= 0f) continue;
+                toxinLoad[i] = Mathf.Max(0f, toxinLoad[i] - BarrierTuning.ToxinDecayPerSecond * deltaTime);
+            }
+        }
+
+        /// <summary>
+        /// Sprint 24: how inflamed the wall is around <paramref name="s"/>,
+        /// 0..1. Read from the host tissue immediately behind that stretch
+        /// -- dead and infected cells are the signal, because those are what
+        /// an oxidative burst and a necrotic kill leave behind.
+        ///
+        /// Deliberately reads the tissue rather than a cytokine value: the
+        /// thing the organism respires is the *product of damage*, not the
+        /// recruitment signal, and a player who clears messily should feed
+        /// it even if no cytokine is left.
+        /// </summary>
+        public float LocalInflammation(float s)
+        {
+            if (tissueGrid == null) return 0f;
+            int lane = LaneOf(s);
+            int edge = board.TissueLumenEdgeAxisIndex;
+
+            int looked = 0, inflamed = 0;
+            for (int d = 0; d < InflammationSampleDepth; d++)
+            {
+                int axis = edge - d;
+                if (!board.InAxisBounds(axis)) break;
+                var c = board.CoarseFromAxis(axis, lane);
+                if (!tissueGrid.IsHostGround(c)) continue;
+                looked++;
+                var st = tissueGrid.GetHostState(c);
+                if (st == HostState.Dead || st == HostState.Infected) inflamed++;
+            }
+            return looked == 0 ? 0f : inflamed / (float)looked;
+        }
+
+        /// <summary>How deep behind the wall the inflammation sample looks.</summary>
+        private const int InflammationSampleDepth = 4;
+
         private static float Probability(float perSecond, float deltaTime)
         {
             float p = Mathf.Clamp01(perSecond);
@@ -1041,6 +1156,8 @@ namespace ImmunologyTD.Grid
         /// actually do.</summary>
         private void TickBarrier(float deltaTime, float currentTime)
         {
+            DecayToxin(deltaTime);
+
             for (int i = 0; i < adhered.Count; i++)
             {
                 var p = adhered[i];
@@ -1056,6 +1173,21 @@ namespace ImmunologyTD.Grid
                 // thereby locked itself out, because a dead stretch has no
                 // living cell to infect.
                 if (p.Class == PathogenClass.IntracellularVirus) continue;
+
+                // Sprint 24 -- **the toxin secretors do not graze.**
+                // Vibrio cholerae never eats the wall and never takes a
+                // slot: it sits on the epithelium and secretes, and the
+                // cells underneath stay alive while ceasing to be the
+                // player's. Routing it through DamageBarrier would make it
+                // just another chewer and lose the entire distinction.
+                float toxin = p.Profile.ToxinFieldStrength;
+                if (toxin > 0f)
+                {
+                    ApplyToxinField(p.WallS, toxin, p.Profile.ToxinFieldRadiusCells,
+                                    p.VirulenceScale * deltaTime);
+                    continue;
+                }
+
                 DamageBarrier(p.WallS, BarrierTuning.GrazeDamagePerSecond * p.VirulenceScale * deltaTime, currentTime);
             }
 

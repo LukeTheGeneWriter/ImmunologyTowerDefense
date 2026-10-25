@@ -256,7 +256,7 @@ namespace ImmunologyTD.Pathogens
                 {
                     var a = live[i];
                     if (a.State != PathogenState.Lumen && a.State != PathogenState.AtInterface) continue;
-                    wall.TrySample(a.CurrentCoarse, a.Class, deltaTime, Random.value);
+                    wall.TrySample(a.CurrentCoarse, a.Species, deltaTime, Random.value);
                 }
             }
 
@@ -417,7 +417,7 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>
-        /// Spawns one pathogen of <paramref name="pClass"/> at or beside
+        /// Spawns one pathogen of <paramref name="species"/> at or beside
         /// <paramref name="source"/>. Three production callers, all through
         /// PathogenAgent's `onSpawnNear` delegate:
         ///
@@ -442,15 +442,15 @@ namespace ImmunologyTD.Pathogens
         ///
         /// Neighbour order is shuffled each call so none favours a direction.
         /// </summary>
-        public bool RequestSpawnNear(CoarseCoord source, PathogenClass pClass, bool asFreeParticle, float currentTime)
+        public bool RequestSpawnNear(CoarseCoord source, PathogenSpecies species, bool asFreeParticle, float currentTime)
         {
             if (live.Count >= maxLivePathogens) return false;
 
-            bool needsHealthyHost = pClass == PathogenClass.IntracellularVirus && !asFreeParticle;
+            bool needsHealthyHost = SpeciesRoster.ClassOf(species) == PathogenClass.IntracellularVirus && !asFreeParticle;
 
             // A brood or a budded free virion may land on the source cell
             // itself; a contact-chain virus never can (that cell is infected).
-            if (!needsHealthyHost && TrySpawnAt(source, pClass, needsHealthyHost, currentTime)) return true;
+            if (!needsHealthyHost && TrySpawnAt(source, species, needsHealthyHost, currentTime)) return true;
 
             var order = new[] { 0, 1, 2, 3 };
             for (int i = 3; i > 0; i--)
@@ -465,13 +465,13 @@ namespace ImmunologyTD.Pathogens
             {
                 var (dc, dr) = CoarseNeighborOffsets[idx];
                 var candidate = new CoarseCoord(source.Column + dc, source.Row + dr);
-                if (TrySpawnAt(candidate, pClass, needsHealthyHost, currentTime)) return true;
+                if (TrySpawnAt(candidate, species, needsHealthyHost, currentTime)) return true;
             }
 
             return false;
         }
 
-        private bool TrySpawnAt(CoarseCoord candidate, PathogenClass pClass, bool needsHealthyHost, float currentTime)
+        private bool TrySpawnAt(CoarseCoord candidate, PathogenSpecies species, bool needsHealthyHost, float currentTime)
         {
             if (!board.InCoarseBounds(candidate)) return false;
             if (board.BandOf(candidate) != BoardBand.Tissue) return false;
@@ -482,7 +482,7 @@ namespace ImmunologyTD.Pathogens
             var child = go.GetComponent<PathogenAgent>();
             child.InitializeInTissueDirect(
                 board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear,
-                candidate, pClass, currentTime);
+                candidate, SpeciesRoster.ClassOf(species), currentTime, species);
             live.Add(child);
             return true;
         }

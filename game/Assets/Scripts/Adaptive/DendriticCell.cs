@@ -84,7 +84,7 @@ namespace ImmunologyTD.Adaptive
         public FineCoord NodePos { get; private set; }
 
         public byte Cargo { get; private set; }
-        public PathogenClass CargoClass { get; private set; }
+        public PathogenSpecies CargoClass { get; private set; }
         public bool HasCargo { get; private set; }
         public bool Frozen { get; set; }
 
@@ -214,7 +214,7 @@ namespace ImmunologyTD.Adaptive
             var wall = GutWallFeatures.Current;
             if (wall != null && wall.TryTakeAntigen(coarse, out var sampled))
             {
-                Cargo = Antigen.ForClass(sampled);
+                Cargo = Antigen.ForSpecies(sampled);
                 CargoClass = sampled;
                 HasCargo = true;
                 presentationsLeft = AdaptiveUnitTuning.PresentationsPerCargo(tuning);
@@ -227,7 +227,7 @@ namespace ImmunologyTD.Adaptive
 
             // (§1c -- a sampling DC is also a clearing DC, so it competes
             // with macrophage efferocytosis for the same debris.)
-            Cargo = Antigen.ForClass(antigen.Value);
+            Cargo = Antigen.ForSpecies(antigen.Value);
             CargoClass = antigen.Value;
             HasCargo = true;
             presentationsLeft = AdaptiveUnitTuning.PresentationsPerCargo(tuning);

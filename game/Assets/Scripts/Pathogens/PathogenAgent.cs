@@ -96,7 +96,7 @@ namespace ImmunologyTD.Pathogens
         private GutWall gutWall;
         private InvasionTally tally;
         private System.Action<PathogenAgent> onExit;
-        private System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear;
+        private System.Func<CoarseCoord, PathogenSpecies, bool, float, bool> onSpawnNear;
 
         public PathogenState State { get; private set; }
 
@@ -191,7 +191,20 @@ namespace ImmunologyTD.Pathogens
         private float millDepth;
         private float millPhase;
 
-        public PathogenClass Class { get; private set; }
+        /// <summary>Sprint 24: the named organism this is. Knowledge is
+        /// keyed by this, not by <see cref="Class"/>.</summary>
+        public PathogenSpecies Species { get; private set; }
+
+        /// <summary>The behavioural archetype. **Derived from
+        /// <see cref="Species"/>**, never set independently -- so every
+        /// pre-existing branch that asks "is this a virus?" keeps working
+        /// untouched while two species can share an archetype and still be
+        /// learned about separately.</summary>
+        public PathogenClass Class => SpeciesRoster.ClassOf(Species);
+
+        /// <summary>This organism's species traits (tropism, toxin,
+        /// inflammation-feeding). Cached per access; the table is static.</summary>
+        public SpeciesProfile Profile => SpeciesRoster.Get(Species);
         public float Health { get; private set; }
         public float MaxHealth { get; private set; }
 
@@ -336,13 +349,19 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void Initialize(
             BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
-            CoarseCoord? lumenCellOverride = null, PathogenClass? classOverride = null)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenSpecies, bool, float, bool> onSpawnNear,
+            CoarseCoord? lumenCellOverride = null, PathogenClass? classOverride = null,
+            PathogenSpecies? speciesOverride = null)
         {
             BindContext(board, tissueGrid, gutWall, tally, onExit, onSpawnNear);
             EnsureSprite();
 
-            Class = classOverride ?? PickRandomClass();
+            // A named species wins; a bare class resolves to its generic;
+            // otherwise roll.
+            Species = speciesOverride
+                      ?? (classOverride.HasValue
+                            ? SpeciesRoster.GenericFor(classOverride.Value)
+                            : PickRandomSpecies());
             SetHealthForClass();
             AssignVirusTraits();
 
@@ -390,13 +409,14 @@ namespace ImmunologyTD.Pathogens
         /// </summary>
         public void InitializeInTissueDirect(
             BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear,
-            CoarseCoord slot, PathogenClass pClass, float currentTime)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenSpecies, bool, float, bool> onSpawnNear,
+            CoarseCoord slot, PathogenClass pClass, float currentTime,
+            PathogenSpecies? speciesOverride = null)
         {
             BindContext(board, tissueGrid, gutWall, tally, onExit, onSpawnNear);
             EnsureSprite();
 
-            Class = pClass;
+            Species = speciesOverride ?? SpeciesRoster.GenericFor(pClass);
             SetHealthForClass();
             AssignVirusTraits();
             InterfacePosition = -1;
@@ -432,11 +452,42 @@ namespace ImmunologyTD.Pathogens
         /// target position already has an extracellular occupant can still
         /// come off the wall.</summary>
         private bool CanTakeHostAt(CoarseCoord slot) =>
-            Class == PathogenClass.IntracellularVirus && tissueGrid.IsHealthyHost(slot);
+            Class == PathogenClass.IntracellularVirus
+            && tissueGrid.IsHealthyHost(slot)
+            && WithinTropismAt(slot);
+
+        /// <summary>
+        /// Sprint 24: positional tropism (<see cref="SpeciesProfile.
+        /// VillusTipTropismCells"/>). A species with a tropism window can
+        /// only infect host cells within that many coarse cells of the
+        /// lumen -- the mature enterocytes near the villus tip.
+        ///
+        /// **Rotavirus is why this exists**, and the consequence is the
+        /// mechanic: it does not infect the crypt stem cell, so the crypt
+        /// end of the tissue keeps producing replacements underneath an
+        /// infection that cannot reach it. On this board that reads as a
+        /// plague which eats the wall but can never touch the engine that
+        /// rebuilds it -- the tissue repaves from the base outward even
+        /// while the infection is still spreading at the tip.
+        ///
+        /// A species with 0 here has no restriction, which is every other
+        /// species, so no call site needs a species check.
+        /// </summary>
+        public bool WithinTropismAt(CoarseCoord slot)
+        {
+            int window = Profile.VillusTipTropismCells;
+            if (window <= 0) return true;
+            // Distance from the lumen edge of the tissue band, measured in
+            // the axis frame so it stays correct on a mirrored board.
+            int depthFromLumen = board.TissueLumenEdgeAxisIndex - board.AxisIndex(slot);
+            return depthFromLumen >= 0 && depthFromLumen < window;
+        }
 
         private void SettleIntoTissue(CoarseCoord slot, float currentTime)
         {
-            if (Class == PathogenClass.IntracellularVirus && tissueGrid.TryInfect(slot, this, currentTime))
+            if (Class == PathogenClass.IntracellularVirus
+                && WithinTropismAt(slot)
+                && tissueGrid.TryInfect(slot, this, currentTime))
             {
                 EstablishInfection(currentTime); // sets IsIntracellular, resets bud/burnout state, applies colour
             }
@@ -451,7 +502,7 @@ namespace ImmunologyTD.Pathogens
 
         private void BindContext(
             BoardConfig board, TissueGrid tissueGrid, GutWall gutWall, InvasionTally tally,
-            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpawnNear)
+            System.Action<PathogenAgent> onExit, System.Func<CoarseCoord, PathogenSpecies, bool, float, bool> onSpawnNear)
         {
             this.board = board;
             this.tissueGrid = tissueGrid;
@@ -960,7 +1011,7 @@ namespace ImmunologyTD.Pathogens
                 float remaining = tissueGrid.GetHostHealth(CurrentCoarse) - InvasionTuning.IntracellularDrainPerReplication;
                 if (remaining > 0f)
                 {
-                    tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.IntracellularDrainPerReplication, Class);
+                    tissueGrid.DamageHostCell(CurrentCoarse, InvasionTuning.IntracellularDrainPerReplication, Species);
                     return;
                 }
 
@@ -1001,7 +1052,7 @@ namespace ImmunologyTD.Pathogens
             var at = CurrentCoarse;
 
             tissueGrid.ReleaseIntracellular(at);   // Infected -> Healthy, drop the resident link
-            tissueGrid.KillHostCell(at, Class);    // Healthy -> Dead + debris (bacterial antigen), no one to notify
+            tissueGrid.KillHostCell(at, Species);  // Healthy -> Dead + debris (this species' antigen), no one to notify
             IsIntracellular = false;
 
             // I am back on the occupant layer of the now-dead cell. A fresh
@@ -1014,7 +1065,7 @@ namespace ImmunologyTD.Pathogens
             int total = Mathf.Clamp(broodCount, 1, Mathf.Max(1, InvasionTuning.IntracellularMaxBrood));
             for (int i = 0; i < total - 1; i++)
             {
-                if (onSpawnNear == null || !onSpawnNear(at, PathogenClass.IntracellularBacterium, false, currentTime)) break;
+                if (onSpawnNear == null || !onSpawnNear(at, Species, false, currentTime)) break;
             }
             broodCount = 0;
         }
@@ -1029,7 +1080,7 @@ namespace ImmunologyTD.Pathogens
             if (Class == PathogenClass.LargeBacterium)
             {
                 tissueGrid.DamageHostCell(CurrentCoarse,
-                    InvasionTuning.LargeBacteriumHostDamagePerStep * VirulenceScale, Class);
+                    InvasionTuning.LargeBacteriumHostDamagePerStep * VirulenceScale, Species);
             }
 
             StepTissue();
@@ -1115,12 +1166,12 @@ namespace ImmunologyTD.Pathogens
             onExit?.Invoke(this);
         }
 
-        private static PathogenClass PickRandomClass()
+        private static PathogenSpecies PickRandomSpecies()
         {
             float r = Random.value;
-            if (r < VirusChance) return PathogenClass.IntracellularVirus;
-            if (r < VirusChance + BacteriumChance) return PathogenClass.IntracellularBacterium;
-            return PathogenClass.LargeBacterium;
+            if (r < VirusChance) return PathogenSpecies.GenericVirus;
+            if (r < VirusChance + BacteriumChance) return PathogenSpecies.GenericIntracellularBacterium;
+            return PathogenSpecies.GenericLargeBacterium;
         }
 
         private void SetHealthForClass()
@@ -1212,6 +1263,8 @@ namespace ImmunologyTD.Pathogens
                 return;
             }
 
+            TickEnterotoxin(currentTime);
+
             if (currentTime - infectionStartTime < IncubationSeconds) return;
 
             if (virusBuds)
@@ -1221,7 +1274,7 @@ namespace ImmunologyTD.Pathogens
                 // asFreeParticle: true -- the virion is dropped ON this
                 // infected cell and floats off (StepVirus), it does not
                 // instantly infect a neighbour.
-                onSpawnNear?.Invoke(CurrentCoarse, PathogenClass.IntracellularVirus, true, currentTime);
+                onSpawnNear?.Invoke(CurrentCoarse, Species, true, currentTime); // Sprint 24: buds ITS OWN species
                 return;
             }
 
@@ -1229,11 +1282,51 @@ namespace ImmunologyTD.Pathogens
             if (hasSpread) return;
             if (currentTime - lastSpreadAttemptTime < SpreadRetryIntervalSeconds) return;
             lastSpreadAttemptTime = currentTime;
-            if (onSpawnNear != null && onSpawnNear(CurrentCoarse, PathogenClass.IntracellularVirus, false, currentTime))
+            if (onSpawnNear != null && onSpawnNear(CurrentCoarse, Species, false, currentTime))
             {
                 hasSpread = true;
             }
         }
+
+        /// <summary>
+        /// Sprint 24 -- **rotavirus NSP4**, a genuine viral enterotoxin.
+        ///
+        /// An infected cell damages its HEALTHY neighbours without infecting
+        /// them. That is the mechanic worth having: rotavirus damage outruns
+        /// rotavirus infection, so the visible harm is wider than the
+        /// visible infection, and a player who clears only the cells that
+        /// look infected is always a step behind.
+        ///
+        /// It also composes with the tropism above in a way neither trait
+        /// has alone: the toxin reaches cells the virus itself is forbidden
+        /// to enter, so damage creeps toward the crypt that the infection
+        /// can never occupy.
+        ///
+        /// Species with no enterotoxin fall out on the first line.
+        /// </summary>
+        private void TickEnterotoxin(float currentTime)
+        {
+            float dose = Profile.EnterotoxinNeighbourDamage;
+            if (dose <= 0f) return;
+            if (currentTime - lastEnterotoxinTime < EnterotoxinIntervalSeconds) return;
+            lastEnterotoxinTime = currentTime;
+
+            for (int i = 0; i < FineCoord.VonNeumannOffsets.Length; i++)
+            {
+                var off = FineCoord.VonNeumannOffsets[i];
+                var n = new CoarseCoord(CurrentCoarse.Column + off.Column, CurrentCoarse.Row + off.Row);
+                if (!tissueGrid.IsHostGround(n)) continue;
+                // Only living, uninfected cells -- the toxin acts on
+                // bystanders. An already-infected neighbour has its own
+                // problems and an already-dead one cannot be poisoned.
+                if (tissueGrid.GetHostState(n) != HostState.Healthy) continue;
+                tissueGrid.DamageHostCell(n, dose * VirulenceScale, Species);
+            }
+        }
+
+        /// <summary>Seconds between enterotoxin pulses.</summary>
+        private const float EnterotoxinIntervalSeconds = 0.5f;
+        private float lastEnterotoxinTime = float.NegativeInfinity;
 
         /// <summary>
         /// A viral infection that has run its course kills its own host cell
@@ -1245,14 +1338,14 @@ namespace ImmunologyTD.Pathogens
         {
             var at = CurrentCoarse;
             tissueGrid.ReleaseIntracellular(at);
-            tissueGrid.KillHostCell(at, Class); // viral antigen in the debris
+            tissueGrid.KillHostCell(at, Species); // this species' antigen in the debris
             IsIntracellular = false;
             freeSinceTime = currentTime;
             hasSpread = false;
             tissueGrid.TryClaimOccupant(at, this, currentTime);
             ApplyRestColorForCurrentClass();
             // Spill one more free virion alongside this one.
-            onSpawnNear?.Invoke(at, PathogenClass.IntracellularVirus, true, currentTime);
+            onSpawnNear?.Invoke(at, Species, true, currentTime);
         }
 
         /// <summary>

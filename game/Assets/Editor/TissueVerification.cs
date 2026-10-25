@@ -112,7 +112,7 @@ public static class TissueVerification
     /// (spawner.RequestSpawnNear) for the firebreak group.</summary>
     private static PathogenAgent PlaceInTissue(
         Rig rig, string name, CoarseCoord slot, PathogenClass pClass, float now,
-        System.Func<CoarseCoord, PathogenClass, bool, float, bool> onSpread = null,
+        System.Func<CoarseCoord, PathogenSpecies, bool, float, bool> onSpread = null,
         System.Action<PathogenAgent> onExit = null)
     {
         var agent = NewAgent(rig, name);

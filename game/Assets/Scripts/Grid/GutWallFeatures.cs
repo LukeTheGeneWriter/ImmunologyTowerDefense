@@ -79,7 +79,7 @@ namespace ImmunologyTD.Grid
 
         private readonly BoardConfig board;
         private readonly List<int> cryptLanes = new List<int>();
-        private readonly Queue<PathogenClass> antigen = new Queue<PathogenClass>();
+        private readonly Queue<PathogenSpecies> antigen = new Queue<PathogenSpecies>();
 
         public int PatchCrossStart { get; }
         public int PatchCrossEnd { get; }   // inclusive
@@ -187,7 +187,7 @@ namespace ImmunologyTD.Grid
         /// <paramref name="at"/> for <paramref name="deltaTime"/> seconds.
         /// <paramref name="roll01"/> is the caller's random draw (so a
         /// harness can force it). Returns true when antigen was taken.</summary>
-        public bool TrySample(CoarseCoord at, PathogenClass cls, float deltaTime, float roll01)
+        public bool TrySample(CoarseCoord at, PathogenSpecies cls, float deltaTime, float roll01)
         {
             if (MCellLevel <= 0) return false;
             if (antigen.Count >= GutWallTuning.MCellAntigenCapacity) return false;
@@ -201,7 +201,7 @@ namespace ImmunologyTD.Grid
 
         /// <summary>A cargo-less DC standing in the follicle collects the
         /// oldest waiting parcel.</summary>
-        public bool TryTakeAntigen(CoarseCoord dcAt, out PathogenClass cls)
+        public bool TryTakeAntigen(CoarseCoord dcAt, out PathogenSpecies cls)
         {
             cls = default;
             if (antigen.Count == 0 || !IsInFollicle(dcAt)) return false;

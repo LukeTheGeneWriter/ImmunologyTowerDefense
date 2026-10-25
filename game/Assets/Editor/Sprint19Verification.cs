@@ -177,22 +177,22 @@ public static class Sprint19Verification
         var midLumen = board.CoarseFromAxis(board.LumenNearWallAxisIndex + 4, lane);
 
         Check("level 0: M cells sample nothing (a landmark only)",
-            !wall.TrySample(overDome, PathogenClass.IntracellularVirus, 1f, 0f) && wall.PendingAntigen == 0);
+            !wall.TrySample(overDome, PathogenSpecies.GenericVirus, 1f, 0f) && wall.PendingAntigen == 0);
 
         wall.MCellLevel = 1;
-        Check("bought: a pathogen over the dome is sampled", wall.TrySample(overDome, PathogenClass.IntracellularVirus, 1f, 0f));
-        Check("...but not one off the patch", !wall.TrySample(offDome, PathogenClass.IntracellularVirus, 1f, 0f));
-        Check("...nor one out in mid-channel", !wall.TrySample(midLumen, PathogenClass.IntracellularVirus, 1f, 0f));
-        Check("a failed roll samples nothing", !wall.TrySample(overDome, PathogenClass.IntracellularVirus, 0.016f, 0.99f));
+        Check("bought: a pathogen over the dome is sampled", wall.TrySample(overDome, PathogenSpecies.GenericVirus, 1f, 0f));
+        Check("...but not one off the patch", !wall.TrySample(offDome, PathogenSpecies.GenericVirus, 1f, 0f));
+        Check("...nor one out in mid-channel", !wall.TrySample(midLumen, PathogenSpecies.GenericVirus, 1f, 0f));
+        Check("a failed roll samples nothing", !wall.TrySample(overDome, PathogenSpecies.GenericVirus, 0.016f, 0.99f));
 
-        for (int i = 0; i < 10; i++) wall.TrySample(overDome, PathogenClass.LargeBacterium, 1f, 0f);
+        for (int i = 0; i < 10; i++) wall.TrySample(overDome, PathogenSpecies.GenericLargeBacterium, 1f, 0f);
         Check("antigen waiting in the dome is capped", wall.PendingAntigen == GutWallTuning.MCellAntigenCapacity);
 
         var follicle = board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex - 1, lane);
         var deepTissue = board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex - GutWallTuning.FollicleDepthCells - 1, lane);
         Check("a DC deep in tissue can't collect", !wall.TryTakeAntigen(deepTissue, out _));
         Check("a DC in the follicle collects the oldest parcel first",
-            wall.TryTakeAntigen(follicle, out var cls) && cls == PathogenClass.IntracellularVirus);
+            wall.TryTakeAntigen(follicle, out var cls) && cls == PathogenSpecies.GenericVirus);
 
         int rate1 = CountSamples(board, 1), rate3 = CountSamples(board, 3);
         Check($"higher M-cell level samples faster ({rate1} -> {rate3} in 200 rolls)", rate3 > rate1);
@@ -208,7 +208,7 @@ public static class Sprint19Verification
         int n = 0;
         for (int i = 0; i < 200; i++)
         {
-            if (w.TrySample(at, PathogenClass.IntracellularVirus, 0.1f, (float)rng.NextDouble())) n++;
+            if (w.TrySample(at, PathogenSpecies.GenericVirus, 0.1f, (float)rng.NextDouble())) n++;
             w.TryTakeAntigen(board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex, w.PatchCrossStart), out _);  // keep it under capacity
         }
         return n;
@@ -223,7 +223,7 @@ public static class Sprint19Verification
         GutWallFeatures.Current = wall;
 
         int lane = (wall.PatchCrossStart + wall.PatchCrossEnd) / 2;
-        wall.TrySample(board.CoarseFromAxis(board.LumenNearWallAxisIndex, lane), PathogenClass.IntracellularBacterium, 1f, 0f);
+        wall.TrySample(board.CoarseFromAxis(board.LumenNearWallAxisIndex, lane), PathogenSpecies.GenericIntracellularBacterium, 1f, 0f);
 
         var dcGo = new GameObject("S19_DC");
         dcGo.AddComponent<SpriteRenderer>();
@@ -238,7 +238,7 @@ public static class Sprint19Verification
         dc.DebugPlaceForTest(board.CoarseCenterFine(board.CoarseFromAxis(board.TissueLumenEdgeAxisIndex - 1, lane)));
         dc.SimulationTick(0.2f);
         Check("a DC in the follicle picks up the M-cell parcel as cargo (no debris needed)",
-            dc.HasCargo && dc.CargoClass == PathogenClass.IntracellularBacterium && wall.PendingAntigen == 0);
+            dc.HasCargo && dc.CargoClass == PathogenSpecies.GenericIntracellularBacterium && wall.PendingAntigen == 0);
 
         GutWallFeatures.Current = null;
         Object.DestroyImmediate(dcGo);

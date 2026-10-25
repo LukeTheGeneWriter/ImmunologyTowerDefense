@@ -20,7 +20,7 @@ namespace ImmunologyTD.Adaptive
         byte Cargo { get; }
 
         /// <summary>The species that antigen belongs to -- the knowledge key.</summary>
-        PathogenClass CargoClass { get; }
+        PathogenSpecies CargoClass { get; }
 
         /// <summary>False once the cargo is spent; a spent DC does not pair.</summary>
         bool HasCargo { get; }

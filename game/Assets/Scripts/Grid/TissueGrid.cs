@@ -120,9 +120,10 @@ namespace ImmunologyTD.Grid
         /// This is the ANTIGEN a dendritic cell picks up when it samples the
         /// pile (GAME_DESIGN.md §1c -- "dead host cells are the antigen
         /// source"; §5a step 1). Set when the cell dies, cleared with the
-        /// pile. Species key = <see cref="PathogenClass"/> for now (no
+        /// pile. Sprint 24: a <see cref="PathogenSpecies"/>, so a dendritic
+        /// cell samples a NAMED organism (no
         /// species roster yet).</summary>
-        private readonly PathogenClass?[,] debrisAntigen;
+        private readonly PathogenSpecies?[,] debrisAntigen;
 
         private readonly float[,] emptySince;
 
@@ -163,7 +164,7 @@ namespace ImmunologyTD.Grid
             attackersLastTick = new int[cols, rows];
             attackersThisTick = new int[cols, rows];
             debrisAmount = new float[cols, rows];
-            debrisAntigen = new PathogenClass?[cols, rows];
+            debrisAntigen = new PathogenSpecies?[cols, rows];
             emptySince = new float[cols, rows];
             occupant = new PathogenAgent[cols, rows];
             occupantStartTime = new float[cols, rows];
@@ -226,7 +227,7 @@ namespace ImmunologyTD.Grid
         /// killer left no antigen (neutrophil collateral on a bare healthy
         /// cell). A dendritic cell standing on the pile samples this
         /// (GAME_DESIGN.md §5a step 1).</summary>
-        public PathogenClass? GetDebrisAntigen(CoarseCoord c) =>
+        public PathogenSpecies? GetDebrisAntigen(CoarseCoord c) =>
             board.InCoarseBounds(c) ? debrisAntigen[c.Column, c.Row] : null;
 
         /// <summary>The pathogen living inside this position's host cell, or
@@ -420,7 +421,7 @@ namespace ImmunologyTD.Grid
         /// scarring**: an apoptotic death leaves a small, quickly-cleared
         /// pile, so the ground is free to regrow far sooner.
         /// </param>
-        public bool KillHostCell(CoarseCoord c, PathogenClass? antigen = null, bool apoptotic = false)
+        public bool KillHostCell(CoarseCoord c, PathogenSpecies? antigen = null, bool apoptotic = false)
         {
             if (!IsHostGround(c)) return false;
             var previous = host[c.Column, c.Row];
@@ -448,7 +449,7 @@ namespace ImmunologyTD.Grid
             // kill does NOT cost the player the thing they learn from.
             debrisAmount[c.Column, c.Row] =
                 apoptotic ? FullDebris * TissueTuning.ApoptoticDebrisFraction : FullDebris;
-            debrisAntigen[c.Column, c.Row] = antigen ?? resident?.Class;
+            debrisAntigen[c.Column, c.Row] = antigen ?? resident?.Species;
             emptySince[c.Column, c.Row] = -1f;
             DeadCount++;
 
@@ -462,7 +463,7 @@ namespace ImmunologyTD.Grid
         /// Reaching zero kills the cell and leaves debris.
         /// </summary>
         /// <returns>True if this damage killed the cell.</returns>
-        public bool DamageHostCell(CoarseCoord c, float amount, PathogenClass? antigen = null)
+        public bool DamageHostCell(CoarseCoord c, float amount, PathogenSpecies? antigen = null)
         {
             if (!IsHostGround(c) || amount <= 0f) return false;
             var state = host[c.Column, c.Row];
