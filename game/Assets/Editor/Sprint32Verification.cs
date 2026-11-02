@@ -695,8 +695,38 @@ public static class Sprint32Verification
         Check($"and what it put on the board is named organisms, not generics stamped out of a class: {string.Join(", ", names)}",
               seen.ContainsKey(PathogenSpecies.AttachingEffacingEcoli));
         Check("rotavirus rode along in the same batch", seen.ContainsKey(PathogenSpecies.Rotavirus));
-        Check($"and the named organisms are the majority of it ({namedOnTheBoard} of {spawner.BatchEmitted}), as that round's cast weights say",
-              namedOnTheBoard > spawner.BatchEmitted / 2);
+        // **Sprint 34: this check used to assert "the named organisms are the
+        // MAJORITY", and that was wrong.** The round it finds is round 20,
+        // whose cast is Bact 2 / Vir 2 / Intra 1 / Vibrio 2 / Rota 2 / Aeec 1
+        // -- so the named organisms are expected to be exactly FIVE TENTHS of
+        // it, and whether a sample of 58 lands above or below half is a coin
+        // flip. It had been passing on luck; a Sprint 34 change to how many
+        // random numbers a rotavirus spawn consumes moved the stream and it
+        // read 24 of 58. Third instance of a harness owning a number it is
+        // not testing (AGENT_HANDBOOK.md).
+        //
+        // What this check is actually for is that the spawner HONOURS THE
+        // CAST WEIGHTS, so it now computes the expectation from the round's
+        // own cast and allows three standard deviations of sampling error at
+        // the batch size actually emitted. That survives any table edit, and
+        // still fails loudly if a named organism stops reaching the board --
+        // an observed zero is ~7.6 sigma from this expectation.
+        float weightNamed = 0f, weightAll = 0f;
+        foreach (var c in def.Cast)
+        {
+            if (c.Weight <= 0f) continue;
+            weightAll += c.Weight;
+            if ((int)c.Species >= (int)PathogenSpecies.Rotavirus) weightNamed += c.Weight;
+        }
+        float expectedNamed = weightAll > 0f ? weightNamed / weightAll : 0f;
+        int emitted = Mathf.Max(1, spawner.BatchEmitted);
+        float observedNamed = namedOnTheBoard / (float)emitted;
+        float sigma = Mathf.Sqrt(Mathf.Max(1e-6f, expectedNamed * (1f - expectedNamed) / emitted));
+        float tolerance = 3f * sigma;
+        Check($"and the named organisms arrive in the proportion round {roundNumber}'s cast weights ask for"
+              + $" ({namedOnTheBoard} of {spawner.BatchEmitted} = {observedNamed:P0}, expected {expectedNamed:P0}"
+              + $" +/- {tolerance:P0} at 3 sigma)",
+              Mathf.Abs(observedNamed - expectedNamed) <= tolerance);
         Check("and every organism on the board was cast by the round",
               AllCast(seen, def));
 

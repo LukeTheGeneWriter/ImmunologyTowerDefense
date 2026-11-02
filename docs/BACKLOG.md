@@ -1272,3 +1272,92 @@ so changing it per round needs those checked rather than assumed.
 - Kill limits on the other four kinds are unmeasured.
 - The Director has not playtested Sprint 32 or 33. Both sprints' claims are
   harness-measured, not played.
+
+## Open after Sprint 34 (2026-11-02)
+
+The roster-expansion spec (`docs/ROSTER_EXPANSION_SPEC.md`) is the shopping
+list; these are the things that gate or follow it.
+
+- **The antigen barcode must widen to 10 -> 12 bits before any new species
+  gets a tag.** Measured: 10 bits admits at most 12 species at r=2
+  (constructed 12, Hamming ceiling 18); the roster becomes 16. A generated
+  16-tag set at minimum distance 6 is in the spec, ready to paste. Getting
+  this wrong is how the 8-bit set ended up cross-teaching 21.9% of the
+  time.
+- **`SpeciesProfile.Antigen`'s comment is wrong** and should be corrected
+  in the same pass: it claims 10 bits "leaves headroom for the avidity
+  upgrade to raise r to 3". The set sits 6 apart and r=3 needs 7. At 10
+  bits r=3 admits exactly **two** species -- a Plotkin bound, not a search
+  limit. `AdaptiveTuning`'s own comment has it right.
+- **There is no per-species sprite path.** `PathogenAgent` selects from
+  `Class` (two sprites), so rotavirus, *V. cholerae* and A/E *E. coli* have
+  rendered as generics since Sprint 24. Needs `SpriteShapes.ForSpecies` + a
+  per-species palette entry, and the three shipped organisms need sprites
+  too, not only new ones.
+- **`KnowledgeView.SpeciesIcon` draws rotavirus as a bacterium** --
+  `case 0 / case 1 / default`, and rotavirus is species 3. Live bug.
+- **The knowledge HUD does not scale**: a fixed 420 px ribbon of 186 px
+  cards. Sixteen species is ~3,000 px. Recommendation: show only species
+  seen this run, which also teaches better.
+- **Four of the ten organisms change silhouette mid-board** (sporulating,
+  cyst/trophozoite, oocyst/blister). A pathogen's sprite is set once at
+  spawn today.
+- **A *Giardia*-only round may softlock the knowledge ladder** -- §1c makes
+  debris the input to adaptive immunity and *Giardia* makes none, so the
+  rungs that counter it are unreachable from that round. See
+  `docs/research/giardia_antigen_route.md`.
+- **The anatomy ruling opens a new head of the shortlist** that no pass has
+  ranked yet: *Entamoeba histolytica* (answers two standing gaps),
+  *Shigella*, *Campylobacter*, *Trichuris*, *C. difficile*, ETBF.
+- **Nontyphoidal *Salmonella* should lead its own sprint** -- more common
+  than five organisms on the chosen ten, but its mechanic is a change to
+  §4a's advance rules (the infected enterocyte is *extruded into the
+  lumen*), not a species addition.
+- **§4a's parasite class is over-specified.** `BACKLOG` calls its
+  multi-slot footprint "more engineering than the other three classes
+  combined"; not one enteric protozoan needs it (a microsporidian spore is
+  *smaller* than the game's bacterium). Re-spec as single-slot with a size
+  multiplier and defer the footprint to helminths.
+- **§4a's "parasites don't hide" and "cleared by direct combat damage,
+  more of it" are both wrong** -- cytotoxic lymphocytes are inactive
+  against helminths; clearance is expulsion.
+- **The built *V. cholerae* actively swims**, and non-chemotactic mutants
+  *out-compete* wild type across the small intestine, so "run straight and
+  get everywhere" beats "steer at the wall" -- truer and cheaper than what
+  is there.
+- **Adenovirus F41 must not be built as a cliff** (MICB only, retention not
+  transcriptional, one cell line, no NK killing assay). `PATHOGEN_ROSTER`
+  calls it "the exact inversion of CMV"; the evidence does not carry that.
+- **Norovirus's "2-4 year cycle" is historical only** -- Sydney 2012 has
+  held 11+ years. Stochastic with a long tail, not a metronome.
+- **The only gut IgA protease found belongs to a commensal**
+  (*Sutterella wadsworthensis*), so whether §5's ~70% IgA rung works may be
+  partly a property of the bacterial lawn.
+- **§7's scale note is computed at 5x but the lattice is 7x7.**
+
+### From the Giardia antigen pass (2026-11-02)
+
+- **"Shed antigen" is designed and unbuilt** — see `GAME_DESIGN.md` §1c's
+  amendment and `docs/research/giardia_antigen_route.md`. One new lumen-side
+  entity (a pathogen-emitted antigen parcel); both carriers already exist.
+  Needs a Director decision.
+- **§1d's PRR -> immunogenic-apoptosis upgrade is inert against two of the
+  ten proposed organisms**, and for different reasons: *Giardia* never
+  infects a cell at all, and *Cryptosporidium*'s infected cells are
+  survivin-protected against apoptosis. The row needs an **applicability
+  flag**, not a multiplier — an upgrade that silently does nothing is the
+  exact dead-feature pattern this project keeps finding.
+- **`ApoptoticDebrisFraction` is not "the whole reward in one number"**
+  without a per-species apoptosis-resistance factor.
+- **Every necessity claim for anti-*Giardia* clearance is mouse** — CD4⁺/αβ
+  T cells (CD8 depletion is irrelevant), IL-17RA signalling, IgA for
+  eradication, mast cells, DC-derived IL-6. Human data are correlative only.
+  NO and α-defensins are *redundant*: only double blockade bites. Worth
+  keeping straight before any of it becomes a tower.
+- ***Giardia* does cause real epithelial apoptosis**, which partly softens
+  the "no debris at all" framing: human duodenal biopsies in chronic
+  infection show increased epithelial apoptosis and reduced claudin-1. But
+  it is **strain-selective** (NF/S2 yes, WB/PB no, with one paper
+  disagreeing — recorded as unresolved), abolished by high glucose via
+  SGLT-1, and no in vivo rate exists. Not enough to carry the knowledge
+  ladder, which is why the EV route is the answer.

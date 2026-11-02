@@ -1228,6 +1228,67 @@ determinism; the other harnesses still leak.
 The three by-hand diagnostics under `ImmunologyTD/Diagnose` remain outside
 `verify`.
 
+## Sprint 34 — the rotavirus corrections
+
+A research sprint with a small code tail. Five parallel research passes
+(`docs/research/`, ~5,500 lines, every claim PubMed- or Consensus-verified
+in session) answered the Director's ask for ten more common gut pathogens.
+Two of their findings were about an organism already shipped, so those were
+fixed here; the ten themselves are specified, not built, in
+`docs/ROSTER_EXPANSION_SPEC.md`.
+
+### What changed in the engine
+
+| Change | Where |
+|---|---|
+| `ViralExit` enum + `SpeciesProfile.Exit` — the roster now owns the spread mode | `Pathogens/PathogenSpecies.cs`, `PathogenAgent.AssignVirusTraits` |
+| `SpeciesProfile.NonLyticReleaseFraction` — suppresses §4b burn-out | `PathogenAgent.TickCombat` |
+| `SpeciesProfile.PlaqueCrowdWeight` + `SpeciesRoster.CrowdWeightOf` | `Grid/GutWall.RebuildCrowdField` |
+| `PathogenAgent.VirusBuds` / `.WillBurnOut` — read-only, so a harness can assert the property | `Pathogens/PathogenAgent.cs` |
+
+**Budding had never been per-species.** §4b has specified "two per-species
+modes" since Sprint 5; `AssignVirusTraits` chose between them with a
+per-spawn coin flip and said so in a comment — "there is no species roster
+yet" — which stopped being true in Sprint 24. Seventh instance of the
+standing pattern (a value written on one side of a boundary and never read
+as that value on the other). A species that leaves `Exit` unspecified still
+rolls, so the three generics are untouched: the harness measures the
+generic virus still splitting 139/300.
+
+**The crowd weight is deliberately capped below the ingress floor.**
+Rotavirus's measured vesicle multiplier is ~3.5x, and §1b Step 2's property
+2 is locked and load-bearing: "a trickle is arithmetically impossible, not
+merely unlikely." A weight of 3.5 against a floor of 2.0 would let a lone
+virion charge a plaque and delete that property, so the weight is 1.9 —
+which makes rotavirus's minimum dose **two organisms where a generic virus
+needs three**, the per-species knob §1b Step 2 always said the floor would
+become.
+
+### Measured
+
+- Four organisms crowd **1.9x harder as rotavirus** — 7.019 against 3.694 —
+  through the real `GutWall`, not a reimplementation of it.
+- **Two rotavirus clear the ingress floor (3.8 > 2.0); two ordinary virions
+  do not (2.0 ≤ 2.0).**
+- **No rotavirus focus burns out** (0/100 established). An ordinary virus
+  still does, at 32/100 ≈ 30%, unchanged.
+- A cross-linked rotavirus raft still crowds **nothing** — the IgA
+  resolution survives the dose multiplier.
+- The antigen barcode holds at most **12** species at r=2 (constructed 12
+  against a Hamming ceiling of 18). At r=3 it holds exactly **two** — a
+  Plotkin bound. A 16-species roster needs **12 bits**.
+
+### Harness
+
+`Editor/Sprint34Verification.cs`, **20 checks** in three parts: the spread
+mode belongs to the roster, a non-lytic releaser does not burn out, and the
+vesicle dose measured through the real wall. Includes two vacuity guards —
+"the test is not vacuous" — and one of them earned its keep immediately:
+the first run established 0 of 200 rotavirus infections because the
+harness had collected host slots at the **crypt** end, which the villus-tip
+tropism correctly forbids. The harness was wrong, not the code.
+
+
 ## Build status (Sprints 13-17)
 
 All run by the **head session**. Numbers copied from actual output.
@@ -1474,6 +1535,30 @@ exercised here only in the sense that nothing moves.
 - **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
+
+- **(New, Sprint 34) There is no per-species sprite path.**
+  `PathogenAgent` sets `sr.sprite` from `Class` alone — two sprites for the
+  whole roster — so rotavirus, *V. cholerae* and A/E *E. coli* have
+  rendered as the generic corona ball and the generic bean since Sprint 24.
+  Sixth instance of the standing pattern, and it blocks the whole
+  roster-expansion sprite spec. Needs `SpriteShapes.ForSpecies` plus a
+  per-species palette entry.
+- **(New, Sprint 34) `KnowledgeView.SpeciesIcon` draws rotavirus as a
+  bacterium.** It switches `case 0 / case 1 / default`, and rotavirus is
+  species 3, so it gets the bacterium silhouette tinted virion-violet.
+- **(New, Sprint 34) The knowledge HUD does not scale past about six
+  species.** The ribbon is a fixed 420 px holding 186 px cards; sixteen
+  species would be ~3,000 px of cards. Showing only species seen this run
+  fixes it and teaches better.
+- **(New, Sprint 34) The antigen barcode is one species-addition away from
+  its ceiling.** Ten bits admits at most **12** species at the shipped
+  match radius (constructed 12, Hamming ceiling 18) and the roster is 6; a
+  16-species roster needs **12 bits**. Separately,
+  `SpeciesProfile.Antigen`'s comment claims 10 bits leaves headroom for the
+  avidity upgrade to raise r to 3 — it does not, the set sits 6 apart and
+  r=3 needs 7, and at 10 bits r=3 admits exactly **two** species by the
+  Plotkin bound. `AdaptiveTuning`'s comment has it right; the two
+  contradict each other.
 
 - **(Closed, Sprint 32) Immune cells walked out of the tissue into the
   blood.** Director-reported in Sprint 31, fixed here with the per-kind

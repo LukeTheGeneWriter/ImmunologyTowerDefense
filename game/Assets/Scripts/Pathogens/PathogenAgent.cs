@@ -195,6 +195,15 @@ namespace ImmunologyTD.Pathogens
         /// keyed by this, not by <see cref="Class"/>.</summary>
         public PathogenSpecies Species { get; private set; }
 
+        /// <summary>Sprint 34, for Sprint34Verification: does this infection
+        /// spread by budding (§4b) rather than by contact chain? Read-only --
+        /// the roster and <see cref="AssignVirusTraits"/> own it.</summary>
+        public bool VirusBuds => virusBuds;
+
+        /// <summary>Sprint 34, for Sprint34Verification: has this infection
+        /// rolled a spontaneous burn-out (§4b)? Read-only.</summary>
+        public bool WillBurnOut => willBurnOut;
+
         /// <summary>The behavioural archetype. **Derived from
         /// <see cref="Species"/>**, never set independently -- so every
         /// pre-existing branch that asks "is this a virus?" keeps working
@@ -1284,14 +1293,21 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>Rolls this agent's virus species traits (GAME_DESIGN.md
-        /// §4b) once, when Class is set. A non-virus clears them. Budding vs
-        /// contact-chain is a per-spawn coin flip -- there is no species
-        /// roster yet, so a budding infection's established virions
-        /// independently re-roll; noted as a simplification.</summary>
+        /// §4b) once, when Class is set. A non-virus clears them.
+        ///
+        /// **Sprint 34: the ROSTER chooses the spread mode.** §4b always said
+        /// budding vs contact-chain was "per-species"; this was a per-spawn
+        /// coin flip, and the comment here admitted "there is no species
+        /// roster yet". There has been one since Sprint 24. A species that
+        /// leaves <see cref="SpeciesProfile.Exit"/> unspecified still rolls,
+        /// so the generics are unchanged.</summary>
         private void AssignVirusTraits()
         {
+            var exit = SpeciesRoster.Get(Species).Exit;
             virusBuds = Class == PathogenClass.IntracellularVirus
-                        && Random.value < InvasionTuning.VirusBuddingSpeciesChance;
+                        && (exit == ViralExit.Budding
+                            || (exit == ViralExit.Unspecified
+                                && Random.value < InvasionTuning.VirusBuddingSpeciesChance));
             lastBudTime = float.NegativeInfinity;
             burnoutRolled = false;
             willBurnOut = false;
@@ -1353,7 +1369,14 @@ namespace ImmunologyTD.Pathogens
             if (!burnoutRolled)
             {
                 burnoutRolled = true;
-                if (Random.value < InvasionTuning.VirusBurnoutChance)
+                // Sprint 34: a non-lytic releaser does not burst. Rotavirus
+                // sheds ~all of its progeny without lysing the cell, so its
+                // focus is NOT self-limiting by burn-out -- it is self-
+                // limiting by the crypt repaving under its villus-tip
+                // tropism. See SpeciesProfile.NonLyticReleaseFraction.
+                float lytic = 1f - Mathf.Clamp01(
+                    SpeciesRoster.Get(Species).NonLyticReleaseFraction);
+                if (Random.value < InvasionTuning.VirusBurnoutChance * lytic)
                 {
                     willBurnOut = true;
                     burnoutTime = currentTime + Random.Range(

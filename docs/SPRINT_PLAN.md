@@ -1,94 +1,156 @@
-# Sprint Plan — Sprint 33 (opened and closed 2026-11-02)
+# Sprint Plan — Sprint 34 (opened and closed 2026-11-02)
 
-Director, straight after Sprint 32 and skipping its playtest: *"make 40
-rounds with a bunch of different mixes and matches of pathogens. Reference
-Bloons TD round descriptions (and how they show up to the player) if you
-need inspiration."*
+Director, skipping Sprint 33's playtest too: *"Kill the game for a while
+longer and launch a research swarm to ID 10 more common gut pathogens in
+humans. Design sprites and warning messages. Some are just stronger
+bacteria or viruses, others have some special power, resistance, etc."*
 
-Sprint 32's plan and outcome are in git (`92ff7bc`) and `CHANGELOG.md`.
+Then, after the passes landed: *"Colonic is fine. Figure out how the body
+learns about giardia, there is definitely a way we can model here. You can
+fix rotavirus, good catch."*
+
+Sprint 33's plan and outcome are in git (`cfde0f7`) and `CHANGELOG.md`.
 
 ---
 
 ## Scope
 
-**One strand: the round table.** Forty hand-authored rounds, the curriculum
-rules from Sprint 32 holding across all of them, and whatever lever set is
-needed to make forty rounds actually differ from one another.
+**A research sprint with a small code tail.** No new organism is built.
 
-### What reading Bloons TD was actually worth
-
-Forty rounds is Bloons TD 6's Easy length. Four habits of its round table
-transfer; one does not.
-
-| Habit | Carried over as |
+| Strand | What |
 |---|---|
-| A new enemy debuts in a small dose, then recurs in bulk | Debuts at 6/11/15, each back within two rounds, never on the hardest round so far |
-| Difficulty is a sawtooth with a rising envelope | 12 of 40 rounds are lighter than the round before; the deepest dip is 17% below the running peak |
-| **Grouped rushes** | `RoundDefinition.Bursts` — per-round delivery shape |
-| The player sees what is coming | The buy-phase caption names any organism debuting next round |
-| ~20 enemy types by round 40 | **Does not transfer.** This game has six organisms, three generic. |
+| A | Five parallel research passes: protozoa, helminths, common bacteria, viruses, and one cross-cutting burden pass |
+| B | A design spec: ten organisms, their sprites, their warning messages, and the engineering that gates them |
+| C | The Director's follow-up: how the body learns about *Giardia* |
+| D | Fix the two rotavirus findings the passes turned up about an organism already shipped |
 
-The third one was the find. The bolus already dropped its cargo in bursts,
-but the count was a global constant, so every round in the game arrived the
-same way. Made per-round, it is the strongest source of variety available
-without new content — and it is the honest form of "wall pressure":
-organisms per clump, not organisms per round.
+### Why a swarm rather than one pass
 
-### The lever that had to be replaced, one sprint after shipping
+The roster had been chosen purely on **mechanical novelty** — deliberately,
+and the rule was good: *a species earns a slot by forcing a decision no
+existing enemy forces.* But the Director asked for **common** pathogens, and
+nobody on this project had ever put a burden number next to a candidate. A
+virologist's "common" and a parasitologist's "common" are not the same
+scale, so one pass had to own the cross-kingdom numbers while four others
+went deep. Two kingdoms — protozoa and helminths — had never been looked at
+at all.
 
-Sprint 32's `WallPressure` multiplier on the economy baseline **cannot
-carry a 40-round curve**, and this was arithmetic rather than judgment:
-baseline (16, +6 a round) × a rising multiplier hits the batch ceiling of 90
-at **round 8**, so rounds 8-40 would every one of them have delivered
-exactly 90 organisms however the multiplier was tuned. Each round authors
-its own `Batch` now. `GAME_DESIGN.md` §5d always said the linear growth was
-a placeholder and that a real difficulty curve was out of framework scope;
-this is where it went. Pressure still drives the endless tail past 40.
+### The rule the Director relaxed, and why that was right
 
----
+"Some are just stronger" closed a real hole. **Sapovirus** (#2 most common
+enteric pathogen in the world) and **ETEC** (#5) are mechanically redundant
+with organisms already built, and the old rule excluded them *for being
+ordinary*. A game about the gut that omits the second most common thing in
+the gut is sorting on the wrong axis. So the ten are **eight mechanic slots
+plus two tier slots**, labelled as tiers rather than given an invented
+power. Bloons does the same thing: red → blue → green is one mechanic at
+four strengths.
 
-## Stopping point — all met
+## What shipped
 
-1. 40 scripted rounds, each fully authored (tagline, cast, count, delivery
-   shape), no round silently falling back to the economy curve.
-2. The curriculum rules hold across all 40, asserted rather than asserted-ish:
-   one named debut at a time, three rounds apart, never on the hardest round
-   so far, everything recurring at least five times, nothing new in the last
-   ten rounds.
-3. The envelope rises **and** individual rounds dip — a monotone ramp would
-   satisfy half of that, so both halves are checked.
-4. Delivery shape measured as a property, through the real spawner: a
-   one-burst round lands its organisms in **1 lane** of wall against **7**
-   for a seven-burst round.
-5. Taglines promise only organisms that exist, and deliver what they name —
-   the Sprint 32 drift, pinned.
-6. The player is warned before a debut round.
-7. `tools/unity.sh verify` green, WebGL builds clean.
-8. Docs current: `GAME_DESIGN.md` §5d, `INTERFACE.md`, `CHANGELOG.md`,
-   `BACKLOG.md`, `TEAM_RETRO.md`, `AGENT_HANDBOOK.md`, and the handoff.
+### A + B — the research and the spec
 
-## What the next sprint should pick up
+~5,500 lines in `docs/research/`, every claim PubMed- or Consensus-verified
+in session, gaps marked **UNVERIFIED** rather than filled in, and every
+mouse finding labelled mouse. The ten, with sprites and warnings, are in
+**`docs/ROSTER_EXPANSION_SPEC.md`**.
 
-1. **The Director has now skipped two playtests.** Sprints 32 and 33 are
-   harness-measured, not played. Everything about whether the curriculum
-   *reads* as teaching, whether IgA is perceptible, whether a one-burst
-   round 40 is exciting or just a wall of sprites, is unverified by a human.
-2. **Astrovirus**, and then **CMV as the boss for round 40's slot** — the
-   back half of the script is a frame waiting for content, and this is the
-   content. Round 40 is currently made of concentration because the boss
-   that belongs there does not exist.
-3. **Norovirus GII.4** is the most interesting *late*-round organism in the
-   roster: antigenic replacement on a real 2-4 year cycle would invalidate
-   knowledge the player spent a whole run accumulating, which is a back-half
-   mechanic by construction.
-4. Round length is still a global 30s for all forty rounds
-   (`FoodItemTransitSeconds`). Varying it needs the adaptive arm's timers
-   checked, not assumed.
+**The two design findings worth more than the organisms:**
 
-## Not in scope, deliberately
+- **The tell goes where the player must look.** Three of the ten put their
+  marker on something other than the enemy, and that is correct rather than
+  a compromise: astrovirus's breach on the **wall** (drawing it on the
+  virion would delete the mechanic), *S. aureus*'s toxin on the **bolus**,
+  *Cryptosporidium*'s apoptosis resistance on the **infected host cell**.
+- **Colour cannot be the species channel.** The palette has two pathogen
+  hues and every other hue is already a meaning on this board, so identity
+  is silhouette family (kingdom) × one tell (the *mechanic*, not the
+  taxonomy) × size — with the eukaryotes legitimately the largest things in
+  the lumen, a *Giardia* trophozoite being 15 µm against a 2 µm bacterium.
 
-- Anything from Sprint 32's open list: astrovirus, the `UnitProfileAudit`
-  gap, the degranulation × A/E *E. coli* interaction, the ten-sprint
-  `INTERFACE.md` backfill.
-- Per-round round *length*, for the reason above.
-- Raising the 150-pathogen live ceiling (a performance question).
+### C — how the body learns about *Giardia*
+
+§1c's "debris is the input to adaptive immunity" made a whole class of
+organism unlearnable: *Giardia* kills nothing and sheds no debris, so the
+rungs that answer it were unreachable from a *Giardia* round. The real
+route is **parasite-shed extracellular vesicles** — human DCs capture and
+mature on *Giardia* microvesicles whose proteome carries VSPs, and
+**antibody binding triggers a massive release**, so attacking it is what
+makes it teachable. Both carriers already exist (the Sprint 19 M-cell dome,
+or a patrolling DC). Recorded as an amendment under §1c: **debris is one
+input, not the only one.** Designed, unbuilt.
+
+Two routes were rejected *on evidence* and recorded so they are not
+re-proposed: transepithelial dendrites (CX3CR1⁺ cells do not migrate to the
+node, so they are structurally wrong for §5a) and goblet-cell antigen
+passages (they feed *tolerogenic* DCs and are shut by IL-1β, which *Giardia*
+does not induce — a GAP route would teach the immune system **tolerance**).
+
+### D — the rotavirus corrections
+
+Both findings were wrong in the same direction: the game had been playing
+rotavirus as an ordinary lytic virus arriving at an ordinary dose.
+
+- **Non-lytic exit.** `SpeciesProfile.NonLyticReleaseFraction` suppresses
+  §4b burn-out. An ignored rotavirus focus no longer resolves itself — it
+  keeps shedding until the player kills the cell. It stays self-limiting
+  via the crypt repaving under its tropism, which is closer to how
+  rotavirus actually resolves clinically.
+- **Vesicle dose.** `SpeciesProfile.PlaqueCrowdWeight`, read through
+  `SpeciesRoster.CrowdWeightOf`. Capped at 1.9, below the ingress floor of
+  2.0, **because §1b Step 2 property 2 is locked and load-bearing** — the
+  measured multiplier is ~3.5x and would have let a lone virion charge a
+  plaque. Rotavirus's minimum dose is now two organisms where a generic
+  virus needs three, which is exactly the per-species knob §1b Step 2 said
+  the floor would become.
+- **And the thing that fell out of fixing them: budding had never been
+  per-species.** §4b has said "two per-species modes" since Sprint 5 and
+  the code chose with a coin flip, admitting in a comment that "there is no
+  species roster yet" — untrue since Sprint 24. Seventh instance of the
+  standing pattern.
+
+## Stopping points — what was deliberately not done
+
+- **None of the ten organisms is built.** Four gates come first (spec §5):
+  the barcode must widen to 12 bits, a per-species sprite path must exist
+  at all, the knowledge HUD must scale past six species, and a pathogen's
+  sprite must be able to change mid-board.
+- **"Shed antigen" is designed, not built.** One new lumen-side entity, and
+  it changes a locked section, so it needs the Director.
+- **The anatomy ruling's unlocked organisms are unranked.** *Entamoeba*,
+  *Shigella*, *Campylobacter*, *Trichuris*, *C. difficile*, ETBF. The
+  ruling landed after the ten were chosen; they are the head of the next
+  list, not a late addition to this one.
+- **No sprite was drawn.** The spec is primitive-level (which `FillDisc`,
+  which `FillStar`, what size, what hue) so that a Code sprint can execute
+  it, but nothing was committed to `SpriteShapes`.
+
+## Corrections this sprint produced
+
+Sixteen across the five passes; the ones touching built code or locked
+sections are listed in `ROSTER_EXPANSION_SPEC.md` §7 and `BACKLOG.md`. The
+two that matter most for whoever builds next:
+
+1. **§4a's "parasites don't hide" and "cleared by direct combat damage,
+   more of it" are both wrong.** Cytotoxic lymphocytes are inactive against
+   helminths; clearance is expulsion. The player's instinct — build more
+   killers — is the wrong answer for the entire group.
+2. **The built *V. cholerae* actively swims**, and non-chemotactic mutants
+   *out-compete* wild type across the small intestine. "Run straight and
+   get everywhere" beats "steer at the wall" — truer *and* cheaper than
+   what is implemented.
+
+## Verification
+
+`Sprint34Verification`, **20 checks** in three parts: the spread mode
+belongs to the roster, a non-lytic releaser does not burn out, and the
+vesicle dose measured through the real `GutWall` rather than a
+reimplementation of it.
+
+One pre-existing harness had to be corrected, not accommodated:
+`Sprint32Verification` asserted that "the named organisms are the
+**majority**" of the round it finds, which is round 20, whose cast makes
+them **exactly half** — it had been passing on luck, and a Sprint 34 change
+to RNG consumption moved the stream. It now computes the expectation from
+the round's own cast weights with a 3σ tolerance at the emitted batch size.
+Third instance of a harness owning a number it is not testing.

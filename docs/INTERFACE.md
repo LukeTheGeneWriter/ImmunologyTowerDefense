@@ -2445,3 +2445,44 @@ wall against **7** for a seven-burst round.
     `Initialize` from `tally.ReachedBase`, so a run restart must build a
     fresh `RoundController` (or the tally must be `Reset()`), not just flip
     the phase.
+
+## Sprint 34 changes — the rotavirus corrections
+
+Three new fields on `SpeciesProfile` (`Assets/Scripts/Pathogens/PathogenSpecies.cs`),
+all **zero-is-neutral**, so a species that does not opt in behaves exactly
+as it did before Sprint 34 and no call site needs a species check:
+
+| Field | Type | Neutral | Meaning |
+|---|---|---|---|
+| `Exit` | `ViralExit` | `Unspecified` = roll it, the pre-34 coin flip | Which of §4b's two spread modes this species uses |
+| `NonLyticReleaseFraction` | `float` | `0` = ordinary lytic virus | Fraction of exits leaving the host cell alive; suppresses §4b burn-out by the same fraction |
+| `PlaqueCrowdWeight` | `float` | `0` → treated as `1` | How much one organism contributes to the §1b crowd field |
+
+```csharp
+public enum ViralExit { Unspecified = 0, ContactChain = 1, Budding = 2 }
+```
+
+**Read `PlaqueCrowdWeight` through the accessor, never raw**, because zero
+means one:
+
+```csharp
+public static float CrowdWeightOf(PathogenSpecies s);   // SpeciesRoster
+```
+
+New read-only state on `PathogenAgent`, added so a harness can assert the
+property rather than a proxy:
+
+```csharp
+public bool VirusBuds { get; }     // spreads by budding (§4b), not contact chain
+public bool WillBurnOut { get; }   // has rolled a spontaneous burn-out (§4b)
+```
+
+**Call-site change in `GutWall.RebuildCrowdField`**: each gripping organism
+now contributes `weight * SpeciesRoster.CrowdWeightOf(p.Species)` instead of
+`weight`. Cross-linked organisms still contribute nothing, so the IgA
+resolution is unaffected.
+
+**Rotavirus's values:** `Exit = Budding`, `NonLyticReleaseFraction = 1f`,
+`PlaqueCrowdWeight = 1.9f`. The last is capped below
+`InvasionTuning.IngressCrowdFloor` (2.0) on purpose — see §1b Step 2 and
+`ENGINE_STATUS.md`.

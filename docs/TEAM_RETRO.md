@@ -1226,3 +1226,51 @@ thing to measure before this becomes routine.
   Measuring it needed the lane recorded at SPAWN time, because lumen flow
   smears lanes afterwards -- a later reading would have measured the flow
   and passed regardless of the burst count.
+
+## Sprint 34 — what five parallel research passes were worth
+
+- **A swarm's best output was a NO, twice.** The helminth pass concluded
+  worms cannot be wave enemies at all (the fastest helminth event is ~5
+  rounds; an adult *Ascaris* is 10,000–20,000 slots and its *diameter*
+  alone is 5× the tissue band) and argued **against** the obvious
+  anti-worm tower, because eosinophil ablation made *T. spiralis* larvae
+  *die*. The viral pass argued down two claims the roster was about to
+  build on: astrovirus's "no inflammation" is refuted for replicating
+  virus, and adenovirus F41's "exact inversion of CMV" rests on one cell
+  line with no NK killing assay. **Briefing an agent to look for reasons
+  not to build something is worth more than briefing it to find
+  candidates.**
+- **Two passes disagreeing is a finding, not a defect.** The burden pass
+  ranks sapovirus #2 in the world; the viral pass says it is not
+  significantly attributable in a high-income series and its post-vaccine
+  rise is relative, not absolute. Both true, different populations — and
+  the burden pass's own "detection ≠ causation" caution applied to its own
+  headline. Smoothing that over would have destroyed the information. It
+  was resolved by the Director's "some are just stronger": sapovirus earns
+  a **tier** slot, not a mechanic slot.
+- **Nobody had ever priced a standing rule.** The anatomy rule had looked
+  free since it rejected one organism. Measured, it was costing **four of
+  the most common gut pathogens in the world**. A rule that has only ever
+  been applied once has not been tested — ask what it would exclude if
+  applied consistently, and price that before defending it.
+- **"Measure before tuning" applies to design space, not just balance.**
+  Three gates on the roster expansion were found by arithmetic rather than
+  by building: the barcode holds at most 12 species (so 16 does not fit),
+  the palette has no free hue for ten organisms (so colour cannot be the
+  species channel), and the knowledge HUD is a 420 px ribbon of 186 px
+  cards. All three would have been discovered half-way through an
+  implementation sprint.
+- **A locked rule is a design constraint, not an obstacle.** Rotavirus's
+  measured vesicle multiplier is ~3.5× and the ingress floor is 2.0, so the
+  honest value would have let a lone virion charge a plaque and deleted
+  §1b Step 2's load-bearing property. Capping at 1.9 and *writing down the
+  tension* produced something better than either option: rotavirus's
+  minimum dose is two organisms where a generic virus needs three, which is
+  exactly the per-species knob §1b Step 2 had promised. When the biology
+  and a locked rule conflict, look for the expression that satisfies both
+  before overriding either.
+- **Fixing a bug exposed an older one.** Making rotavirus's non-lytic exit
+  real meant reading §4b's budding mode — and budding turned out never to
+  have been per-species, a coin flip for 29 sprints with a comment
+  admitting why. Seventh instance of the pattern. The grep that finds it is
+  still the same one: *who reads this value, and with what?*

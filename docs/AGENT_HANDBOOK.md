@@ -80,7 +80,7 @@ Last distilled: end of **Sprint 11** (2026-08-29), covering Sprints 1–11.
 
 ## Known points of difficulty (recurring — with the standing fix)
 
-- **A harness must not own a number it is not testing — three instances
+- **A harness must not own a number it is not testing — four instances
   now.** A check that hard-codes something incidental breaks on changes that
   have nothing to do with it, and the breakage looks like a regression.
   Seen as a tuning default (below), as upgrade arithmetic written out as
@@ -91,6 +91,34 @@ Last distilled: end of **Sprint 11** (2026-08-29), covering Sprints 1–11.
   the fixture's own base plus the live per-level constant — rather than
   naming it. If a check fails on a change unrelated to its subject, it owns
   a number it shouldn't.
+
+  **The fourth instance (Sprint 34) is the instructive one, because the
+  number was a *statistical* claim rather than a literal.**
+  `Sprint32Verification` asserted that "the named organisms are the
+  **majority**" of the round it finds. That round's cast is 2/2/1/2/2/1, so
+  the named organisms are expected to be **exactly half** — the assertion
+  was a coin flip on a 58-organism sample, and it had been passing on luck
+  for two sprints. A Sprint 34 change to how many random numbers a spawn
+  consumes moved the RNG stream and it read 24 of 58. The fix was to assert
+  what the check was *for* — that the spawner honours the cast weights —
+  by computing the expectation from the round's own weights and allowing
+  3σ at the batch size actually emitted. **If an assertion's threshold sits
+  near the expected value, it is a coin flip, not a test.** Derive the
+  tolerance from the sample size instead of picking one.
+- **Put a vacuity guard next to any count-based assertion.** "No rotavirus
+  focus burns out (0/100)" is a worthless pass if zero infections were
+  established. `Sprint34Verification` asserts "the test is not vacuous"
+  first, and it earned its keep on the very first run: 0 of 200 infections
+  established, because the harness had collected host slots at the **crypt**
+  end — which rotavirus's villus-tip tropism correctly forbids. Without the
+  guard it would have reported a clean zero from nothing at all.
+- **A long patch anchor is a fragile anchor.** Two doc patches missed this
+  sprint because the anchor text had been re-wrapped since it was read.
+  Prefer a short unique anchor, check it with `grep -c` *before* patching,
+  and write a patcher that commits nothing unless every anchor matched — a
+  half-applied multi-anchor patch is worse than a failed one. Note also
+  that inserting after a *paragraph* in a Markdown list walks past sibling
+  bullets, so verify where the insertion actually landed.
 - **A harness assertion that leans on a tuning default breaks when a later
   sprint moves that default.** Hit at least 3× (Sprint 3 contact radius,
   Sprint 9 `AdhesionChanceAtWall` 0.12→0.30, Sprint 11

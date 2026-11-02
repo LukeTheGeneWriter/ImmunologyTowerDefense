@@ -421,10 +421,18 @@ namespace ImmunologyTD.Grid
                 int centre = Mathf.RoundToInt(s * bpc);
                 int lo = Mathf.Max(0, centre - reach);
                 int hi = Mathf.Min(crowd.Length - 1, centre + reach);
+                // Sprint 34: one organism is not always one dose. Rotavirus
+                // arrives in vesicles carrying >10 virions, so a single unit
+                // contributes more than one to the crowd field -- which is
+                // exactly the per-species "minimum infectious dose" knob
+                // §1b Step 2 said the floor would become. Capped below the
+                // floor, so Step 2's locked property (a lone pathogen can
+                // NEVER charge) survives. See SpeciesProfile.PlaqueCrowdWeight.
+                float dose = ImmunologyTD.Pathogens.SpeciesRoster.CrowdWeightOf(p.Species);
                 for (int b = lo; b <= hi; b++)
                 {
                     float weight = 1f - Mathf.Abs(s - BucketToS(b)) / radius;
-                    if (weight > 0f) crowd[b] += weight;
+                    if (weight > 0f) crowd[b] += weight * dose;
                 }
             }
         }

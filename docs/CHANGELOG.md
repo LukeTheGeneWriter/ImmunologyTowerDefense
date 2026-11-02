@@ -1227,3 +1227,44 @@ built.
 **24 verify methods, 869 checks, green.** Two older checks owned numbers they had
 no business owning and broke on the new table -- one hard-coded "round 5 is
 the E. coli round". Both now find what they need instead of naming it.
+
+## Sprint 34 -- 2026-11-02
+A research sprint with a small code tail. The Director asked for ten more
+common gut pathogens with sprites and warnings; five parallel research
+passes answered, and two of their findings were about organisms already
+shipped.
+
+- **~5,500 lines of verified research** in `docs/research/`: protozoa and
+  helminths (two kingdoms four earlier passes never looked at), the common
+  bacteria re-ranked by prevalence, the viruses extended, and one
+  cross-cutting burden pass so "common" is GBD/GEMS/MAL-ED numbers rather
+  than assumption.
+- **`docs/ROSTER_EXPANSION_SPEC.md`**: the ten organisms, a three-channel
+  sprite identity system, the tell alphabet, and the warning-message
+  design. Not built -- a spec.
+- **The anatomy rule is relaxed** (Director): colonic is fine. It had been
+  quietly costing four of the world's most common gut pathogens.
+- **Rotavirus corrected, two ways.** It leaves the cell **non-lytically**
+  (so an ignored focus never bursts; it stays self-limiting via the crypt
+  repaving under its tropism) and it **arrives in vesicles** (so one unit
+  is already a dose). `SpeciesProfile.NonLyticReleaseFraction` and
+  `PlaqueCrowdWeight`, the latter capped below the ingress floor so §1b
+  Step 2's locked "a lone pathogen can never charge" survives.
+- **Budding is per-species at last.** §4b has said "two per-species modes"
+  since Sprint 5 and the code chose with a **coin flip**, its own comment
+  admitting "there is no species roster yet" -- there has been one since
+  Sprint 24. Seventh instance of the standing pattern.
+- **Measured, not estimated:** the antigen barcode holds at most **12**
+  species at the shipped match radius, so a 16-species roster needs 12
+  bits. A generated 16-tag set at minimum distance 6 is in the spec.
+- `Sprint34Verification`, 20 checks. Four organisms crowd 1.9x harder as
+  rotavirus (7.019 vs 3.694) through the real `GutWall`; two rotavirus
+  clear the ingress floor where two ordinary virions do not.
+- **25 verify methods, 889 checks, green.** WebGL Succeeded, 9,319,617
+  bytes, 0 errors.
+- One pre-existing harness corrected rather than accommodated:
+  `Sprint32Verification` asserted that named organisms are the **majority**
+  of round 20, whose cast makes them exactly **half** -- it had been passing
+  on luck, and a Sprint 34 change to RNG consumption moved the stream. It
+  now derives the expectation from the round's own cast weights with a 3
+  sigma tolerance at the emitted batch size.

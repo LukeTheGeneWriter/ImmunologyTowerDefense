@@ -218,6 +218,19 @@ Three properties are load-bearing and must survive any future change:
    unlikely. This floor is also the **minimum infectious dose**, which is
    real and famously species-specific, so it is the knob that will later
    distinguish one species from another.
+
+   **Sprint 34: that knob is now in use, and it lives on the organism
+   rather than on the plaque.** `SpeciesProfile.PlaqueCrowdWeight` says how
+   much one organism contributes to the crowd field, because one organism is
+   not always one dose: **rotavirus arrives in vesicles** carrying >10
+   virions each (10-45% of stool virus; stripping the vesicles cuts
+   infectivity 72-83%), so a single arriving unit is already a crowd. The
+   weight is **capped below the floor on purpose** — the measured multiplier
+   is ~3.5x, which would let a lone virion charge a plaque and delete this
+   very property — so rotavirus's effective minimum dose is **two organisms
+   where a generic virus needs three**. Literal mechanism, abstracted
+   magnitude, in the same style as the roster's "tropism literal, dose
+   abstracted".
 3. **A rupture is one event releasing everything at once**, not a stream of
    independent invasions.
 
@@ -415,6 +428,52 @@ sampled. Whether that tension is left sharp or softened (e.g. sampling
 being instant while clearance takes time) is a **balance question for
 whenever this is built** — not resolved here, and not in Sprint 4 or 5.
 
+
+
+**Amendment — debris is ONE input, not the only one (research 2026-11-02,
+`docs/research/giardia_antigen_route.md`). Not yet built.**
+
+This rule is load-bearing and stays, but taken as the *only* route it makes
+a whole class of real organism unlearnable. ***Giardia duodenalis*** never
+enters a cell, kills nothing on the scale this game draws, and produces no
+debris — so on this rule alone the player could never learn about it, and
+the antibody and sIgA rungs that answer it would be permanently
+unreachable in a *Giardia* round. People do mount specific anti-*Giardia*
+responses and do clear it, so the model was missing a route rather than the
+biology missing one.
+
+**The route, with the evidence, is parasite-shed extracellular vesicles.**
+Human immature dendritic cells *capture* *Giardia* microvesicles and become
+activated and allostimulatory; human monocyte-derived DCs mature on
+*Giardia* EVs whose proteome contains VSPs, giardins, tubulin and EF-1α;
+and antibody binding to the surface triggers a **massive** release of VSP
+microvesicles. The parasite sheds its own antigen, and it sheds *more* when
+the player attacks it.
+
+**The mechanic (proposed, needs a Director decision before build):
+"shed antigen".** A wall-adherent trophozoite emits a drifting antigen
+parcel on a slow baseline timer, and a **burst** of them when coated by
+antibody or sIgA. Both carriers already exist: the Sprint 19 M-cell sampler
+parcels it at the dome for a cargo-less DC, or a patrolling DC samples it
+in tissue. The player's levers are therefore things they already buy — the
+M-cell upgrade, antibody/sIgA, more DCs — and coating becomes a genuine
+trade rather than a pure win, because it both accelerates learning *and*
+triggers the antigenic switch that discounts what was learned. Knowledge
+per encounter should be **lower** than debris gives, because the same
+packet suppresses: VSP^AS7 binds NLRP3, and *Giardia* lowers DC IL-12,
+CD83 and CD86 while raising IL-10.
+
+Cost: mostly reuse, plus one new lumen-side entity (a pathogen-emitted
+antigen parcel).
+
+**Two routes were considered and rejected on evidence**, which is worth
+recording so they are not re-proposed: **transepithelial dendrites** (no
+*Giardia* data, and CX3CR1⁺ cells do not migrate to the node, so they are
+structurally wrong for §5a) and **goblet-cell-associated antigen passages**
+(they pass *soluble* antigen to *tolerogenic* CD103⁺ DCs, are shut by IL-1β
+during infection, and exist for oral tolerance — since *Giardia* causes no
+IL-1β, a GAP route would teach the player's immune system **tolerance** to
+it).
 
 ### Antigen presentation is a spectrum, not a DC monopoly (Director, 2026-08-21)
 
@@ -818,7 +877,15 @@ search-ladder chemotaxis (Director's note); that is deferred with them, in
 - **A free virion dies after `VirusFreeSurvivalSeconds` outside a host.**
   Unchanged — the "needs a new host *now*" pressure, and half of the
   firebreak (§1c).
-- **Spread has two per-species modes:**
+- **Spread has two per-species modes.** *(Sprint 34: genuinely
+  per-species at last. `PathogenAgent.AssignVirusTraits` chose between
+  these with a per-spawn **coin flip** from Sprint 5 to Sprint 33, and its
+  own comment admitted "there is no species roster yet" — there has been
+  one since Sprint 24. The roster now owns the choice via
+  `SpeciesProfile.Exit`, and a species that leaves it unspecified still
+  rolls, so the three generics are unchanged. Seventh instance of the
+  standing pattern: a value written on one side of a boundary and never
+  read as that value on the other.)*
   - *Contact-chain* (Sprint 5, kept): an infected cell infects **one**
     adjacent healthy cell after an incubation period. Produces a snaking
     path.
@@ -835,6 +902,19 @@ search-ladder chemotaxis (Director's note); that is deferred with them, in
   virions + debris with no immune action. Makes a viral infection
   self-limiting even if wholly ignored, and seeds fresh free virions into
   the tissue as it goes.
+- **Non-lytic release — some species never burst** (Sprint 34).
+  `SpeciesProfile.NonLyticReleaseFraction` suppresses burn-out by the
+  fraction of exits that leave the host cell alive. **Rotavirus releases
+  essentially all of its progeny non-lytically**, with no measured
+  permeability change at 72 h, so an ignored rotavirus focus does **not**
+  burst and resolve — it keeps shedding until the player kills the cell.
+  That looks like it contradicts the self-limiting rule above and does
+  not: **rotavirus is still self-limiting, by the crypt repaving
+  underneath its villus-tip tropism** rather than by burning out. The two
+  traits it already had compose into one organism — a plague that keeps
+  shedding, under tissue that keeps rebuilding — which is much closer to
+  how rotavirus actually resolves clinically, by epithelial replacement
+  rather than by the virus exhausting itself.
 - Infected cells still spread only into **`Healthy`** neighbours, so a
   budding front still cannot cross dead ground — the firebreak survives the
   rework.

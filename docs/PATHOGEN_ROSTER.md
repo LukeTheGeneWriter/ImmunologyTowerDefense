@@ -46,6 +46,26 @@ no dose-dependence over four logs. Taken literally that deletes §1b's
 proximity-gated adhesion roll entirely. **Tropism literal, dose
 abstracted.**
 
+**Two corrections, found 2026-11-02 and fixed in Sprint 34**
+(`docs/research/pathogens_viruses_02.md`). Both were wrong in the same
+direction: the game had been playing rotavirus as an ordinary lytic virus
+arriving at an ordinary dose.
+
+1. **It leaves the cell non-lytically** — ~100% of progeny released, with no
+   measured permeability change at 72 h. So an ignored focus does not burst
+   and resolve. §1c appeared to have no host-cell state for "released its
+   virus and is still alive", but §4b's *budding* mode already was that
+   state; the real defect was that budding had never been per-species — a
+   coin flip chose it, for 29 sprints. Rotavirus remains self-limiting, by
+   the crypt repaving beneath its tropism rather than by burn-out.
+2. **It arrives in vesicles** — 10-45% of stool virus is membrane-bound,
+   >10 virions per vesicle, and stripping the vesicles cuts infectivity
+   72-83%. That defeats §1b's minimum-dose floor, because one arriving unit
+   is already a dose. Implemented as a per-species crowd weight, capped
+   below the floor so §1b Step 2's locked property survives. The dose is
+   still abstracted; what changed is that it is now **species-specific**,
+   which is exactly what §1b Step 2 said the floor would become.
+
 ### Vibrio cholerae — it wins without killing anything
 
 Never enters a cell, never takes a slot, never kills. It adheres and
@@ -112,10 +132,31 @@ vasculature); EPEC; EAEC (**farms mucus** — Pic is both a goblet
 secretagogue and a MUC2 protease, inverting the §6b mucus upgrade); ETEC;
 a shared preformed-toxin slot.
 
-**Rejected: *Clostridioides difficile*, on anatomy.** It is colonic; small-
-bowel CDI is a reportable rarity, and its antibiotic-demolition trigger
-needs a dense microbiota the small intestine does not have. Banked as the
-headline act for a future colon map rather than forced onto this one.
+**~~Rejected: *Clostridioides difficile*, on anatomy.~~ SUPERSEDED — the
+anatomy rule is relaxed (Director, 2026-11-02).** The original reasoning
+stands as biology: *C. difficile* is colonic, small-bowel CDI is a
+reportable rarity, and its antibiotic-demolition trigger needs a dense
+microbiota the small intestine does not have.
+
+What changed is the **cost** of the rule, which nobody had priced until the
+2026-11-02 burden pass (`docs/research/enteric_burden.md`). Applied
+consistently it does not merely bank *C. difficile* — it banks **four of
+the most common gut pathogens in the world**: ***Shigella*** (#1 on three
+of five global metrics, 24% of under-five diarrhoeal deaths, colonic and
+rectal, with the organ specificity explicitly unexplained in the
+literature), ***Campylobacter*** (#1 in FoodNet at 20.6/100k; human disease
+is colitis), ***Entamoeba histolytica*** (whose trogocytosis answers **two**
+of the five standing "no answer in the roster" gaps — killing the phagocyte
+outright, and a justification for a NET mechanic) and ***Trichuris*** (the
+best helminth mechanic the research found).
+
+**The Director's ruling: colonic is fine.** Anatomy is no longer a veto. It
+remains a **note** — an organism's real compartment is recorded, and a
+colonic candidate is labelled as such rather than quietly relocated — but
+it does not disqualify. The map is "the gut" rather than strictly the
+jejunum, and the honest consequence to state is that §1a's three bands are
+now a *generic* mucosal cross-section. Nothing already built changes; what
+changes is that the shortlist above is no longer filtered by compartment.
 
 ## Corrections to standing design
 

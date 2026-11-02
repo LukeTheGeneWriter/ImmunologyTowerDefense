@@ -61,6 +61,29 @@ namespace ImmunologyTD.Pathogens
     }
 
     /// <summary>
+    /// Sprint 34. **How a virus leaves the cell it infected.** GAME_DESIGN.md
+    /// §4b has always said spread "has two per-species modes" -- contact-chain
+    /// or budding -- but <c>PathogenAgent.AssignVirusTraits</c> picked between
+    /// them with a per-spawn coin flip, and said so in a comment: "there is no
+    /// species roster yet". There has been one since Sprint 24. This is the
+    /// seventh instance of the standing pattern (a value written on one side
+    /// of a boundary and never read as that value on the other), so the fix
+    /// is to let the roster own the choice.
+    ///
+    /// <c>Unspecified</c> keeps the coin flip, so the three generics behave
+    /// exactly as they did before this change.
+    /// </summary>
+    public enum ViralExit
+    {
+        /// <summary>Roll it, as every virus did before Sprint 34.</summary>
+        Unspecified = 0,
+        /// <summary>Infects ONE adjacent healthy cell. Snaking path.</summary>
+        ContactChain = 1,
+        /// <summary>Periodically emits a free virion. Growing disk.</summary>
+        Budding = 2,
+    }
+
+    /// <summary>
     /// The per-species table: what each species IS, and the handful of
     /// traits that make it behave unlike its classmates.
     ///
@@ -129,6 +152,52 @@ namespace ImmunologyTD.Pathogens
         /// enchainment sweeping it away and goblet-cell sloughing. 1 =
         /// ordinary adhesion.</summary>
         public float FlushResistance;
+
+        // -- Sprint 34 traits (docs/research/pathogens_viruses_02.md). --
+
+        /// <summary>Which of §4b's two spread modes this species uses.
+        /// <see cref="ViralExit.Unspecified"/> = roll it, the pre-Sprint-34
+        /// behaviour.</summary>
+        public ViralExit Exit;
+
+        /// <summary>
+        /// The fraction of this species' exits that leave the host cell
+        /// ALIVE, which suppresses §4b's spontaneous burn-out by the same
+        /// fraction. 0 = ordinary lytic virus.
+        ///
+        /// Rotavirus releases essentially all of its progeny non-lytically
+        /// with no measured permeability change at 72 h, so an ignored
+        /// rotavirus focus does not burst and resolve on its own. §4b wants
+        /// viral infections self-limiting if wholly ignored, and rotavirus
+        /// still is -- but by the CRYPT REPAVING UNDERNEATH IT (the villus-
+        /// tip tropism it already has), not by burning out. The two traits
+        /// compose into one organism: a plague that keeps shedding until the
+        /// player kills the cell, under tissue that keeps rebuilding.
+        /// </summary>
+        public float NonLyticReleaseFraction;
+
+        /// <summary>
+        /// How much one organism of this species contributes to the §1b
+        /// plaque crowd field. 0 = neutral, treated as 1 -- use
+        /// <see cref="SpeciesRoster.CrowdWeightOf"/>, never the raw field.
+        ///
+        /// **Rotavirus arrives in vesicles.** 10-45% of stool virus is
+        /// membrane-bound, each vesicle carries >10 virions, and stripping
+        /// the vesicles cuts infectivity 72-83%: one arriving unit is
+        /// already a dose. The measured multiplier is ~3.5x.
+        ///
+        /// **It is capped below <c>InvasionTuning.IngressCrowdFloor</c>
+        /// (2.0) on purpose.** §1b Step 2 property 2 is LOCKED and declared
+        /// load-bearing -- "ingress is something a CROWD does, never
+        /// something a pathogen does... a trickle is arithmetically
+        /// impossible, not merely unlikely" -- and a weight of 3.5 would let
+        /// a lone virion charge a plaque, deleting that property. So the
+        /// honest abstraction, in the roster's own "tropism literal, dose
+        /// abstracted" style: rotavirus's minimum infectious dose is TWO
+        /// organisms where a generic virus needs three, which is exactly the
+        /// per-species knob §1b Step 2 promised the floor would become.
+        /// </summary>
+        public float PlaqueCrowdWeight;
     }
 
     /// <summary>Static roster lookup. Mutable-statics-with-a-reset shape, so
@@ -151,6 +220,15 @@ namespace ImmunologyTD.Pathogens
         public static string NameOf(PathogenSpecies s) => Get(s).DisplayName;
 
         public static string ShortNameOf(PathogenSpecies s) => Get(s).ShortName;
+
+        /// <summary>Sprint 34. This species' §1b crowd contribution, with
+        /// zero normalised to 1 so an un-opted-in species counts as one
+        /// organism. Call sites must use this, not the raw field.</summary>
+        public static float CrowdWeightOf(PathogenSpecies s)
+        {
+            float w = Get(s).PlaqueCrowdWeight;
+            return w <= 0f ? 1f : w;
+        }
 
         /// <summary>The generic species standing in for a bare class -- the
         /// bridge for code and harnesses that still speak in classes.</summary>
@@ -218,6 +296,13 @@ namespace ImmunologyTD.Pathogens
                 // rotavirus infection.
                 EnterotoxinNeighbourDamage = 0.12f,
                 FlushResistance = 1f,
+                // Sprint 34, from pathogens_viruses_02.md: rotavirus leaves
+                // the cell NON-LYTICALLY and arrives IN VESICLES. Both were
+                // corrections to what the game already shipped -- it had
+                // been played as a cell-killer with an ordinary dose.
+                Exit = ViralExit.Budding,
+                NonLyticReleaseFraction = 1f,
+                PlaqueCrowdWeight = 1.9f,
             };
 
             // -- Vibrio cholerae --------------------------------------------

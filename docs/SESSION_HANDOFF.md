@@ -1,4 +1,4 @@
-# Session Handoff — 2026-11-02 (Sprints 32-33: the permit, turnover, and the 40-round script)
+# Session Handoff — 2026-11-02 (Sprint 34: five research passes, and the rotavirus corrections)
 
 A checkpoint written by the head session. **This is a living file:
 overwrite it at the next checkpoint rather than accumulating dated
@@ -13,7 +13,7 @@ win.
 | Clone | `C:\Users\lukef\ImmunologyTowerDefense` | `~/Projects/Biotech/ImmunologyTowerDefense` |
 | Shell | PowerShell | fish (scripts are bash, run directly) |
 | Unity | `C:\Program Files\Unity\Hub\Editor\6000.6.4f1\Editor\Unity.exe` | `~/Unity/Hub/Editor/6000.6.4f1/Editor/Unity` |
-| Run harnesses | `Unity.exe -batchmode -quit -projectPath game -executeMethod <X>`, then grep the log | `tools/unity.sh verify` (23 methods) |
+| Run harnesses | `Unity.exe -batchmode -quit -projectPath game -executeMethod <X>`, then grep the log | `tools/unity.sh verify` (25 methods) |
 | Build / serve WebGL | `BuildScript.BuildWebGL`; `powershell -ExecutionPolicy Bypass -File tools\serve_webgl.ps1` | `tools/unity.sh webgl`; `tools/serve_webgl.py` → http://localhost:8000 |
 | Look at sprites | — | `tools/unity.sh SpriteShapeDump.DumpAll` → `_spritedump/` |
 
@@ -21,167 +21,149 @@ win.
 **The Windows machine still needs Unity `6000.6.4f1`** (via the Hub, with
 "Web Build Support") before it opens the project.
 
-## What shipped this session (2026-11-02, Linux machine)
+## What this session was
 
-Two sprints in one sitting. **Sprint 33 is the one to read first** — it
-replaced a lever Sprint 32 had just shipped.
+**Mostly research.** The Director asked for ten more common gut pathogens
+with sprites and warning messages, and explicitly sanctioned "some are just
+stronger bacteria or viruses". Five research passes ran in parallel; two of
+their findings were about an organism already shipped, so those were fixed
+in code. **The ten are specified, not built.**
 
-### Sprint 33 — the 40-round script
-
-The Director asked for 40 rounds of mixes and matches with Bloons TD as the
-reference, and skipped Sprint 32's playtest to get it.
+### The deliverables
 
 | What | Where |
 |---|---|
-| 40 hand-authored rounds: cast, count and delivery shape each | `Rounds/RoundScript.cs` |
-| **Per-round delivery shape** (`Bursts`) — the find of the sprint | `RoundDefinition`, `PathogenSpawner.BeginRound` |
-| Per-round authored volume (`Batch`), replacing Sprint 32's pressure multiplier in the script | `EconomyTuning.BatchForRound`'s 4th arg |
-| A new-organism callout before the round (`DebutLabelFor`) | `RoundScript`, `HudView` buy-phase caption |
+| The ten organisms, sprite specs, warning messages, engineering gates | **`docs/ROSTER_EXPANSION_SPEC.md`** — start here |
+| Protozoa (a kingdom no earlier pass looked at) | `docs/research/pathogens_protozoa.md` |
+| Helminths + the type-2 arm the game has no towers for | `docs/research/pathogens_helminths.md` |
+| Common bacteria, re-ranked by prevalence | `docs/research/pathogens_bacteria_common.md` |
+| Viruses extended; three deep dives closed | `docs/research/pathogens_viruses_02.md` |
+| Cross-cutting burden, so "common" is GBD/GEMS/MAL-ED numbers | `docs/research/enteric_burden.md` |
+| How the body learns about *Giardia* (the Director's follow-up) | `docs/research/giardia_antigen_route.md` |
 
-**Bursts are the thing worth knowing.** The food bolus always dropped its
-cargo in bursts, but the count was a global constant, so every round in the
-game arrived the same way. Per-round, it is the strongest variety lever
-available without new organisms — and measured through the real spawner,
-**round 40's 88 organisms land in one lane of wall while round 27's 52 land
-in seven.** Same mechanic, opposite problem. It is also the honest form of
-"wall pressure": organisms per clump, not per round.
+~5,500 lines, every claim PubMed- or Consensus-verified in session, gaps
+marked **UNVERIFIED** rather than filled in, mouse findings labelled mouse.
 
-**Sprint 32's `WallPressure` multiplier is out of the script, one sprint
-after it shipped**, and arithmetic is the reason: the economy baseline (16,
-+6 a round) times a rising multiplier hits the batch ceiling of 90 at round
-8, so rounds 8-40 would all have delivered exactly 90 organisms however it
-was tuned. The whole back half would have been flat. Pressure still drives
-the endless tail past 40. The §5d paragraph is marked superseded rather than
-deleted — its *reasoning* (the Sprint 22 IgA miss was round design, not IgA
-strength) still holds.
+## Two Director rulings landed
 
-**The honest limit, stated so nobody has to rediscover it:** Bloons has ~20
-bloon types by round 40; this game has six organisms, three generic. Rounds
-20-40 differ by proportion, volume and delivery shape, not by content. The
-back half is a frame waiting for `PATHOGEN_ROSTER.md` — astrovirus, then
-**CMV as a real boss for round 40's slot**, which is currently filled by
-concentration because the boss that belongs there is unbuilt.
+1. **Colonic is fine.** The anatomy rule that rejected *C. difficile* was
+   quietly costing **four of the most common gut pathogens in the world** —
+   *Shigella*, *Campylobacter*, *Entamoeba histolytica* and *Trichuris*.
+   Anatomy is now a recorded note, not a veto; §1a's bands are a generic
+   mucosal cross-section. Recorded in `PATHOGEN_ROSTER.md`. **This opens a
+   new head of the shortlist that no pass has ranked**, led by *Entamoeba*,
+   which answers two of the five standing "no answer in the roster" gaps.
+2. **Fix rotavirus** (below).
 
-### Sprint 32 — the permit, the curriculum, turnover
+## Sprint 34 — what changed in the engine
 
-Sprint 32, one sitting, three strands. The Director picked "rounds and new
-pathogens" with the edge bug first, and said yes to innate turnover.
+Three new `SpeciesProfile` fields, all zero-is-neutral, so an un-opted-in
+species behaves exactly as before. Full signatures in `INTERFACE.md`.
 
-| Strand | What |
+| Change | Why |
 |---|---|
-| A | **The edge bug is fixed.** Per-kind band permit in `Chemotaxis.ChooseNextStep`. |
-| B | **Innate cells turn over.** Macrophage kill limit 20 → 5, neutrophil 5 → 3, from a measured distribution. |
-| C1 | **Named species can spawn at all** — they never could. Rounds carry a cast of species. |
-| C2 | **A round curriculum**: one new organism at a time, organisms recur, wall pressure climbs. |
-| C3 | **Astrovirus: not built**, deliberately. Scoped in `BACKLOG.md`. |
-| + | **A round-hang fixed before it shipped** — the scaled batch ran into the spawner's 150-pathogen ceiling, and a food round never ends if its batch cannot be emitted. Clamped to 90. |
+| `SpeciesProfile.Exit` + the `ViralExit` enum | §4b's "two per-species modes" was a **coin flip** |
+| `NonLyticReleaseFraction` | rotavirus does not lyse the cell, so its focus never bursts |
+| `PlaqueCrowdWeight` + `SpeciesRoster.CrowdWeightOf` | rotavirus arrives in vesicles: one unit is already a dose |
+| `PathogenAgent.VirusBuds` / `.WillBurnOut` (read-only) | so a harness can assert the property, not a proxy |
 
-**24 verify methods, 869 checks, green** (`Sprint32Verification` 60,
-`Sprint33Verification` 41). WebGL builds clean.
+**Budding had never been per-species — seventh instance of the standing
+pattern.** §4b has specified two per-species spread modes since Sprint 5;
+`AssignVirusTraits` picked with `Random.value` and its own comment admitted
+"there is no species roster yet", which stopped being true in Sprint 24.
 
-## The finding that mattered most
+**The crowd weight is capped below the ingress floor on purpose.**
+Rotavirus's measured vesicle multiplier is ~3.5x. §1b Step 2 property 2 is
+locked and load-bearing — "a trickle is arithmetically impossible, not
+merely unlikely" — and 3.5 against a floor of 2.0 would let a lone virion
+charge a plaque and delete it. The weight is **1.9**, which makes
+rotavirus's minimum dose **two organisms where a generic virus needs
+three** — the per-species knob §1b Step 2 always said the floor would
+become. Mechanism literal, magnitude abstracted.
 
-**Rotavirus, *Vibrio cholerae* and A/E *E. coli* had never been on the
-board.** `PathogenSpawner.SpawnFromFood` passed a `PathogenClass`, and a
-bare class resolves to the *generic* species of that class; nothing in
-`Assets/Scripts` ever passed a named species except replication, which
-inherits its parent's. All of Sprints 24-25 — traits, sprites,
-knowledge-HUD rows — was unreachable, while the round taglines promised
-*Salmonella*, poliovirus and *Listeria*, none of which are in the roster.
-
-That is the **fifth** instance of one pattern: three upgrade ceilings that
-never bound, one barcode guarantee that was mathematically unreachable,
-and now this. The signature every time: **a value written on one side of a
-boundary and never read as that value on the other.** Worth asking of any
-new feature — who reads this, and with what?
+**Rotavirus is still self-limiting**, but by the crypt repaving under its
+villus-tip tropism rather than by burn-out. The two traits it already had
+compose, and that is closer to how rotavirus actually resolves — by
+epithelial replacement, not by the virus exhausting itself.
 
 ## Numbers worth keeping
 
-- Immune cells spent **43% of their steps outside the tissue** under the
-  old movement rule (34,402 of 80,000). Now 0. A stray cell homes in 38
-  steps worst case, and cells still diffuse (mean depth 2.2 of 13 cells).
-- Round 5 now delivers, through the real spawner: **32 A/E *E. coli*, 11
-  intracellular bacteria, 9 rotavirus, 8 gut bacteria**.
-- Kills per cell with the ceiling lifted: macrophage **median 2** per 45s
-  round, **9** per three; neutrophil **3** and **11**.
-- The macrophage's old ceiling of 20 retired **0 cells even over three
-  rounds**. The neutrophil's 5 retired 7 of 11 over three rounds — so
-  that row was never inert, which corrects the standing claim.
+- Four organisms crowd **1.9x harder as rotavirus** — 7.019 against 3.694 —
+  through the real `GutWall`.
+- **Two rotavirus clear the ingress floor (3.8 > 2.0); two ordinary virions
+  do not (2.0 ≤ 2.0).**
+- **No rotavirus focus burns out** (0/100). An ordinary virus still does
+  (32/100 ≈ 30%), unchanged.
+- A cross-linked rotavirus raft crowds **nothing** — the IgA resolution
+  survives the dose multiplier.
+- **The antigen barcode holds at most 12 species** at the shipped match
+  radius (constructed 12, Hamming ceiling 18). At r=3 it holds exactly
+  **two** — a Plotkin bound, not a search limit. A 16-species roster needs
+  **12 bits**, and a generated 16-tag set at minimum distance 6 is in the
+  spec ready to paste.
+- **Norovirus's knowledge knock-back is ×0.3 with a floor at the ~10% CTL
+  rung** — only ~30% of antibody blockade survives one variant
+  replacement, while the HLA class-I epitopes are conserved.
 
 ## Open, in rough priority order
 
-Full detail in `BACKLOG.md` under "Open after Sprint 32".
+Full detail in `BACKLOG.md` under "Open after Sprint 34".
 
-1. **The Director has now skipped two playtests.** Sprints 32 and 33 are
-   harness-measured, not played. Nothing is known about whether the
-   curriculum *reads* as teaching, whether a one-burst round 40 is exciting
-   or just a wall of sprites, or whether IgA is perceptible now. The
-   questions below were written for Sprint 32 and still stand.
-2. **The back half of the script needs organisms, not re-weighting.**
-   Rounds 20-40 have no new content to introduce. Astrovirus first, then CMV
-   for round 40's boss slot, then norovirus GII.4 — whose antigenic
-   replacement would invalidate knowledge the player spent a whole run
-   accumulating, which is a back-half mechanic by construction.
-3. **The Sprint 32 playtest questions**, unchanged:
-   does the curriculum read as teaching; is IgA perceptible now that wall
-   pressure climbs (the Sprint 22 miss was diagnosed as round design, and
-   this is the fix being tested); does the board still feel populated with
-   turnover live.
-4. **Astrovirus** — the next pathogen, now on working rails. More than a
-   roster entry: it needs a non-infecting virus path in `PathogenAgent`,
-   a barrier interaction, a sprite pass, and the barcode search re-run for
-   the whole seven-species set. **And a design question first:** it
-   produces no debris and no stress signal, so no knowledge can ever
-   accrue from it — what does its knowledge-HUD row say?
-5. **The structural gap behind the dead-upgrade pattern**: no harness can
-   read the shipped per-kind unit numbers (they live on `GameBootstrap`'s
-   serialized fields; a harness cannot stand that component up), so
-   nothing compares an upgrade row's step against the base it applies to.
-   A `UnitProfileAudit` on the `UpgradeAudit` precedent closes it.
-6. **Degranulation × A/E *E. coli*** — faster neutrophil turnover makes
-   more debris, and that organism respires exactly that. Both landed this
-   sprint; the compound effect is unmeasured.
-7. **`docs/INTERFACE.md` is ten sprints stale** (last per-sprint section
-   before Sprint 32: Sprint 21). It is a `WORKFLOW.md` §5.3 checkbox that
-   was being ticked without being true.
-8. Kill limits on the other four kinds are **unmeasured** (CTL 16, NK 10,
-   γδ 12). The board now drifts toward long-lived adaptive and
-   short-lived innate cells, which nobody has decided.
-
-## Where things live now
-
-- `Grid/BoardConfig.cs` — `BandPermit`, `BandOfFine`, `BandAxisRange`,
-  `FineDistanceToPermittedBand`. Band extents have one home now.
-- `Units/Chemotaxis.cs` — `CollectCandidates`, the three-pass permit rule.
-- `Rounds/RoundScript.cs` — the curriculum and `SpeciesWeight`.
-- `Editor/Sprint32Verification.cs` — 53 checks in three parts.
-- `Editor/KillLimitDiagnostic.cs` — now has a distribution mode.
-- `Rounds/RoundScript.cs` — the 40-round table, `DebutsInRound`,
-  `DebutLabelFor`. The file to edit for round design.
-- `Editor/Sprint33Verification.cs` — 41 checks on the script, including the
-  burst-concentration measurement through the real spawner.
+1. **The Director has now skipped three playtests.** Sprints 32, 33 and 34
+   are harness-measured, not played. Nothing is known about whether the
+   40-round curriculum *reads* as teaching, whether a one-burst round 40 is
+   exciting or a wall of sprites, or whether IgA is perceptible.
+2. **Four gates before any new species ships**, all in the spec's §5:
+   widen the barcode to 12 bits; build a per-species sprite path (there is
+   none — `PathogenAgent` picks from `Class`, two sprites for the whole
+   roster); make the knowledge HUD scale past six species; allow a
+   pathogen's sprite to change mid-board (four of the ten need it).
+3. **"Shed antigen" is designed and unbuilt** — how the body learns about
+   *Giardia*. The parasite sheds its own antigen in extracellular vesicles,
+   human DCs capture and mature on them, and **antibody binding triggers a
+   massive release**, so attacking it is what makes it teachable. Carried by
+   either sampler already built. Recorded as an amendment under §1c:
+   **debris is one input, not the only one.** Needs a Director decision.
+4. **Nontyphoidal *Salmonella* should lead its own sprint** — more common
+   than five of the chosen ten, but its mechanic is a change to §4a's
+   advance rules (the infected enterocyte is *extruded into the lumen*).
+5. **Corrections to standing design** that touch built code: the built
+   *V. cholerae* actively swims (non-chemotactic mutants out-compete wild
+   type); §4a's "parasites don't hide / cleared by combat damage" is wrong
+   for every helminth; adenovirus F41 must not be built as a cliff;
+   norovirus's 2–4 year cycle is historical only.
+6. **§4a's parasite class is over-specified** — no enteric protozoan needs
+   the multi-slot footprint `BACKLOG` calls "more engineering than the
+   other three classes combined". Single slot with a size multiplier;
+   defer the footprint to helminths.
+7. **`docs/INTERFACE.md`** now has a Sprint 34 section, but the ten-sprint
+   backfill (Sprints 22–31) is still missing.
 
 ## Traps this session hit
 
-- **A test can fail because the test is wrong.** The first no-excursion
-  check also demanded cells cross the whole tissue band in 600 steps; an
-  unbiased walk needs ~8,000 to cover 91 fine tiles, so it was testing the
-  step budget. Restated as diffusion.
-- **Every harness leaks units into `SearchUnit`'s static registry**
-  (`ResetForPool` is the only exit), which moved a measurement from 4 to 3
-  depending on how many runs preceded it. `Sprint32Verification` drains it
-  and asserts run-to-run determinism; the others still leak.
-- **A batchmode CRASH can be a transient build-system error.**
-  `Sprint24Verification` reported `Internal build system error … binlog`
-  then "Scripts have compiler errors" in a run where every other harness
-  compiled; it passed on a bare re-run. A real compile error fails every
-  method in the run, not one.
-- **A harness must not own a number it is not testing — three instances
-  now**, and it cost time twice in two sprints. Sprint 32's own spawner
-  check hard-coded "round 5 is the A/E E. coli round" and broke when the
-  table grew to 40; it now *finds* the first round casting both organisms.
-  Standing fix in `AGENT_HANDBOOK.md`.
-- **Two older harnesses owned numbers they had no reason to own** —
-  `Sprint18Verification` asserted `20 -> 28` and `5 -> 7` as literals, so
-  a turnover change broke tests that were not about turnover. Both now
-  read their own fixture base plus the live per-level constant.
+- **A harness assertion was wrong, and had been passing on luck.**
+  `Sprint32Verification` asserted "the named organisms are the **majority**"
+  of the round it finds. That round is 20, whose cast is 2/2/1/2/2/1 — so
+  the named organisms are expected to be **exactly half**, and whether a
+  58-organism sample lands above or below is a coin flip. A Sprint 34 change
+  to how many random numbers a rotavirus spawn consumes moved the RNG stream
+  and it read 24 of 58. It now computes the expectation from the round's own
+  cast weights and allows 3σ of sampling error at the emitted batch size —
+  an observed zero is ~7.6σ away, so it still fails loudly if a named
+  organism stops reaching the board. **Third instance of a harness owning a
+  number it is not testing.**
+- **A vacuity guard earned its keep immediately.** `Sprint34Verification`'s
+  first run established 0 of 200 rotavirus infections, because the harness
+  had collected host slots at the **crypt** end — which the villus-tip
+  tropism correctly forbids. Without the "the test is not vacuous" check it
+  would have reported a clean zero burn-out rate from zero infections.
+- **A long anchor is a fragile anchor.** Two doc patches missed because the
+  anchor text had been re-wrapped since it was read. Short unique anchors,
+  verified with `grep -c` first, and a patcher that writes nothing unless
+  every anchor matches.
+- **Two research passes disagreed about sapovirus, and both were right.**
+  The burden pass ranks it #2 in the world; the viral pass says it is not
+  significantly attributable in a high-income case–control series and that
+  its post-vaccine rise is relative, not absolute. Different populations.
+  The resolution was the Director's "some are just stronger" instruction: it
+  earns a **tier** slot, not a mechanic slot.
