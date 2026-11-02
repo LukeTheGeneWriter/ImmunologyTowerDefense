@@ -51,6 +51,39 @@ namespace ImmunologyTD.Rounds
         /// Null or empty falls back to the class weights below.</summary>
         public SpeciesWeight[] Cast;
 
+        /// <summary>**Sprint 33: how many organisms this round delivers**,
+        /// authored per round. 0 means "use the economy's linear baseline x
+        /// <see cref="WallPressure"/>", which is what the procedural tail
+        /// past the script does.
+        ///
+        /// A hand-authored 40-round script has to own its own volume curve,
+        /// the way Bloons' round tables do. The alternative was discovered
+        /// by arithmetic: the economy baseline (16, +6 a round) times a
+        /// rising pressure multiplier hits the batch ceiling of 90 at round
+        /// 8, so **every round from 8 to 40 would have delivered exactly 90
+        /// organisms** and the whole back half of the curve would have been
+        /// flat however the multiplier was tuned.
+        ///
+        /// `GAME_DESIGN.md` §5d always said the linear growth was a
+        /// placeholder and that a real difficulty curve was out of
+        /// framework scope; this is where that curve now lives.</summary>
+        public int Batch;
+
+        /// <summary>**Sprint 33: how the batch arrives.** The contaminated
+        /// food item drops its cargo in this many bursts as it transits the
+        /// lumen; 0 means <see cref="InvasionTuning.FoodItemBurstCount"/>,
+        /// the global default of 4.
+        ///
+        /// This is the round-design lever that is NOT volume, and it is the
+        /// one that reads most strongly at the wall. Bursts land at the
+        /// bolus's current lane, so **1 burst of 80 is a rush against one
+        /// stretch of wall, while 7 bursts of 11 is a trickle smeared along
+        /// the whole thing** — the same count, a different problem. It is
+        /// this game's answer to Bloons' grouped rushes, and it is the
+        /// honest form of "wall pressure": organisms per clump, not
+        /// organisms per round.</summary>
+        public int Bursts;
+
         /// <summary>Multiplier on the round's batch size -- how much traffic
         /// arrives at the wall. **Zero means 1.0**, so a definition written
         /// before this field existed is unchanged.
@@ -70,6 +103,19 @@ namespace ImmunologyTD.Rounds
         public float LargeBacteriumWeight;
 
         public float EffectiveWallPressure => WallPressure <= 0f ? 1f : WallPressure;
+
+        /// <summary>Bursts this round uses, resolving 0 to the global
+        /// default.</summary>
+        public int EffectiveBursts =>
+            Bursts > 0 ? Bursts : Mathf.Max(1, ImmunologyTD.Pathogens.InvasionTuning.FoodItemBurstCount);
+
+        /// <summary>Organisms per clump — <see cref="Batch"/> divided by
+        /// <see cref="EffectiveBursts"/>. The quantity that actually
+        /// describes pressure at the wall, and the one the 40-round script's
+        /// difficulty envelope is built from. 0 for a round with no authored
+        /// batch.</summary>
+        public float OrganismsPerClump =>
+            Batch > 0 ? Batch / (float)Mathf.Max(1, EffectiveBursts) : 0f;
 
         public bool HasCast => Cast != null && Cast.Length > 0;
 
@@ -112,125 +158,171 @@ namespace ImmunologyTD.Rounds
     }
 
     /// <summary>
-    /// The scripted opening rounds -- Sprint 32's **curriculum**.
+    /// The **40-round script** (Sprint 33, Director: "40 rounds with a bunch
+    /// of different mixes and matches, reference Bloons TD").
     ///
-    /// Three rules shaped this list, and they are design decisions rather
-    /// than flavour:
+    /// ## What Bloons actually does, and what carries over
     ///
-    ///  1. **One new organism at a time, against a board you already
-    ///     understand.** Species are learned independently (§5c), so round
-    ///     order *is* teaching order.
-    ///  2. **Organisms RECUR after they are introduced.** This is the part
-    ///     that is easy to get wrong: knowledge is per species, and the
-    ///     adaptive ladder's rungs (secretory IgA at 70%) only fire for a
-    ///     species the player has actually accumulated knowledge on. A
-    ///     parade of novelties would keep every species below its rungs
-    ///     forever and the whole adaptive arm would stay dark -- which is
-    ///     very close to what the Sprint 22 playtest reported.
-    ///  3. **Wall pressure rises.** See <see cref="RoundDefinition.WallPressure"/>.
-    ///     Rounds 1 and 2 stay at 1.0 deliberately: the economy harnesses
-    ///     assert the unscaled batch size for those two rounds, and a
-    ///     tutorial round should not be crowded anyway.
+    /// Forty rounds is Bloons TD 6's Easy length, and its round table has
+    /// four habits worth stealing:
     ///
-    /// Taglines now name what the round actually contains. Before Sprint 32
-    /// they named organisms that were not in the game.
+    /// 1. **A new enemy debuts, then recurs in quantity.** Nothing appears
+    ///    once. A type arrives in a small dose against a board the player
+    ///    already handles, and comes back in bulk two or three rounds later.
+    /// 2. **Difficulty is a sawtooth, not a ramp.** A hard round is followed
+    ///    by an easier one. The envelope rises; individual rounds dip. This
+    ///    is what makes a spike legible as a spike.
+    /// 3. **Grouped rushes.** The same count delivered tightly is a
+    ///    different problem from the same count spread out — and it is a
+    ///    *delivery* property, not a new enemy. This is the single biggest
+    ///    source of variety in Bloons' back half.
+    /// 4. **The player can see what is coming.** The round number and the
+    ///    callout for a new type are both up before the round starts.
+    ///
+    /// All four are here. (3) is <see cref="RoundDefinition.Bursts"/>:
+    /// bursts land at the bolus's current lane, so one burst of 88 hits one
+    /// stretch of wall while seven bursts of 12 smear along the whole
+    /// thing. (4) is the buy-phase caption, which already previewed the next
+    /// round's tagline and now also names any organism debuting in it
+    /// (<see cref="DebutsInRound"/>).
+    ///
+    /// ## What does NOT carry over, and the honest limit of this script
+    ///
+    /// Bloons has ~20 bloon types by round 40. **This game has six
+    /// organisms**, three of them generic. So rounds 20-40 differ by
+    /// proportion, volume and delivery shape — not by new content. The
+    /// script is built to make those three levers carry as far as they can,
+    /// and the back half is where the ranked shortlist in
+    /// `PATHOGEN_ROSTER.md` (astrovirus, CMV as a boss, norovirus,
+    /// *Shigella*, *Salmonella*) would actually change the game rather than
+    /// re-weight it. Read rounds 20-40 as a frame waiting for content, not
+    /// as a finished difficulty curve.
+    ///
+    /// ## The three rules the harness enforces
+    ///
+    /// 1. **One new named organism at a time** — debuts at rounds 6
+    ///    (*Vibrio cholerae*), 11 (rotavirus) and 15 (A/E *E. coli*), with
+    ///    the three generic classes established in rounds 1-3.
+    /// 2. **Everything recurs.** No organism appears in only one round,
+    ///    because knowledge is per species (§5c) and the adaptive rungs fire
+    ///    per species — a parade of novelties keeps the whole adaptive arm
+    ///    dark, which is close to what the Sprint 22 playtest reported.
+    /// 3. **The envelope rises and individual rounds dip.** Measured on
+    ///    organisms-per-clump (batch ÷ bursts): 4 at round 1, 17 by round 5,
+    ///    26 by 17, 33 by 28, and 88 at round 40 — the finale is the whole
+    ///    batch in a single burst.
+    ///
+    /// Taglines name only organisms that are actually in the roster. Before
+    /// Sprint 32 they promised *Salmonella*, poliovirus and *Listeria*, none
+    /// of which exist here, which is the kind of drift that hid a much worse
+    /// bug for eight sprints.
     /// </summary>
     public static class RoundScript
     {
+        // Short aliases, so a 40-row table stays readable.
+        private const PathogenSpecies Bact = PathogenSpecies.GenericLargeBacterium;
+        private const PathogenSpecies Vir = PathogenSpecies.GenericVirus;
+        private const PathogenSpecies Intra = PathogenSpecies.GenericIntracellularBacterium;
+        private const PathogenSpecies Vibrio = PathogenSpecies.VibrioCholerae;
+        private const PathogenSpecies Rota = PathogenSpecies.Rotavirus;
+        private const PathogenSpecies Aeec = PathogenSpecies.AttachingEffacingEcoli;
+
+        private static SpeciesWeight W(PathogenSpecies s, float weight) => new SpeciesWeight(s, weight);
+
+        private static RoundDefinition R(string tagline, int batch, int bursts, params SpeciesWeight[] cast)
+            => new RoundDefinition { Tagline = tagline, Batch = batch, Bursts = bursts, Cast = cast };
+
         private static readonly RoundDefinition[] Scripted =
         {
-            // R1 -- one familiar enemy, nothing else. Learn adhesion, the
-            // mill at the wall, and that macrophages eat.
-            new RoundDefinition
-            {
-                Tagline = "Bagged salad, gut bacteria",
-                WallPressure = 1f,
-                Cast = new[] { new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 3f) },
-            },
+            // -- Act 1 (1-5): the three classes, and the first rush. ------
+            // One enemy, a slow trickle: adhesion, the mill at the wall, and
+            // macrophages eating. Nothing to read yet.
+            R("Bagged salad, gut bacteria", 16, 4, W(Bact, 3)),
+            // A virus behaves nothing like a bacterium -- it takes a cell
+            // rather than a slot -- so it is the next thing to meet.
+            R("Undercooked egg, and something viral", 22, 4, W(Bact, 3), W(Vir, 1)),
+            // The third class: an invader that gets inside a cell and stays.
+            R("Reheated rice, an invader among them", 26, 5, W(Bact, 3), W(Vir, 1), W(Intra, 1)),
+            // Same cast, spread as thin as it goes. The quiet round before
+            // the first spike, and a chance to see the whole wall at once.
+            R("Unwashed berries, a long thin trickle", 30, 6, W(Bact, 3), W(Vir, 1), W(Intra, 1)),
+            // **First rush.** Same organisms, two clumps instead of six.
+            R("Street-cart sauce, all at once", 34, 2, W(Bact, 4), W(Vir, 1)),
 
-            // R2 -- the second class. A virus behaves nothing like a
-            // bacterium (it takes a cell rather than a slot), so it is the
-            // next thing to meet, with the familiar organism still dominant.
-            new RoundDefinition
-            {
-                Tagline = "Undercooked egg, bacteria and a virus",
-                WallPressure = 1f,
-                Cast = new[]
-                {
-                    new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 3f),
-                    new SpeciesWeight(PathogenSpecies.GenericVirus, 1f),
-                    new SpeciesWeight(PathogenSpecies.GenericIntracellularBacterium, 1f),
-                },
-            },
+            // -- Act 2 (6-14): the named organisms arrive. ---------------
+            // **Vibrio cholerae debuts**, and it is the gentlest of the three
+            // to meet first: it never kills a cell and never takes a slot.
+            // Its lesson is that hunting for dying cells is not enough,
+            // because subverted wall looks perfectly healthy.
+            R("Raw oysters, Vibrio cholerae", 32, 4, W(Vibrio, 3), W(Bact, 2), W(Vir, 1)),
+            R("Brackish ice, more of the same", 38, 5, W(Vibrio, 3), W(Bact, 2), W(Intra, 1)),
+            // A deliberately viral round: the tissue answer, not the wall one.
+            R("Contaminated water, mostly viral", 34, 6, W(Vir, 4), W(Bact, 1), W(Vibrio, 1)),
+            R("Buffet tongs, a bit of everything", 42, 4, W(Bact, 2), W(Vir, 2), W(Intra, 1), W(Vibrio, 2)),
+            R("Oyster platter, one heavy dose", 46, 2, W(Vibrio, 4), W(Bact, 2)),
+            // **Rotavirus debuts.** It eats the villus tip and can never
+            // touch the crypt, so damage creeps one way while the board
+            // repaves from the other: WHERE a thing can reach starts to
+            // matter.
+            R("Nursery water bottle, rotavirus", 40, 4, W(Rota, 3), W(Vir, 1), W(Bact, 1)),
+            R("Shared teething ring, rotavirus again", 44, 5, W(Rota, 3), W(Vir, 2), W(Vibrio, 1)),
+            R("Soft cheese, invaders inside the cells", 46, 4, W(Intra, 3), W(Bact, 2), W(Rota, 1)),
+            R("Picnic leftovers, nothing exotic", 40, 6, W(Bact, 3), W(Vir, 2), W(Intra, 2)),
 
-            // R3 -- *Vibrio cholerae*, the first named organism, and the
-            // gentlest introduction of the three: it never kills a cell and
-            // never takes a slot. Its whole lesson is that looking for dying
-            // cells is not enough, because subverted wall looks healthy.
-            new RoundDefinition
-            {
-                Tagline = "Raw oysters, Vibrio cholerae",
-                WallPressure = 1.2f,
-                Cast = new[]
-                {
-                    new SpeciesWeight(PathogenSpecies.VibrioCholerae, 3f),
-                    new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 2f),
-                    new SpeciesWeight(PathogenSpecies.GenericVirus, 1f),
-                },
-            },
+            // -- Act 3 (15-27): the last organism, and composition. ------
+            // **A/E E. coli debuts, deliberately last.** It respires the
+            // products of the host's own response, so a messy
+            // neutrophil-heavy clear feeds the survivors -- the one strategy
+            // in the research with no answer anywhere in the roster. It
+            // should land on a player who has settled into a routine.
+            R("Street-cart mince, attaching-effacing E. coli", 44, 4, W(Aeec, 3), W(Bact, 1), W(Intra, 1)),
+            R("Dripping burger press, E. coli and friends", 50, 5, W(Aeec, 3), W(Bact, 2), W(Vir, 1)),
+            // A clump of the one organism that resists being flushed: IgA
+            // enchainment and goblet sloughing both work poorly on it.
+            R("Unrinsed sprouts, in one clump", 52, 2, W(Aeec, 4), W(Bact, 2)),
+            // The two organisms that never present as dying cells, together.
+            R("Oyster and ice, nothing looks sick", 48, 5, W(Vibrio, 3), W(Rota, 2), W(Bact, 1)),
+            R("Daycare door handles, a viral week", 52, 4, W(Rota, 3), W(Vir, 3), W(Bact, 1)),
+            // Milestone: the full roster, no novelty, tightened up.
+            R("Catered wedding, the full menu", 58, 3,
+              W(Bact, 2), W(Vir, 2), W(Intra, 1), W(Vibrio, 2), W(Rota, 2), W(Aeec, 1)),
+            R("Home cooking, a quiet week", 48, 6, W(Bact, 3), W(Vir, 2), W(Intra, 1)),
+            R("Minced beef, inflamed ground", 56, 4, W(Aeec, 3), W(Bact, 3), W(Intra, 1)),
+            R("Food truck at rush hour", 60, 2, W(Aeec, 2), W(Bact, 2), W(Vibrio, 2)),
+            R("Villus tips, chewed from the top", 56, 5, W(Rota, 4), W(Vir, 2), W(Bact, 1)),
+            R("The wall is alive, and not yours", 58, 4, W(Vibrio, 4), W(Bact, 2), W(Intra, 1)),
+            // Almost nothing extracellular: everything worth killing is
+            // inside a cell, which is the stress-sensing arm's round.
+            R("Nothing in the lumen, everything inside", 60, 5, W(Intra, 3), W(Vir, 3), W(Rota, 2)),
+            R("Thin soup, spread thinner", 52, 7, W(Bact, 3), W(Vir, 2), W(Vibrio, 2), W(Intra, 1)),
 
-            // R4 -- rotavirus. Teaches that WHERE a thing can reach matters:
-            // it eats the villus tip and can never touch the crypt, so the
-            // board regrows from one end while damage creeps the other way.
-            new RoundDefinition
-            {
-                Tagline = "Nursery water bottle, rotavirus",
-                WallPressure = 1.3f,
-                Cast = new[]
-                {
-                    new SpeciesWeight(PathogenSpecies.Rotavirus, 3f),
-                    new SpeciesWeight(PathogenSpecies.GenericVirus, 1f),
-                    new SpeciesWeight(PathogenSpecies.VibrioCholerae, 1f),
-                    new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 1f),
-                },
-            },
-
-            // R5 -- A/E *E. coli*, deliberately last of the three and on a
-            // crowded wall. It respires the products of the host's own
-            // response, so a messy neutrophil-heavy clear feeds the
-            // survivors. That is the one strategy in the research with no
-            // answer anywhere in the roster, and it should land on a player
-            // who has already settled into a routine.
-            new RoundDefinition
-            {
-                Tagline = "Street-cart mince, attaching-effacing E. coli",
-                WallPressure = 1.5f,
-                Cast = new[]
-                {
-                    new SpeciesWeight(PathogenSpecies.AttachingEffacingEcoli, 3f),
-                    new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 1f),
-                    new SpeciesWeight(PathogenSpecies.Rotavirus, 1f),
-                    new SpeciesWeight(PathogenSpecies.GenericIntracellularBacterium, 1f),
-                },
-            },
-
-            // R6 -- everything, at pressure. Every species the player has
-            // met, no novelty: the round that asks whether the routine
-            // actually holds.
-            new RoundDefinition
-            {
-                Tagline = "Street-cart everything",
-                WallPressure = 1.7f,
-                Cast = new[]
-                {
-                    new SpeciesWeight(PathogenSpecies.GenericLargeBacterium, 2f),
-                    new SpeciesWeight(PathogenSpecies.GenericVirus, 2f),
-                    new SpeciesWeight(PathogenSpecies.GenericIntracellularBacterium, 1f),
-                    new SpeciesWeight(PathogenSpecies.VibrioCholerae, 2f),
-                    new SpeciesWeight(PathogenSpecies.Rotavirus, 2f),
-                    new SpeciesWeight(PathogenSpecies.AttachingEffacingEcoli, 2f),
-                },
-            },
+            // -- Act 4 (28-40): volume, concentration, and the finale. ---
+            R("Two deliveries, one wall", 66, 2, W(Aeec, 3), W(Bact, 2), W(Rota, 2)),
+            R("Offal and oysters", 64, 4, W(Aeec, 3), W(Intra, 3), W(Vibrio, 2)),
+            R("Festival weekend, everything at once", 70, 3,
+              W(Bact, 2), W(Vir, 2), W(Intra, 2), W(Vibrio, 2), W(Rota, 2), W(Aeec, 2)),
+            R("Convalescence, a lighter plate", 60, 6, W(Bact, 3), W(Vir, 2), W(Rota, 1)),
+            // Toxin and fuel: rotavirus damages neighbours it never infects,
+            // and A/E E. coli respires the mess that leaves behind.
+            R("Toxin, and something that feeds on it", 68, 4, W(Rota, 3), W(Aeec, 3), W(Bact, 1)),
+            R("Neither of them kills a cell", 70, 5, W(Vibrio, 4), W(Aeec, 3), W(Bact, 1)),
+            R("One bolus, one stretch of wall", 74, 2, W(Aeec, 3), W(Bact, 3), W(Vir, 2)),
+            R("A viral storm", 72, 4, W(Rota, 4), W(Vir, 4), W(Intra, 1)),
+            R("Plain fare, and plenty of it", 66, 6, W(Bact, 4), W(Vir, 2), W(Intra, 2)),
+            R("A siege, all bacterial", 78, 3, W(Bact, 3), W(Intra, 3), W(Aeec, 3)),
+            R("Everything, delivered twice", 82, 2,
+              W(Bact, 2), W(Vir, 2), W(Intra, 2), W(Vibrio, 2), W(Rota, 2), W(Aeec, 2)),
+            R("The last quiet plate", 84, 5,
+              W(Bact, 2), W(Vir, 2), W(Intra, 2), W(Vibrio, 2), W(Rota, 2), W(Aeec, 2)),
+            // **Round 40.** The whole batch in a single burst, against one
+            // stretch of wall, with every organism in it. There is no boss
+            // unit to put here -- the designed one (CMV, four independent
+            // MHC-I mechanisms, a ~96h lytic cycle) is still unbuilt in
+            // `PATHOGEN_ROSTER.md` -- so the finale is made of
+            // concentration rather than of a new enemy. If a boss is ever
+            // built, this is its slot.
+            R("All of it, in one mouthful", 88, 1,
+              W(Bact, 2), W(Vir, 2), W(Intra, 2), W(Vibrio, 3), W(Rota, 3), W(Aeec, 3)),
         };
 
         /// <summary>Highest wall pressure the procedural tail will reach.
@@ -241,15 +333,72 @@ namespace ImmunologyTD.Rounds
 
         public static int ScriptedRounds => Scripted.Length;
 
+        /// <summary>
+        /// Organisms making their FIRST scripted appearance in this round,
+        /// in roster order. Bloons calls out a new bloon type before the
+        /// round it debuts in; this is the data behind that callout, and
+        /// `HudView` shows it in the buy-phase caption, which already
+        /// previewed the next round's tagline.
+        ///
+        /// Returns an empty array for a round that introduces nothing, and
+        /// for anything past the script.
+        /// </summary>
+        public static PathogenSpecies[] DebutsInRound(int roundNumber)
+        {
+            if (roundNumber < 1 || roundNumber > Scripted.Length)
+                return System.Array.Empty<PathogenSpecies>();
+
+            var seenBefore = new System.Collections.Generic.HashSet<PathogenSpecies>();
+            for (int r = 1; r < roundNumber; r++)
+            {
+                var earlier = Scripted[r - 1].Cast;
+                if (earlier == null) continue;
+                for (int i = 0; i < earlier.Length; i++)
+                    if (earlier[i].Weight > 0f) seenBefore.Add(earlier[i].Species);
+            }
+
+            var cast = Scripted[roundNumber - 1].Cast;
+            if (cast == null) return System.Array.Empty<PathogenSpecies>();
+
+            var debuts = new System.Collections.Generic.List<PathogenSpecies>();
+            for (int i = 0; i < cast.Length; i++)
+            {
+                if (cast[i].Weight <= 0f) continue;
+                if (seenBefore.Contains(cast[i].Species)) continue;
+                if (debuts.Contains(cast[i].Species)) continue;
+                debuts.Add(cast[i].Species);
+            }
+            debuts.Sort((a, b) => ((int)a).CompareTo((int)b));
+            return debuts.ToArray();
+        }
+
+        /// <summary>The player-facing callout for a round's debuts, or null
+        /// when it introduces nothing. "NEW: Vibrio cholerae".</summary>
+        public static string DebutLabelFor(int roundNumber)
+        {
+            var debuts = DebutsInRound(roundNumber);
+            if (debuts.Length == 0) return null;
+
+            var names = new string[debuts.Length];
+            for (int i = 0; i < debuts.Length; i++) names[i] = SpeciesRoster.NameOf(debuts[i]);
+            return "NEW: " + string.Join(", ", names);
+        }
+
         public static RoundDefinition ForRound(int roundNumber)
         {
             int n = roundNumber < 1 ? 1 : roundNumber;
             if (n <= Scripted.Length) return Scripted[n - 1];
 
-            // Procedural tail: the full roster, with pressure still climbing
-            // toward the cap. Reuses round 6's cast rather than inventing a
-            // mix, so "past the script" means more of everything the player
-            // has already learned, not a different game.
+            // Procedural tail past round 40: the full roster, at the
+            // baseline-times-pressure volume the script does not author, in
+            // a middling delivery shape. Deliberately NOT round 40's single
+            // burst -- the finale is a spike, and a spike repeated forever
+            // is just a plateau.
+            //
+            // Note the honest limitation: the economy baseline is far above
+            // the batch ceiling by round 41, so every tail round delivers
+            // the ceiling (90) whatever the pressure says. Past 40 the game
+            // does not get harder, it just continues. See BACKLOG.md.
             int past = n - Scripted.Length;
             return new RoundDefinition
             {
@@ -259,7 +408,8 @@ namespace ImmunologyTD.Rounds
                 Tagline = $"Spoiled leftovers, day {n}",
                 WallPressure = Mathf.Min(
                     MaxProceduralWallPressure,
-                    Scripted[Scripted.Length - 1].EffectiveWallPressure + 0.1f * past),
+                    1.7f + 0.1f * past),
+                Bursts = 3,
                 Cast = Scripted[Scripted.Length - 1].Cast,
             };
         }

@@ -1550,7 +1550,10 @@ three rules govern the order:
    playtest actually reported.
 3. **Wall pressure rises** (`RoundDefinition.WallPressure`, a multiplier on
    the batch size the economy sets). This is the lever for the Sprint 22
-   IgA miss. The Director never perceived IgA, and the diagnosis was
+   IgA miss. **(Superseded one sprint later — see the 40-round script
+   below. The multiplier ran into the batch ceiling at round 8, so volume
+   is authored per round now and pressure is the procedural tail's lever.
+   The reasoning in this paragraph still holds; only the mechanism moved.)** The Director never perceived IgA, and the diagnosis was
    explicitly *not* that IgA is too weak: IgA acts in the lumen, so if the
    tissue defence clears everything before pressure builds at the wall, the
    player never sees what IgA prevents. **A defence against a problem you
@@ -1570,6 +1573,84 @@ player has met, no novelty, at pressure.
 
 `RoundScript`'s class weights still work for a definition with no cast, so
 the Sprint 9 behaviour is intact for the harnesses that test the roll.
+
+### The 40-round script — Sprint 33 (Director, 2026-11-02)
+
+The Director asked for forty rounds of mixes and matches, with **Bloons TD**
+as the reference. Forty is Bloons TD 6's Easy length, and four habits of its
+round table carry over:
+
+1. **A new enemy debuts in a small dose, then recurs in bulk.** Nothing
+   appears once.
+2. **Difficulty is a sawtooth with a rising envelope**, not a ramp — a hard
+   round is followed by a lighter one, which is what makes a spike legible.
+3. **Grouped rushes.** The same count delivered tightly is a different
+   problem from the same count spread out. In Bloons this is most of what
+   makes the back half varied, and it is a *delivery* property rather than a
+   new enemy.
+4. **The player sees what is coming** before the round starts.
+
+### The three levers
+
+| Lever | Field | What it does |
+|---|---|---|
+| Cast | `RoundDefinition.Cast` | Which organisms, in what proportion |
+| Volume | `RoundDefinition.Batch` | How many arrive |
+| Concentration | `RoundDefinition.Bursts` | How many clumps they arrive in |
+
+**Volume is authored per round now, and that is a change of ownership.**
+Sprint 32 expressed difficulty as a `WallPressure` multiplier on the
+economy's linear baseline. Arithmetic killed it: baseline (16, +6 a round)
+times a rising multiplier hits the batch ceiling of 90 at **round 8**, so
+rounds 8-40 would all have delivered exactly 90 organisms however the
+multiplier was tuned. §5d always said the linear growth was a placeholder
+and a real difficulty curve was out of framework scope — the curve now lives
+in the script, the way Bloons' round tables do. `WallPressure` remains the
+lever for the procedural tail past round 40.
+
+**Concentration is the honest form of "wall pressure."** Bursts land at the
+bolus's current lane, so measured through the real spawner: round 40's 88
+organisms land in **one lane** of wall, while round 27's 52 land in
+**seven**. Organisms-per-clump (batch ÷ bursts) is therefore the quantity
+the difficulty envelope is built on: **4 at round 1, 17 by round 5, 26 by
+17, 33 by 28, and 88 at round 40**, where the whole batch arrives in a
+single burst.
+
+### The shape of the forty
+
+- **Rounds 1-5 — the three classes, and the first rush.** One organism, a
+  thin trickle; then a virus (takes a cell, not a slot); then an invader
+  that gets inside and stays; then the same cast spread as thin as it goes;
+  then the same cast in two clumps instead of six.
+- **Rounds 6-14 — the named organisms arrive.** *Vibrio cholerae* at 6,
+  deliberately first because it never kills a cell and never takes a slot:
+  its lesson is that hunting for dying cells is not enough. Rotavirus at 11:
+  *where* a thing can reach starts to matter. Each returns within two rounds.
+- **Rounds 15-27 — the last organism, and composition.** A/E *E. coli* at
+  15, deliberately last and against a settled routine, because it respires
+  the products of the player's own response. Then rounds built on pairings
+  that pose one question each: the two organisms that never present as dying
+  cells; a round where everything worth killing is inside a cell; a round of
+  nothing but the villus tip.
+- **Rounds 28-40 — volume and concentration.** Alternating rushes and
+  shoulders, ending on the whole roster in one burst.
+
+**Round 40 is made of concentration, not of a new enemy**, because the
+designed boss (CMV — four independent MHC-I mechanisms, a ~96h lytic cycle,
+`PATHOGEN_ROSTER.md`) is unbuilt. That slot is reserved for it.
+
+### The honest limit
+
+Bloons has ~20 bloon types by round 40. **This game has six organisms,
+three of them generic.** Rounds 20-40 therefore differ by proportion,
+volume and delivery shape, not by new content. The script is built to make
+those three levers carry as far as they can, and the back half should be
+read as a frame waiting for content — the ranked shortlist in
+`PATHOGEN_ROSTER.md` is what would make it genuinely new rather than
+re-weighted.
+
+Past round 40 the procedural tail continues at the batch ceiling. It does
+not get harder; it just continues.
 
 ## 6. Tissue recovery and fibrosis — LOCKED in principle
 

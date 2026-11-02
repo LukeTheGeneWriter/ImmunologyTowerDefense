@@ -1220,3 +1220,55 @@ process miss, not just a doc gap.
   Director's read.
 - `SimulationDriver` refactor + headless strategy harness, queued since
   Sprint 22.
+
+## Open after Sprint 33 (2026-11-02)
+
+### The back half of the 40-round script needs organisms, not re-weighting
+This is the headline item now. Rounds 1-19 teach something new most rounds;
+**rounds 20-40 differ only by proportion, volume and delivery shape**,
+because there are six organisms and three of them are generic. The three
+levers are already worked as hard as they go. What would actually change the
+back half, in the order the research ranks them
+(`PATHOGEN_ROSTER.md`):
+
+- **Astrovirus** — breach with no infection and no stress signal. Already
+  scoped below.
+- **CMV as a real boss for round 40's slot.** Round 40 is currently made of
+  concentration (88 organisms in one burst) because the boss that belongs
+  there does not exist. CMV is specified as a boss and never a wave enemy:
+  four independent MHC-I mechanisms, a ~96h lytic cycle, which zeroes
+  cytotoxic T cells and is answerable only by stress-sensing NK/γδ.
+- **Norovirus GII.4** — antigenic replacement on a real 2-4 year cycle,
+  i.e. literally §5's mutation discount, which would make a *late* round
+  invalidate knowledge the player spent the whole run accumulating. That is
+  a back-half mechanic by construction.
+- ***Shigella*** (actin-tail spread, enters via neutrophil transmigration)
+  and ***Salmonella*** (two speeds in two niches).
+
+### Difficulty past round 40 does not rise
+The procedural tail sits at the batch ceiling (90) forever, because the
+economy baseline is far past it by round 41. The tail varies its cast and
+nothing else. Options: author more rounds, raise the live-pathogen ceiling
+(a performance question — 150 is a serialized field on `PathogenSpawner`),
+or make the tail escalate by composition. Director call, and not urgent
+until someone plays past 40.
+
+### Round length is still a global constant
+`InvasionTuning.FoodItemTransitSeconds` (30s) sets how long every round
+takes. Bloons varies round length a lot, and a short frantic round is a real
+flavour this script cannot express — every one of the 40 takes the same
+time. Deliberately not added this sprint: transit time interacts with the
+adaptive arm's timers (DC round trips, lymphocyte lifespan, IgA accrual),
+so changing it per round needs those checked rather than assumed.
+
+### Still open from Sprint 32
+- **Astrovirus**, scoped under "Open after Sprint 32" — unchanged, and now
+  also the most valuable thing for the back half of the script.
+- **The structural gap behind the dead-upgrade pattern** (no harness can
+  read the shipped per-kind unit numbers).
+- **Degranulation × A/E *E. coli*** — unmeasured interaction.
+- **`docs/INTERFACE.md` was ten sprints stale** — Sprint 32 and 33 have
+  sections now, 22-31 still do not.
+- Kill limits on the other four kinds are unmeasured.
+- The Director has not playtested Sprint 32 or 33. Both sprints' claims are
+  harness-measured, not played.

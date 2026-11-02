@@ -1193,3 +1193,36 @@ thing to measure before this becomes routine.
   there at round 24. **Standing question for any new multiplier: what
   ceiling does this now reach, and what happens at it — a difficulty
   spike, or a hang?**
+
+### Sprint 33 -- 2026-11-02 (head session, Linux machine)
+
+- **Do the arithmetic on a curve before authoring content against it.**
+  Sprint 32's wall-pressure multiplier was designed, documented, verified
+  and shipped -- and one table of numbers (baseline x pressure against the
+  batch ceiling, rounds 1-40) showed it would flatten every round from 8
+  onward to an identical 90 organisms. Five minutes of multiplication before
+  writing 40 rounds, rather than after.
+- **A harness must not own a number it is not testing. Second instance.**
+  Sprint 32 found `Sprint18Verification` asserting `20 -> 28` as literals;
+  this sprint found Sprint 32's own spawner check hard-coding "round 5 is
+  the A/E E. coli round", which broke when the round table grew. The fix is
+  the same both times: *find* what you need (first round casting both
+  organisms; the fixture's own base plus the live constant) rather than
+  naming it. If a check breaks on a change that has nothing to do with what
+  it tests, that is the smell.
+- **When a lever is replaced one sprint after shipping, say so in the doc
+  rather than deleting the reasoning.** §5d's wall-pressure paragraph is
+  marked superseded with the mechanism that replaced it and why; the
+  reasoning behind it (the IgA miss was round design, not IgA strength) is
+  still correct and still load-bearing.
+- **Reference material is worth reading for its STRUCTURE, not its content.**
+  The useful thing in Bloons' round table was not which bloons appear where
+  -- it was that the same count delivered tightly is a different problem
+  from the same count spread out, which is a lever this game already had
+  (burst count) and was wasting as a global constant. The content analogy
+  (we have 6 organisms, it has 20) was the least transferable part.
+- **Assert the delivery, not the delivery setting.** "Bursts = 1" is a
+  number in a table; "88 organisms land in one lane of wall" is the claim.
+  Measuring it needed the lane recorded at SPAWN time, because lumen flow
+  smears lanes afterwards -- a later reading would have measured the flow
+  and passed regardless of the burst count.

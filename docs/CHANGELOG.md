@@ -1173,3 +1173,57 @@ by composition instead.
 **22 harnesses green. Astrovirus did not make it in** -- it needs a
 non-infecting virus path, a barrier interaction and a sprite pass, which
 is a sprint of its own rather than a tail end of this one.
+
+## Sprint 33 -- 2026-11-02
+Forty rounds, and the thing that makes them different from each other turned
+out not to be the pathogen list.
+
+**The round table.** Forty hand-authored rounds, each with its own cast,
+count and delivery shape. The curriculum from Sprint 32 holds across all of
+them: the three classes in rounds 1-3, then *Vibrio cholerae* at 6,
+rotavirus at 11, A/E *E. coli* at 15 -- one new organism at a time, never on
+the hardest round so far, and each one back within two rounds of its debut.
+Nothing new debuts in the last ten rounds; the back half is recombination.
+
+**Bursts are the real lever, and they're new.** Reading Bloons' round table,
+the thing that carries its back half isn't new bloon types -- it's grouped
+rushes: the same count delivered tightly is a completely different problem.
+The food bolus already dropped its cargo in bursts, but the count was a
+global constant, so every round arrived the same way. It's per-round now,
+and it's measured through the real spawner rather than trusted: **round 40's
+88 organisms land in ONE lane of wall; round 27's 52 spread across SEVEN.**
+Same mechanic, opposite problem. That is also the honest version of "wall
+pressure" -- organisms per clump, not organisms per round. It runs 4 at
+round 1, 17 by round 5, 33 by round 28, and 88 at round 40, where the whole
+batch arrives in a single burst.
+
+**Sprint 32's wall-pressure multiplier is gone from the script**, one sprint
+after it shipped, and arithmetic is why: the economy baseline (16, +6 a
+round) times a rising multiplier hits the batch ceiling of 90 at round 8, so
+rounds 8 through 40 would all have delivered exactly 90 organisms no matter
+how the multiplier was tuned. The whole back half of the curve would have
+been flat. Each round states its own count now -- which is what
+`GAME_DESIGN.md` §5d always said a real difficulty curve would need, and
+what Bloons does. The multiplier still drives the endless tail past 40.
+
+**You get told before it arrives.** The buy-phase caption already previewed
+the next round's tagline; it now also names any organism debuting in it
+("NEW: Vibrio cholerae"), which is Bloons' new-bloon callout. Rounds that
+introduce nothing stay quiet. And the taglines are now checked against the
+roster: a tagline naming an organism must deliver it, and no tagline may
+name an organism that isn't in the game. That is the Sprint 32 drift --
+taglines promising *Salmonella*, poliovirus and *Listeria* -- pinned so it
+can't come back.
+
+**The honest limit, stated plainly:** Bloons has about twenty bloon types by
+round 40 and this game has six organisms, three of them generic. Rounds
+20-40 differ by proportion, volume and delivery shape, not by new content.
+The three levers are worked as hard as they go, but the back half is a frame
+waiting for the ranked shortlist in `PATHOGEN_ROSTER.md` -- astrovirus, CMV
+as an actual boss for round 40's slot, norovirus, *Shigella*. Round 40 is
+currently made of concentration because the boss that belongs there isn't
+built.
+
+**24 verify methods, 869 checks, green.** Two older checks owned numbers they had
+no business owning and broke on the new table -- one hard-coded "round 5 is
+the E. coli round". Both now find what they need instead of naming it.

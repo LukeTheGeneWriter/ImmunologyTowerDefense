@@ -80,6 +80,17 @@ Last distilled: end of **Sprint 11** (2026-08-29), covering Sprints 1–11.
 
 ## Known points of difficulty (recurring — with the standing fix)
 
+- **A harness must not own a number it is not testing — three instances
+  now.** A check that hard-codes something incidental breaks on changes that
+  have nothing to do with it, and the breakage looks like a regression.
+  Seen as a tuning default (below), as upgrade arithmetic written out as
+  literals (`20 -> 28`, Sprint18Verification), and as a round index
+  (`RoundScript.ForRound(5)` as "the A/E E. coli round", Sprint32Verification
+  — which broke when the script grew from 6 rounds to 40). **Standing fix:**
+  *find* the thing — the first round casting the organism you care about,
+  the fixture's own base plus the live per-level constant — rather than
+  naming it. If a check fails on a change unrelated to its subject, it owns
+  a number it shouldn't.
 - **A harness assertion that leans on a tuning default breaks when a later
   sprint moves that default.** Hit at least 3× (Sprint 3 contact radius,
   Sprint 9 `AdhesionChanceAtWall` 0.12→0.30, Sprint 11

@@ -556,8 +556,23 @@ public static class Sprint32Verification
             prev = p;
         }
         Check("wall pressure never falls across the script", monotone);
-        Check($"the last scripted round leans on the wall harder than the first ({RoundScript.ForRound(RoundScript.ScriptedRounds).EffectiveWallPressure:F1}x vs 1.0x)",
-              RoundScript.ForRound(RoundScript.ScriptedRounds).EffectiveWallPressure > 1.4f);
+        // **Restated in Sprint 33.** This check used to assert that the
+        // last scripted round carried a pressure multiplier above 1.4x.
+        // That was true of the six-round script, where pressure WAS the
+        // difficulty curve. The 40-round script authors each round's count
+        // outright (RoundDefinition.Batch), because the multiplier times the
+        // economy baseline hits the batch ceiling at round 8 and would have
+        // flattened rounds 8-40 to an identical 90 organisms. Pressure is
+        // now the procedural tail's lever only, and the scripted curve is
+        // asserted in Sprint33Verification -- on the envelope of
+        // organisms-per-clump, which is what pressure at the wall actually
+        // means. Weakening a check silently is how dead features ship, so:
+        // the claim moved, it did not disappear.
+        int authored = 0;
+        for (int r = 1; r <= RoundScript.ScriptedRounds; r++)
+            if (RoundScript.ForRound(r).Batch > 0) authored++;
+        Check($"every one of the {RoundScript.ScriptedRounds} scripted rounds authors its own count, so the pressure multiplier is not the scripted curve any more ({authored} authored)",
+              authored == RoundScript.ScriptedRounds);
 
         // The procedural tail climbs and then stops climbing.
         float at50 = RoundScript.ForRound(50).EffectiveWallPressure;
@@ -622,12 +637,35 @@ public static class Sprint32Verification
         template.SetActive(false);
         spawner.Initialize(board, grid, field, gut, tally, template);
 
-        // Round 5: A/E E. coli is the headline, and three other organisms
-        // ride along. Driven with adhesion off so the batch washes through
-        // and nothing is removed from `Live` before it is counted.
+        // **Sprint 33: find the round, do not name it.** This check used to
+        // hard-code round 5, which was the A/E E. coli round in the
+        // six-round script and is a generic rush in the forty-round one --
+        // so it failed on a table edit that had nothing to do with what it
+        // tests. The same mistake Sprint18Verification made with the
+        // upgrade numbers. Pick the first round that casts both of the
+        // named organisms this check is about, and pass the round's
+        // AUTHORED batch, which is what the game now delivers.
+        //
+        // Adhesion is off so the batch washes through and nothing leaves
+        // `Live` before it is counted.
         InvasionTuning.AdhesionChanceAtWall = 0f;
-        var def = RoundScript.ForRound(5);
-        int batch = EconomyTuning.BatchForRound(5, def.EffectiveWallPressure, spawner.MaxLivePathogens);
+
+        int roundNumber = -1;
+        for (int r = 1; r <= RoundScript.ScriptedRounds && roundNumber < 0; r++)
+        {
+            bool hasAeec = false, hasRota = false;
+            foreach (var c in RoundScript.ForRound(r).Cast)
+            {
+                if (c.Weight <= 0f) continue;
+                if (c.Species == PathogenSpecies.AttachingEffacingEcoli) hasAeec = true;
+                if (c.Species == PathogenSpecies.Rotavirus) hasRota = true;
+            }
+            if (hasAeec && hasRota) roundNumber = r;
+        }
+
+        var def = RoundScript.ForRound(roundNumber);
+        int batch = EconomyTuning.BatchForRound(
+            roundNumber, def.EffectiveWallPressure, spawner.MaxLivePathogens, def.Batch);
         spawner.BeginRound(batch, def);
 
         var seen = new Dictionary<PathogenSpecies, int>();
@@ -649,13 +687,16 @@ public static class Sprint32Verification
         foreach (var kv in seen) names.Add($"{SpeciesRoster.ShortNameOf(kv.Key)} {kv.Value}");
         names.Sort();
 
-        Check($"the real spawner emitted the whole round-5 batch ({spawner.BatchEmitted} of {batch})",
-              spawner.BatchEmitted == batch);
+        int namedOnTheBoard = 0;
+        foreach (var kv in seen) if ((int)kv.Key >= (int)PathogenSpecies.Rotavirus) namedOnTheBoard += kv.Value;
+
+        Check($"the real spawner emitted the whole authored batch of round {roundNumber} ({spawner.BatchEmitted} of {batch})",
+              roundNumber > 0 && spawner.BatchEmitted == batch && batch == def.Batch);
         Check($"and what it put on the board is named organisms, not generics stamped out of a class: {string.Join(", ", names)}",
               seen.ContainsKey(PathogenSpecies.AttachingEffacingEcoli));
-        Check("A/E E. coli is the majority of a round that casts it at 3 of 6",
-              seen.TryGetValue(PathogenSpecies.AttachingEffacingEcoli, out int ae) && ae > batch / 3);
         Check("rotavirus rode along in the same batch", seen.ContainsKey(PathogenSpecies.Rotavirus));
+        Check($"and the named organisms are the majority of it ({namedOnTheBoard} of {spawner.BatchEmitted}), as that round's cast weights say",
+              namedOnTheBoard > spawner.BatchEmitted / 2);
         Check("and every organism on the board was cast by the round",
               AllCast(seen, def));
 
@@ -700,43 +741,60 @@ public static class Sprint32Verification
         int ceiling = Mathf.FloorToInt(LiveCap * EconomyTuning.MaxBatchShareOfLiveCap);
 
         int overCeiling = 0, underOne = 0;
-        int firstRawCrossing = -1, firstScaledCrossing = -1;
-        for (int r = 1; r <= 60; r++)
+        int firstRawCrossing = -1;
+        for (int r = 1; r <= 80; r++)
         {
             var def = RoundScript.ForRound(r);
-            int batch = EconomyTuning.BatchForRound(r, def.EffectiveWallPressure, LiveCap);
+            int batch = EconomyTuning.BatchForRound(r, def.EffectiveWallPressure, LiveCap, def.Batch);
             if (batch > ceiling) overCeiling++;
             if (batch < 1) underOne++;
 
-            int raw = EconomyTuning.BatchSizeForRound(r);
-            int scaled = Mathf.RoundToInt(raw * def.EffectiveWallPressure);
-            if (firstRawCrossing < 0 && raw > LiveCap) firstRawCrossing = r;
-            if (firstScaledCrossing < 0 && scaled > LiveCap) firstScaledCrossing = r;
+            if (firstRawCrossing < 0 && EconomyTuning.BatchSizeForRound(r) > LiveCap) firstRawCrossing = r;
         }
 
-        Check($"no round 1-60 asks for more pathogens than the board can hold (ceiling {ceiling} of a live cap of {LiveCap})",
+        Check($"no round 1-80 asks for more pathogens than the board can hold (ceiling {ceiling} of a live cap of {LiveCap})",
               overCeiling == 0 && underOne == 0);
-        Check($"and the hazard was real: unclamped, the raw curve alone passes the live cap at round {firstRawCrossing}, and with wall pressure at round {firstScaledCrossing}",
-              firstRawCrossing > 0 && firstScaledCrossing > 0 && firstScaledCrossing < firstRawCrossing);
 
-        // The curriculum must be untouched by the clamp -- if a scripted
-        // round were being clipped, the designed mix would be a lie.
+        // The hazard, restated for the Sprint 33 shape: the scripted rounds
+        // are authored under the ceiling and never need clamping, while the
+        // PROCEDURAL TAIL does -- the economy baseline is far past the live
+        // cap by round 41, so without the clamp every tail round would set a
+        // target the board cannot hold, and a food round that cannot finish
+        // emitting never ends.
+        var tail = RoundScript.ForRound(RoundScript.ScriptedRounds + 1);
+        int tailRaw = Mathf.RoundToInt(
+            EconomyTuning.BatchSizeForRound(RoundScript.ScriptedRounds + 1) * tail.EffectiveWallPressure);
+        int tailClamped = EconomyTuning.BatchForRound(
+            RoundScript.ScriptedRounds + 1, tail.EffectiveWallPressure, LiveCap, tail.Batch);
+        Check($"the clamp still earns its place: the first tail round would ask for {tailRaw} against a live cap of {LiveCap}, clamped to {tailClamped}",
+              tailRaw > LiveCap && tailClamped == ceiling);
+        Check($"and the raw economy curve crosses the live cap on its own at round {firstRawCrossing}, so the hazard was never the multiplier's fault alone",
+              firstRawCrossing > 0 && firstRawCrossing <= RoundScript.ScriptedRounds);
+
+        // No scripted round may be clipped -- a clipped round delivers a
+        // different count from the one the script authored, which would make
+        // the whole 40-round curve a lie.
         int clipped = 0;
         for (int r = 1; r <= RoundScript.ScriptedRounds; r++)
         {
             var def = RoundScript.ForRound(r);
-            int scaled = Mathf.RoundToInt(EconomyTuning.BatchSizeForRound(r) * def.EffectiveWallPressure);
-            if (EconomyTuning.BatchForRound(r, def.EffectiveWallPressure, LiveCap) != scaled) clipped++;
+            if (EconomyTuning.BatchForRound(r, def.EffectiveWallPressure, LiveCap, def.Batch) != def.Batch) clipped++;
         }
-        Check($"none of the {RoundScript.ScriptedRounds} scripted rounds is clipped by the ceiling, so the curriculum is delivered as designed",
+        Check($"none of the {RoundScript.ScriptedRounds} scripted rounds is clipped by the ceiling, so each delivers exactly the count it authors",
               clipped == 0);
 
         // Rounds 1-2 must still equal the bare economy number, which is what
         // RoundVerification and EconomyVerification assert.
-        Check("rounds 1 and 2 still equal the unscaled economy batch size exactly",
-              EconomyTuning.BatchForRound(1, RoundScript.ForRound(1).EffectiveWallPressure, LiveCap)
+        // Rounds 1 and 2 are authored to the SAME numbers the economy curve
+        // produced (16 and 22), deliberately: RoundVerification and
+        // EconomyVerification both assert the unscaled batch for those two
+        // rounds, and a tutorial round should not be crowded anyway.
+        Check("rounds 1 and 2 still deliver exactly the economy's batch size (16 and 22)",
+              EconomyTuning.BatchForRound(1, RoundScript.ForRound(1).EffectiveWallPressure, LiveCap,
+                                          RoundScript.ForRound(1).Batch)
                   == EconomyTuning.BatchSizeForRound(1)
-              && EconomyTuning.BatchForRound(2, RoundScript.ForRound(2).EffectiveWallPressure, LiveCap)
+              && EconomyTuning.BatchForRound(2, RoundScript.ForRound(2).EffectiveWallPressure, LiveCap,
+                                             RoundScript.ForRound(2).Batch)
                   == EconomyTuning.BatchSizeForRound(2));
 
         Check("a caller that does not know the ceiling (liveCap 0) gets the unclamped number",

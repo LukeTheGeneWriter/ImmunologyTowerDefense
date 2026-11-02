@@ -183,8 +183,21 @@ namespace ImmunologyTD.UI
             {
                 case RoundPhase.Building:
                 {
-                    string tag = RoundScript.ForRound(rounds.RoundNumber + 1).Tagline;
-                    caption.text = (string.IsNullOrEmpty(tag) ? "" : $"“{tag}”  ·  ") + "buy phase, time is frozen  ·  Space";
+                    // Sprint 33: this caption already previewed the NEXT
+                    // round's tagline, which is the game's "see what is
+                    // coming" affordance. It now also names any organism
+                    // debuting in that round -- Bloons puts its new-bloon
+                    // callout up before the round starts, and a first
+                    // encounter is the one thing a player most wants
+                    // warning of. Null for a round that introduces nothing,
+                    // so quiet rounds stay quiet.
+                    int nextRound = rounds.RoundNumber + 1;
+                    string tag = RoundScript.ForRound(nextRound).Tagline;
+                    string debut = RoundScript.DebutLabelFor(nextRound);
+                    caption.text =
+                        (string.IsNullOrEmpty(tag) ? "" : $"“{tag}”  ·  ")
+                        + (string.IsNullOrEmpty(debut) ? "" : $"{debut}  ·  ")
+                        + "buy phase, time is frozen  ·  Space";
                     break;
                 }
                 case RoundPhase.Active:

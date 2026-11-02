@@ -108,7 +108,8 @@ namespace ImmunologyTD.Rounds
             // numbers the harnesses assert still hold exactly.
             int batch = EconomyTuning.BatchForRound(
                 RoundNumber, def.EffectiveWallPressure,
-                spawner != null ? spawner.MaxLivePathogens : 0);
+                spawner != null ? spawner.MaxLivePathogens : 0,
+                def.Batch);
             CurrentTagline = def.Tagline;
             spawner?.BeginRound(batch, def);
 

@@ -2199,6 +2199,62 @@ here, though `ENGINE_STATUS.md` and `CHANGELOG.md` cover them. Sprint 32's
 section is written against the code as it actually is, but a reader should
 not treat the gap as "nothing changed". Backfilling it is in `BACKLOG.md`.
 
+## Sprint 33 changes — the 40-round script
+
+### `ImmunologyTD.Rounds.RoundDefinition`
+
+- `int Batch` (new) — **how many organisms this round delivers**, authored
+  per round. 0 falls back to the economy baseline × `WallPressure`, which is
+  what the procedural tail uses.
+- `int Bursts` (new) — how the batch arrives: the number of clumps the food
+  bolus drops as it transits. 0 means `InvasionTuning.FoodItemBurstCount`
+  (4).
+- `int EffectiveBursts`, `float OrganismsPerClump` (= `Batch ÷
+  EffectiveBursts`) — the quantity the difficulty envelope is built on.
+- `WallPressure` still works and is unchanged, but **no scripted round uses
+  it any more**; it is the procedural tail's volume lever.
+
+### `ImmunologyTD.Rounds.RoundScript`
+
+- 40 scripted rounds (was 6). `ScriptedRounds` reports it.
+- `PathogenSpecies[] DebutsInRound(int round)` (new, pure) — organisms making
+  their first scripted appearance in that round, roster order; empty past the
+  script.
+- `string DebutLabelFor(int round)` (new) — the player-facing callout
+  (`"NEW: Vibrio cholerae"`), or **null** for a round that introduces
+  nothing.
+
+### `ImmunologyTD.Economy.EconomyTuning`
+
+- `BatchForRound(int roundNumber, float wallPressure, int liveCap, int authoredBatch = 0)`
+  — the optional fourth argument is the round's authored count and wins over
+  baseline × pressure. The ceiling clamp still applies last, and no scripted
+  round is close to it (max authored batch 88, ceiling 90).
+
+### `ImmunologyTD.Pathogens.PathogenSpawner`
+
+- `BeginRound` resolves the round's burst count **once**, into
+  `foodBurstCount`, instead of `AdvanceFood` reading the global tuning every
+  frame — so a mid-round tuning change cannot alter a burst schedule that is
+  already part-delivered.
+- `int FoodBurstCount` (new getter) — bursts for the round in progress.
+
+### `ImmunologyTD.UI.HudView`
+
+- The buy-phase caption already previewed the *next* round's tagline; it now
+  also appends `RoundScript.DebutLabelFor(nextRound)` when that round
+  introduces an organism. Quiet rounds stay quiet (the label is null).
+
+### Verification
+
+`Assets/Editor/Sprint33Verification.cs` — 41 checks: the table is fully
+authored, taglines promise only organisms that exist *and* deliver what they
+name, debuts arrive one at a time and never on the hardest round so far,
+everything recurs at least five times, the envelope rises while individual
+rounds dip, and — measured through the real spawner rather than read back
+out of the table — a one-burst round lands its organisms in **1 lane** of
+wall against **7** for a seven-burst round.
+
 ## Open questions for whoever builds on this next
 
 1. **~~Coarse `Row` vs. the four-compartment depth-5 model~~ — RESOLVED by

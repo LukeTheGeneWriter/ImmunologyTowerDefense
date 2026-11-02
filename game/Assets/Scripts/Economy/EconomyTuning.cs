@@ -167,10 +167,17 @@ namespace ImmunologyTD.Economy
         /// Pure and static so a harness can assert the property across the
         /// whole round range rather than playing to round 11 to find out.
         /// </summary>
-        public static int BatchForRound(int roundNumber, float wallPressure, int liveCap)
+        public static int BatchForRound(int roundNumber, float wallPressure, int liveCap,
+                                       int authoredBatch = 0)
         {
+            // Sprint 33: a scripted round states its own count (see
+            // RoundDefinition.Batch). The baseline-times-pressure path below
+            // is what the procedural tail past the script uses, and what
+            // every round used before the 40-round script existed.
             float pressure = wallPressure <= 0f ? 1f : wallPressure;
-            int scaled = Mathf.RoundToInt(BatchSizeForRound(roundNumber) * pressure);
+            int scaled = authoredBatch > 0
+                ? authoredBatch
+                : Mathf.RoundToInt(BatchSizeForRound(roundNumber) * pressure);
 
             if (liveCap > 0)
             {

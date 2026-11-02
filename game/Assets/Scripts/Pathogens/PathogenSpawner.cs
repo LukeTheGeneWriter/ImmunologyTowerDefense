@@ -80,6 +80,14 @@ namespace ImmunologyTD.Pathogens
         private bool foodActive;
         private bool foodExited;
         private RoundDefinition foodDef;
+
+        /// <summary>Sprint 33: bursts for the round in progress, resolved at
+        /// BeginRound from the round definition. 0 outside a food round.</summary>
+        private int foodBurstCount;
+
+        /// <summary>Read-only, for the HUD and the harness: how many bursts
+        /// the round in progress delivers its batch in.</summary>
+        public int FoodBurstCount => foodBurstCount;
         private int foodAxisIndex;   // distance-from-base index, held near the wall
         private int foodCrossIndex;  // position along the flow -- this is what advances
         // Sprint 19: seconds since the bolus entered, and lanes stepped so
@@ -142,6 +150,10 @@ namespace ImmunologyTD.Pathogens
             batchTarget = count < 0 ? 0 : count;
             batchEmitted = 0;
             burstsDone = 0;
+            // Sprint 33: the round says how its cargo arrives. Resolved once
+            // here rather than read per frame, so a mid-round tuning change
+            // cannot alter a burst schedule already part-delivered.
+            foodBurstCount = Mathf.Max(1, def.EffectiveBursts);
             foodElapsed = 0f;
             foodStepsTaken = 0;
             foodLaneFraction = 0f;
@@ -356,7 +368,9 @@ namespace ImmunologyTD.Pathogens
             // Burst schedule: bursts k = 1..FoodItemBurstCount fire at
             // travelled-fractions k / (FoodItemBurstCount + 1), so they land
             // through the middle of the transit rather than at the ends.
-            int burstCount = Mathf.Max(1, InvasionTuning.FoodItemBurstCount);
+            int burstCount = foodBurstCount > 0
+                ? foodBurstCount
+                : Mathf.Max(1, InvasionTuning.FoodItemBurstCount);
             float travelled = Mathf.Abs(foodCrossIndex - board.LumenEntryCrossIndex) / (float)lanes;
             while (burstsDone < burstCount
                    && travelled >= (burstsDone + 1) / (float)(burstCount + 1))
