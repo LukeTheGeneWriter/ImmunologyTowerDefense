@@ -1,4 +1,4 @@
-# Session Handoff — 2026-11-02 (Sprint 34: five research passes, and the rotavirus corrections)
+# Session Handoff — 2026-11-03 (after Sprint 34 and the Director's playtest)
 
 A checkpoint written by the head session. **This is a living file:
 overwrite it at the next checkpoint rather than accumulating dated
@@ -6,7 +6,46 @@ copies.** It is not one of `WORKFLOW.md` §3's canonical docs; if it
 contradicts `SPRINT_PLAN.md`, `ENGINE_STATUS.md` or `INTERFACE.md`, those
 win.
 
-## First: which machine are you on?
+## START HERE — what the next sprint is
+
+**The Director played the build and the game said nothing to him.** That is
+the whole top of the queue, and it outranks the ten-organism expansion that
+Sprint 34 spent its time specifying.
+
+> "I gave it a play test, and did not see any messages for the rounds or
+> showcases of a new pathogen and what it does. I didn't ask for that last
+> part."
+
+1. **Fix the round messages.** Sprint 33 shipped a buy-phase caption that
+   previews the next round's tagline and names any debuting organism.
+   **41 harness checks are green on it and the player sees neither.**
+2. **Then build the pathogen showcase** — designed in
+   `ROSTER_EXPANSION_SPEC.md` §4.2–4.4, unbuilt. The Director noted he had
+   not asked for it, so it is a feature rather than a regression, but it is
+   the surface **eight of the ten proposed organisms depend on**.
+
+Order matters: a showcase built on a caption that does not display would be
+invisible too.
+
+**What is already ruled out, so you do not spend the time twice:** the
+obvious cause — `ApplyPhase` never firing on the opening buy phase — is
+**wrong**. `builtForPhase` is initialised to `(RoundPhase)(-1)`, so the
+first frame always triggers it. Candidates, to be **measured and not
+assumed**: `caption`'s visibility/layout inside `topRight` (it is added to
+`Root` but never passed to `UiTheme.Show`); a later `ApplyPhase`
+overwriting the text in the same frame; HUD scale clipping the line in the
+WebGL build.
+
+**The deeper fix is a harness capability that does not exist.** Nothing in
+`Assets/Editor` asserts on a UI element's state. A check that drives a real
+`RoundController` through Building → Active → Building and reads
+`caption.text` would have caught this. **This is the eighth instance of the
+standing pattern and the first on the UI side of the boundary**: the
+harness asserts a value is *returned*, nothing asserts it is *displayed*. A
+verified string written into a `Label` the player never reads is the same
+defect as a value never read at all.
+
+## Which machine are you on?
 
 | | Windows | Linux (CachyOS) |
 |---|---|---|
@@ -21,149 +60,130 @@ win.
 **The Windows machine still needs Unity `6000.6.4f1`** (via the Hub, with
 "Web Build Support") before it opens the project.
 
-## What this session was
+**State as of this handoff:** `main` at Sprint 34, 25 verify methods / 889
+checks green, WebGL Succeeded at 9,319,617 bytes with 0 errors. **The local
+web server is stopped** — restart it with `tools/serve_webgl.py` when you
+need to hand over a playable build.
+
+## What Sprint 34 was
 
 **Mostly research.** The Director asked for ten more common gut pathogens
-with sprites and warning messages, and explicitly sanctioned "some are just
-stronger bacteria or viruses". Five research passes ran in parallel; two of
-their findings were about an organism already shipped, so those were fixed
-in code. **The ten are specified, not built.**
+with sprites and warning messages, and sanctioned *"some are just stronger
+bacteria or viruses"* — which closed a real hole, because the roster's
+mechanics-only rule had been excluding the world's #2 and #5 enteric
+pathogens for being ordinary.
 
-### The deliverables
+**Nothing new is built.** The ten are specified, with four engineering
+gates in front of them.
 
 | What | Where |
 |---|---|
-| The ten organisms, sprite specs, warning messages, engineering gates | **`docs/ROSTER_EXPANSION_SPEC.md`** — start here |
-| Protozoa (a kingdom no earlier pass looked at) | `docs/research/pathogens_protozoa.md` |
-| Helminths + the type-2 arm the game has no towers for | `docs/research/pathogens_helminths.md` |
-| Common bacteria, re-ranked by prevalence | `docs/research/pathogens_bacteria_common.md` |
-| Viruses extended; three deep dives closed | `docs/research/pathogens_viruses_02.md` |
-| Cross-cutting burden, so "common" is GBD/GEMS/MAL-ED numbers | `docs/research/enteric_burden.md` |
-| How the body learns about *Giardia* (the Director's follow-up) | `docs/research/giardia_antigen_route.md` |
+| The ten, their sprites, their warnings, the gates | **`docs/ROSTER_EXPANSION_SPEC.md`** |
+| An index of all 19 research passes + the findings that changed built code | **`docs/research/README.md`** |
+| The passes themselves | `docs/research/` |
 
-~5,500 lines, every claim PubMed- or Consensus-verified in session, gaps
-marked **UNVERIFIED** rather than filled in, mouse findings labelled mouse.
+### The code that did change
 
-## Two Director rulings landed
+Rotavirus, which the game had been playing as an ordinary lytic virus
+arriving at an ordinary dose. Both corrections are real biology:
 
-1. **Colonic is fine.** The anatomy rule that rejected *C. difficile* was
-   quietly costing **four of the most common gut pathogens in the world** —
-   *Shigella*, *Campylobacter*, *Entamoeba histolytica* and *Trichuris*.
-   Anatomy is now a recorded note, not a veto; §1a's bands are a generic
-   mucosal cross-section. Recorded in `PATHOGEN_ROSTER.md`. **This opens a
-   new head of the shortlist that no pass has ranked**, led by *Entamoeba*,
-   which answers two of the five standing "no answer in the roster" gaps.
-2. **Fix rotavirus** (below).
+- **Non-lytic exit** — ~100% release with no permeability change at 72 h,
+  so an ignored focus never bursts. It stays self-limiting via the crypt
+  repaving under its villus-tip tropism, which is closer to how rotavirus
+  actually resolves clinically.
+- **Vesicle dose** — one arriving unit is already a dose.
+  `PlaqueCrowdWeight` is capped at **1.9**, below the ingress floor of 2.0,
+  because §1b Step 2 property 2 is locked and load-bearing and the measured
+  ~3.5× would have let a lone virion charge a plaque. Rotavirus's minimum
+  dose is now **two organisms where a generic virus needs three** — exactly
+  the per-species knob §1b Step 2 said the floor would become.
+- **And budding had never been per-species** — a coin flip for 29 sprints,
+  with the code's own comment admitting "there is no species roster yet",
+  untrue since Sprint 24. Seventh instance of the pattern.
 
-## Sprint 34 — what changed in the engine
+## Two Director rulings to respect
 
-Three new `SpeciesProfile` fields, all zero-is-neutral, so an un-opted-in
-species behaves exactly as before. Full signatures in `INTERFACE.md`.
-
-| Change | Why |
-|---|---|
-| `SpeciesProfile.Exit` + the `ViralExit` enum | §4b's "two per-species modes" was a **coin flip** |
-| `NonLyticReleaseFraction` | rotavirus does not lyse the cell, so its focus never bursts |
-| `PlaqueCrowdWeight` + `SpeciesRoster.CrowdWeightOf` | rotavirus arrives in vesicles: one unit is already a dose |
-| `PathogenAgent.VirusBuds` / `.WillBurnOut` (read-only) | so a harness can assert the property, not a proxy |
-
-**Budding had never been per-species — seventh instance of the standing
-pattern.** §4b has specified two per-species spread modes since Sprint 5;
-`AssignVirusTraits` picked with `Random.value` and its own comment admitted
-"there is no species roster yet", which stopped being true in Sprint 24.
-
-**The crowd weight is capped below the ingress floor on purpose.**
-Rotavirus's measured vesicle multiplier is ~3.5x. §1b Step 2 property 2 is
-locked and load-bearing — "a trickle is arithmetically impossible, not
-merely unlikely" — and 3.5 against a floor of 2.0 would let a lone virion
-charge a plaque and delete it. The weight is **1.9**, which makes
-rotavirus's minimum dose **two organisms where a generic virus needs
-three** — the per-species knob §1b Step 2 always said the floor would
-become. Mechanism literal, magnitude abstracted.
-
-**Rotavirus is still self-limiting**, but by the crypt repaving under its
-villus-tip tropism rather than by burn-out. The two traits it already had
-compose, and that is closer to how rotavirus actually resolves — by
-epithelial replacement, not by the virus exhausting itself.
+1. **Colonic is fine** (2026-11-02). The anatomy rule had been quietly
+   costing four of the most common gut pathogens in the world. It is a
+   recorded note now, not a veto, and §1a's bands are a generic mucosal
+   cross-section. **This reopens the shortlist**, and the organisms it
+   unlocks are unranked because the ruling landed after the ten were
+   chosen: *Entamoeba histolytica* first (its trogocytosis answers **two**
+   of the five standing "no answer in the roster" gaps), then *Shigella*,
+   *Campylobacter*, *Trichuris*, *C. difficile*, ETBF.
+2. **"Some are just stronger" is sanctioned.** Two of the ten are explicit
+   tier slots (sapovirus, ETEC) rather than organisms with invented powers.
 
 ## Numbers worth keeping
 
-- Four organisms crowd **1.9x harder as rotavirus** — 7.019 against 3.694 —
-  through the real `GutWall`.
-- **Two rotavirus clear the ingress floor (3.8 > 2.0); two ordinary virions
-  do not (2.0 ≤ 2.0).**
+- Four organisms crowd **1.9× harder as rotavirus** — 7.019 against 3.694 —
+  through the real `GutWall`. **Two rotavirus clear the ingress floor
+  (3.8 > 2.0); two ordinary virions do not (2.0 ≤ 2.0).**
 - **No rotavirus focus burns out** (0/100). An ordinary virus still does
   (32/100 ≈ 30%), unchanged.
-- A cross-linked rotavirus raft crowds **nothing** — the IgA resolution
-  survives the dose multiplier.
 - **The antigen barcode holds at most 12 species** at the shipped match
   radius (constructed 12, Hamming ceiling 18). At r=3 it holds exactly
-  **two** — a Plotkin bound, not a search limit. A 16-species roster needs
-  **12 bits**, and a generated 16-tag set at minimum distance 6 is in the
-  spec ready to paste.
-- **Norovirus's knowledge knock-back is ×0.3 with a floor at the ~10% CTL
-  rung** — only ~30% of antibody blockade survives one variant
-  replacement, while the HLA class-I epitopes are conserved.
+  **two** — a Plotkin bound. A 16-species roster needs **12 bits**, and a
+  generated 16-tag set at minimum distance 6 is in the spec ready to paste.
+- **Norovirus's knock-back is ×0.3 with a floor at the ~10% CTL rung** —
+  only ~30% of antibody blockade survives a variant replacement, while the
+  HLA class-I epitopes are conserved.
 
-## Open, in rough priority order
+## Open, in priority order
 
-Full detail in `BACKLOG.md` under "Open after Sprint 34".
+Full detail in `BACKLOG.md`, which now opens with "Next sprint — Director's
+playtest, 2026-11-03".
 
-1. **The Director has now skipped three playtests.** Sprints 32, 33 and 34
-   are harness-measured, not played. Nothing is known about whether the
-   40-round curriculum *reads* as teaching, whether a one-burst round 40 is
-   exciting or a wall of sprites, or whether IgA is perceptible.
-2. **Four gates before any new species ships**, all in the spec's §5:
-   widen the barcode to 12 bits; build a per-species sprite path (there is
-   none — `PathogenAgent` picks from `Class`, two sprites for the whole
-   roster); make the knowledge HUD scale past six species; allow a
-   pathogen's sprite to change mid-board (four of the ten need it).
-3. **"Shed antigen" is designed and unbuilt** — how the body learns about
-   *Giardia*. The parasite sheds its own antigen in extracellular vesicles,
-   human DCs capture and mature on them, and **antibody binding triggers a
-   massive release**, so attacking it is what makes it teachable. Carried by
-   either sampler already built. Recorded as an amendment under §1c:
+1. **The round messages** and then **the showcase** (top of this file).
+2. **The three playtest questions are still unanswered** — the session went
+   on the messaging gap. Does the 40-round curriculum read as teaching; is
+   a one-burst round 40 exciting or a wall of sprites; is IgA perceptible
+   now that wall pressure climbs.
+3. **The four gates** before any new organism ships (spec §5): widen the
+   barcode to 12 bits; build a per-species sprite path (there is none —
+   `PathogenAgent` picks from `Class`, two sprites for the whole roster, so
+   rotavirus has rendered as a generic ball since Sprint 24); make the
+   knowledge HUD scale past six species; let a pathogen's sprite change
+   mid-board.
+4. **"Shed antigen" is designed and unbuilt** — how the body learns about
+   *Giardia*. The parasite sheds its own antigen in extracellular vesicles
+   and **antibody binding triggers a massive release**, so attacking it is
+   what makes it teachable. Both carriers already exist. §1c is amended:
    **debris is one input, not the only one.** Needs a Director decision.
-4. **Nontyphoidal *Salmonella* should lead its own sprint** — more common
-   than five of the chosen ten, but its mechanic is a change to §4a's
-   advance rules (the infected enterocyte is *extruded into the lumen*).
-5. **Corrections to standing design** that touch built code: the built
-   *V. cholerae* actively swims (non-chemotactic mutants out-compete wild
-   type); §4a's "parasites don't hide / cleared by combat damage" is wrong
-   for every helminth; adenovirus F41 must not be built as a cliff;
-   norovirus's 2–4 year cycle is historical only.
-6. **§4a's parasite class is over-specified** — no enteric protozoan needs
-   the multi-slot footprint `BACKLOG` calls "more engineering than the
-   other three classes combined". Single slot with a size multiplier;
-   defer the footprint to helminths.
-7. **`docs/INTERFACE.md`** now has a Sprint 34 section, but the ten-sprint
-   backfill (Sprints 22–31) is still missing.
+5. **Nontyphoidal *Salmonella* should lead its own sprint** — more common
+   than five of the chosen ten, but its mechanic changes §4a's advance
+   rules (the infected enterocyte is *extruded into the lumen*).
+6. **Corrections that touch built code**: the built *V. cholerae* actively
+   swims; §4a's "parasites don't hide / cleared by combat damage" is wrong
+   for every helminth; adenovirus F41 must not be a cliff; norovirus's 2–4
+   year cycle is historical only.
+7. **`docs/INTERFACE.md`** has Sprint 32/33/34 sections, but the backfill
+   for Sprints 22–31 is still missing — a `WORKFLOW.md` §5.3 checkbox that
+   was ticked without being true.
 
-## Traps this session hit
+## Traps worth carrying forward
 
-- **A harness assertion was wrong, and had been passing on luck.**
-  `Sprint32Verification` asserted "the named organisms are the **majority**"
-  of the round it finds. That round is 20, whose cast is 2/2/1/2/2/1 — so
-  the named organisms are expected to be **exactly half**, and whether a
-  58-organism sample lands above or below is a coin flip. A Sprint 34 change
-  to how many random numbers a rotavirus spawn consumes moved the RNG stream
-  and it read 24 of 58. It now computes the expectation from the round's own
-  cast weights and allows 3σ of sampling error at the emitted batch size —
-  an observed zero is ~7.6σ away, so it still fails loudly if a named
-  organism stops reaching the board. **Third instance of a harness owning a
-  number it is not testing.**
-- **A vacuity guard earned its keep immediately.** `Sprint34Verification`'s
-  first run established 0 of 200 rotavirus infections, because the harness
-  had collected host slots at the **crypt** end — which the villus-tip
-  tropism correctly forbids. Without the "the test is not vacuous" check it
-  would have reported a clean zero burn-out rate from zero infections.
-- **A long anchor is a fragile anchor.** Two doc patches missed because the
-  anchor text had been re-wrapped since it was read. Short unique anchors,
-  verified with `grep -c` first, and a patcher that writes nothing unless
-  every anchor matches.
-- **Two research passes disagreed about sapovirus, and both were right.**
-  The burden pass ranks it #2 in the world; the viral pass says it is not
-  significantly attributable in a high-income case–control series and that
-  its post-vaccine rise is relative, not absolute. Different populations.
-  The resolution was the Director's "some are just stronger" instruction: it
-  earns a **tier** slot, not a mechanic slot.
+- **A green harness is not a working feature.** Sprint 33's caption had 41
+  checks and reached no pixel. **Ask where the value is consumed, and
+  whether anything asserts on the consumer.** That question has now found
+  eight defects in this project.
+- **A harness assertion whose threshold sits near its expected value is a
+  coin flip, not a test.** `Sprint32Verification` asserted that named
+  organisms are the *majority* of round 20, whose cast makes them exactly
+  **half**. It passed on luck for two sprints until a Sprint 34 change to
+  RNG consumption moved the stream. It now derives the expectation from the
+  round's own cast weights with a 3σ tolerance at the emitted batch size.
+  Fourth instance of a harness owning a number it is not testing.
+- **Put a vacuity guard next to any count-based assertion.**
+  `Sprint34Verification`'s first run established 0 of 200 infections,
+  because the harness collected host slots at the **crypt** end — which
+  rotavirus's tropism correctly forbids. Without the guard it would have
+  reported a clean zero burn-out rate from zero infections.
+- **A long patch anchor is a fragile anchor**, and inserting after a
+  *paragraph* in a Markdown list walks past sibling bullets. Short unique
+  anchors, `grep -c` first, and a patcher that writes nothing unless every
+  anchor matched.
+- **Two research passes disagreeing can be a finding.** Sapovirus is #2 in
+  the world by one metric and not significantly attributable by another;
+  both are right about different populations. Smoothing it over would have
+  destroyed the information.

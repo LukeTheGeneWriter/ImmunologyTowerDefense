@@ -107,3 +107,68 @@ is working and the rounds are not yet asking anything of it.
 He will **suggest new cell types and upgrades**, and wants the current
 upgrade behaviour reviewed alongside. Open the next session by asking him
 about both.
+
+## Sprint 34 — 2026-11-03 (Director)
+
+**The first playtest in three sprints.** Sprints 32, 33 and 34 had all been
+handed off harness-measured but unplayed, which was flagged each time; this
+is the session that closed that gap, and it immediately found something no
+harness had.
+
+### What the Director reported, verbatim
+
+> "I gave it a play test, and did not see any messages for the rounds or
+> showcases of a new pathogen and what it does. I didn't ask for that last
+> part."
+
+Two separate items, and he separated them himself.
+
+### 1. The round messages do not reach the player — A BUG
+
+**Sprint 33 shipped a buy-phase caption** that previews the next round's
+tagline ("Raw oysters, *Vibrio cholerae*") and names any organism debuting
+in that round ("NEW: *Vibrio cholerae*"). `Sprint33Verification` has 41
+checks green on it, including the debut callouts. **The Director saw
+neither.**
+
+This is the Sprint 32/33 pattern again, one layer further out: the harness
+asserts that `RoundScript.DebutLabelFor` and `ForRound().Tagline` return the
+right strings, and **nothing asserts that the string reaches a pixel.**
+A verified value written into a `Label` that the player never reads is the
+same class of defect as a value never read at all — the eighth instance,
+and the first one on the UI side of the boundary.
+
+**Ruled out already:** the obvious cause, that `ApplyPhase` never fires on
+the opening buy phase, is **wrong** — `builtForPhase` is initialised to
+`(RoundPhase)(-1)`, so the first frame always triggers it. The cause is
+further in and was deliberately not chased, because the Director asked for
+this recorded rather than fixed. Candidates for whoever picks it up:
+`caption`'s visibility/layout inside `topRight` (it is added to `Root` but
+never passed to `UiTheme.Show`), whether its text is being overwritten by a
+later `ApplyPhase` in the same frame, and whether the WebGL build's HUD
+scale clips the line. **Do not assume it is one of these** — measure which
+of the three it actually is before changing anything.
+
+### 2. A pathogen showcase — NOT a bug, and not previously asked for
+
+The Director noted this himself: *"I didn't ask for that last part."* The
+three-line debut card (vehicle → name + sprite at large size → the one thing
+that will not work) is **designed in
+`docs/ROSTER_EXPANSION_SPEC.md` §4.2–4.4 and unbuilt**. It is the right
+answer to "what does this new pathogen do", and it is also the surface most
+of the ten proposed organisms depend on, since eight of them have a special
+power the player cannot infer from a silhouette.
+
+**Both are next-sprint material.** Fix (1) first: a showcase built on top of
+a caption that does not display would be invisible too.
+
+### What was NOT learned, and is still open
+
+The three playtest questions carried since Sprint 32 remain unanswered,
+because the session was spent on the messaging gap:
+
+- Does the 40-round curriculum **read** as teaching?
+- Is a one-burst round 40 exciting, or a wall of sprites?
+- Is IgA perceptible now that wall pressure climbs? (The Sprint 22 miss was
+  diagnosed as round design, and the 40-round script is the fix being
+  tested.)

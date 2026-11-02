@@ -1361,3 +1361,37 @@ list; these are the things that gate or follow it.
   disagreeing — recorded as unresolved), abolished by high glucose via
   SGLT-1, and no in vivo rate exists. Not enough to carry the knowledge
   ladder, which is why the EV route is the answer.
+
+## Next sprint — Director's playtest, 2026-11-03
+
+**These two are the head of the queue, ahead of everything above.** Full
+report in `PLAYTEST_LOG.md`.
+
+1. **BUG — the round messages never reach the player.** Sprint 33's
+   buy-phase caption previews the next round's tagline and names any
+   debuting organism; 41 harness checks are green on it and **the Director
+   saw neither in play**. Eighth instance of the standing pattern and the
+   first on the UI side: the harness asserts the string is *returned*,
+   nothing asserts it is *displayed*.
+   - **Already ruled out:** `ApplyPhase` not firing on the opening buy
+     phase. `builtForPhase` is `(RoundPhase)(-1)`, so the first frame always
+     triggers it.
+   - **Candidates, to be measured not assumed:** `caption`'s
+     visibility/layout in `topRight` (added to `Root`, never passed to
+     `UiTheme.Show`); a later `ApplyPhase` overwriting the text in the same
+     frame; HUD scale clipping the line in the WebGL build.
+   - **The harness gap is the real fix.** A check that reads
+     `caption.text` after driving a real `RoundController` through
+     Building → Active → Building would have caught this. Nothing in
+     `Assets/Editor` asserts on a UI element's rendered state today, so this
+     is a new harness capability, not another check.
+2. **The pathogen showcase — designed, unbuilt** (`ROSTER_EXPANSION_SPEC.md`
+   §4.2–4.4). The Director flagged that he had not asked for it, so it is a
+   feature, not a regression. It is also the surface **eight of the ten
+   proposed organisms depend on**, because their special powers cannot be
+   inferred from a 20 px silhouette. Build it *after* (1) — a showcase on
+   top of a caption that does not display would be invisible too.
+
+**Still unanswered after this playtest**, because the session went on the
+messaging gap: does the 40-round curriculum read as teaching, is a one-burst
+round 40 exciting or a wall of sprites, and is IgA perceptible now.
