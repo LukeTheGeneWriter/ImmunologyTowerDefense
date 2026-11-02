@@ -1524,6 +1524,53 @@ re-emission (a fresh random tag each time) *and* the round boundary. The
 `CytokineField` inside the node). Every number is a placeholder. See
 `ENGINE_STATUS.md` and `SPRINT_PLAN.md`.
 
+### Reworked — Sprint 32: the round is a CURRICULUM (2026-11-02)
+
+Sprint 9's round definition carried three **class** weights, which was
+right when there were three pathogen classes and nothing else. Sprints
+24-25 then named species, and this section was never revisited — with a
+consequence nobody saw for eight sprints: a round rolled a class, a bare
+class resolves to the *generic* species of that class, and so **rotavirus,
+*Vibrio cholerae* and A/E *E. coli* could not appear in play at all.** Three
+organisms with working traits, sprites and knowledge-HUD rows, unreachable.
+Meanwhile the taglines promised *Salmonella*, poliovirus and *Listeria*,
+none of which are in the roster.
+
+A round now carries a **cast of species** (`RoundDefinition.Cast`), and
+three rules govern the order:
+
+1. **One new organism at a time, against a board the player already
+   understands.** Knowledge is per species (§5c), so round order *is*
+   teaching order.
+2. **Organisms RECUR once introduced.** This is the rule that is easy to
+   miss and expensive to get wrong: the adaptive rungs fire per species
+   (secretory IgA at 70% knowledge of *that* organism), so a parade of
+   novelties keeps every species below its rungs forever and the whole
+   adaptive arm stays dark. That is very close to what the Sprint 22
+   playtest actually reported.
+3. **Wall pressure rises** (`RoundDefinition.WallPressure`, a multiplier on
+   the batch size the economy sets). This is the lever for the Sprint 22
+   IgA miss. The Director never perceived IgA, and the diagnosis was
+   explicitly *not* that IgA is too weak: IgA acts in the lumen, so if the
+   tissue defence clears everything before pressure builds at the wall, the
+   player never sees what IgA prevents. **A defence against a problem you
+   never have is invisible by construction.** Rounds 1-2 stay at 1.0; the
+   script climbs to 1.7 by round 6 and the procedural tail is capped at
+   2.5, because past that the lumen simply saturates.
+
+The shipped curriculum: **R1** gut bacteria alone — adhesion, the mill,
+macrophages eat. **R2** adds the other two classes. **R3** *Vibrio
+cholerae*, the gentlest named organism to meet first because it never kills
+a cell and never takes a slot; its lesson is that looking for dying cells
+is not enough. **R4** rotavirus — *where* a thing can reach starts to
+matter. **R5** A/E *E. coli*, deliberately last and on a crowded wall,
+because it respires the products of the player's own response and should
+land on someone who has settled into a routine. **R6** everything the
+player has met, no novelty, at pressure.
+
+`RoundScript`'s class weights still work for a definition with no cast, so
+the Sprint 9 behaviour is intact for the harnesses that test the roll.
+
 ## 6. Tissue recovery and fibrosis — LOCKED in principle
 
 Host cells refill damaged coordinates between rounds. Damage is inevitable
@@ -1743,6 +1790,46 @@ Numbers (max active children, neutrophil kill-count limit, macrophage
 kill-count limit, degranulation collateral damage, contact radius) are
 tuning values, not derived — see `docs/SPRINT_PLAN.md` for the Sprint 3
 starting figures and `BACKLOG.md` for what's still open.
+
+### Innate cells DO turn over — Sprint 32 (Director, 2026-11-02)
+
+The question §6d left open: innate cells die **only** on reaching their
+kill limit, so a cell that never reaches it lives forever. Sprint 29
+suspected the kill-limit upgrade rows were therefore inert, Sprint 31
+measured it, and the Director's call this sprint was **yes, they should
+turn over** — which makes it a mechanic rather than a number.
+
+Measured first (`KillLimitDiagnostic`, with the ceiling lifted so the
+distribution is visible rather than censored, and a deliberately generous
+supply of targets so the numbers are an upper bound):
+
+| | per 45s round | per three rounds |
+|---|---|---|
+| Macrophage | median 2, best 4 | median 9, best 15 |
+| Neutrophil | median 3, best 7 | median 11, best 19 |
+
+So the macrophage's ceiling of **20 never bound at all** — 0 retirements
+even over three rounds. **The neutrophil's ceiling of 5 did bind across
+rounds, just not inside one**, which is a correction to the standing
+"both rows are inert" claim: that came from a single-round measurement.
+
+Shipped: **macrophage 20 → 5**, **neutrophil 5 → 3**, and the upgrade
+steps resized against the new bases (+2/level over 3 levels, and
++1/level over 4). Consequences, both deliberate:
+
+- **A neutrophil's death is not an accounting event** — it degranulates,
+  with collateral damage at its own slot. Turnover therefore makes
+  "Controlled degranulation" a live purchase for the first time, and makes
+  a neutrophil-heavy defence genuinely messy. That is the trade the
+  biology charges, and it interacts directly with A/E *E. coli*, which
+  respires the products of that mess — reachable from this sprint onward.
+- **The marrow and the economy get an ongoing job.** Replacement runs at
+  the emission interval rather than instantly (§6d's rate cap), so a line
+  that burns out costs real time to rebuild.
+
+The standing population still recovers to its cap — verified, because the
+warning on this change was that it thins the board on top of Sprint 31's
+dispersal.
 
 ## 7. Spatial representation — LOCKED
 

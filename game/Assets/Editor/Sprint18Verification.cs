@@ -154,7 +154,15 @@ public static class Sprint18Verification
         Check("macrophage efferocytic capacity: 0.05 -> 0.11 at level 2",
             Mathf.Approximately(mac.EfferocytosisDebrisPerTick, 0.05f + 2 * ProgenitorUpgrades.EfferocytosisPerLevel));
         Buy(rig, 0, 1);
-        Check("macrophage tissue residency: kill limit 20 -> 28", mac.KillLimit == 28);
+        // Sprint 32: written against THIS RIG's base and the live per-level
+        // constant rather than two literals. The shipped base moved 20 -> 5
+        // and the step 8 -> 2 when innate turnover went in, and this check
+        // broke on numbers it had no reason to own. (The rig's own base of
+        // 20 is a fixture, independent of GameBootstrap -- see
+        // BACKLOG.md on harnesses not being able to read the shipped
+        // profile numbers.)
+        Check($"macrophage sustained respiratory burst: kill limit {rig.Mac.KillLimit} -> {mac.KillLimit} at level 1",
+            mac.KillLimit == rig.Mac.KillLimit + ProgenitorUpgrades.MacrophageKillLimitPerLevel);
         Buy(rig, 0, 2);
         Check("macrophage pseudopod reach: contact radius 2 -> 3", mac.ContactRadiusFineTiles == 3);
 
@@ -163,7 +171,8 @@ public static class Sprint18Verification
         for (int i = 0; i < 5; i++) Buy(rig, 1, 0);
         Check("neutrophil degranulation burst floors at 1", Mathf.Approximately(neu.DegranulationBurstMultiplier, 1f));
         Buy(rig, 1, 1);
-        Check("neutrophil extended lifespan: kill limit 5 -> 7", neu.KillLimit == 7);
+        Check($"neutrophil extended lifespan: kill limit {rig.Neu.KillLimit} -> {neu.KillLimit} at level 1",
+            neu.KillLimit == rig.Neu.KillLimit + ProgenitorUpgrades.NeutrophilKillLimitPerLevel);
         Buy(rig, 1, 2);
         Check("neutrophil rapid chemokinesis: 3 -> 4 fine tiles per tick", neu.FineTilesPerTick == 4);
         Check("...and the shared neutrophil profile is untouched", rig.Neu.FineTilesPerTick == 3);

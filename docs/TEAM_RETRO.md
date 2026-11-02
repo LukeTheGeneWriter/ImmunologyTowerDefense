@@ -1142,3 +1142,54 @@ thing to measure before this becomes routine.
 - **The research agent's web-request rule held.** The second design
   agent fetched references with a generic User-Agent and committed no
   images.
+
+### Sprint 32 -- 2026-11-02 (head session, Linux machine)
+
+- **"Add a new X" is worth one grep before it is worth any code.** The
+  sprint was scoped as "rounds and new pathogens". Reading the spawn path
+  first turned up that the three species already shipped could not spawn
+  at all, which changed the whole shape of the sprint and delivered more
+  content than adding a seventh species would have. The grep that found it
+  was two minutes: every call site that passes a `speciesOverride`.
+- **The dead-feature pattern now has five instances and a signature.**
+  Three upgrade ceilings that never bound, one barcode guarantee that was
+  mathematically unreachable, and now a species roster with no path into
+  play. The signature is always the same: **a value written on one side of
+  a boundary and never read as that value on the other.** Worth asking of
+  any new feature: who reads this, and with what?
+- **A ceiling is only inert on a stated horizon.** "Both kill-limit rows
+  are inert" was true of the macrophage and false of the neutrophil, and
+  the difference was that the original measurement ran one round. Any
+  "this never binds" claim should say *over what window*.
+- **Harnesses leak into `SearchUnit`'s static registry.** It only empties
+  via `ResetForPool()`, so a rig that destroys its GameObjects leaves
+  phantom neighbours that later runs read through crowd desensitisation.
+  Caught because adding two runs ahead of a measurement changed it from 4
+  to 3; a determinism check (run the same config twice, assert identical
+  results) is now in `Sprint32Verification` and is cheap enough to copy.
+- **No harness can read the shipped per-kind unit numbers**, because they
+  live on `GameBootstrap`'s serialized fields and a harness cannot stand
+  that component up. Every harness mirrors them by hand. This is the
+  structural reason dead upgrade rows keep shipping: nothing compares a
+  row's step against the base it applies to. Logged in `BACKLOG.md`.
+- **A test can fail because the test is wrong, and that is still useful.**
+  The first version of the no-excursion check also asserted cells crossed
+  the whole tissue band in 600 steps. An unbiased walk needs ~8,000 to
+  cover 91 fine tiles, so the assertion was a test of the step budget.
+  Restated as diffusion (mean depth, deepest reach, time on the edge
+  cell), which is what "not a cage" actually means.
+- **Zero should mean the safe default, every time.** The band permit's
+  zero is `Unrestricted`, not "no bands", so node movement through the
+  same function and any profile deserialized from the Sprint-1-era scene
+  both keep the old behaviour. The scene on disk still carries only the
+  five fields `UnitProfile` had in Sprint 1, which is exactly why this
+  matters.
+- **A new multiplier needs checking against every cap it can reach.**
+  Wall pressure looked like a pure design knob, and it ran the batch size
+  into `PathogenSpawner`'s 150-pathogen ceiling — where a food round that
+  cannot emit its whole batch never completes at all. Found by arithmetic
+  (write out the curve for rounds 1-30 against the cap) rather than by
+  playing to round 11. The hazard pre-dated the change: the raw curve gets
+  there at round 24. **Standing question for any new multiplier: what
+  ceiling does this now reach, and what happens at it — a difficulty
+  spike, or a hang?**

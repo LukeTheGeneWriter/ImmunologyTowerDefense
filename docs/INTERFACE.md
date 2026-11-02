@@ -2069,6 +2069,136 @@ production classes; builds its own boards via `ConfigureForTest` and
 **never loads the scene**, which is why it could not catch the stale
 serialized `columns` bug.
 
+## Sprint 32 changes — the band permit, species-level rounds, innate turnover
+
+### `ImmunologyTD.Grid.BandPermit` (new, `[Flags]`)
+
+Which lateral bands a mover may occupy. **`Unrestricted` is zero, and that
+is load-bearing**: movement inside the lymph node goes through the same
+`Chemotaxis.ChooseNextStep` on `LymphNode.NodeBoard`, whose bands are
+meaningless, and a `UnitProfile` deserialized from a scene saved before
+this field existed reads zero too. Both keep exactly the pre-Sprint-32
+behaviour instead of being boxed in.
+
+```
+Unrestricted = 0, Base = 1, Tissue = 2, Lumen = 4,
+TissueOnly = Tissue, TissueAndBase = Base | Tissue
+```
+
+### `ImmunologyTD.Grid.BoardConfig` additions
+
+- `BoardBand BandOfFine(FineCoord)` — band of a FINE tile. The one
+  sanctioned bridge from fine-tile movement code to a coarse band concept.
+- `bool BandAxisRange(BoardBand, out int lo, out int hi)` — a band's
+  inclusive axis-index interval; false for a zero-width band. Now the
+  single source of band extents: `BandWorldRect` reads it too.
+- `int FineDistanceToPermittedBand(FineCoord, BandPermit)` — fine tiles of
+  travel to the nearest permitted band, 0 when already inside one.
+  **Fine tiles, not coarse cells, deliberately**: measured in coarse cells
+  six of the seven steps across a cell leave the number unchanged, so
+  "strictly closer" would be unsatisfiable and a stray cell could not
+  steer home. Same failure Sprint 31 found in the crowding penalty.
+- `bool BandPermitted(FineCoord, BandPermit)`.
+
+### `ImmunologyTD.Units.Chemotaxis`
+
+- `ChooseNextStep(..., BandPermit permit = BandPermit.Unrestricted)` — one
+  new optional trailing parameter. Every existing call site is unchanged
+  and unrestricted.
+- `int CollectCandidates(FineCoord, BoardConfig, FineCoord[], BandPermit)`
+  — new, public, pure, allocation-free. The candidate rule, lifted out so a
+  harness can enumerate the permitted set directly instead of inferring it
+  from where a random walk happened to go. **Three passes, in order:**
+  1. in bounds and permitted — the normal case;
+  2. nothing permitted, because the mover is itself outside its bands:
+     only steps that get *strictly closer* to a permitted band, so it
+     walks home rather than stranding;
+  3. still nothing: any in-bounds step — exactly the pre-Sprint-32 rule.
+     The permit can never be a cage.
+
+### `ImmunologyTD.Units.UnitProfile`
+
+- `BandPermit Bands = BandPermit.TissueOnly` (new). Per-kind on purpose:
+  the lymph node sits in the BASE band, so a kind that commutes there must
+  be allowed to, and a blanket tissue clamp would have stranded the
+  adaptive arm. Every `SearchUnit` kind is tissue-only today; the two
+  kinds that commute (`DendriticCell`, `Lymphocyte`) are not SearchUnits
+  and move on their own steppers.
+- `SearchUnit.StepOnce` passes `profile.Bands` through. Nothing else in
+  the movement path changed.
+
+### `ImmunologyTD.Rounds` — rounds now speak species
+
+- `struct SpeciesWeight { PathogenSpecies Species; float Weight; }` (new).
+- `RoundDefinition` gains:
+  - `SpeciesWeight[] Cast` — the organisms the round delivers. Null or
+    empty falls back to the three class weights, which still work.
+  - `float WallPressure` — multiplier on the round's batch size. **Zero
+    means 1.0**, so a definition written before this field is unchanged.
+  - `bool HasCast`, `float EffectiveWallPressure`,
+    `PathogenSpecies RollSpecies()`.
+  - `RollClass()` now DERIVES the class from a rolled species when a cast
+    is present, so the two can never disagree — the drift that let the
+    taglines name organisms the round could not deliver.
+- `RoundScript.ScriptedRounds`, `RoundScript.MaxProceduralWallPressure`.
+- `PathogenSpawner.SpawnFromFood` passes the rolled **species** to
+  `PathogenAgent.Initialize` instead of a bare class. This is the fix for
+  the bug that made every named species unreachable; see `GAME_DESIGN.md`
+  §5d "the round is a CURRICULUM".
+- `RoundController.StartRound` scales `EconomyTuning.BatchSizeForRound(n)`
+  by the round's `EffectiveWallPressure`. Rounds 1-2 are at 1.0, so the
+  unscaled batch numbers the economy harnesses assert still hold exactly.
+
+### `ImmunologyTD.Economy.EconomyTuning` — batch sizing moved
+
+- `BatchSizeForRound(n)` is now **the baseline only**.
+- `int BatchForRound(int roundNumber, float wallPressure, int liveCap)`
+  (new, pure, static) is what `RoundController.StartRound` calls: baseline
+  × pressure, clamped to `liveCap × MaxBatchShareOfLiveCap` (0.6). A
+  `liveCap` of 0 means "caller does not know the ceiling" and skips the
+  clamp; a `wallPressure` of 0 reads as 1.0.
+- `float MaxBatchShareOfLiveCap = 0.6f` (new, reset by `ResetToDefaults`).
+- `PathogenSpawner.MaxLivePathogens` (new getter) publishes the ceiling.
+
+**Why the clamp exists:** `SpawnFromFood` emits only while
+`live.Count < maxLivePathogens`, and a food round is complete only once
+`batchEmitted >= batchTarget` and the food has exited — so a target above
+the ceiling is never reached and the round never ends. The raw curve
+crosses the ceiling at round 24 on its own; wall pressure moved that to
+round 11.
+
+### Innate lifecycle numbers (`GameBootstrap`, `ProgenitorUpgrades`)
+
+- Macrophage `KillLimit` **20 → 5**; neutrophil **5 → 3** (measured, see
+  `GAME_DESIGN.md` §6d).
+- `MacrophageKillLimitPerLevel` **8 → 2**; `NeutrophilKillLimitPerLevel`
+  **2 → 1**. Shop copy updated to match.
+
+### Contract note: `SearchUnit`'s static registry
+
+`SearchUnit` keeps a **static** `live` list (the IFN-gamma aura and crowd
+desensitisation read it), and the only exit is `ResetForPool()`. A harness
+that destroys unit GameObjects directly therefore leaves phantom entries
+in it forever, and the next run reads them as neighbours. Measured this
+sprint: adding two rig runs ahead of another shifted its retirement count
+from 4 to 3. `Sprint32Verification` drains the registry in its teardown;
+every other harness in the repo that builds SearchUnits still leaks.
+
+### Verification
+
+`Assets/Editor/Sprint32Verification.cs` — 59 checks in three parts (the
+permit, the species path, turnover). `KillLimitDiagnostic` gained a
+distribution mode.
+
+### Note on this file's currency
+
+**This file was last updated for Sprint 21.** Sprints 22-31 — the invasion
+rework, the adaptive roster, named species, the marrow expansion, the
+upgrade pass, virus dissemination, the dispersal fix — are not described
+here, though `ENGINE_STATUS.md` and `CHANGELOG.md` cover them. Sprint 32's
+section is written against the code as it actually is, but a reader should
+not treat the gap as "nothing changed". Backfilling it is in `BACKLOG.md`.
+
 ## Open questions for whoever builds on this next
 
 1. **~~Coarse `Row` vs. the four-compartment depth-5 model~~ — RESOLVED by

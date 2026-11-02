@@ -1,4 +1,5 @@
 using UnityEngine;
+using ImmunologyTD.Grid;
 
 namespace ImmunologyTD.Units
 {
@@ -79,6 +80,25 @@ namespace ImmunologyTD.Units
         /// SPRINT_PLAN.md: neutrophil 5, macrophage 20 (Director,
         /// 2026-08-21 -- an earlier drafted 15 read "a little low").</summary>
         [Min(1)] public int KillLimit = 5;
+
+        /// <summary>Sprint 32: which lateral bands a unit of this kind may
+        /// occupy -- the fix for the Director-reported bug where immune
+        /// cells walked out of the tissue into the blood at round start.
+        ///
+        /// **Per-kind on purpose, not a blanket clamp.** The lymph node is
+        /// in the BASE band, so a kind that commutes there must be allowed
+        /// to; getting that wrong would have stranded the adaptive arm
+        /// instead of fixing the bug. Every kind that is a
+        /// <see cref="SearchUnit"/> today is tissue-only, and the two that
+        /// commute are not SearchUnits at all -- but this is a field rather
+        /// than a hardcoded "tissue" in the movement loop so the next kind
+        /// that needs the base band says so in data.
+        ///
+        /// <see cref="BandPermit.Unrestricted"/> (zero) keeps the old
+        /// behaviour, which is what a profile deserialized from a scene
+        /// saved before this field existed will read as -- the same
+        /// zero-is-neutral discipline as the trait fields below.</summary>
+        public BandPermit Bands = BandPermit.TissueOnly;
 
         /// <summary>Neutrophils degranulate on depletion; macrophages retire
         /// quietly (GAME_DESIGN.md section 6d).</summary>

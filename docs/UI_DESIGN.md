@@ -471,13 +471,20 @@ where there's a good fourth, so the Director can pick.
 ### Macrophage — `UnitProfile` / `UnitLifecycleTuning`
 
 Sim behaviours in play: efferocytosis (clears debris on its own slot),
+**(Note, Sprint 32.)** The shop rows below are a design-time snapshot and
+have drifted twice — Sprint 29 renamed rows and Sprint 32 re-based the
+kill-limit numbers. The live source is
+`Assets/Scripts/UI/ProgenitorUpgradeCatalog.cs` for the copy and
+`Assets/Scripts/Units/ProgenitorUpgrades.cs` for the effects; read those
+before trusting a number here.
+
 quiet retirement at a high kill limit, a low contact stress-sense roll,
 a 5-fine-tile footprint, slow (`FineTilesPerTick` 1).
 
 | Display name | Effect (player-facing) | Field it writes | Cost curve |
 |---|---|---|---|
 | **Efferocytic capacity** (scavenger-receptor panel) | Clears debris markedly faster — frees dead ground to regrow. | `EfferocytosisDebrisPerTick` `0.05 → +0.03 / lvl` | base 30, cap 3 |
-| **Tissue residency (M2)** | +8 kills before the cell retires. A longer-lived line. | `KillLimit` `20 → +8 / lvl` | base 40, cap 3 |
+| **Sustained respiratory burst** *(renamed Sprint 29; numbers Sprint 32)* | +2 kills before the cell is spent. | `KillLimit` `5 → +2 / lvl` | base 40, cap 3 |
 | **Pseudopod reach** (podosome extension) | The cell touches — and clears — pathogens one tile further out. | `ContactRadiusFineTiles` `2 → 3` | base 45, cap 1 |
 | **Inflammasome priming (NLRP3)** *(optional 4th — see note)* | Better odds each tick of sensing an infected cell it's touching and killing it loudly. | `StressSenseChancePerTick` `0.03 → +0.015 / lvl` | base 70, cap 2 |
 
@@ -501,7 +508,7 @@ depletion something the player can raise the ceiling on.
 | Display name | Effect (player-facing) | Field it writes | Cost curve |
 |---|---|---|---|
 | **Controlled degranulation** | The terminal burst does less collateral tissue damage — less scarring from your own defence. | `DegranulationBurstMultiplier` `3 → −0.5 / lvl`, floor 1 | base 40, cap 4 |
-| **Extended lifespan (GM-CSF priming)** | +2 kills before the cell degranulates. | `KillLimit` `5 → +2 / lvl` | base 30, cap 4 |
+| **Extended lifespan (GM-CSF priming)** *(numbers Sprint 32)* | +1 kill before the cell degranulates. | `KillLimit` `3 → +1 / lvl` | base 30, cap 4 |
 | **Rapid chemokinesis** | The cell covers ground faster on its way to a signal. | `FineTilesPerTick` `3 → +1 / lvl` — *needs the field moved onto `UnitLifecycleTuning`; see wiring note* | base 45, cap 2 |
 | **Respiratory burst reach** *(optional 4th)* | ROS diffusion — hits pathogens one tile further out. | `ContactRadiusFineTiles` `2 → 3` | base 45, cap 1 |
 

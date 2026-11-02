@@ -427,9 +427,16 @@ namespace ImmunologyTD.Units
 
         private void StepOnce()
         {
+            // Sprint 32: the band permit. Without it this unit's only
+            // movement constraint was InFineBounds -- the whole board --
+            // which is why cells drifted off the tissue's base-side edge
+            // into the blood at round start, before any cytokine gradient
+            // existed to pull them inward. A profile that predates the
+            // field reads as Unrestricted and behaves exactly as before.
             Current = Chemotaxis.ChooseNextStep(
                 Current, board, cytokineField, CytokineToggle.Enabled, candidateBuffer, weightBuffer,
-                crowdBuffer, crowdCount, crowdWeights);
+                crowdBuffer, crowdCount, crowdWeights,
+                profile != null ? profile.Bands : ImmunologyTD.Grid.BandPermit.Unrestricted);
         }
 
         /// <summary>

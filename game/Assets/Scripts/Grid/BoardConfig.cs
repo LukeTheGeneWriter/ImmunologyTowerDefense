@@ -8,6 +8,52 @@ namespace ImmunologyTD.Grid
     /// proportions without touching any gameplay code.</summary>
     public enum BoardBand { Base, Tissue, Lumen }
 
+    /// <summary>
+    /// Which bands a mover is allowed to occupy -- a per-kind movement
+    /// permit, consumed by <c>Chemotaxis.ChooseNextStep</c>.
+    ///
+    /// **Sprint 32.** The Director reported immune cells drifting out of the
+    /// tissue into the blood at round start, and the cause was that nothing
+    /// constrained them: the candidate loop tested only
+    /// <see cref="BoardConfig.InFineBounds"/>, the whole board. Pathogens
+    /// have always had the discipline (<c>StepTissue</c> checks the band);
+    /// immune cells never got the equivalent.
+    ///
+    /// **Zero means UNRESTRICTED, deliberately.** Movement on the lymph
+    /// node's own little board (<c>LymphNode.NodeBoard</c>) goes through the
+    /// same <c>ChooseNextStep</c>, and that board's bands are meaningless --
+    /// so a caller that passes nothing, and a <see cref="UnitProfile"/>
+    /// deserialized from a scene saved before this field existed, both keep
+    /// exactly the pre-Sprint-32 behaviour instead of being boxed in. Same
+    /// discipline as <c>SpeciesProfile</c>'s traits and
+    /// <c>UnitProfile.EfferocytosisDebrisPerTick</c>: the neutral default is
+    /// the zero.
+    /// </summary>
+    [System.Flags]
+    public enum BandPermit
+    {
+        Unrestricted = 0,
+        Base = 1 << 0,
+        Tissue = 1 << 1,
+        Lumen = 1 << 2,
+
+        /// <summary>Every <c>SearchUnit</c> kind: macrophage, neutrophil,
+        /// cytotoxic T, NK, gamma-delta IEL, plasma cell. None of them has
+        /// any business in the blood or out in the lumen -- the wall work
+        /// they do is indexed by LANE (<c>GutWall.SOfLane</c>), not by how
+        /// far along the threat axis they stand, so holding them in the
+        /// tissue costs them nothing.</summary>
+        TissueOnly = Tissue,
+
+        /// <summary>For a kind that legitimately travels to the base band --
+        /// the lymph node sits there. Not currently needed by any
+        /// <c>SearchUnit</c>: the two adaptive kinds that commute
+        /// (<c>DendriticCell</c>, <c>Lymphocyte</c>) are not SearchUnits and
+        /// move on their own steppers. Here so that the fix is per-kind by
+        /// construction rather than by a comment promising it is.</summary>
+        TissueAndBase = Base | Tissue,
+    }
+
     /// <summary>Which grid axis the base -> tissue -> lumen bands are laid
     /// out along, i.e. the axis pathogens advance along. Map 01 is
     /// Horizontal (bands are columns, rows are lanes).</summary>
@@ -199,6 +245,80 @@ namespace ImmunologyTD.Grid
 
         public BoardBand BandOf(CoarseCoord c) => BandAtAxisIndex(AxisIndex(c));
 
+        /// <summary>Sprint 32: band of a FINE tile. Movement code works in
+        /// fine tiles and bands are a coarse concept, so this is the one
+        /// sanctioned bridge -- going via <see cref="FineAxisIndex"/> keeps
+        /// the base-end flip in one place.</summary>
+        public BoardBand BandOfFine(FineCoord c) =>
+            BandAtAxisIndex(FineAxisIndex(c) / FineSubdivision);
+
+        /// <summary>Sprint 32: the axis-index interval a band occupies,
+        /// inclusive. Returns false for a band with no cells (a map may set
+        /// a band to zero width). The single source for band extents --
+        /// <see cref="BandWorldRect"/> and the movement permit both read it
+        /// rather than re-deriving the arithmetic.</summary>
+        public bool BandAxisRange(BoardBand band, out int lo, out int hi)
+        {
+            int start, count;
+            switch (band)
+            {
+                case BoardBand.Base: start = 0; count = BaseBandCells; break;
+                case BoardBand.Tissue: start = BaseBandCells; count = TissueBandCells; break;
+                default: start = LumenNearWallAxisIndex; count = LumenBandCells; break;
+            }
+            lo = start;
+            hi = start + count - 1;
+            return count > 0;
+        }
+
+        /// <summary>Sprint 32: how many FINE tiles of travel along the
+        /// threat axis separate <paramref name="c"/> from the nearest band
+        /// <paramref name="permit"/> allows. 0 when it is already in one.
+        ///
+        /// This is what lets the movement permit be a constraint rather than
+        /// a cage: a cell that is ALREADY outside its bands (it was there
+        /// before the permit existed, or code placed it there) has a
+        /// strictly decreasing quantity to follow home, so it walks back in
+        /// instead of being stranded.
+        ///
+        /// **Fine tiles, not coarse cells, and that is the whole point.**
+        /// Measured in coarse cells, six of the seven fine steps across a
+        /// cell leave the number unchanged, so "strictly closer" would
+        /// almost never be satisfiable and a stranded cell would be left to
+        /// drift home by luck. This is the same mistake Sprint 31 found in
+        /// the crowding penalty -- a quantity too coarse to vary at the
+        /// scale of one step cannot steer one step.</summary>
+        public int FineDistanceToPermittedBand(FineCoord c, BandPermit permit)
+        {
+            if (permit == BandPermit.Unrestricted) return 0;
+
+            int a = FineAxisIndex(c);
+            int best = int.MaxValue;
+
+            for (int b = 0; b < 3; b++)
+            {
+                var band = (BoardBand)b;
+                if ((permit & (BandPermit)(1 << b)) == 0) continue;
+                if (!BandAxisRange(band, out int lo, out int hi)) continue;
+
+                int fineLo = lo * FineSubdivision;
+                int fineHi = hi * FineSubdivision + FineSubdivision - 1;
+
+                int d = a < fineLo ? fineLo - a : (a > fineHi ? a - fineHi : 0);
+                if (d < best) best = d;
+            }
+
+            // No permitted band exists on this board at all -- treat as
+            // unrestricted rather than trapping the mover.
+            return best == int.MaxValue ? 0 : best;
+        }
+
+        /// <summary>Sprint 32: is this fine tile in a band the permit
+        /// allows? <see cref="BandPermit.Unrestricted"/> allows everything.</summary>
+        public bool BandPermitted(FineCoord c, BandPermit permit) =>
+            permit == BandPermit.Unrestricted
+            || (permit & (BandPermit)(1 << (int)BandOfFine(c))) != 0;
+
         /// <summary>How many cells a lumen position sits out from the gut
         /// interface. 0 = hugging the wall, LumenBandCells-1 = far side of
         /// the channel. This is the distance GAME_DESIGN.md section 1b step
@@ -294,17 +414,12 @@ namespace ImmunologyTD.Grid
         /// compartment placement.</summary>
         public Rect BandWorldRect(BoardBand band)
         {
-            int start, count;
-            switch (band)
-            {
-                case BoardBand.Base: start = 0; count = BaseBandCells; break;
-                case BoardBand.Tissue: start = BaseBandCells; count = TissueBandCells; break;
-                default: start = LumenNearWallAxisIndex; count = LumenBandCells; break;
-            }
-            if (count <= 0) return new Rect(0, 0, 0, 0);
+            // Sprint 32: band extents come from BandAxisRange, the one
+            // place that knows them.
+            if (!BandAxisRange(band, out int lo, out int hi)) return new Rect(0, 0, 0, 0);
 
-            var a = CoarseToWorldCenter(CoarseFromAxis(start, 0));
-            var b = CoarseToWorldCenter(CoarseFromAxis(start + count - 1, CrossLength - 1));
+            var a = CoarseToWorldCenter(CoarseFromAxis(lo, 0));
+            var b = CoarseToWorldCenter(CoarseFromAxis(hi, CrossLength - 1));
             float half = CoarseCellWorldSize * 0.5f;
             return Rect.MinMaxRect(
                 Mathf.Min(a.x, b.x) - half, Mathf.Min(a.y, b.y) - half,

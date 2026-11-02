@@ -164,17 +164,37 @@ namespace ImmunologyTD.Units
             float[] weightBuffer,
             FineCoord[] crowdBuffer = null,
             int crowdCount = 0,
-            float[] crowdWeights = null)
+            float[] crowdWeights = null,
+            BandPermit permit = BandPermit.Unrestricted)
         {
-            int validCount = 0;
+            // ----------------------------------------------------------------
+            // Sprint 32 -- the band permit. The Director reported immune
+            // cells walking out of the tissue into the blood at round start,
+            // and the cause was that this loop rejected a candidate ONLY on
+            // InFineBounds, the whole board. Pathogens have always checked
+            // the band in StepTissue; immune cells never got the equivalent.
+            //
+            // It lands here rather than in SearchUnit so every mover that
+            // goes through this function inherits it -- and it is a
+            // per-caller PERMIT rather than a blanket tissue clamp, because
+            // the lymph node sits in the base band and the kinds that
+            // commute there are allowed to.
+            //
+            // Three passes, in strict order, so the constraint can never
+            // deadlock a mover:
+            //   1. in bounds AND permitted -- the normal case;
+            //   2. nothing permitted next to a mover that is itself outside
+            //      its bands: only steps that get strictly CLOSER to a
+            //      permitted band, so it walks home instead of stranding;
+            //   3. still nothing: any in-bounds step, i.e. exactly the
+            //      pre-Sprint-32 behaviour. Never return a cage.
+            // ----------------------------------------------------------------
+            int validCount = CollectCandidates(current, board, candidateBuffer, permit);
+
             float maxValue = float.NegativeInfinity;
-
-            foreach (var offset in FineCoord.VonNeumannOffsets)
+            for (int i = 0; i < validCount; i++)
             {
-                var candidate = current.Add(offset);
-                if (!board.InFineBounds(candidate)) continue;
-
-                candidateBuffer[validCount] = candidate;
+                var candidate = candidateBuffer[i];
                 float value = cytokineEnabled ? cytokineField.SampleFine(candidate) : 0f;
                 // Sprint 28: crowding is subtracted BEFORE the softmax, in
                 // the same units as the cytokine reading, so a crowded
@@ -182,9 +202,8 @@ namespace ImmunologyTD.Units
                 // rather than being forbidden. A cell with nowhere better to
                 // go will still go there.
                 value -= CrowdPenaltyAt(candidate, crowdBuffer, crowdWeights, crowdCount);
-                weightBuffer[validCount] = value; // raw value for now; exponentiated below
+                weightBuffer[i] = value; // raw value for now; exponentiated below
                 if (value > maxValue) maxValue = value;
-                validCount++;
             }
 
             if (validCount == 0) return current; // shouldn't happen on any board >= 2x2 fine tiles
@@ -207,6 +226,57 @@ namespace ImmunologyTD.Units
             }
 
             return candidateBuffer[chosen];
+        }
+
+        /// <summary>
+        /// The in-bounds von Neumann neighbours this mover may step to,
+        /// written into <paramref name="candidateBuffer"/>. Pure, allocates
+        /// nothing, and separated out so a harness can enumerate the
+        /// permitted set directly rather than inferring it from where a
+        /// random walk happened to go -- the project's "assert the property,
+        /// not a proxy" rule (docs/AGENT_HANDBOOK.md).
+        /// </summary>
+        public static int CollectCandidates(
+            FineCoord current, BoardConfig board, FineCoord[] candidateBuffer,
+            BandPermit permit)
+        {
+            int count = 0;
+
+            // Pass 1: in bounds and inside a permitted band.
+            foreach (var offset in FineCoord.VonNeumannOffsets)
+            {
+                var candidate = current.Add(offset);
+                if (!board.InFineBounds(candidate)) continue;
+                if (!board.BandPermitted(candidate, permit)) continue;
+                candidateBuffer[count++] = candidate;
+            }
+            if (count > 0) return count;
+
+            // Pass 2: the mover is outside its own bands. Admit only steps
+            // that get strictly closer to one, so it heads home on a
+            // gradient that varies at the scale of a single fine step.
+            if (permit != BandPermit.Unrestricted)
+            {
+                int here = board.FineDistanceToPermittedBand(current, permit);
+                foreach (var offset in FineCoord.VonNeumannOffsets)
+                {
+                    var candidate = current.Add(offset);
+                    if (!board.InFineBounds(candidate)) continue;
+                    if (board.FineDistanceToPermittedBand(candidate, permit) >= here) continue;
+                    candidateBuffer[count++] = candidate;
+                }
+                if (count > 0) return count;
+            }
+
+            // Pass 3: no permitted step and no way home -- fall back to the
+            // pre-Sprint-32 rule so a mover is never frozen by its permit.
+            foreach (var offset in FineCoord.VonNeumannOffsets)
+            {
+                var candidate = current.Add(offset);
+                if (!board.InFineBounds(candidate)) continue;
+                candidateBuffer[count++] = candidate;
+            }
+            return count;
         }
     }
 }

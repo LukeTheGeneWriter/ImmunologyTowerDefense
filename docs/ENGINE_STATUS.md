@@ -1136,6 +1136,98 @@ is.
   the profile when it is 0 (a hand-built harness instance).
 - Prices, caps and per-level steps are all still placeholders.
 
+## Sprint 32 — the band permit, species-level rounds, innate turnover
+
+### The edge bug is fixed, and it was bigger than it looked
+
+The Director reported immune cells drifting out of the tissue into the
+blood at round start. Cause: `Chemotaxis.ChooseNextStep` rejected a
+candidate step only on `InFineBounds` — the whole board — so **nothing
+whatsoever held an immune cell inside the tissue band.** Pathogens have
+always had the equivalent discipline (`StepTissue` checks the band).
+
+Measured over 80,000 real steps from the round-start entry tile:
+
+| | Steps outside the tissue |
+|---|---|
+| Pre-Sprint-32 rule | **34,402 of 80,000 (43%)** |
+| With the permit | **0** |
+
+43% is why it was visible from across the room. The fix is
+`Grid/BandPermit.cs`-style flags on `UnitProfile`, consumed in
+`ChooseNextStep` so every mover inherits it, with a three-pass candidate
+rule that cannot cage a mover (see `INTERFACE.md`). A cell placed in the
+blood walks back into the tissue in **38 steps worst case**, strictly
+closer every step. Cells still diffuse — mean depth 2.2 cells into the
+band, deepest 12 of 13 — so the constraint is not a wall they pile against.
+
+### Named species could never spawn — the fifth dead feature of the same shape
+
+`PathogenSpawner.SpawnFromFood` passed `foodDef.RollClass()`, and
+`PathogenAgent.Initialize` resolves a bare class to the *generic* species
+of that class. `PickRandomSpecies()` returns only generics too. Nothing in
+`Assets/Scripts` ever passed a `speciesOverride` except replication, which
+inherits the parent's species.
+
+**So rotavirus, *Vibrio cholerae* and A/E *E. coli* — all of Sprints 24-25
+— had never been on the board in a playtest.** Traits implemented, sprites
+drawn, knowledge-HUD rows present, unreachable.
+
+Rounds now carry a cast of species (`GAME_DESIGN.md` §5d). Verified through
+the real spawner rather than the round table: round 5 put **32 A/E
+*E. coli*, 11 intracellular bacteria, 9 rotavirus and 8 gut bacteria** on
+the board, all of them cast by the round.
+
+### Innate turnover
+
+Measured with the ceiling lifted (`KillLimitDiagnostic`, distribution
+mode): macrophage median 2 kills per 45s round / 9 per three; neutrophil 3
+/ 11. The macrophage's ceiling of 20 produced **0 retirements even over
+three rounds**; the neutrophil's 5 bound across rounds but not inside one,
+which corrects the standing "both rows are inert" claim.
+
+Now 5 and 3. Over three rounds a macrophage tower retires 2 of 6 emitted
+and a neutrophil tower 14, both holding a full standing population of 4 at
+the end. The fully-upgraded macrophage limit (11) drops retirements to 0
+over three rounds but still binds over six — a longer life, not an
+unmeetable ceiling.
+
+### A round could hang past round 11 — caught before it shipped
+
+Wall pressure multiplies the batch size, and `PathogenSpawner` only emits
+while `live.Count < maxLivePathogens` (150), while a food round completes
+only once `batchEmitted >= batchTarget` **and** the food has exited. A
+target the board cannot hold is therefore a target never reached, and the
+round never ends.
+
+This is a **pre-existing** hazard, not one Sprint 32 introduced: the raw
+economy curve (base 16, +6 a round) passes 150 on its own at **round 24**.
+Wall pressure pulled that forward to **round 11**, which is inside
+ordinary play. `EconomyTuning.BatchForRound(round, pressure, liveCap)` now
+owns the final number and clamps it to 60% of the live ceiling (90 of
+150), leaving headroom for replication, persisting adherents and IgA's
+pool reserve. None of the six scripted rounds is clipped, so the
+curriculum is delivered as designed.
+
+**Side effect worth a Director decision:** difficulty now plateaus in
+batch *size* from about round 8. Past there, rounds should get harder by
+composition rather than by volume — or the board needs to clear faster.
+
+### Harness hygiene note
+
+`SearchUnit`'s static `live` registry only empties via `ResetForPool()`, so
+a harness that destroys units directly leaves phantom neighbours behind for
+every later run in the same Editor launch. This was measured, not guessed:
+adding two rig runs ahead of a measurement moved it from 4 retirements to
+3. `Sprint32Verification` drains it in teardown and asserts run-to-run
+determinism; the other harnesses still leak.
+
+### State
+
+**22 harnesses, 827 checks, green.** `Sprint32Verification` is 59 of them.
+The three by-hand diagnostics under `ImmunologyTD/Diagnose` remain outside
+`verify`.
+
 ## Build status (Sprints 13-17)
 
 All run by the **head session**. Numbers copied from actual output.
@@ -1382,6 +1474,31 @@ exercised here only in the sense that nothing moves.
 - **WebGL** not re-verified (unchanged since Sprint 1).
 
 ## Known issues
+
+- **(Closed, Sprint 32) Immune cells walked out of the tissue into the
+  blood.** Director-reported in Sprint 31, fixed here with the per-kind
+  band permit. The class of bug is still live elsewhere: any mover that
+  calls `ChooseNextStep` without a permit is unconstrained by design, and
+  `DendriticCell`'s own tissue stepper still tests only `InFineBounds`
+  (its patrol bias turns it round at the band edges, which is not the same
+  guarantee).
+- **(New, Sprint 32) No harness can see the shipped per-kind unit
+  numbers.** `UnitProfile` defaults live on `GameBootstrap`'s serialized
+  fields, and a harness cannot stand a `GameBootstrap` up (its `Awake`
+  builds the whole game), so every harness that needs them *mirrors* them
+  in its own fixture. That is the structural reason dead upgrade rows keep
+  shipping: nothing compares the row's step against the base it applies
+  to. A read-only `UnitProfileAudit` (the `UpgradeAudit` pattern) or moving
+  the defaults into a `ScriptableObject` would close it.
+- **(New, Sprint 32) `docs/INTERFACE.md` is ten sprints stale.** Its last
+  per-sprint section before this one is Sprint 21; 22-31 are undocumented
+  there, though `CHANGELOG.md` and this file cover them.
+- **(New, Sprint 32) The other kinds' kill limits are unmeasured.**
+  Cytotoxic T 16, NK 10, gamma-delta 12 were not touched because there is
+  no measurement for them — only the innate pair was diagnosed. If they
+  are also unbindable, the board now drifts toward long-lived adaptive
+  cells and short-lived innate ones, which may be right but is not a
+  decision anyone has made.
 
 - **(New, Sprint 4) A stale serialized field silently deleted the
   playfield — fixed, but the class of bug is live.** `Sprint1.unity` still

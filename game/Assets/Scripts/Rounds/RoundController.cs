@@ -93,11 +93,22 @@ namespace ImmunologyTD.Rounds
             if (Phase != RoundPhase.Building) return;
 
             RoundNumber++;
-            int batch = EconomyTuning.BatchSizeForRound(RoundNumber);
 
             // Sprint 9: the round is delivered by a contaminated food item
             // whose cargo mix and flavour text come from the round script.
             var def = RoundScript.ForRound(RoundNumber);
+
+            // Sprint 32: the script also says how hard the round leans on
+            // the wall. The economy still owns the baseline batch size; the
+            // round scales it, and EconomyTuning.BatchForRound clamps the
+            // result to what the board can hold -- a target above the
+            // spawner's live ceiling is never reached, and a food round
+            // that never reaches its target never ends. Rounds 1-2 are at
+            // 1.0 and well under the ceiling, so the unscaled economy
+            // numbers the harnesses assert still hold exactly.
+            int batch = EconomyTuning.BatchForRound(
+                RoundNumber, def.EffectiveWallPressure,
+                spawner != null ? spawner.MaxLivePathogens : 0);
             CurrentTagline = def.Tagline;
             spawner?.BeginRound(batch, def);
 

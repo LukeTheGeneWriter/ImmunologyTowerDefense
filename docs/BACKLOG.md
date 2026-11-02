@@ -1133,3 +1133,90 @@ question comes up, so the answer is measured rather than argued:
 - **Is the kill-limit row inert?** — kills achieved per cell per round.
 - **Where do viruses die?** — adhesion, tissue fate, dissemination, and
   whether a focus marches.
+
+## Open after Sprint 32 (2026-11-02)
+
+### Closed by Sprint 32
+- **BUG: immune cells walk out of the tissue into the blood** — fixed with
+  the per-kind band permit. Measured 43% of steps outside the tissue under
+  the old rule, 0 now.
+- **The named species could not spawn** — found and fixed this sprint;
+  rounds now carry a cast of species.
+- **The kill-limit decision** — the Director called it (turn over), and the
+  limits were set from a measured distribution. Note the correction: the
+  **neutrophil** row was never inert, it bound across rounds but not inside
+  one. Only the macrophage's ceiling of 20 was unreachable.
+
+### Astrovirus — the next pathogen, deliberately deferred
+Scoped and not built. It is the ranked standout in `PATHOGEN_ROSTER.md`
+(capsid alone opens tight junctions: breach with **no infection and no
+stress signal**, defeating the whole detection stack by not being
+detectable), and it is more than a roster entry because nothing in
+`PathogenAgent` currently supports a virus that never infects:
+
+- a **non-infecting virus path** — adhere, charge the plaque, cross, and
+  never produce an `Infected` host cell, so there is no stress signal for
+  NK/gamma-delta/CTL and no debris for the DC shuttle, which means **no
+  knowledge accrues from it either**. Check what that does to the
+  knowledge HUD before building it: a species the player can never learn
+  about may need its own row treatment.
+- a **barrier interaction** that opens junctions for *other* organisms —
+  the thing that makes it a support unit rather than a sneak.
+- a **sprite**, which per the standing rule must be dumped magnified AND
+  composited against the *pathogens* before it ships.
+- the **barcode search re-run for the whole seven-species set** at 10
+  bits, not a tag that looks far enough away.
+
+### The structural gap behind the dead-upgrade pattern
+No harness can read the shipped per-kind unit numbers: they live on
+`GameBootstrap`'s serialized fields and a harness cannot stand that
+component up (its `Awake` builds the game). Every harness mirrors them by
+hand, so nothing compares an upgrade row's step against the base it
+applies to — which is how three dead rows shipped. Fix shape: a read-only
+`UnitProfileAudit` following the `UpgradeAudit` precedent, or move the
+per-kind defaults into a `ScriptableObject` the Editor assembly can load.
+
+### Unmeasured kill limits on the other four kinds
+Cytotoxic T 16, NK 10, gamma-delta 12, plasma cell 9999. Untouched this
+sprint because there is no measurement for them. With innate turnover live,
+the board now drifts toward long-lived adaptive cells and short-lived
+innate ones — defensible, but nobody has decided it.
+
+### Difficulty past round 8 can no longer come from volume
+`EconomyTuning.BatchForRound` clamps a round's batch to 60% of the
+spawner's live ceiling (90 of 150), because a target the board cannot hold
+is a round that never ends. The consequence: batch size plateaus from
+about round 8, so later rounds have to get harder by **composition** —
+nastier casts, more wall pressure per organism, species that punish a
+settled routine — or the board has to clear faster (a bigger board, or a
+higher live ceiling, both performance questions). Director call.
+
+### Watch in playtest (Sprint 32's two known interactions)
+- **Degranulation × A/E *E. coli*.** Faster neutrophil turnover means more
+  terminal bursts, more debris and dead tissue, and that organism respires
+  exactly those products. Both landed in the same sprint, so the compound
+  effect is unmeasured. Measuring it properly needs the deferred
+  `SimulationDriver` / headless strategy harness.
+- **Board density.** Turnover thins the board on top of Sprint 31's
+  dispersal. A tower still holds its cap of four, but the Director should
+  say whether the board reads as populated.
+
+### `docs/INTERFACE.md` is ten sprints stale
+Its last per-sprint section before Sprint 32 is **Sprint 21**. Sprints
+22-31 (invasion rework, adaptive roster, named species, marrow expansion,
+upgrade pass, virus dissemination, dispersal) are not described there.
+`WORKFLOW.md` §5.3 lists it as a stopping-point checkbox, so this is a
+process miss, not just a doc gap.
+
+### Still open from Sprint 31
+- **Epithelial extrusion** and the **messy-death fork** — designed, not
+  built; both turn on how an infected cell dies.
+- **MHC-I stealth pathogen** (CMV-shaped), built as a cliff.
+- The two **§4a corrections** (the brood does not burst out for
+  *Salmonella*; actin-tail spread for *Shigella*/*Listeria*).
+- The **~60% complement rung** re-specification (opsonisation + phagocyte
+  recruitment) — a Director call.
+- **Virus march speed** (~185s, incubation-bound) — left for the
+  Director's read.
+- `SimulationDriver` refactor + headless strategy harness, queued since
+  Sprint 22.

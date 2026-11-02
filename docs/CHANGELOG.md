@@ -1106,3 +1106,70 @@ what the kill bonus rewards.
 The surprise was that **radius mattered far more than strength**: widening
 it alone took mean spacing from 4.4 to 10.2 tiles, while strength had
 almost no effect until the shape was fixed.
+
+## Sprint 32 -- 2026-11-02
+Three organisms you have never met were already in the game, and immune
+cells spent 43% of their time in the blood.
+
+**The edge bug.** You reported immune cells wandering out of the tissue
+into the blood at round start. Nothing held them there: the movement code
+rejected a step only if it left the *board*, and pathogens have always
+checked the band. Measured over 80,000 steps from the entry tile, cells
+were outside the tissue **34,402 times -- 43% of the time**. Now zero. The
+constraint is per-kind, because the lymph node sits in the base band and
+the cells that commute there have to be allowed to; a cell that somehow
+ends up in the blood walks back in, 38 steps worst case, getting strictly
+closer every step rather than drifting home by luck.
+
+**Rotavirus, Vibrio cholerae and A/E E. coli have never been on your
+board.** Rounds rolled a pathogen *class*, and a bare class resolves to
+the generic of that class, so every organism a food bolus ever delivered
+was a generic. All of Sprints 24-25 -- three organisms with working
+mechanics, sprites and knowledge-HUD rows -- was unreachable. The round
+taglines, meanwhile, promised Salmonella, poliovirus and Listeria, none of
+which are in the roster.
+
+Rounds now carry a cast of **species**, and the order is a curriculum:
+one new organism at a time, and organisms **recur** after they arrive --
+because knowledge is per species and the IgA rung needs 70% of *that*
+organism, so a parade of novelties would keep the whole adaptive arm dark.
+R3 is Vibrio (it never kills a cell: the lesson is that hunting dying
+cells isn't enough), R4 rotavirus (where a thing can reach starts to
+matter), R5 A/E E. coli last and on a crowded wall, because it feeds on
+the mess your own response makes. Wall pressure climbs 1.0 -> 1.7 across
+the script -- which is the actual answer to the Sprint 22 IgA miss, where
+the diagnosis was never "IgA is too weak" but "nothing ever crowded the
+wall, so there was nothing for it to prevent."
+
+**Innate cells turn over now**, your call. Measured first, with the
+ceiling lifted so the distribution was visible: a macrophage lands a
+median of 2 kills in a 45s round, 9 across three. Against a ceiling of 20
+it retired **never** -- 0 retirements even over three rounds -- so the 40
+ATP "+8 kills" row bought nothing. Macrophage 20 -> 5, neutrophil 5 -> 3,
+and the upgrade steps resized to match (+2 and +1 a level).
+
+One correction while measuring: the neutrophil row was **not** inert. At 5
+it bound across rounds, just not inside one -- the old "both rows are
+inert" note came from a single-round measurement. So 5 -> 3 is a rebalance
+toward within-a-round turnover, not a repair.
+
+Two things to watch when you play it: a neutrophil's death is a
+degranulation, so faster turnover means more of your own collateral
+damage -- which is exactly what A/E E. coli respires, and that organism is
+reachable for the first time in the same sprint. And the board thins a
+little further on top of Sprint 31's dispersal, though a tower still holds
+its full standing population of four.
+
+**And a round-hang caught on the way.** Scaling the batch by wall pressure
+ran it into the spawner's 150-pathogen ceiling, and a food round only ends
+once its whole batch has been emitted -- so a target the board can't hold
+is a round that never ends. The raw size curve reaches that ceiling by
+itself at round 24; the pressure multiplier would have brought it to round
+11. The batch is now clamped to 90, which doesn't touch any of the six
+scripted rounds. One consequence for you to rule on: past about round 8,
+rounds can no longer get harder by *volume*, so they'll need to get harder
+by composition instead.
+
+**22 harnesses green. Astrovirus did not make it in** -- it needs a
+non-infecting virus path, a barrier interaction and a sprite pass, which
+is a sprint of its own rather than a tail end of this one.

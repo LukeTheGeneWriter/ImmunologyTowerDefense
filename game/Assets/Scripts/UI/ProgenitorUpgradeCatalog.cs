@@ -52,9 +52,13 @@ namespace ImmunologyTD.UI
             // discourage, and the row's actual effect is a kill count, which
             // has nothing to do with ontogeny. What polarisation really
             // trades is arginine — NOS2 (killing) against ARG1 (repair).
+            // Sprint 32: the row is honest for the first time. The base
+            // limit was 20 against a measured median of 2 kills a round, so
+            // the cell retired of old age that never came and the +8 was
+            // unobservable. Base 5, +2 a level.
             new Row("Sustained respiratory burst",
-                    "+8 kills before the cell is spent. A longer-working line.",
-                    "UnitLifecycleTuning.KillLimit 20 → +8/lvl", 40, 3),
+                    "+2 kills before the cell is spent — a macrophage line that works for longer before the marrow has to replace it.",
+                    "UnitLifecycleTuning.KillLimit 5 → +2/lvl", 40, 3),
             new Row("Pseudopod reach",
                     "The cell touches — and clears — pathogens one tile further out.",
                     "UnitLifecycleTuning.ContactRadiusFineTiles 2 → 3", 45, 1),
@@ -65,9 +69,12 @@ namespace ImmunologyTD.UI
             new Row("Controlled degranulation",
                     "The terminal burst does less collateral damage — less scarring from your own defence.",
                     "UnitLifecycleTuning.DegranulationBurstMultiplier 3 → −0.5/lvl, floor 1", 40, 4),
+            // Sprint 32: base 5 -> 3, step +2 -> +1. Neutrophils now really
+            // do burn out inside a round or two, so this row buys time
+            // between degranulations rather than a ceiling nobody met.
             new Row("Extended lifespan (GM-CSF priming)",
-                    "+2 kills before the cell degranulates.",
-                    "UnitLifecycleTuning.KillLimit 5 → +2/lvl", 30, 4),
+                    "+1 kill before the cell degranulates — fewer terminal bursts, and less of your own collateral damage.",
+                    "UnitLifecycleTuning.KillLimit 3 → +1/lvl", 30, 4),
             new Row("Rapid chemokinesis",
                     "The cell covers ground faster on its way to a signal.",
                     "UnitLifecycleTuning.FineTilesPerTick 3 → +1/lvl", 45, 2),

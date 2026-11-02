@@ -103,11 +103,35 @@ Last distilled: end of **Sprint 11** (2026-08-29), covering Sprints 1–11.
   job. Write the *logic* behind them as an explicit-time method the
   harness can call, and gate/tween in `Update()`.
 - **The scene is still `Assets/Scenes/Sprint1.unity`** and carries real
-  serialized state (`columns: 25`; only 5 of `UnitProfile`'s fields are in
-  the YAML, the rest come from `GameBootstrap`'s initializer). **A new
-  serialized field's C# default is NOT used if the scene predates the
-  field** — a stale `columns: 30` once silently zeroed the tissue band
-  (Sprint 4). Check the scene asset, not just the C# default.
+  serialized state. Two different cases, easy to conflate (clarified
+  Sprint 32, after this bullet was briefly read the wrong way round):
+  - **A field PRESENT in the YAML beats the C# default.** A stale
+    `columns: 30` once silently zeroed the tissue band (Sprint 4). Check
+    the scene asset, not just the C# default.
+  - **A field ABSENT from the YAML keeps the C# initializer**, because
+    Unity constructs the object before applying the serialized stream.
+    Only 5 of `UnitProfile`'s fields are in that YAML; everything since
+    Sprint 3 (`KillLimit`, the trait fields, Sprint 32's `Bands`) arrives
+    this way, so the pattern is load-bearing. **Give every new serialized
+    field a zero that means the safe default**, so a profile from an older
+    scene behaves like the old code rather than breaking.
+- **A batchmode "CRASH" can be a transient Unity build-system error, not
+  your code.** Sprint 32 saw `Sprint24Verification` report CRASH in a
+  full `verify` run with `Internal build system error. Request cancelled
+  while reading the binlog.` followed by `Scripts have compiler errors.`,
+  while every other harness in the same run compiled and passed. It
+  passed on a bare re-run with no code change. **Fix:** before chasing a
+  phantom compile error, re-run that one method alone; a real compile
+  error fails *every* method in the run, not one.
+- **Harnesses leak units into `SearchUnit`'s static `live` registry.**
+  The only exit is `ResetForPool()`, so a rig that `DestroyImmediate`s
+  its unit GameObjects leaves phantom entries that later runs in the same
+  Editor launch read as neighbours through crowd desensitisation and the
+  IFN-gamma aura. Sprint 32 measured a retirement count move from 4 to 3
+  purely from two extra runs ahead of it. **Fix:** drain it in teardown
+  (`foreach (var u in new List<SearchUnit>(SearchUnit.Live)) u.ResetForPool();`)
+  and, for anything numeric, run the same configuration twice and assert
+  identical results — cheap, and it catches the next leak too.
 - **Dispatched Code agents hit their usage limit mid-sprint** on Sprints
   3, 4 and 5 — one left an uncommitted, non-compiling tree. See Dispatch
   practices below; the current answer is "the head does it inline."

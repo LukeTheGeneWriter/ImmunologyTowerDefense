@@ -93,6 +93,13 @@ namespace ImmunologyTD.Pathogens
 
         public bool FoodActive => foodActive;
 
+        /// <summary>Sprint 32: the live-pathogen ceiling, published so the
+        /// round controller can keep a round's batch target inside what the
+        /// board can actually hold. A target above this is never reached,
+        /// and a food round that never reaches its target never ends --
+        /// see EconomyTuning.BatchForRound.</summary>
+        public int MaxLivePathogens => maxLivePathogens;
+
         /// <summary>Read-only view of currently live pathogens -- exposed so
         /// a headless harness can advance every agent with an explicit
         /// simulated clock (Unity's Update() does not run in Editor
@@ -363,10 +370,18 @@ namespace ImmunologyTD.Pathogens
         }
 
         /// <summary>Drops one pathogen into the lumen at a wall-hugging cell
-        /// near the food item's current position, class per the round
+        /// near the food item's current position, **species** per the round
         /// definition. It then rides the flow and rolls adhesion like any
         /// other lumen pathogen -- but starting at the wall, so it mostly
-        /// sticks.</summary>
+        /// sticks.
+        ///
+        /// **Sprint 32: species, not class.** This line used to pass
+        /// `foodDef.RollClass()`, and `PathogenAgent.Initialize` resolves a
+        /// bare class to the GENERIC species of that class -- so every
+        /// organism that ever arrived on a food item was a generic, and the
+        /// three named species added in Sprints 24-25 could not appear in
+        /// play at all. `Sprint32Verification` tallies what this method
+        /// actually emits, per species, so that cannot silently return.</summary>
         private void SpawnFromFood()
         {
             int axis = Mathf.Clamp(
@@ -375,10 +390,12 @@ namespace ImmunologyTD.Pathogens
             int cross = Mathf.Clamp(foodCrossIndex, 0, board.CrossLength - 1);
             var cell = board.CoarseFromAxis(axis, cross);
 
+            var species = foodDef.RollSpecies();
+
             var go = pool.Get();
             var agent = go.GetComponent<PathogenAgent>();
             agent.Initialize(board, tissueGrid, gutWall, tally, OnPathogenExit, RequestSpawnNear,
-                cell, foodDef.RollClass());
+                cell, SpeciesRoster.ClassOf(species), species);
             live.Add(agent);
             batchEmitted++;
         }

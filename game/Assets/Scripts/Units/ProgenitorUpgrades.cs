@@ -20,12 +20,21 @@ namespace ImmunologyTD.Units
     {
         // Macrophage
         public const float EfferocytosisPerLevel = 0.03f;
-        public const int MacrophageKillLimitPerLevel = 8;
+        /// <summary>Sprint 32: 8 -> 2. The base limit dropped 20 -> 5
+        /// because 20 never bound, and a +8 step against a base of 5 would
+        /// have overshot in the other direction -- one level would nearly
+        /// triple a macrophage's working life and the row would be the only
+        /// purchase worth making. +2 per level over a cap of 3 takes it from
+        /// 5 to 11, i.e. roughly doubles it across the whole row.</summary>
+        public const int MacrophageKillLimitPerLevel = 2;
         public const int ContactRadiusPerLevel = 1;
         // Neutrophil
         public const float DegranulationCutPerLevel = 0.5f;
         public const float DegranulationFloor = 1f;
-        public const int NeutrophilKillLimitPerLevel = 2;
+        /// <summary>Sprint 32: 2 -> 1, for the same reason, against a base
+        /// that moved 5 -> 3. Four levels take it 3 -> 7: more than double,
+        /// in steps a player can feel one at a time.</summary>
+        public const int NeutrophilKillLimitPerLevel = 1;
         public const int NeutrophilSpeedPerLevel = 1;
         // Dendritic cell
         public const int DcPresentationsPerLevel = 2;

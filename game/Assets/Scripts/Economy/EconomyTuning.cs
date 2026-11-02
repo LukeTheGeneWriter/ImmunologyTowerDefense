@@ -130,7 +130,10 @@ namespace ImmunologyTD.Economy
         public static int BatchSizeGrowthPerRound = 6;
 
         /// <summary>Batch size for round <paramref name="roundNumber"/>
-        /// (1-based). Clamped at 1.</summary>
+        /// (1-based). Clamped at 1. **The baseline only** -- Sprint 32's
+        /// wall pressure and the live-pathogen ceiling are applied by
+        /// <see cref="BatchForRound"/>, which is what the round controller
+        /// calls.</summary>
         public static int BatchSizeForRound(int roundNumber)
         {
             int n = roundNumber < 1 ? 1 : roundNumber;
@@ -138,8 +141,49 @@ namespace ImmunologyTD.Economy
             return size < 1 ? 1 : size;
         }
 
+        /// <summary>Largest share of the spawner's live-pathogen ceiling one
+        /// round's batch may claim. The rest is headroom for replication
+        /// (<c>PathogenSpawner.RequestSpawnNear</c>), for adherents that
+        /// persist from earlier rounds, and for IgA's own pool reserve.</summary>
+        public static float MaxBatchShareOfLiveCap = 0.6f;
+
+        /// <summary>
+        /// The batch a round actually delivers: the economy's baseline,
+        /// scaled by the round's wall pressure, then clamped to what the
+        /// board can hold.
+        ///
+        /// **The clamp is not cosmetic -- without it a round can hang.**
+        /// `PathogenSpawner.SpawnFromFood` only emits while
+        /// `live.Count < maxLivePathogens`, and a food round is complete
+        /// only once `batchEmitted >= batchTarget` AND the food has exited.
+        /// So a target the board cannot hold is a target that is never
+        /// reached, and the round never ends. Measured against the shipped
+        /// numbers (base 16, +6 a round, ceiling 150): the raw curve alone
+        /// reaches the ceiling at **round 23**, and Sprint 32's wall
+        /// pressure brings that forward to **round 11** -- so this is a
+        /// pre-existing hang that the pressure multiplier would have made
+        /// reachable in ordinary play.
+        ///
+        /// Pure and static so a harness can assert the property across the
+        /// whole round range rather than playing to round 11 to find out.
+        /// </summary>
+        public static int BatchForRound(int roundNumber, float wallPressure, int liveCap)
+        {
+            float pressure = wallPressure <= 0f ? 1f : wallPressure;
+            int scaled = Mathf.RoundToInt(BatchSizeForRound(roundNumber) * pressure);
+
+            if (liveCap > 0)
+            {
+                int ceiling = Mathf.Max(1, Mathf.FloorToInt(liveCap * Mathf.Clamp01(MaxBatchShareOfLiveCap)));
+                if (scaled > ceiling) scaled = ceiling;
+            }
+
+            return scaled < 1 ? 1 : scaled;
+        }
+
         public static void ResetToDefaults()
         {
+            MaxBatchShareOfLiveCap = 0.6f;
             StartingAtp = 100;
             RoundStartLumpSum = 80;
             AtpPerKill = 3;

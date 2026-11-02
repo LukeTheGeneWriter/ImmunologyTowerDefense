@@ -43,7 +43,23 @@ namespace ImmunologyTD.Bootstrap
             // of four that you have invested in should beat ten that you have
             // not.
             MaxActiveChildren = 4,
-            KillLimit = 20,
+            // **Sprint 32: 20 -> 5.** Measured, not guessed
+            // (KillLimitDiagnostic, "kills per cell with NO effective
+            // ceiling"): with a deliberately generous stream of targets a
+            // macrophage lands a median of 2 kills in a 45s round and a
+            // median of 9 over three. A ceiling of 20 therefore never bound
+            // -- 0 of 8 cells reached it even over 180s -- so the 40 ATP
+            // "+8 kills" row wrote nothing, the third dead upgrade of that
+            // exact shape.
+            //
+            // 5 is chosen to retire NOBODY in round 1 (the generous rig's
+            // best single cell managed 4) and roughly everybody across three
+            // rounds. The real board offers fewer targets than this rig, so
+            // the true turnover is slower than the measurement -- picked low
+            // on purpose for that reason. The Director's call was that innate
+            // cells SHOULD turn over; this is the number that makes the marrow
+            // and the shop row both mean something.
+            KillLimit = 5,
             DegranulatesOnDepletion = false,
             DegranulationBurstMultiplier = 0f,
             ContactRadiusFineTiles = 2,
@@ -84,7 +100,20 @@ namespace ImmunologyTD.Bootstrap
             // the cheap abundant one and should still read as a swarm next to
             // a macrophage line, just a smaller one.
             MaxActiveChildren = 5,
-            KillLimit = 5,
+            // **Sprint 32: 5 -> 3.** Same measurement: a median of 3 kills
+            // in a 45s round, 11 over three rounds, so 5 bound for almost
+            // nobody inside a single round. At 3 roughly half a neutrophil
+            // line retires per round in the generous rig, fewer in real play.
+            //
+            // A neutrophil's death is not an accounting event -- it
+            // degranulates, with collateral damage at its own slot. Turnover
+            // therefore makes "Controlled degranulation" a live purchase for
+            // the first time, and it makes a neutrophil-heavy defence
+            // genuinely messy, which is the trade the biology actually
+            // charges. Watch it against A/E E. coli, which respires the
+            // products of that mess (Sprint 32 made that organism reachable
+            // in the same sprint; see docs/SPRINT_PLAN.md).
+            KillLimit = 3,
             DegranulatesOnDepletion = true,
             DegranulationBurstMultiplier = 3f,
             ContactRadiusFineTiles = 2,
