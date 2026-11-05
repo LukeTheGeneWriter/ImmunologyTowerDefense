@@ -351,6 +351,11 @@ namespace ImmunologyTD.Bootstrap
             GutWallFeatures.Current = new GutWallFeatures(board);
             cytokineField = new CytokineField(board);
             tally = new InvasionTally();
+            // Sprint 35: run state, so it is cleared with the rest of it.
+            // The knowledge ribbon orders itself by what the player has
+            // actually met, and a stale history would order the HUD by the
+            // previous run.
+            ImmunologyTD.Pathogens.SpeciesSightings.ResetForNewRun();
             gutWall = new GutWall(board, tissueGrid, tally);
             GutWall.Current = gutWall; // Sprint 23: gamma-delta IELs reach the wall through this
 

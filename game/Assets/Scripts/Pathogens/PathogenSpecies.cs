@@ -26,9 +26,18 @@ namespace ImmunologyTD.Pathogens
     /// species at once. Sprint 29 measured the real ceiling by exhaustive
     /// search rather than estimating it: **8 bits admits at most FOUR such
     /// tags**, which is why the six-species 8-bit set was cross-teaching
-    /// 21.9% of the time. At 10 bits these six sit 6 apart with headroom.
-    /// Before adding a species, re-run the search for the WHOLE set -- see
-    /// SpeciesProfile.Antigen.
+    /// 21.9% of the time.
+    ///
+    /// **Sprint 35 widened the barcode from 10 bits to 12**, ahead of the
+    /// roster that needs it. Ten bits admits at most **12** species at r=2
+    /// (constructed 12 against a Hamming sphere-packing ceiling of 18) and
+    /// `ROSTER_EXPANSION_SPEC.md` §1 brings the roster to **16**, which
+    /// does not fit. Eleven bits is the minimum; 12 was chosen for the
+    /// headroom (20 constructed). The 16-tag set is already here --
+    /// <see cref="SpeciesRoster.ReservedAntigens"/> holds the ten not yet
+    /// built -- so a new species takes its tag from a set whose 120 pairs
+    /// were verified together, rather than one that "looks far enough" from
+    /// the others. That habit is how the 8-bit set happened.
     /// </summary>
     public enum PathogenSpecies
     {
@@ -84,6 +93,25 @@ namespace ImmunologyTD.Pathogens
     }
 
     /// <summary>
+    /// Sprint 35: **a pathogen can look like two things.** Four of the ten
+    /// organisms in `ROSTER_EXPANSION_SPEC.md` change silhouette on the
+    /// board -- *C. perfringens* arms itself, *Giardia* has a trophozoite
+    /// and a cyst, *Cryptosporidium* an oocyst and a blister -- and until
+    /// now a sprite was chosen once at spawn and never revisited.
+    ///
+    /// Deliberately generic, and deliberately only two: the meaning of
+    /// <see cref="Alternate"/> is a per-species fact documented on the
+    /// profile field that triggers it, not something this enum pretends to
+    /// name for everyone. A/E *E. coli*'s pedestal is the first shipped
+    /// user (<see cref="SpeciesProfile.AnchorsWhenAdhered"/>).
+    /// </summary>
+    public enum PathogenForm
+    {
+        Primary = 0,
+        Alternate = 1,
+    }
+
+    /// <summary>
     /// The per-species table: what each species IS, and the handful of
     /// traits that make it behave unlike its classmates.
     ///
@@ -106,9 +134,19 @@ namespace ImmunologyTD.Pathogens
         ///
         /// **The whole set is chosen together, not one tag at a time.**
         /// Tags must be at least 2r+1 apart (5 at the shipped r=2) for a
-        /// helper-T cell to teach at most one species. These six sit at a
-        /// minimum distance of SIX, found by exhaustive search, which also
-        /// leaves headroom for the avidity upgrade to raise r to 3.
+        /// helper-T cell to teach at most one species. The live six and the
+        /// ten reserved in <see cref="SpeciesRoster.ReservedAntigens"/> sit
+        /// at a minimum distance of SIX across all 120 pairs.
+        ///
+        /// **Correction (Sprint 35).** This comment used to claim the set
+        /// "leaves headroom for the avidity upgrade to raise r to 3". It
+        /// does not, and never did: a set 6 apart needs 7 to be safe at
+        /// r=3, and at 10 bits r=3 admitted exactly **two** species -- a
+        /// Plotkin bound, not a search limit. At 12 bits it admits four.
+        /// `AdaptiveTuning.MatchMaxHammingDistance`'s own comment has this
+        /// right and says the cross-teaching is deliberately bought; the
+        /// two comments contradicted each other for six sprints and this
+        /// was the wrong one.
         ///
         /// Adding a species means re-running that search for the whole set,
         /// not picking a tag that "looks far enough" from the others --
@@ -198,6 +236,65 @@ namespace ImmunologyTD.Pathogens
         /// per-species knob §1b Step 2 promised the floor would become.
         /// </summary>
         public float PlaqueCrowdWeight;
+
+        // -- Sprint 35 ---------------------------------------------------
+
+        /// <summary>
+        /// The debut card's third line (`ROSTER_EXPANSION_SPEC.md` §4.2):
+        /// **the one thing that will not work**, stated as a negative.
+        ///
+        /// A positive hint ("use IgA") deletes the puzzle. A negative
+        /// warning tells the player their habit is about to fail without
+        /// handing them the replacement, which is the Bloons convention for
+        /// the lead bloon -- the game says *sharp will not pop this* and
+        /// lets the player find the rest.
+        ///
+        /// Every warning here names a mechanic that is actually
+        /// implemented. A warning about a trait the code does not have
+        /// would be the taglines-promising-Salmonella mistake again.
+        /// </summary>
+        public string Warning;
+
+        /// <summary>
+        /// **An applicability flag, not a multiplier** (BACKLOG, from the
+        /// Giardia antigen pass). §1d's PRR -> immunogenic-apoptosis
+        /// upgrade raises the debris an infected cell yields when it dies
+        /// well. *Vibrio cholerae* never enters a cell at all, so that row
+        /// does nothing against it -- and an upgrade that silently does
+        /// nothing is the exact dead-feature pattern this project keeps
+        /// finding. The flag lets the UI say so instead.
+        ///
+        /// It also pre-answers two of the ten: *Giardia* never infects a
+        /// cell either, and *Cryptosporidium*'s infected cells are
+        /// survivin-protected against apoptosis.
+        /// </summary>
+        public bool NeverEntersCells;
+
+        /// <summary>
+        /// A/E *E. coli*. Once this species is adhered to the gut wall it
+        /// draws in its <see cref="PathogenForm.Alternate"/> form -- the
+        /// actin pedestal (spec §5.4's two-form organisms, and the first
+        /// shipped user of that path).
+        ///
+        /// Biologically the pedestal is not carried around: it is
+        /// assembled *under* an intimately attached bacterium, intimin
+        /// binding Tir, effacing the microvilli beneath it. So the
+        /// silhouette changes exactly when the fact about the organism
+        /// changes -- which is the only honest reason for a sprite to
+        /// change at all.
+        /// </summary>
+        public bool AnchorsWhenAdhered;
+
+        /// <summary>
+        /// *Vibrio cholerae*. **Correction from the Sprint 34 research**
+        /// (`pathogens_bacteria_01.md`): the built organism steered toward
+        /// the wall, and the measured truth is the opposite -- *V. cholerae*
+        /// swims, and NON-chemotactic mutants out-compete wild type across
+        /// the small intestine. "Run straight and get everywhere" beats
+        /// "steer at the wall", and it is cheaper to compute than what it
+        /// replaces.
+        /// </summary>
+        public bool SwimsStraight;
     }
 
     /// <summary>Static roster lookup. Mutable-statics-with-a-reset shape, so
@@ -232,6 +329,38 @@ namespace ImmunologyTD.Pathogens
 
         /// <summary>The generic species standing in for a bare class -- the
         /// bridge for code and harnesses that still speak in classes.</summary>
+        /// <summary>The debut card's warning line, or the empty string
+        /// for a species with none authored.</summary>
+        public static string WarningOf(PathogenSpecies s) => Get(s).Warning ?? "";
+
+        /// <summary>
+        /// The ten 12-bit tags held for the organisms in
+        /// `ROSTER_EXPANSION_SPEC.md` §1 that are **specified and not
+        /// built**. They are here rather than in the doc because the
+        /// property that matters -- minimum pairwise distance 6 across all
+        /// 120 pairs of the full 16 -- is only true of the set as a whole,
+        /// and a harness can check a C# array. A tag chosen later, against
+        /// the six live ones only, could sit 6 from each of them and 3 from
+        /// a sibling nobody compared it to.
+        ///
+        /// Order matches the spec's table. Nothing reads these in play;
+        /// adding the species is what promotes one into
+        /// <see cref="SpeciesProfile.Antigen"/>.
+        /// </summary>
+        public static readonly (string name, int antigen)[] ReservedAntigens =
+        {
+            ("Norovirus GII.4",          0b011100111010),
+            ("Astrovirus",               0b100000101110),
+            ("Sapovirus",                0b100101000101),
+            ("Clostridium perfringens",  0b101001110011),
+            ("Staph aureus toxin",       0b101110100000),
+            ("STEC O157:H7",             0b101111011110),
+            ("ETEC",                     0b110010010010),
+            ("Giardia",                  0b110111101011),
+            ("Cryptosporidium",          0b111001001000),
+            ("Cyclospora",               0b111010111101),
+        };
+
         public static PathogenSpecies GenericFor(PathogenClass c)
         {
             switch (c)
@@ -252,8 +381,9 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.IntracellularVirus,
                 DisplayName = "Virus",
                 ShortName = "Virus",
-                Antigen = 0b0000000000,
+                Antigen = 0b000011011001,
                 FlushResistance = 1f,
+                Warning = "Your phagocytes cannot touch it once it is inside one of your own cells.",
             };
 
             table[(int)PathogenSpecies.GenericIntracellularBacterium] = new SpeciesProfile
@@ -262,8 +392,9 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.IntracellularBacterium,
                 DisplayName = "Intracellular bacterium",
                 ShortName = "Intra",
-                Antigen = 0b0000111111,
+                Antigen = 0b000110110111,
                 FlushResistance = 1f,
+                Warning = "Flushing the lumen will not reach this one.",
             };
 
             table[(int)PathogenSpecies.GenericLargeBacterium] = new SpeciesProfile
@@ -272,8 +403,9 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "Gut bacterium",
                 ShortName = "Bact",
-                Antigen = 0b0111000111,
+                Antigen = 0b001000010100,
                 FlushResistance = 1f,
+                Warning = "No tricks, and no mercy either. If this one gets through, it is because nothing was there.",
             };
 
             // -- Rotavirus --------------------------------------------------
@@ -289,8 +421,12 @@ namespace ImmunologyTD.Pathogens
                 DisplayName = "Rotavirus",
                 ShortName = "Rota",
                 // Part of the Sprint 29 10-bit set (min distance 6).
-                Antigen = 0b1011011001,
+                Antigen = 0b010000100001,
                 VillusTipTropismCells = 3,
+                // Both halves of this are implemented traits:
+                // NonLyticReleaseFraction suppresses burn-out, and
+                // EnterotoxinNeighbourDamage harms cells it never infects.
+                Warning = "Ignoring a focus will not make it burn out — and the damage will outrun the infection.",
                 // NSP4: a real viral enterotoxin. Harm spreads to cells the
                 // virus never enters, which is why rotavirus damage outruns
                 // rotavirus infection.
@@ -315,10 +451,17 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "Vibrio cholerae",
                 ShortName = "Vibrio",
-                Antigen = 0b1101101010,
+                Antigen = 0b010110001100,
                 ToxinFieldStrength = 0.9f,
                 ToxinFieldRadiusCells = 2.5f,
                 FlushResistance = 1f,
+                Warning = "Hunting for dying cells will not find it. The wall it has taken looks perfectly healthy.",
+                // It never takes a host-cell slot, so §1d's
+                // immunogenic-apoptosis row has nothing to act on.
+                NeverEntersCells = true,
+                // Sprint 35 correction: non-chemotactic mutants out-compete
+                // wild type across the small intestine.
+                SwimsStraight = true,
             };
 
             // -- Attaching-effacing E. coli ---------------------------------
@@ -331,9 +474,11 @@ namespace ImmunologyTD.Pathogens
                 Class = PathogenClass.LargeBacterium,
                 DisplayName = "A/E E. coli",
                 ShortName = "AEEC",
-                Antigen = 0b1110110100,
+                Antigen = 0b011011000111,
                 InflammationFuelFactor = 1.6f,
                 FlushResistance = 2.2f,
+                Warning = "A messy clear feeds the survivors, and once it is anchored it will not flush.",
+                AnchorsWhenAdhered = true,
             };
         }
     }

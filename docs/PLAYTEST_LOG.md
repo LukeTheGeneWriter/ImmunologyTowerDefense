@@ -172,3 +172,62 @@ because the session was spent on the messaging gap:
 - Is IgA perceptible now that wall pressure climbs? (The Sprint 22 miss was
   diagnosed as round design, and the 40-round script is the fix being
   tested.)
+
+---
+
+## Sprint 35 — the answer to (1), measured (2026-11-05)
+
+**Not a display bug. All three candidates above were wrong.**
+
+A harness that boots the real game, drives a real `RoundController`
+through Building → Active → Building and reads the live visual tree
+(`UiProbe`, `UiTreeDump`) found the caption **correct in every phase**:
+right text, exactly one element, attached to the panel root, nothing
+hiding it, every character drawable in the shipped font.
+
+What was actually true:
+
+> The round's identity was **11 px of dim grey, in the top-right corner,
+> under two 30 px numbers, beside a 48 px button, with four facts run
+> together by middots** — and in a browser window narrower than the
+> 1920 px reference, the panel scales that line down further.
+
+The message was drawn. Nobody was ever going to read it. **That makes (1)
+and (2) the same piece of work**, because the surface the message needed
+is the debut card from §4.2 — and both shipped in Sprint 35.
+
+**The lesson is sharper than "measure first".** The handoff's three
+candidates were all *mechanical* explanations, and the project's standing
+pattern ("a value produced and never consumed") primed everyone to expect
+one. The failure was in **design**, not wiring — and a green harness plus
+a correct tree would have gone on hiding it indefinitely, because nothing
+in either can see 11 px of grey in a corner. `UiProbe` closes the
+mechanical half of that gap and explicitly **cannot** close the other
+half; batchmode runs no layout pass.
+
+### One finding that bears directly on the standing IgA question
+
+**The knowledge ladder has been labelling secretory IgA "Complement"
+since Sprint 25** — in the expanded ladder and in the unlock ribbon both,
+from a six-entry label array indexed against a five-rung ladder.
+
+Read that next to the two facts already on file: `KnowledgeLadder`'s
+header records that IgA's *built* flag stayed false for a sprint after it
+shipped, so the HUD called a running mechanic "planned"; and the Sprint 22
+miss was diagnosed as round design. A third explanation is now on the
+table and it is the dullest one: **the surface that announces IgA has
+never once said "IgA".** Whether that is *the* reason it was never
+perceived is still unknown — but it has to be ruled out before the
+round-design diagnosis gets another sprint of work.
+
+### Still open — now four questions
+
+The three from Sprint 32, unchanged, plus one this sprint created:
+
+- Does the 40-round curriculum **read** as teaching?
+- Is a one-burst round 40 exciting, or a wall of sprites?
+- Is IgA perceptible now — **and does it read differently now that the
+  ribbon calls it by its name?**
+- **Do the new messages land, or crowd?** Three surfaces now say what is
+  coming (debut card, first-sighting banner, HUD caption), and the two
+  banner dwell times (7 s plain, 16 s debut) are guesses.

@@ -1,6 +1,17 @@
 # Engine Status
 
-Rewritten at the end of every sprint, not just appended to. This version
+Rewritten at the end of every sprint, not just appended to.
+
+> **Honesty note (Sprint 35).** That first sentence has not been true for
+> twenty sprints: this file is appended to, and the paragraph below still
+> opens by describing Sprint 15. Rather than leave a header that lies,
+> read it as what it is — a layered record whose **newest sections are at
+> `## Sprint 32`, `## Sprint 34`, `## Sprint 35` and `## Known issues`**,
+> with the earlier narrative kept because it is still accurate about the
+> parts it describes. A real rewrite is a sprint of its own; pretending
+> the file is something it is not costs more than admitting it.
+
+The paragraph below
 reflects the state after **Sprint 15** (the compartment visual pass — the
 lumen and base bands leave the per-cell grid and are drawn as an open
 fluid channel and a bloodstream; the lymph node and bone marrow gain
@@ -1289,6 +1300,87 @@ harness had collected host slots at the **crypt** end, which the villus-tip
 tropism correctly forbids. The harness was wrong, not the code.
 
 
+## Sprint 35 — the screen says it
+
+The Director's playtest said the game told him nothing about the rounds.
+The expected cause was a wiring bug; it was measured instead, and it was
+not one. This sprint built the capability that could measure it, fixed the
+real defect, and took down the four engineering gates in front of the ten
+specified organisms.
+
+### The measurement that overturned the diagnosis
+
+`UiProbe` + `UiTreeDump` boot the real game, drive a real
+`RoundController` through its phases, and read the **live visual tree**.
+Sprint 33's caption came back **correct in every phase** — right text,
+unique in the tree, attached to the panel root, displayed, drawable in the
+shipped font.
+
+The defect was that the round's identity was **11 px of dim grey in the
+top-right corner**, beneath two 30 px numbers, with four facts run
+together by middots, scaled down further in any browser window narrower
+than the 1920 px reference. Not a wire — a surface.
+
+### What changed in the engine
+
+| Change | Where |
+|---|---|
+| `UiProbe` + `UiNames` — the live tree, by name, from the Editor assembly | `UI/UiProbe.cs` (new) |
+| `UiController.RefreshViews()` public; `UiProbe.Register` at build | `UI/UiController.cs` |
+| `RoundBannerView` — the buy-phase debut card and the first-sighting banner | `UI/RoundBannerView.cs` (new) |
+| `SpeciesSightings` — what the player has met, and in what order | `Pathogens/SpeciesSightings.cs` (new) |
+| `PathogenForm` + `SpeciesProfile.AnchorsWhenAdhered` — mid-board form change | `Pathogens/PathogenSpecies.cs`, `PathogenAgent.RefreshForm` |
+| `SpriteShapes.ForSpecies` / `Palette.ForSpecies` + three organism sprites | `Rendering/SpriteShapes.Sprint35.cs`, `Rendering/Palette.cs` |
+| `PathogenAgent.ApplySpeciesVisual()` — **one** place decides what an organism looks like (was three, all keyed off `Class`) | `Pathogens/PathogenAgent.cs` |
+| `AdaptiveTuning.BarcodeBits` 10 → 12; `SpeciesRoster.ReservedAntigens` | `Adaptive/AdaptiveTuning.cs`, `Pathogens/PathogenSpecies.cs` |
+| Knowledge ribbon: five-slot viewport, sliding strip, edge fades, recency order | `UI/KnowledgeView.cs` |
+| `SpeciesProfile.Warning` / `NeverEntersCells` / `SwimsStraight` | `Pathogens/PathogenSpecies.cs` |
+
+### Three live bugs, and what they have in common
+
+1. **The 70% knowledge rung has been labelled "Complement" since Sprint
+   25.** `KnowledgeView` indexed a six-entry label array by rung against a
+   five-rung ladder; Sprint 25 moved Complement off the ladder and the
+   array was not updated. The expanded ladder *and* the unlock ribbon both
+   mislabelled Secretory IgA. Now derived from `KnowledgeCapability`.
+2. **`KnowledgeView.SpeciesIcon` drew rotavirus as a bacterium** —
+   `case 0 / case 1 / default`, rotavirus is species 3.
+3. **The ribbon's left fade would have lied** — its cached visibility
+   started out disagreeing with its actual visibility, so the first update
+   never fired.
+
+All three are the same shape: **two things that must agree, kept in
+agreement by hand.** Each fix removes the hand — a switch on the
+capability, a shared dispatch, a cache initialised against reality.
+
+### Numbers worth keeping
+
+- A steering bacterium drifts **+0.75 coarse cells** wallward across its
+  lumen transit; *V. cholerae*, after the non-chemotactic correction,
+  **−0.30** (an unbiased walk from a near-wall spawn drifts *away* — that
+  is the signature, not a fault).
+- The 16-tag 12-bit barcode set: **120 pairs, minimum distance 6**, and
+  **0 of 4,096** possible helper-T tags teach two species at r=2. At r=3,
+  **1,356** tags do — cross-reactivity bought deliberately, as
+  `AdaptiveTuning` always claimed and `SpeciesProfile` wrongly denied.
+- Knowledge ribbon: viewport **960 px** (5 × 192), scroll range
+  `(species − 5) × 192`, clamped both ends.
+
+### Verification
+
+`Sprint35Verification`, **94 checks**, including a negative control on the
+probe itself. Suite: **26 methods, 983 checks, all green** (was 25 / 889).
+WebGL **Succeeded, 9,328,875 bytes, 0 errors**.
+
+**A harness trap worth carrying forward:** `GameBootstrap` creates many
+**root** GameObjects, so a harness that destroys only its own bootstrap
+object leaves an entire parallel game in the scene — and the next
+`FindFirstObjectByType<UiController>()` returns the **stale** one while
+`UiProbe` answers for the newest tree. The first run of this harness
+failed exactly that way, and the pass/fail pattern (first boot fine, every
+later boot wrong) is the tell. `Booted` now records the scene's roots
+before booting and takes down everything that appeared.
+
 ## Build status (Sprints 13-17)
 
 All run by the **head session**. Numbers copied from actual output.
@@ -1536,20 +1628,28 @@ exercised here only in the sense that nothing moves.
 
 ## Known issues
 
-- **(New, Sprint 34) There is no per-species sprite path.**
-  `PathogenAgent` sets `sr.sprite` from `Class` alone — two sprites for the
-  whole roster — so rotavirus, *V. cholerae* and A/E *E. coli* have
-  rendered as the generic corona ball and the generic bean since Sprint 24.
-  Sixth instance of the standing pattern, and it blocks the whole
-  roster-expansion sprite spec. Needs `SpriteShapes.ForSpecies` plus a
-  per-species palette entry.
-- **(New, Sprint 34) `KnowledgeView.SpeciesIcon` draws rotavirus as a
-  bacterium.** It switches `case 0 / case 1 / default`, and rotavirus is
-  species 3, so it gets the bacterium silhouette tinted virion-violet.
-- **(New, Sprint 34) The knowledge HUD does not scale past about six
-  species.** The ribbon is a fixed 420 px holding 186 px cards; sixteen
-  species would be ~3,000 px of cards. Showing only species seen this run
-  fixes it and teaches better.
+- ~~**(Sprint 34) There is no per-species sprite path.**~~ **FIXED,
+  Sprint 35** — `SpriteShapes.ForSpecies` + `Palette.ForSpecies`, and all
+  three shipped organisms drawn.
+- ~~**(Sprint 34) `KnowledgeView.SpeciesIcon` draws rotavirus as a
+  bacterium.**~~ **FIXED, Sprint 35** — routed through the same
+  per-species dispatch the board uses.
+- ~~**(Sprint 34) The knowledge HUD does not scale past about six
+  species.**~~ **FIXED, Sprint 35** — a five-card viewport over a
+  scrolling strip, ordered most-recently-seen (Director's design).
+- **(New, Sprint 35) The free A/E *E. coli* silhouette is close to the
+  generic bean.** Deliberate so far as it goes — in the lumen it *is*
+  just an *E. coli*, and its tell (the pedestal) is a property of being
+  attached. But at 20 px the two read nearly alike, and the only
+  separation is a within-family hue shift. If a playtest says the pair
+  are confusable, the free form needs its own modifier, not a louder
+  colour.
+- **(New, Sprint 35) Nothing asserts on UI LAYOUT.** `UiProbe` can prove
+  an element exists, says the right thing and is not hidden; it cannot
+  prove the line is legible, unclipped or on top, because Editor
+  batchmode runs no layout pass. The defect this sprint fixed — a message
+  that was drawn correctly and was still unreadable — is therefore *still
+  outside the harness*. An eye on a real build remains load-bearing.
 - **(New, Sprint 34) The antigen barcode is one species-addition away from
   its ceiling.** Ten bits admits at most **12** species at the shipped
   match radius (constructed 12, Hamming ceiling 18) and the roster is 6; a

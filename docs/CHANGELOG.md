@@ -1268,3 +1268,52 @@ shipped.
   on luck, and a Sprint 34 change to RNG consumption moved the stream. It
   now derives the expectation from the round's own cast weights with a 3
   sigma tolerance at the emitted batch size.
+
+## Sprint 35 -- 2026-11-05
+The game talks to you now, and the four gates in front of the next ten
+organisms are down.
+
+- **Every buy phase announces itself.** A card in the middle of the
+  screen names the round and what is coming in it -- "Raw oysters,
+  Vibrio cholerae" -- at a size you can actually read.
+  - The first time an organism appears in the script, the card shows its
+    picture big, its name, and **the one thing that will not work
+    against it**: "Hunting for dying cells will not find it. The wall it
+    has taken looks perfectly healthy." It never tells you what *does*
+    work -- that is the puzzle.
+  - A smaller banner says "first sighting" the first time each organism
+    actually turns up on the board.
+  - The old corner caption keeps the short version for the rest of the
+    phase.
+- **Why you were not seeing round messages.** They were being drawn, and
+  had been all along -- in 11-pixel grey text in the top corner, under
+  two big numbers, with four separate things crammed onto one line. The
+  message was there; nobody was ever going to read it.
+- **Pathogens look like themselves.** Rotavirus is a wheel (that is what
+  "rota" means, and what it looks like), *Vibrio cholerae* is a comma
+  with a bright flare for the toxin it works at a distance with, and A/E
+  *E. coli* is a long rod -- until it attaches to the wall, when it
+  **plants itself on a dark pedestal** and keeps it until something
+  flushes it off. Before this, all three were drawn as a generic ball or
+  a generic bean.
+- **The knowledge strip scrolls.** Five cards visible, the five organisms
+  you have met most recently, the rest a scroll away behind a soft fade
+  at each edge. Organisms you have never met are dimmed -- which is what
+  dimming always should have meant.
+- **The knowledge ladder has been calling secretory IgA "Complement"
+  since Sprint 25.** A list of labels and a list of rungs drifted one
+  apart. Of everything here, this is the one most likely to have changed
+  how the game felt: the surface that tells you your antibody defence has
+  arrived has never once said its name.
+- **The rotavirus card was drawing a bacterium.** Fixed.
+- ***Vibrio cholerae* stopped steering.** It swims hard and straight
+  instead of aiming at the wall, which is what the real organism does --
+  the ones that cannot steer actually do *better* in the small intestine.
+- **Rungs that cannot work on an organism now say so.** Killer T cells
+  and memory T cells both need an infected cell, and *Vibrio cholerae*
+  never enters one, so its ladder reads "no effect on this one" instead
+  of quietly doing nothing.
+- Under the hood: the antigen barcode widened from 10 bits to 12 (ten
+  could not hold the sixteen organisms the roster is heading for), and
+  the test harness can finally read the screen -- 94 new checks, 983
+  across the project, all green.

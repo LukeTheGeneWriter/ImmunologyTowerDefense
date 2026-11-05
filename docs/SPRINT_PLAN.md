@@ -1,156 +1,174 @@
-# Sprint Plan — Sprint 34 (opened and closed 2026-11-02)
+# Sprint Plan — Sprint 35 (opened and closed 2026-11-05)
 
-Director, skipping Sprint 33's playtest too: *"Kill the game for a while
-longer and launch a research swarm to ID 10 more common gut pathogens in
-humans. Design sprites and warning messages. Some are just stronger
-bacteria or viruses, others have some special power, resistance, etc."*
+Director, on the outline of everything still outstanding: *"Make the
+knowledge hub scrollable with a fade out and have the 5 most recently seen
+pathogens occupy the visible spaces. A user can browse this way but still
+has the most useful info available. Your other changes are scoped well,
+please work them out. This will be a big sprint with everything."*
 
-Then, after the passes landed: *"Colonic is fine. Figure out how the body
-learns about giardia, there is definitely a way we can model here. You can
-fix rotavirus, good catch."*
-
-Sprint 33's plan and outcome are in git (`cfde0f7`) and `CHANGELOG.md`.
+Sprint 34's plan and outcome are in git (`6ca032b`, `a3575ff`) and
+`CHANGELOG.md`.
 
 ---
 
 ## Scope
 
-**A research sprint with a small code tail.** No new organism is built.
+**Everything outstanding, in one sprint.** The head of the queue was the
+Director's playtest report — *"I gave it a play test, and did not see any
+messages for the rounds"* — and behind it the four engineering gates in
+front of the ten specified organisms, the live bugs, and the corrections
+the Sprint 34 research produced.
 
 | Strand | What |
 |---|---|
-| A | Five parallel research passes: protozoa, helminths, common bacteria, viruses, and one cross-cutting burden pass |
-| B | A design spec: ten organisms, their sprites, their warning messages, and the engineering that gates them |
-| C | The Director's follow-up: how the body learns about *Giardia* |
-| D | Fix the two rotavirus findings the passes turned up about an organism already shipped |
+| A | The harness can see the screen — the capability that did not exist |
+| B | The round message, measured and then actually fixed |
+| C | The four gates (barcode, sprites, the ribbon, two forms) |
+| D | Three live bugs found on the way |
+| E | Corrections to built code and to standing design |
 
-### Why a swarm rather than one pass
+## A. The measurement, and the thing it overturned
 
-The roster had been chosen purely on **mechanical novelty** — deliberately,
-and the rule was good: *a species earns a slot by forcing a decision no
-existing enemy forces.* But the Director asked for **common** pathogens, and
-nobody on this project had ever put a burden number next to a candidate. A
-virologist's "common" and a parasitologist's "common" are not the same
-scale, so one pass had to own the cross-kingdom numbers while four others
-went deep. Two kingdoms — protozoa and helminths — had never been looked at
-at all.
+**The handoff's diagnosis was wrong, and it was worth the hour to find
+out.** Sprint 33's caption had 41 green checks and the Director saw
+nothing, so the expected cause was a wiring bug — a string written into a
+Label that never reached a pixel. The handoff listed three candidates to
+measure.
 
-### The rule the Director relaxed, and why that was right
+None of them. `UiProbe` + `UiTreeDump` boot the real game, drive a real
+`RoundController` through its phases and read the **live visual tree**:
+the caption's text was correct, unique, attached to the panel root,
+displayed, and drawable in the shipped font, **in every phase**.
 
-"Some are just stronger" closed a real hole. **Sapovirus** (#2 most common
-enteric pathogen in the world) and **ETEC** (#5) are mechanically redundant
-with organisms already built, and the old rule excluded them *for being
-ordinary*. A game about the gut that omits the second most common thing in
-the gut is sorting on the wrong axis. So the ten are **eight mechanic slots
-plus two tier slots**, labelled as tiers rather than given an invented
-power. Bloons does the same thing: red → blue → green is one mechanic at
-four strengths.
+The round's identity was **11 px of dim grey in the top-right corner,
+under two 30 px numbers, beside a 48 px button, with four facts run
+together by middots** — and in a browser window narrower than the 1920 px
+reference the panel scales that down further. A first encounter with an
+organism the player had never met was given the smallest type on the
+screen.
 
-## What shipped
+So: **not a wire, a surface.** Which collapses the two top queue items
+into one piece of work, because the surface the message needed is exactly
+`ROSTER_EXPANSION_SPEC.md` §4.2's debut card — the thing the Director had
+flagged as *"I didn't ask for that last part."*
 
-### A + B — the research and the spec
+**The capability is the durable half.** `UiProbe` gives the Editor
+assembly the live tree by name, with the two questions a UI check needs:
+*what does this say*, and *would the player see it*. Eight defects in this
+project have now come from asking "is this value consumed" — this is the
+first tool that can ask it on the UI side.
 
-~5,500 lines in `docs/research/`, every claim PubMed- or Consensus-verified
-in session, gaps marked **UNVERIFIED** rather than filled in, and every
-mouse finding labelled mouse. The ten, with sprites and warnings, are in
-**`docs/ROSTER_EXPANSION_SPEC.md`**.
+Its limit is stated rather than papered over: **batchmode runs no layout
+pass**, so `worldBound` is all zeroes and nothing here can prove a line is
+legible, unclipped or on top. That still needs an eye on a build.
 
-**The two design findings worth more than the organisms:**
+## B. What the player now gets
 
-- **The tell goes where the player must look.** Three of the ten put their
-  marker on something other than the enemy, and that is correct rather than
-  a compromise: astrovirus's breach on the **wall** (drawing it on the
-  virion would delete the mechanic), *S. aureus*'s toxin on the **bolus**,
-  *Cryptosporidium*'s apoptosis resistance on the **infected host cell**.
-- **Colour cannot be the species channel.** The palette has two pathogen
-  hues and every other hue is already a meaning on this board, so identity
-  is silhouette family (kingdom) × one tell (the *mechanic*, not the
-  taxonomy) × size — with the eukaryotes legitimately the largest things in
-  the lumen, a *Giardia* trophozoite being 15 µm against a 2 µm bacterium.
+- **A round banner**, centred, every buy phase: the round number, the
+  vehicle at 22 px, and on a debut round the organism's name, its sprite
+  at 86 px, and **the one thing that will not work**, stated as a negative
+  (§4.3's rule — a positive hint deletes the puzzle).
+- **A first-sighting banner** (§4.5) the first time a species actually
+  arrives on the board in a run. Three surfaces, one fact each: the debut
+  card teaches, the banner confirms, the HUD tracks.
+- **The HUD caption keeps the residue** — what is new, and how to start.
+  Four facts in 11 px was one fact nobody read.
 
-### C — how the body learns about *Giardia*
+## C. The four gates, all closed
 
-§1c's "debris is the input to adaptive immunity" made a whole class of
-organism unlearnable: *Giardia* kills nothing and sheds no debris, so the
-rungs that answer it were unreachable from a *Giardia* round. The real
-route is **parasite-shed extracellular vesicles** — human DCs capture and
-mature on *Giardia* microvesicles whose proteome carries VSPs, and
-**antibody binding triggers a massive release**, so attacking it is what
-makes it teachable. Both carriers already exist (the Sprint 19 M-cell dome,
-or a patrolling DC). Recorded as an amendment under §1c: **debris is one
-input, not the only one.** Designed, unbuilt.
+| Gate | What shipped |
+|---|---|
+| Barcode 10 → 12 bits | The six live tags re-cut from the spec's verified 16-tag set; the **ten unbuilt tags held in `SpeciesRoster.ReservedAntigens`**, because the property that matters (120 pairs ≥ 6 apart) is only true of the set as a whole |
+| Per-species sprites | `SpriteShapes.ForSpecies` + `Palette.ForSpecies`; rotavirus's wheel, *V. cholerae*'s comma, A/E *E. coli*'s rod, all three of which had rendered as generics since Sprint 24 |
+| The knowledge ribbon | The Director's design: five visible slots, the whole roster behind them, ordered most-recently-seen, edges fading under the card |
+| Two forms | `PathogenForm`, with **one real shipped user** rather than a mechanism waiting for one |
 
-Two routes were rejected *on evidence* and recorded so they are not
-re-proposed: transepithelial dendrites (CX3CR1⁺ cells do not migrate to the
-node, so they are structurally wrong for §5a) and goblet-cell antigen
-passages (they feed *tolerogenic* DCs and are shut by IL-1β, which *Giardia*
-does not induce — a GAP route would teach the immune system **tolerance**).
+**The two-form path got a real user on purpose.** Building it for the four
+unbuilt organisms that need it would have been a mechanism with no caller
+— the dead-feature pattern, pre-committed. A/E *E. coli*'s actin pedestal
+is assembled *under an intimately attached bacterium* (intimin–Tir,
+microvilli effaced beneath it), so the silhouette now changes exactly when
+the fact about the organism changes, and being sloughed costs it the
+anchor. True on both sides.
 
-### D — the rotavirus corrections
+## D. Three live bugs, found on the way
 
-Both findings were wrong in the same direction: the game had been playing
-rotavirus as an ordinary lytic virus arriving at an ordinary dose.
+1. **The knowledge ladder has been calling IgA "Complement" since Sprint
+   25.** `KnowledgeView` held a positional array of six labels against a
+   ladder of five rungs; Sprint 25 moved Complement off the ladder and the
+   array was never updated, so every index from there on was one out — and
+   the 70% rung, which is Secretory IgA, was labelled **Complement** in
+   the expanded ladder *and* in the unlock ribbon.
 
-- **Non-lytic exit.** `SpeciesProfile.NonLyticReleaseFraction` suppresses
-  §4b burn-out. An ignored rotavirus focus no longer resolves itself — it
-  keeps shedding until the player kills the cell. It stays self-limiting
-  via the crypt repaving under its tropism, which is closer to how
-  rotavirus actually resolves clinically.
-- **Vesicle dose.** `SpeciesProfile.PlaqueCrowdWeight`, read through
-  `SpeciesRoster.CrowdWeightOf`. Capped at 1.9, below the ingress floor of
-  2.0, **because §1b Step 2 property 2 is locked and load-bearing** — the
-  measured multiplier is ~3.5x and would have let a lone virion charge a
-  plaque. Rotavirus's minimum dose is now two organisms where a generic
-  virus needs three, which is exactly the per-species knob §1b Step 2 said
-  the floor would become.
-- **And the thing that fell out of fixing them: budding had never been
-  per-species.** §4b has said "two per-species modes" since Sprint 5 and
-  the code chose with a coin flip, admitting in a comment that "there is no
-  species roster yet" — untrue since Sprint 24. Seventh instance of the
-  standing pattern.
+   This matters more than its size. `PLAYTEST_LOG.md` has carried an open
+   question since Sprint 22 about why the Director never perceived IgA,
+   and `KnowledgeLadder`'s own header already records that its *built*
+   flag was left false for a sprint, so the HUD called IgA "planned" while
+   it was running. **The one surface that announces IgA has never once
+   said "IgA".** Now derived from the capability, so it cannot drift
+   again.
+
+2. **`KnowledgeView.SpeciesIcon` drew rotavirus as a bacterium** —
+   `case 0 / case 1 / default`, and rotavirus is species 3. Routed through
+   the same per-species dispatch the board uses.
+
+3. **The left fade would have lied.** Caught by its own harness check: the
+   cached "what is on screen" started disagreeing with what *was* on
+   screen, so the first update never fired and a ribbon at its start would
+   have claimed there was more behind you.
+
+## E. Corrections landed
+
+- ***V. cholerae* swims, it does not steer.** Non-chemotactic mutants
+  out-compete wild type across the small intestine, so "run straight and
+  get everywhere" replaces "steer at the wall" — truer, and cheaper than
+  what it replaced. Measured on the board: a steering bacterium drifts
+  **+0.75 cells** wallward over its lumen transit, *Vibrio* **−0.30**.
+- **An applicability flag, not a multiplier.** *V. cholerae* never enters
+  a cell, so the two knowledge rungs that act on an infected cell are
+  inert against it and the HUD now says **"no effect on this one"**. The
+  §1d shop row inherits the flag when it is built; it also pre-answers
+  *Giardia* and *Cryptosporidium*.
+- **§4a's parasite class, twice over** (`GAME_DESIGN.md`): re-spec'd as
+  single-slot with a size multiplier — not one enteric protozoan needs the
+  multi-slot footprint that deferred the whole class since Sprint 2 — and
+  its clearance rule corrected from "direct combat damage, more of it" to
+  **expulsion**. The player's instinct on meeting this class, build more
+  killers, is the wrong answer for the entire group.
+- **§1d gets its applicability amendment**; `PATHOGEN_ROSTER.md` loses two
+  overstatements (adenovirus F41 is not a cliff; norovirus's 2–4 year
+  cycle is historical only).
+- **The eukaryote hue is decided** (desaturated plum) and deliberately
+  *not* added to `Palette` until something uses it.
+- **`docs/INTERFACE.md`'s Sprint 22–31 backfill**, a `WORKFLOW.md` §5.3
+  checkbox that had been ticked without being true.
 
 ## Stopping points — what was deliberately not done
 
-- **None of the ten organisms is built.** Four gates come first (spec §5):
-  the barcode must widen to 12 bits, a per-species sprite path must exist
-  at all, the knowledge HUD must scale past six species, and a pathogen's
-  sprite must be able to change mid-board.
-- **"Shed antigen" is designed, not built.** One new lumen-side entity, and
-  it changes a locked section, so it needs the Director.
-- **The anatomy ruling's unlocked organisms are unranked.** *Entamoeba*,
-  *Shigella*, *Campylobacter*, *Trichuris*, *C. difficile*, ETBF. The
-  ruling landed after the ten were chosen; they are the head of the next
-  list, not a late addition to this one.
-- **No sprite was drawn.** The spec is primitive-level (which `FillDisc`,
-  which `FillStar`, what size, what hue) so that a Code sprint can execute
-  it, but nothing was committed to `SpriteShapes`.
-
-## Corrections this sprint produced
-
-Sixteen across the five passes; the ones touching built code or locked
-sections are listed in `ROSTER_EXPANSION_SPEC.md` §7 and `BACKLOG.md`. The
-two that matter most for whoever builds next:
-
-1. **§4a's "parasites don't hide" and "cleared by direct combat damage,
-   more of it" are both wrong.** Cytotoxic lymphocytes are inactive against
-   helminths; clearance is expulsion. The player's instinct — build more
-   killers — is the wrong answer for the entire group.
-2. **The built *V. cholerae* actively swims**, and non-chemotactic mutants
-   *out-compete* wild type across the small intestine. "Run straight and
-   get everywhere" beats "steer at the wall" — truer *and* cheaper than
-   what is implemented.
+- **None of the ten organisms is built.** The gates are down; the
+  organisms are the next sprint's work, and the shortlist the colonic
+  ruling unlocked (*Entamoeba* first) is still unranked.
+- **"Shed antigen" is still designed, not built.** It needs one new
+  lumen-side entity and it amends a locked section — but its only emitter
+  would be *Giardia*, which does not exist yet. Building it now would be a
+  mechanism with no caller, which is exactly what the two-form path was
+  deliberately *not* allowed to be. It lands in the sprint that builds
+  *Giardia*.
+- **No layout assertions.** The probe cannot see pixels, and a check that
+  pretended otherwise would be the same mistake one level up.
 
 ## Verification
 
-`Sprint34Verification`, **20 checks** in three parts: the spread mode
-belongs to the roster, a non-lytic releaser does not burn out, and the
-vesicle dose measured through the real `GutWall` rather than a
-reimplementation of it.
+`Sprint35Verification`, **94 checks** in eleven parts, including a
+negative control on the probe itself — a probe that can only answer
+"displayed" is not a probe.
 
-One pre-existing harness had to be corrected, not accommodated:
-`Sprint32Verification` asserted that "the named organisms are the
-**majority**" of the round it finds, which is round 20, whose cast makes
-them **exactly half** — it had been passing on luck, and a Sprint 34 change
-to RNG consumption moved the stream. It now computes the expectation from
-the round's own cast weights with a 3σ tolerance at the emitted batch size.
-Third instance of a harness owning a number it is not testing.
+**Suite: 26 methods, 983 checks, all green** (was 25 / 889).
+`Sprint29Verification`'s `BarcodeBits == 10` was replaced rather than
+edited to 12: it asserted a *decision*, so a correct widening would have
+had to edit the test to pass. It now derives the width from the Hamming
+sphere-packing bound for the actual roster — a necessary condition, so it
+can never falsely fail. **Fifth instance of a harness owning a number it
+is not testing.**
+
+Build: WebGL **Succeeded, 9,328,875 bytes, 0 errors**.

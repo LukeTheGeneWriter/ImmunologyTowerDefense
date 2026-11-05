@@ -391,16 +391,12 @@ namespace ImmunologyTD.Pathogens
             contactFlashTimer = 0f;
             lastSpreadAttemptTime = float.NegativeInfinity;
 
-            // Visible as itself in the channel. Sprint 13: class-specific
-            // sprite + colour (virion = cold dot, bacterium = maroon rod).
-            restColor = Class == PathogenClass.IntracellularVirus
-                ? BoardRenderer.VirionColor : BoardRenderer.PathogenColor;
-            sr.color = restColor;
-            sr.sprite = Class == PathogenClass.IntracellularVirus
-                ? ImmunologyTD.Rendering.SpriteShapes.Virion
-                : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
-            ApplyVisualScale();
-            sr.enabled = true;
+            // Visible as itself in the channel. Sprint 35: as ITSELF,
+            // per species -- this used to pick from the class, which is why
+            // rotavirus had rendered as a generic ball since Sprint 24.
+            Form = PathogenForm.Primary;
+            ApplySpeciesVisual();
+            SpeciesSightings.Record(Species);
 
             SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
             // Desync step clocks so a batch of spawns doesn't move in
@@ -427,6 +423,8 @@ namespace ImmunologyTD.Pathogens
             EnsureSprite();
 
             Species = speciesOverride ?? SpeciesRoster.GenericFor(pClass);
+            Form = PathogenForm.Primary;
+            SpeciesSightings.Record(Species);
             SetHealthForClass();
             AssignVirusTraits();
             InterfacePosition = -1;
@@ -695,7 +693,15 @@ namespace ImmunologyTD.Pathogens
 
             // Wallward is DECREASING axis index: LumenNearWallAxisIndex is
             // the channel cell closest to the epithelium.
-            float wallward = motile ? 0.5f + 0.5f * InvasionTuning.MotileWallwardBias : 0.5f;
+            //
+            // **Sprint 35 correction (V. cholerae).** A swimmer that does
+            // not steer still mixes, it just does not aim: non-chemotactic
+            // mutants OUT-COMPETE wild type across the small intestine, so
+            // "run straight and get everywhere" is both truer and cheaper
+            // than "steer at the wall". The organism keeps its motile
+            // lane-change rate and loses only the bias.
+            bool steers = motile && !SpeciesRoster.Get(Species).SwimsStraight;
+            float wallward = steers ? 0.5f + 0.5f * InvasionTuning.MotileWallwardBias : 0.5f;
             int delta = Random.value < wallward ? -1 : +1;
 
             int candidate = axis + delta;
@@ -779,8 +785,10 @@ namespace ImmunologyTD.Pathogens
             millDepth = Random.Range(0.05f, 0.12f);
             millPhase = Random.Range(0f, Mathf.PI * 2f);
 
-            restColor = BoardRenderer.PathogenColor;
-            if (sr != null) { sr.color = restColor; sr.enabled = true; }
+            // Sprint 35: per species, and the pedestal goes up here --
+            // RefreshForm reads the state this method just set.
+            RefreshForm();
+            ApplySpeciesVisual();
             SnapTo(gutWall.WallToWorld(WallS, WallD));
             return true;
         }
@@ -865,6 +873,10 @@ namespace ImmunologyTD.Pathogens
             CurrentCoarse = board.CoarseFromAxis(board.LumenNearWallAxisIndex, lane);
             Current = board.CoarseCenterFine(CurrentCoarse);
             stepTimer = 0f;
+            // An A/E pedestal is assembled in the host membrane, so being
+            // sloughed costs the organism its anchor -- the silhouette says
+            // so, and the flush resistance it bought was spent.
+            RefreshForm();
             SnapTo(board.CoarseToWorldCenter(CurrentCoarse));
         }
 
@@ -1335,18 +1347,55 @@ namespace ImmunologyTD.Pathogens
         /// now driven by <see cref="IsIntracellular"/>.</summary>
         private void ApplyRestColorForCurrentClass()
         {
+            ApplySpeciesVisual();
+        }
+
+        /// <summary>
+        /// **Sprint 35: the one place that decides what this organism looks
+        /// like.** Three call sites used to answer it independently from
+        /// <see cref="PathogenClass"/> -- spawn, wall adhesion, and the
+        /// hide-in-tissue rule -- which is how a species could have a sprite
+        /// nothing ever selected.
+        ///
+        /// Keeps every existing rule intact: an intracellular pathogen is
+        /// drawn as the host cell rather than itself (§4a), so its own
+        /// renderer is disabled; everything extracellular is visible as
+        /// itself on the occupant layer (§1b step 4).
+        /// </summary>
+        private void ApplySpeciesVisual()
+        {
             restColor = IsIntracellular
                 ? BoardRenderer.InfectedHostColor
-                : (Class == PathogenClass.IntracellularVirus ? BoardRenderer.VirionColor : BoardRenderer.PathogenColor);
+                : ImmunologyTD.Rendering.Palette.ForSpecies(Species);
             if (sr == null) return;
             sr.color = restColor;
             sr.enabled = !IsIntracellular;
-            // Sprint 13: shape by class -- a small cold dot for a free
-            // virion, a maroon rod for either bacterium.
-            sr.sprite = Class == PathogenClass.IntracellularVirus
-                ? ImmunologyTD.Rendering.SpriteShapes.Virion
-                : ImmunologyTD.Rendering.SpriteShapes.LargeBacterium;
+            sr.sprite = ImmunologyTD.Rendering.SpriteShapes.ForSpecies(Species, Form);
             ApplyVisualScale();
+        }
+
+        /// <summary>
+        /// Which of its forms this organism is currently drawn in
+        /// (`ROSTER_EXPANSION_SPEC.md` §5.4). Public and settable only from
+        /// here: a form is a consequence of the organism's state, never a
+        /// cosmetic choice a caller makes.
+        /// </summary>
+        public PathogenForm Form { get; private set; }
+
+        /// <summary>Re-evaluates the form from the organism's state and
+        /// redraws if it changed. A/E E. coli raises its actin pedestal on
+        /// intimate attachment and loses it when it is flushed back into
+        /// the flow, which is the only shipped two-form organism and the
+        /// reason this path exists at all rather than waiting for the
+        /// four specified ones.</summary>
+        private void RefreshForm()
+        {
+            var want = SpeciesRoster.Get(Species).AnchorsWhenAdhered && State == PathogenState.AtInterface
+                ? PathogenForm.Alternate
+                : PathogenForm.Primary;
+            if (want == Form) return;
+            Form = want;
+            ApplySpeciesVisual();
         }
 
         /// <summary>

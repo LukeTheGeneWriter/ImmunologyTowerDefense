@@ -17,6 +17,36 @@ namespace ImmunologyTD.UI
     /// capstone star. Click a card to expand the full ladder above the
     /// strip (Esc, a second click, or a round starting closes it).
     ///
+    /// ## Sprint 35: it scrolls, and it is ordered by what you have met
+    ///
+    /// The ribbon was a fixed 420 px window onto a row of 186 px cards.
+    /// Six species already overflowed it and the planned sixteen would be
+    /// ~3,000 px -- one of the four gates in front of the roster expansion
+    /// (`ROSTER_EXPANSION_SPEC.md` §5.2).
+    ///
+    /// **Director's design (2026-11-05):** "make the knowledge hub
+    /// scrollable with a fade out and have the 5 most recently seen
+    /// pathogens occupy the visible spaces. A user can browse this way but
+    /// still has the most useful info available." So: a five-card viewport,
+    /// the whole roster in the strip behind it, ordered most-recently-seen
+    /// first, with the edges fading under the card to say *there is more*.
+    /// Nothing is hidden and nothing has to be hunted for.
+    ///
+    /// **Why the order is snapshotted at phase boundaries.** Ranking
+    /// strictly by the newest arrival would reshuffle the ribbon on every
+    /// spawn -- during a six-species round the cards would churn every few
+    /// hundred milliseconds and the player could not keep their eye on one.
+    /// The order is therefore recomputed when the phase changes, or when a
+    /// genuinely new organism is met (which is worth an interruption).
+    /// Within a round it holds still.
+    ///
+    /// **Why a hand-rolled viewport and not a ScrollView.** Everything in
+    /// this front end is explicitly styled from code with no theme chrome
+    /// (`UiController`'s header); a `ScrollView` brings Unity's own
+    /// scrollers and a content container styled by the default runtime
+    /// theme. Wheel, drag and clamping are ~40 lines here, and the offset
+    /// is a plain float a headless check can read.
+    ///
     /// **Feedback, polled via <see cref="KnowledgeWatcher"/>:**
     ///  - a match sends a "+3%" token flying from the lymph node to the card;
     ///    on arrival the number pops, the bar eases up, the card edge flashes
@@ -49,15 +79,79 @@ namespace ImmunologyTD.UI
             ImmunologyTD.Pathogens.SpeciesRoster.NameOf((ImmunologyTD.Pathogens.PathogenSpecies)s);
         private static readonly string[] PctText = BuildPct();
 
-        private static readonly (string name, string effect)[] RungInfo =
+        /// <summary>
+        /// **Sprint 35 fixes a live mislabel here, and removes the shape
+        /// that caused it.**
+        ///
+        /// This was a positional array of SIX entries indexed by rung,
+        /// against a ladder of FIVE rungs. Sprint 25 moved Complement off
+        /// the knowledge ladder and into the shop -- correctly, it is
+        /// structural rather than learned -- and this array was not
+        /// updated. Every index from Complement on was therefore one out,
+        /// so the **70% rung, which is Secretory IgA, was labelled
+        /// "Complement"** in the expanded ladder and in the unlock ribbon.
+        ///
+        /// That is worth sitting with. `PLAYTEST_LOG.md` has carried an
+        /// open question since Sprint 22 about why the Director never
+        /// perceived IgA, and `KnowledgeLadder`'s own header already notes
+        /// that its *built* flag was left false for a sprint, so the HUD
+        /// called IgA "planned" while it was running. The same surface was
+        /// also calling it by the wrong name. Whatever else is true about
+        /// whether IgA reads in play, the one piece of UI that announces
+        /// its arrival has never once said "IgA".
+        ///
+        /// Keyed off <see cref="KnowledgeCapability"/> now, so a rung
+        /// cannot be labelled as its neighbour however the ladder is
+        /// reordered, and a new capability fails to compile instead of
+        /// shifting everything after it.
+        /// </summary>
+        private static (string name, string effect) RungInfoFor(KnowledgeCapability c)
         {
-            ("Cytotoxic T cells", "Kill an infected cell cleanly: no collateral."),
-            ("Neutralising antibodies", "A known pathogen sticks to the gut wall less."),
-            ("Memory T cells", "A burst of killer T cells when it returns."),
-            ("Fc receptor", "Antibodies tag it for your innate cells."),
-            ("Complement", "Coated pathogens are damaged with no cell present."),
-            ("Secretory IgA", "Antibody in the lumen, before it can land."),
-        };
+            switch (c)
+            {
+                case KnowledgeCapability.CytotoxicTCells:
+                    return ("Cytotoxic T cells", "Kill an infected cell cleanly: no collateral.");
+                case KnowledgeCapability.NeutralizingAntibodies:
+                    return ("Neutralising antibodies", "A known pathogen sticks to the gut wall less.");
+                case KnowledgeCapability.MemoryTCells:
+                    return ("Memory T cells", "A burst of killer T cells when it returns.");
+                case KnowledgeCapability.FcReceptor:
+                    return ("Fc receptor", "Antibodies tag it for your innate cells.");
+                case KnowledgeCapability.SecretoryIgA:
+                    return ("Secretory IgA", "Antibody in the lumen, before it can land.");
+                default:
+                    return (c.ToString(), "");
+            }
+        }
+
+        /// <summary>
+        /// Whether a rung's capability can do anything at all against this
+        /// species -- **an applicability flag, not a multiplier**
+        /// (BACKLOG, from the Giardia antigen pass).
+        ///
+        /// Two rungs act on an INFECTED CELL rather than on the organism:
+        /// the cytotoxic-T rung kills one, and the memory-T rung summons
+        /// cells to kill one. *Vibrio cholerae* never enters a cell -- it
+        /// adheres and secretes, and the enterocyte lives -- so both rungs
+        /// are inert against it, and the player can currently spend a whole
+        /// run's learning on them and see nothing.
+        ///
+        /// This is the dead-feature pattern caught one layer earlier than
+        /// usual: the row is not broken, it is simply *not applicable*, and
+        /// an upgrade that silently does nothing is exactly what this
+        /// project keeps finding. Saying so is cheap and honest. It also
+        /// pre-answers two of the ten proposed organisms -- *Giardia* never
+        /// infects a cell either, and *Cryptosporidium*'s infected cells
+        /// are survivin-protected against apoptosis.
+        /// </summary>
+        private static bool RungApplies(KnowledgeCapability c, int species)
+        {
+            bool needsInfectedCell =
+                c == KnowledgeCapability.CytotoxicTCells || c == KnowledgeCapability.MemoryTCells;
+            if (!needsInfectedCell) return true;
+            return !ImmunologyTD.Pathogens.SpeciesRoster
+                .Get((ImmunologyTD.Pathogens.PathogenSpecies)species).NeverEntersCells;
+        }
         private const string CapstoneName = "Specific sensing (capstone)";
         private const string CapstoneEffect = "Coated pathogens become beacons: search is solved.";
 
@@ -89,6 +183,13 @@ namespace ImmunologyTD.UI
             public float Delta;
         }
 
+        /// <summary>One card plus its left margin -- the pitch of the
+        /// strip, and the unit scrolling moves in.</summary>
+        private const float SlotW = 192f;
+
+        /// <summary>The Director's five (2026-11-05).</summary>
+        private const int VisibleSlots = 5;
+
         private readonly Card[] cards = new Card[ImmunologyTD.Pathogens.SpeciesRoster.Count];
         private readonly Token[] tokens = new Token[TokenPool];
         private readonly VisualElement floatLayer;
@@ -112,11 +213,22 @@ namespace ImmunologyTD.UI
         private int expandedSpecies = -1;
         private float clock;
 
+        // -- Sprint 35: the viewport ------------------------------------
+        private readonly VisualElement viewport, strip, fadeLeft, fadeRight;
+        private readonly ImmunologyTD.Pathogens.PathogenSpecies[] order =
+            new ImmunologyTD.Pathogens.PathogenSpecies[ImmunologyTD.Pathogens.SpeciesRoster.Count];
+        private float scroll, scrollTarget;
+        private bool dragging;
+        private float dragFromX, dragFromScroll;
+        private int orderedForPhase = -1, orderedForSeen = -1;
+        private bool lastFadeLeft, lastFadeRight;
+
         public KnowledgeView(VisualElement parent, VisualElement floatLayer)
         {
             this.floatLayer = floatLayer;
 
             Root = UiTheme.Card(8);
+            Root.name = UiNames.KnowledgeCard;
             Root.style.flexDirection = FlexDirection.Row;
             Root.style.alignItems = Align.Center;
             Root.style.marginLeft = 24;
@@ -132,7 +244,52 @@ namespace ImmunologyTD.UI
             header.Add(h);
             Root.Add(header);
 
+            // The viewport clips; the strip slides behind it.
+            viewport = new VisualElement();
+            viewport.name = UiNames.KnowledgeViewport;
+            viewport.style.width = VisibleSlots * SlotW;
+            viewport.style.maxWidth = Length.Percent(100);
+            viewport.style.height = 132;
+            viewport.style.overflow = Overflow.Hidden;
+            Root.Add(viewport);
+
+            strip = new VisualElement();
+            strip.name = UiNames.KnowledgeStrip;
+            strip.style.position = Position.Absolute;
+            strip.style.left = 0;
+            strip.style.top = 0;
+            strip.style.flexDirection = FlexDirection.Row;
+            strip.style.alignItems = Align.Center;
+            strip.style.height = Length.Percent(100);
+            viewport.Add(strip);
+
             for (int s = 0; s < SpeciesCount; s++) cards[s] = BuildCard(s);
+
+            // The fades sit over the clipped edges, tinted to the card they
+            // are cut out of, and are hidden when there is nothing past
+            // that edge -- a permanent fade would be decoration, and would
+            // say "there is more" when there is not.
+            fadeRight = BuildFade(false);
+            fadeRight.name = UiNames.KnowledgeFadeRight;
+            viewport.Add(fadeRight);
+            fadeLeft = BuildFade(true);
+            fadeLeft.name = UiNames.KnowledgeFadeLeft;
+            viewport.Add(fadeLeft);
+            // Hidden, to match lastFadeLeft/lastFadeRight starting false.
+            // A cache of "what is on screen" that disagrees with what IS
+            // on screen turns into a write that never happens: the left
+            // fade was visible from construction and the first StepScroll
+            // saw no change to make, so a ribbon sitting at its start
+            // would have claimed there was more behind you.
+            UiTheme.Show(fadeRight, false);
+            UiTheme.Show(fadeLeft, false);
+
+            viewport.RegisterCallback<WheelEvent>(OnWheel);
+            viewport.RegisterCallback<PointerDownEvent>(OnPointerDown);
+            viewport.RegisterCallback<PointerMoveEvent>(OnPointerMove);
+            viewport.RegisterCallback<PointerUpEvent>(OnPointerUp);
+
+            ReorderStrip();
 
             // Expanded ladder: above the strip.
             expanded = UiTheme.Card(10);
@@ -212,28 +369,42 @@ namespace ImmunologyTD.UI
         // Construction
         // ------------------------------------------------------------------
 
-        /// <summary>Sprint 25: colour follows the species' CLASS, so a
-        /// newly-added organism gets a sensible colour with no edit here.</summary>
+        /// <summary>Sprint 35: one shade per species, within its family's
+        /// hue (<see cref="Palette.ForSpecies"/>). Was per CLASS, which
+        /// made every bacterium the same green.</summary>
         private static Color SpeciesColor(int s) =>
-            ImmunologyTD.Pathogens.SpeciesRoster.ClassOf((ImmunologyTD.Pathogens.PathogenSpecies)s)
-                == ImmunologyTD.Pathogens.PathogenClass.IntracellularVirus
-                ? Palette.Virion : Palette.Bacterium;
+            Palette.ForSpecies((ImmunologyTD.Pathogens.PathogenSpecies)s);
 
+        /// <summary>
+        /// **Sprint 35 fixes a live bug here.** This switched on
+        /// <c>case 0 / case 1 / default</c>, so every species from index 2
+        /// up drew as a bacterium -- and rotavirus is index 3. The
+        /// knowledge HUD has been showing the player a green rod labelled
+        /// "Rotavirus" since Sprint 25.
+        ///
+        /// It now goes through the same per-species dispatch the board
+        /// uses, so the card and the thing on the board are the same
+        /// drawing by construction rather than by two lists agreeing.
+        /// </summary>
         private static VisualElement SpeciesIcon(int s, float size)
         {
             var box = new VisualElement();
             box.style.width = size; box.style.height = size;
             box.pickingMode = PickingMode.Ignore;
-            switch (s)
+            var species = (ImmunologyTD.Pathogens.PathogenSpecies)s;
+
+            // The one species whose icon is not its board sprite: an
+            // intracellular bacterium's whole point is that it is inside a
+            // cell, so the card shows the cell with it in it (§4a's "visible
+            // as the host cell, not itself").
+            if (species == ImmunologyTD.Pathogens.PathogenSpecies.GenericIntracellularBacterium)
             {
-                case 0: UiTheme.Layer(box, SpriteShapes.Virion, Palette.Virion, size); break;
-                case 1:
-                    // "the one that lives in your cells": a lime infected cell with the bacterium in it
-                    UiTheme.Layer(box, SpriteShapes.HostCellInfectedBacterial, Palette.HostInfectedBact, size);
-                    UiTheme.Layer(box, SpriteShapes.LargeBacterium, Palette.Bacterium, size, 0.55f);
-                    break;
-                default: UiTheme.Layer(box, SpriteShapes.LargeBacterium, Palette.Bacterium, size); break;
+                UiTheme.Layer(box, SpriteShapes.HostCellInfectedBacterial, Palette.HostInfectedBact, size);
+                UiTheme.Layer(box, SpriteShapes.LargeBacterium, Palette.Bacterium, size, 0.55f);
+                return box;
             }
+
+            UiTheme.Layer(box, SpriteShapes.ForSpecies(species), Palette.ForSpecies(species), size);
             return box;
         }
 
@@ -241,7 +412,9 @@ namespace ImmunologyTD.UI
         {
             var c = new Card();
             c.Root = UiTheme.Tile();
+            c.Root.name = UiNames.KnowledgeSpecies(s);
             c.Root.style.width = 186; c.Root.style.height = 120;
+            c.Root.style.flexShrink = 0;
             c.Root.style.marginLeft = 6;
             c.Root.style.paddingLeft = c.Root.style.paddingRight = 8;
             c.Root.style.paddingTop = c.Root.style.paddingBottom = 6;
@@ -322,7 +495,7 @@ namespace ImmunologyTD.UI
             c.Next = UiTheme.Text("", 11, UiTheme.InkDim, Weight.Bold);
             c.Root.Add(c.Next);
 
-            Root.Add(c.Root);
+            strip.Add(c.Root);
             return c;
         }
 
@@ -347,8 +520,9 @@ namespace ImmunologyTD.UI
             row.Add(pct);
             var text = new VisualElement();
             text.style.flexGrow = 1; text.style.flexShrink = 1;
-            text.Add(UiTheme.Text(capstone ? CapstoneName : RungInfo[i].name, 13, UiTheme.Ink, Weight.Black));
-            var eff = UiTheme.Text(capstone ? CapstoneEffect : RungInfo[i].effect, 11, UiTheme.InkDim);
+            var info = capstone ? (CapstoneName, CapstoneEffect) : RungInfoFor(KnowledgeLadder.Rungs[i].Capability);
+            text.Add(UiTheme.Text(info.Item1, 13, UiTheme.Ink, Weight.Black));
+            var eff = UiTheme.Text(info.Item2, 11, UiTheme.InkDim);
             eff.style.whiteSpace = WhiteSpace.Normal;
             text.Add(eff);
             row.Add(text);
@@ -362,6 +536,139 @@ namespace ImmunologyTD.UI
             row.Add(pill);
             expanded.Add(row);
             return (row, pip, pill);
+        }
+
+        private VisualElement BuildFade(bool mirrored)
+        {
+            var v = new VisualElement();
+            v.style.position = Position.Absolute;
+            v.style.top = 0; v.style.bottom = 0;
+            v.style.width = 34;
+            if (mirrored) v.style.left = 0; else v.style.right = 0;
+            v.style.backgroundImage = new StyleBackground(SpriteShapes.FadeToRight);
+            v.style.unityBackgroundImageTintColor = UiTheme.CardFill;
+            // One texture for both edges: the left one is the same ramp,
+            // flipped.
+            if (mirrored) v.style.scale = new Scale(new Vector3(-1f, 1f, 1f));
+            v.pickingMode = PickingMode.Ignore;
+            return v;
+        }
+
+        // ------------------------------------------------------------------
+        // Sprint 35: order, scroll, fade
+        // ------------------------------------------------------------------
+
+        /// <summary>How far the strip can slide before its last card is
+        /// flush with the viewport's right edge. Zero when everything
+        /// fits.</summary>
+        private float MaxScroll => Mathf.Max(0f, SpeciesCount * SlotW - VisibleSlots * SlotW);
+
+        /// <summary>
+        /// Puts the cards in display order: most recently seen first, never
+        /// seen last (<c>SpeciesSightings.OrderForDisplay</c>, which is a
+        /// pure function so the ordering can be asserted without building a
+        /// UI tree).
+        ///
+        /// Reordering is a re-parent, not a rebuild -- the Card objects,
+        /// their animation state and their pips are untouched, so a card
+        /// that moves while its "+3%" token is in flight keeps its number
+        /// and its flash.
+        /// </summary>
+        private void ReorderStrip()
+        {
+            int n = ImmunologyTD.Pathogens.SpeciesSightings.OrderForDisplay(order);
+            if (n == 0) return;
+            for (int i = 0; i < n; i++)
+            {
+                var card = cards[(int)order[i]];
+                if (card != null) strip.Add(card.Root);   // Add re-parents to the end
+            }
+        }
+
+        /// <summary>Recomputes the order only when it is safe to: at a
+        /// phase boundary, or when the player has met an organism they had
+        /// never met before. See the class header for why this is not done
+        /// on every sighting.</summary>
+        private void ReorderIfDue(int phase)
+        {
+            int seen = ImmunologyTD.Pathogens.SpeciesSightings.DistinctSeen();
+            if (phase == orderedForPhase && seen == orderedForSeen) return;
+            orderedForPhase = phase;
+            orderedForSeen = seen;
+            ReorderStrip();
+        }
+
+        private void OnWheel(WheelEvent e)
+        {
+            if (MaxScroll <= 0f) return;
+            // One card per notch, whichever axis the device reports on --
+            // a trackpad's horizontal swipe and a mouse wheel's vertical
+            // notch should both walk the ribbon.
+            float d = Mathf.Abs(e.delta.x) > Mathf.Abs(e.delta.y) ? e.delta.x : e.delta.y;
+            scrollTarget = Mathf.Clamp(scrollTarget + Mathf.Sign(d) * SlotW, 0f, MaxScroll);
+            e.StopPropagation();
+        }
+
+        private void OnPointerDown(PointerDownEvent e)
+        {
+            if (MaxScroll <= 0f) return;
+            dragging = true;
+            dragFromX = e.position.x;
+            dragFromScroll = scrollTarget;
+        }
+
+        private void OnPointerMove(PointerMoveEvent e)
+        {
+            if (!dragging) return;
+            scrollTarget = Mathf.Clamp(dragFromScroll - (e.position.x - dragFromX), 0f, MaxScroll);
+            scroll = scrollTarget;   // a drag tracks the finger exactly, no easing
+        }
+
+        private void OnPointerUp(PointerUpEvent e) => dragging = false;
+
+        private void StepScroll(float dt)
+        {
+            float max = MaxScroll;
+            scrollTarget = Mathf.Clamp(scrollTarget, 0f, max);
+            if (Mathf.Abs(scrollTarget - scroll) > 0.5f)
+                scroll += (scrollTarget - scroll) * Mathf.Min(1f, 14f * dt);
+            else scroll = scrollTarget;
+
+            strip.style.left = -scroll;
+
+            bool showLeft = scroll > 1f;
+            bool showRight = scroll < max - 1f;
+            if (showLeft != lastFadeLeft) { UiTheme.Show(fadeLeft, showLeft); lastFadeLeft = showLeft; }
+            if (showRight != lastFadeRight) { UiTheme.Show(fadeRight, showRight); lastFadeRight = showRight; }
+        }
+
+        /// <summary>The species currently in the viewport's slots, in
+        /// order, for a harness: the Director's claim is that the five most
+        /// recently seen organisms occupy the visible spaces, and this is
+        /// the half of it the view owns.</summary>
+        public ImmunologyTD.Pathogens.PathogenSpecies[] VisibleSpecies()
+        {
+            int first = Mathf.Clamp(Mathf.RoundToInt(scroll / SlotW), 0, Mathf.Max(0, SpeciesCount - 1));
+            int n = Mathf.Min(VisibleSlots, SpeciesCount - first);
+            var a = new ImmunologyTD.Pathogens.PathogenSpecies[Mathf.Max(0, n)];
+            for (int i = 0; i < a.Length; i++) a[i] = order[first + i];
+            return a;
+        }
+
+        /// <summary>Scroll offset in pixels, and how far it can go -- so a
+        /// check can prove the ribbon really is scrollable and really does
+        /// clamp, rather than that a field exists.</summary>
+        public float ScrollOffset => scroll;
+        public float ScrollRange => MaxScroll;
+
+        /// <summary>Drives the ribbon as a wheel notch would, for a
+        /// harness: UITK events cannot be synthesised headlessly, and a
+        /// scroll nothing can exercise is a scroll nobody has tested.</summary>
+        public void KnowledgeScrollBySlots(int slots)
+        {
+            scrollTarget = Mathf.Clamp(scrollTarget + slots * SlotW, 0f, MaxScroll);
+            scroll = scrollTarget;
+            StepScroll(1f);
         }
 
         // ------------------------------------------------------------------
@@ -403,6 +710,17 @@ namespace ImmunologyTD.UI
                 if (reached && !built) UiTheme.ApplyHatch(pip, 6f);
 
                 pill.style.backgroundImage = StyleKeyword.None;
+                if (!capstone && !RungApplies(rungs[i].Capability, s))
+                {
+                    // Not "locked" and not "planned": there is nothing here
+                    // for this organism to be used ON.
+                    pill.text = "NO EFFECT ON THIS ONE";
+                    pill.style.backgroundColor = UiTheme.ChipDim;
+                    pill.style.color = UiTheme.Ink;
+                    UiTheme.Show(pill, true);
+                    row.style.opacity = 0.45f;
+                    continue;
+                }
                 if (reached)
                 {
                     pill.text = built ? "LEARNED" : "LEARNED · PLANNED";
@@ -434,11 +752,19 @@ namespace ImmunologyTD.UI
         // Per-frame
         // ------------------------------------------------------------------
 
-        public void Refresh(IPanel panel)
+        /// <summary><paramref name="phase"/> is the round phase as an int
+        /// (<c>RoundPhase</c> lives in another namespace and this view has
+        /// no other reason to know about rounds). It is the boundary the
+        /// ribbon's ordering is snapshotted at -- see the class
+        /// header.</summary>
+        public void Refresh(IPanel panel, int phase)
         {
             if (ledger == null) return;
             float dt = Time.unscaledDeltaTime;
             clock += dt;
+
+            ReorderIfDue(phase);
+            StepScroll(dt);
 
             int n = watcher.Poll(ledger);
             for (int i = 0; i < n; i++)
@@ -528,7 +854,14 @@ namespace ImmunologyTD.UI
             }
             else c.Fill.style.width = Length.Percent(Mathf.Clamp(c.Shown, 0f, 100f));
 
-            c.Root.style.opacity = c.Target <= 0f ? 0.55f : 1f;   // naive: nothing known yet
+            // Sprint 35: dimmed means NEVER MET, which is what the
+            // player actually wants to know. It used to mean "knowledge is
+            // zero" -- a different statement, and wrong for any organism
+            // fought repeatedly without ever being sampled, which is
+            // exactly the case the knowledge ladder is about.
+            bool met = ImmunologyTD.Pathogens.SpeciesSightings.HasSeen(
+                (ImmunologyTD.Pathogens.PathogenSpecies)s);
+            c.Root.style.opacity = met ? 1f : 0.55f;
 
             var rungs = KnowledgeLadder.Rungs;
             int unlocked = KnowledgeLadder.UnlockedCount(c.Target);
@@ -609,7 +942,7 @@ namespace ImmunologyTD.UI
                 var rung = KnowledgeLadder.Rungs[r];
                 ribbonStripe.style.backgroundColor = SpeciesColor(s);
                 ribbonTop.text = $"Learned · {NameOf(s)} {Mathf.RoundToInt(rung.ThresholdPercent)}%".ToUpperInvariant();
-                ribbonName.text = RungInfo[r].name;
+                ribbonName.text = RungInfoFor(KnowledgeLadder.Rungs[r].Capability).name;
                 UiTheme.Show(ribbonPlanned, !rung.Built);
                 UiTheme.Show(ribbon, true);
                 ribbonT = 0f;

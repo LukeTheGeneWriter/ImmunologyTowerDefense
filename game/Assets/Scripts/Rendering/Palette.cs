@@ -59,6 +59,37 @@ namespace ImmunologyTD.Rendering
         public static Color Bacterium     => C(0.36f, 0.76f, 0.12f);
         public static Color Virion        => C(0.58f, 0.20f, 0.92f);
         public static Color PathogenHit   => C(0.95f, 0.85f, 0.30f);
+
+        /// <summary>
+        /// Sprint 35: **hue varies only WITHIN a family**
+        /// (`ROSTER_EXPANSION_SPEC.md` §2.2). The board's two pathogen hues
+        /// stay the family colours -- violet for viruses, green for
+        /// bacteria -- and a named organism gets a neighbouring shade of
+        /// its own family, never a new hue. Blue, yellow, magenta, teal,
+        /// lime, lilac, orange, red, aqua and brown are all already
+        /// *meanings* here, so colour cannot be the species channel; it is
+        /// a tie-break under silhouette and tell, which is all it can
+        /// honestly carry.
+        ///
+        /// A species with no shade of its own falls back to its family
+        /// colour, so this is safe to call for the whole enum.
+        /// </summary>
+        public static Color ForSpecies(ImmunologyTD.Pathogens.PathogenSpecies species)
+        {
+            switch (species)
+            {
+                // Violet family.
+                case ImmunologyTD.Pathogens.PathogenSpecies.Rotavirus:
+                    return C(0.72f, 0.26f, 0.90f);      // a warmer violet
+                // Green family.
+                case ImmunologyTD.Pathogens.PathogenSpecies.VibrioCholerae:
+                    return C(0.22f, 0.78f, 0.38f);      // cooler, sea-ward
+                case ImmunologyTD.Pathogens.PathogenSpecies.AttachingEffacingEcoli:
+                    return C(0.52f, 0.72f, 0.08f);      // yellower, duller
+            }
+            return ImmunologyTD.Pathogens.SpeciesRoster.ClassOf(species)
+                   == ImmunologyTD.Pathogens.PathogenClass.IntracellularVirus ? Virion : Bacterium;
+        }
         public static Color FoodBolus     => C(0.64f, 0.44f, 0.20f);
 
         // ---- base band, marrow, node --------------------------------------

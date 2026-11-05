@@ -43,6 +43,7 @@ namespace ImmunologyTD.UI
             this.onStartRound = onStartRound;
 
             Root = UiTheme.Card(8);
+            Root.name = UiNames.HudCard;
             Root.style.width = 600;
             Root.style.marginTop = 14;
             Root.style.marginRight = 24;
@@ -63,11 +64,13 @@ namespace ImmunologyTD.UI
             row.Add(right);
 
             startButton = UiTheme.ChunkyButton("START ROUND 1", () => onStartRound?.Invoke(), SpriteShapes.IconPlay, 16);
+            startButton.name = UiNames.HudStartButton;
             startButton.style.height = 48;
             startButton.style.minWidth = 210;
             right.Add(startButton);
 
             waveBlock = new VisualElement();
+            waveBlock.name = UiNames.HudWaveBlock;
             waveBlock.style.width = 210;
             waveLabel = UiTheme.Text("WAVE 0 / 0", 16, UiTheme.Ink, Weight.Black);
             inPlayLabel = UiTheme.Text("0 in play", 11, UiTheme.InkDim, Weight.Bold);
@@ -90,9 +93,11 @@ namespace ImmunologyTD.UI
             right.Add(waveBlock);
 
             gameOver = UiTheme.Text("GAME OVER", 30, UiTheme.Bad, Weight.Black);
+            gameOver.name = UiNames.HudGameOver;
             right.Add(gameOver);
 
             caption = UiTheme.Text("", 11, UiTheme.InkDim, Weight.Bold);
+            caption.name = UiNames.HudCaption;
             caption.style.marginTop = 4;
             caption.style.whiteSpace = WhiteSpace.Normal;
             Root.Add(caption);
@@ -183,20 +188,27 @@ namespace ImmunologyTD.UI
             {
                 case RoundPhase.Building:
                 {
-                    // Sprint 33: this caption already previewed the NEXT
-                    // round's tagline, which is the game's "see what is
-                    // coming" affordance. It now also names any organism
-                    // debuting in that round -- Bloons puts its new-bloon
-                    // callout up before the round starts, and a first
-                    // encounter is the one thing a player most wants
-                    // warning of. Null for a round that introduces nothing,
-                    // so quiet rounds stay quiet.
+                    // **Sprint 35: the tagline moved off this line.**
+                    //
+                    // Sprint 33 put four facts here -- the next round's
+                    // tagline, any debuting organism, the phase rule and
+                    // the key to press -- run together by middots in 11 px
+                    // of dim grey in the corner of the screen. Every one of
+                    // them was drawn, correctly, and the Director saw none
+                    // of them (measured, not assumed: see
+                    // `RoundBannerView`'s header and `UiTreeDump`). Four
+                    // facts in the smallest type on screen is one fact
+                    // nobody reads.
+                    //
+                    // `RoundBannerView` now carries the round's identity at
+                    // 22 px in the middle of the screen. What is left here
+                    // is the **quiet residue**: the one thing worth having
+                    // up for the whole phase after the banner has faded --
+                    // what is new, and how to start.
                     int nextRound = rounds.RoundNumber + 1;
-                    string tag = RoundScript.ForRound(nextRound).Tagline;
                     string debut = RoundScript.DebutLabelFor(nextRound);
                     caption.text =
-                        (string.IsNullOrEmpty(tag) ? "" : $"“{tag}”  ·  ")
-                        + (string.IsNullOrEmpty(debut) ? "" : $"{debut}  ·  ")
+                        (string.IsNullOrEmpty(debut) ? "" : $"{debut}  ·  ")
                         + "buy phase, time is frozen  ·  Space";
                     break;
                 }

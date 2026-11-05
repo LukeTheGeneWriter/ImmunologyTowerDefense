@@ -62,7 +62,18 @@ public static class Sprint29Verification
         AdaptiveTuning.ResetToDefaults();
         SpeciesRoster.ResetToDefaults();
 
-        Check("the barcode is 10 bits", AdaptiveTuning.BarcodeBits == 10);
+        // Sprint 35: this asserted the literal 10, which made it a check
+        // on a decision rather than on a property -- and it would have had
+        // to be edited to let a correct widening through, which is a
+        // harness owning a number it is not testing (fifth instance). What
+        // the barcode has to be is WIDE ENOUGH for the roster at the
+        // shipped radius, so that is what is asserted now; the width itself
+        // is Sprint 35's business (12) and is pinned by
+        // Sprint35Verification against the whole 16-tag set.
+        int needed = SmallestWidthThatHoldsTheRoster();
+        Check($"the barcode is wide enough for {SpeciesRoster.Count} species at r={AdaptiveTuning.MatchMaxHammingDistance}"
+              + $" ({AdaptiveTuning.BarcodeBits} bits, >= {needed})",
+              AdaptiveTuning.BarcodeBits >= needed);
 
         var all = (PathogenSpecies[])System.Enum.GetValues(typeof(PathogenSpecies));
         int worst = int.MaxValue;
@@ -311,4 +322,40 @@ public static class Sprint29Verification
             default: return null;
         }
     }
+
+    /// <summary>
+    /// The narrowest barcode that could possibly hold the roster at the
+    /// shipped match radius -- the Hamming sphere-packing bound.
+    ///
+    /// For tags to sit 2r+1 apart, their radius-r spheres must be
+    /// disjoint, so <c>Count * |sphere|</c> cannot exceed the code space.
+    /// That is a **necessary** condition, which is what makes it safe to
+    /// assert against: it is a true lower bound on the width, so a roster
+    /// that fits can never fail this check, while a width that is
+    /// arithmetically impossible always does. (The achievable maximum is
+    /// lower than the bound -- 10 bits packs 12 tags where the ceiling says
+    /// 18 -- and finding it needs a search, which is Sprint 35's job and
+    /// not something to re-run on every harness pass.)
+    /// </summary>
+    private static int SmallestWidthThatHoldsTheRoster()
+    {
+        int r = AdaptiveTuning.MatchMaxHammingDistance;
+        for (int bits = 1; bits <= 24; bits++)
+        {
+            double sphere = 0;
+            for (int i = 0; i <= r; i++) sphere += Choose(bits, i);
+            if (SpeciesRoster.Count * sphere <= System.Math.Pow(2, bits)) return bits;
+        }
+        return 24;
+    }
+
+    private static double Choose(int n, int k)
+    {
+        if (k < 0 || k > n) return 0;
+        double c = 1;
+        for (int i = 0; i < k; i++) c = c * (n - i) / (i + 1);
+        return c;
+    }
+
+
 }

@@ -297,7 +297,21 @@ HUD tracks — three surfaces, one fact each.
 
 Measured this session, not estimated. Each one blocks the build.
 
-### 5.1 The antigen barcode must widen to 12 bits
+> ### ALL FOUR CLOSED IN SPRINT 35 (2026-11-05)
+>
+> | Gate | What shipped | Pinned by |
+> |---|---|---|
+> | 5.1 barcode → 12 bits | `AdaptiveTuning.BarcodeBits = 12`; the six live tags re-cut from this spec's 16-tag set, and the **ten unbuilt tags held in `SpeciesRoster.ReservedAntigens`** so the set stays verifiable as a set | all 120 pairs ≥ 6 apart, and no tag in the whole 4,096-code space teaches two of the sixteen |
+> | 5.2 knowledge HUD | A five-card viewport with the strip behind it, ordered most-recently-seen first, edges fading under the card. **Director's design, 2026-11-05** | viewport bounded at 5 × 192 px; scroll clamps both ends; visible slots == the first five of the display order |
+> | 5.3 per-species sprites | `SpriteShapes.ForSpecies` + `Palette.ForSpecies`, and all three shipped organisms drawn: rotavirus's wheel, *V. cholerae*'s comma, A/E *E. coli*'s rod | each named organism's sprite differs from its class generic and from every other, and hue stays inside its family |
+> | 5.4 two forms | `PathogenForm` + `SpeciesProfile.AnchorsWhenAdhered`, with **one real shipped user**: A/E *E. coli* raises its actin pedestal on adhesion and loses it when sloughed | driven through the real `GutWall`: primary in the lumen → alternate on the wall → primary again after `ReturnToFlow` |
+>
+> The ribbon design is **not** §5.2's original recommendation ("show only
+> species seen this run"). The Director's is better and was taken: show
+> everything, order it by recency, and let the player browse. Nothing is
+> hidden, and the five that matter are the five in front of you.
+
+### 5.1 The antigen barcode must widen to 12 bits — CLOSED, Sprint 35
 
 Greedy construction with randomised restarts, against the Hamming
 sphere-packing ceiling:
@@ -349,19 +363,19 @@ inherits the same property** — it is fine at r=2 and cross-teaches at r=3,
 which is now a stated consequence of buying avidity rather than an
 accident.
 
-### 5.2 The knowledge HUD does not scale
+### 5.2 The knowledge HUD does not scale — CLOSED, Sprint 35
 
 `KnowledgeView` builds a fixed 420 px ribbon of 186 px cards. Six species
 already overflow it; sixteen would be ~3,000 px. Recommendation: **the
 ribbon shows only species seen this run**, which also teaches better — the
 player's ledger grows as their run does.
 
-### 5.3 Per-species sprites need a dispatch
+### 5.3 Per-species sprites need a dispatch — CLOSED, Sprint 35
 
 See §2.1. `SpriteShapes.ForSpecies` + a per-species palette entry, and the
 three shipped organisms get sprites in the same pass.
 
-### 5.4 Two-form organisms are new
+### 5.4 Two-form organisms are new — CLOSED, Sprint 35
 
 Four of the ten change silhouette on the board: *C. perfringens* (arms
 itself), *Giardia* (trophozoite / cyst), *Cryptosporidium* (oocyst /
@@ -426,7 +440,7 @@ to the node, so they are structurally wrong for §5a) and goblet-cell
 antigen passages (they feed *tolerogenic* DCs and are shut by IL-1β, which
 *Giardia* does not induce — a GAP route would teach **tolerance**).
 
-### 6.3 The eukaryote hue
+### 6.3 The eukaryote hue — DECIDED: desaturated plum, Sprint 35
 
 Recommendation: a **desaturated plum**, distinguished from the virion's
 saturated violet by saturation and from debris grey by value — with
@@ -434,7 +448,26 @@ saturated violet by saturation and from debris grey by value — with
 Alternatives all collide: amber with the neutrophil, orange with cytokine
 heat, teal with the helper T, brown with the bolus.
 
-### 6.4 §4a's parasite class is over-specified, and fixing it unblocks this
+> **Taken as recommended** (head session, 2026-11-05, under the Director's
+> "work them out"). **Deliberately not added to `Palette` yet**: no
+> eukaryote is built, and a named colour nothing reads is the dead-entry
+> version of the dead-upgrade pattern this project keeps finding. The
+> decision is recorded here, costs nothing to honour, and the first
+> eukaryote sprint adds the one line.
+>
+> The reasoning survived a check it could have failed: the Sprint 35
+> sprite pass confirmed empirically that **hue is the weakest of the three
+> channels**. Tinted rasters at 22 px showed silhouette doing nearly all
+> the work and the per-species shades reading as "the same family" — which
+> is what they are for. Size, for the eukaryotes, will matter more than
+> the plum does.
+
+### 6.4 §4a's parasite class is over-specified — DONE, Sprint 35
+
+> Amended in `GAME_DESIGN.md` §4a on 2026-11-05, with the clearance
+> correction folded in: single slot plus a size multiplier, footprint
+> deferred to helminths, and **expulsion rather than killing** as the
+> class's counter.
 
 `BACKLOG.md` calls the parasite class's multi-slot footprint "more
 engineering than the other three classes combined". **Not one enteric

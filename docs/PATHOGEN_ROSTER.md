@@ -110,12 +110,27 @@ flush answers — IgA enchainment and goblet sloughing — work poorly on it.
 
 **Viruses:** CMV (the stealth boss — four independent MHC-I mechanisms,
 already behind the wall, ~96 h lytic cycle, so it must be a boss and never
-a wave enemy); norovirus GII.4 (antigenic replacement on a real 2–4 year
-cycle — literally §5's mutation discount); astrovirus (**breach with no
-infection and no stress signal** — capsid alone opens tight junctions, so
-it defeats the entire detection stack by not being detectable); adenovirus
-F41 (CTL-visible but NK-blind, the mirror of CMV); hepatitis A
-(quasi-enveloped, antibody-resistant).
+a wave enemy); norovirus GII.4 (antigenic replacement — literally §5's
+mutation discount); astrovirus (**breach with no infection and no stress
+signal** — capsid alone opens tight junctions, so it defeats the entire
+detection stack by not being detectable); adenovirus F41 (a *partial*
+NK-blind, see below); hepatitis A (quasi-enveloped, antibody-resistant).
+
+> **Two corrections to the entries above (Sprint 34 research, recorded
+> Sprint 35).** Both were overstatements in the direction of a tidier
+> mechanic, which is the direction this document has to be most careful
+> about.
+>
+> - **Norovirus's "real 2–4 year cycle" is historical only.** Sydney 2012
+>   has now held for 11+ years. Replacement is **stochastic with a long
+>   tail**, not a metronome, so the mechanic must not be built as a timer
+>   that fires every N rounds — that would teach the player a schedule
+>   that does not exist.
+> - **Adenovirus F41 must not be built as a cliff.** "CTL-visible but
+>   NK-blind, the mirror of CMV" is more than the evidence carries: the
+>   finding is MICB only, by *retention* rather than transcriptional
+>   shutdown, in one cell line, with **no NK killing assay**. A
+>   partial, single-ligand effect is a modifier, not an immunity.
 
 **Invasive bacteria:** *Shigella* (actin-tail spread, never returns to the
 extracellular space, lowest ID of anything); *Salmonella* Typhimurium

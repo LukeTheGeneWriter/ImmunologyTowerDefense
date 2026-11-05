@@ -1362,7 +1362,73 @@ list; these are the things that gate or follow it.
   SGLT-1, and no in vivo rate exists. Not enough to carry the knowledge
   ladder, which is why the EV route is the answer.
 
-## Next sprint — Director's playtest, 2026-11-03
+## Closed by Sprint 35 (2026-11-05)
+
+The Director asked for "a big sprint with everything", and most of the two
+sections above went with it. Closed:
+
+- **The round messages** — measured, and the diagnosis was wrong. The
+  caption was correct, displayed and renderable in every phase; it was
+  11 px of dim grey in a corner. Fixed with a surface
+  (`RoundBannerView`), not a wire.
+- **The pathogen showcase** — built, as the same piece of work.
+- **All four engineering gates**: barcode → 12 bits (with the ten unbuilt
+  tags reserved in code), per-species sprites, the knowledge ribbon, and
+  the two-form path (with A/E *E. coli*'s pedestal as a real shipped
+  user).
+- **`SpeciesProfile.Antigen`'s wrong r=3 comment**, and
+  `KnowledgeView.SpeciesIcon`'s rotavirus-as-a-bacterium.
+- **The *V. cholerae* swimming correction**, measured on the board.
+- **The §1d applicability flag** — shipped as `NeverEntersCells`, with the
+  knowledge HUD printing "no effect on this one" against rungs that need
+  an infected cell.
+- **§4a's parasite class**, re-spec'd single-slot with the clearance
+  correction (expulsion, not more damage).
+- **`PATHOGEN_ROSTER.md`'s two overstatements** (adenovirus F41, the
+  norovirus cycle).
+- **The eukaryote hue** — decided (desaturated plum), deliberately not
+  added to `Palette` until something reads it.
+- **`docs/INTERFACE.md`'s Sprint 22–31 backfill.**
+
+## Open after Sprint 35 (2026-11-05)
+
+- **Nothing asserts on UI LAYOUT, and the defect this sprint fixed lived
+  exactly there.** `UiProbe` proves an element exists, says the right
+  thing and is not hidden; batchmode runs no layout pass, so it cannot
+  prove a line is legible, unclipped or on top. The honest options are a
+  play-mode harness or a screenshot diff, and both are a sprint. Until
+  then, **an eye on a real build is load-bearing** — say so rather than
+  trusting a green suite.
+- **The free A/E *E. coli* silhouette is close to the generic bean** at
+  20 px. Honest as far as it goes (in the lumen it is just an *E. coli*,
+  and its tell belongs to being attached), but watch it in playtest.
+- **The ribbon's recency order is snapshotted at phase boundaries**, not
+  live. Within a round, meeting an organism again does not move its card.
+  That was deliberate — live ranking churns the strip every few hundred
+  milliseconds during a six-species round — but it means "most recently
+  seen" lags by up to one round.
+- **The banner's dwell times are guesses**: 7 s for a plain round, 16 s
+  for a debut card, both dismissible. Only a playtest can say whether the
+  debut card outstays its welcome or vanishes too soon.
+- **Three surfaces now say what is coming** (debut card, first-sighting
+  banner, HUD caption). If that reads as noise rather than as a build-up,
+  the first-sighting banner is the one to cut — it is the only one that
+  fires mid-round.
+- **"Shed antigen" is still designed and unbuilt**, and now has a stated
+  reason to wait: its only emitter would be *Giardia*. It lands in the
+  sprint that builds *Giardia*, not before — a lumen entity nothing emits
+  is the dead-feature pattern, pre-committed.
+- **The ten organisms are next.** The gates are down. The shortlist the
+  colonic ruling unlocked is still unranked: *Entamoeba histolytica*
+  first (it answers two of the five standing "no answer in the roster"
+  gaps), then *Shigella*, *Campylobacter*, *Trichuris*, *C. difficile*,
+  ETBF.
+- **Nontyphoidal *Salmonella* still wants its own sprint** — its mechanic
+  changes §4a's advance rules.
+- Still open from Sprint 33: **difficulty past round 40 does not rise**,
+  and **round length is still a global constant**.
+
+## Next sprint — Director's playtest, 2026-11-03 (CLOSED by Sprint 35)
 
 **These two are the head of the queue, ahead of everything above.** Full
 report in `PLAYTEST_LOG.md`.

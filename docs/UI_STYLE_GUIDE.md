@@ -309,3 +309,63 @@ board scale. A sprite that only ever gets looked at alone will pass.
 **Known, unresolved:** the NK/ILC1 tower and the virion sit at nearly the
 same hue (both purple). They differ in saturation and silhouette and read
 acceptably today, but it is the next most likely confusion on the board.
+
+## Sprint 35 — per-species pathogens, and the surfaces that name them
+
+### Three channels, because colour is already full
+
+`ROSTER_EXPANSION_SPEC.md` §2.2, now shipped. Identity is **silhouette
+family (kingdom) × one tell (the mechanic) × size**, and **hue varies
+only within a family** — violet for viruses, green for bacteria. Every
+other hue on this board is already a meaning, so colour cannot be the
+species channel; it is a tie-break, and the Sprint 35 raster dumps
+confirmed it is the weakest of the three.
+
+| Organism | Silhouette | Tell | Means |
+|---|---|---|---|
+| Rotavirus | knobbed ball, dense knobs | dark **wheel rim** + bright hub | the wheel is its name; the hub is NSP4, a toxin that acts on its own |
+| *V. cholerae* | **comma** (three capsules, no tail) | bright 6-point **star** | acts without infecting anything |
+| A/E *E. coli* (free) | long flat rod | none | in the lumen it is just an *E. coli* |
+| A/E *E. coli* (anchored) | the same rod on a dark plinth | **solid dark anchor** | fixed in place, resists removal |
+
+### Two rules learned by dumping the raster and looking at it
+
+1. **Inside a filled shape, the only contrast is darkness.** A `FillRing`
+   painted white into an already-opaque body is *invisible* — the Sprint
+   23 lesson, re-learned here when rotavirus's wheel simply was not
+   there. Use `InnerShadeRing` / `InnerShadeCapsule`.
+2. **A tell must be large and bright, or it is noise at 20 px.** The
+   first *V. cholerae* star was a 7 px additive mark; at board scale it
+   read as a stray pixel. It is now 13 px and sits on a brightened patch.
+
+**No flagella** (ART_DIRECTION §3.3) — they vanish under 20 px, and long
+thin arms belong to the dendritic cell alone.
+
+### The round banner (`RoundBannerView`)
+
+Floats over the board, centred, 620 px, top 132 px — on-demand surfaces
+float, permanent ones live in the gutters (COSMETIC_PASS_SPEC §2.3).
+
+- Line 1: round number + phase rule, 11 px dim, uppercase.
+- Line 2: **the vehicle, 22 px black.** This is the line the Sprint 33
+  caption was trying to be.
+- On a debut round only: an 86 px portrait, a `NEW` tag, the organism at
+  19 px, and the warning at 14 px.
+- Dwell 7 s plain / 16 s debut, fading 0.35 s, dismissed by a click, Esc,
+  or the round starting. **`dt` is clamped to 0.1 s** so one slow frame
+  cannot eat the card.
+
+The first-sighting banner is the same geometry at half scale, 2.6 s, with
+sprite and name only.
+
+### The knowledge ribbon
+
+A **five-card viewport** (960 px = 5 × 192) clipping a sliding strip that
+holds the whole roster, ordered most-recently-seen first. Both edges carry
+a 34 px fade — one eased alpha ramp (`SpriteShapes.FadeToRight`), tinted
+`UiTheme.CardFill`, mirrored with a negative scale for the left — shown
+only when there is content past that edge. A permanent fade is decoration
+and, worse, a claim that there is more when there is not.
+
+Dimming an organism's card (0.55) means **never met this run**, not
+"knowledge is zero".

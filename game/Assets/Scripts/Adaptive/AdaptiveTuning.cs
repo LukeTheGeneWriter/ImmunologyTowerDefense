@@ -34,8 +34,19 @@ namespace ImmunologyTD.Adaptive
         /// cross-teaching is exactly zero and cross-reactivity becomes a
         /// thing the player can buy (the avidity row takes r to 3) rather
         /// than an accident of tag choice.
+        ///
+        /// **Sprint 35: 10 -> 12 bits.** Ten admits at most **12** species
+        /// at r=2 (constructed 12 against a Hamming sphere-packing ceiling
+        /// of 18) and `ROSTER_EXPANSION_SPEC.md` brings the roster to
+        /// **16**, so the width had to move *before* any new species took a
+        /// tag -- the 8-bit lesson applied in advance for once rather than
+        /// in hindsight. Eleven bits was the minimum; 12 constructs 20 and
+        /// leaves room to keep going. The six live tags and the ten
+        /// reserved for the specified-but-unbuilt organisms are one set,
+        /// verified together across all 120 pairs
+        /// (<c>SpeciesRoster.ReservedAntigens</c>).
         /// </summary>
-        public const int BarcodeBits = 10;
+        public const int BarcodeBits = 12;
 
         /// <summary>
         /// A DC:helper-T pairing teaches iff the Hamming distance between

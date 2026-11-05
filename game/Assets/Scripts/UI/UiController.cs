@@ -66,6 +66,7 @@ namespace ImmunologyTD.UI
         private VisualElement floatLayer;
 
         private HudView hud;
+        private RoundBannerView banner;
         private ShopView shopView;
         private UpgradePanelView upgrade;
         private TowerPickerView picker;
@@ -133,6 +134,11 @@ namespace ImmunologyTD.UI
             root.pickingMode = PickingMode.Ignore;
             UiTheme.ApplyFont(root);
 
+            // Sprint 35: the harness can ask what the screen says
+            // (UiProbe). Registered before the views are built so a view
+            // constructor that throws still leaves a partial tree to read.
+            UiProbe.Register(root);
+
             // Sprint 21 (COSMETIC_PASS_SPEC.md §2.3): every permanent
             // surface lives in the gutters above and below the board, so
             // nothing permanent covers it -- HUD top-right, knowledge
@@ -161,6 +167,11 @@ namespace ImmunologyTD.UI
             else knowledgeView.Bind(knowledge, Vector3.zero, 1f);
             bandTabs = new BandTabsView(tabLayer, board);
 
+            // Sprint 35: the round message, at a size that reads. Added
+            // before the picker/upgrade panels so those float OVER it --
+            // a banner is temporary and must never block a purchase.
+            banner = new RoundBannerView(floatLayer);
+
             upgrade = new UpgradePanelView(floatLayer, ClearSelection);
             picker = new TowerPickerView(floatLayer, ClearSelection);
 
@@ -180,6 +191,35 @@ namespace ImmunologyTD.UI
         }
 
         private (Vector3 world, float flash)? pendingNode;
+
+        // ------------------------------------------------------------------
+        // Sprint 35: the audit surface for the knowledge ribbon.
+        //
+        // Same reasoning as UiTextAudit's: the harness lives in the Editor
+        // assembly and only needs the ANSWER, so four forwarding members on
+        // a class that is already public beat making the whole view public.
+        // Without them the Director's ribbon design -- five most recently
+        // seen in the visible slots, scrollable, clamped -- would be
+        // unassertable, which is the exact gap this sprint exists to close.
+        // ------------------------------------------------------------------
+
+        /// <summary>How far the ribbon has scrolled, in pixels.</summary>
+        public float KnowledgeScrollOffset => knowledgeView != null ? knowledgeView.ScrollOffset : 0f;
+
+        /// <summary>How far it can scroll. 0 means everything fits.</summary>
+        public float KnowledgeScrollRange => knowledgeView != null ? knowledgeView.ScrollRange : 0f;
+
+        /// <summary>Walks the ribbon by whole cards, as a wheel notch does.
+        /// UITK events cannot be synthesised headlessly, and a scroll
+        /// nothing can exercise is a scroll nobody has tested.</summary>
+        public void KnowledgeScrollBySlots(int slots) => knowledgeView?.KnowledgeScrollBySlots(slots);
+
+        /// <summary>Which species are in the ribbon's visible slots, in
+        /// order.</summary>
+        public ImmunologyTD.Pathogens.PathogenSpecies[] KnowledgeVisibleSpecies() =>
+            knowledgeView != null
+                ? knowledgeView.VisibleSpecies()
+                : System.Array.Empty<ImmunologyTD.Pathogens.PathogenSpecies>();
 
         /// <summary>Sprint 21: where the lymph node is, for the knowledge
         /// HUD's "+3%" tokens (they fly from it) and its unlock ring.</summary>
@@ -213,6 +253,7 @@ namespace ImmunologyTD.UI
         private void StartRound()
         {
             if (rounds == null || rounds.Phase != RoundPhase.Building) return;
+            banner?.Dismiss();
             rounds.StartRound();
         }
 
@@ -257,10 +298,7 @@ namespace ImmunologyTD.UI
                 }
             }
 
-            hud.Refresh(wallet, rounds, spawner);
-            shopView.Refresh();
-            knowledgeView.Refresh(root.panel);
-            bandTabs.Refresh(root.panel);
+            RefreshViews();
 
             if (rounds != null && rounds.Phase != lastPhase)
             {
@@ -283,6 +321,25 @@ namespace ImmunologyTD.UI
                 ? marrow.SelectedSlotIndex.Value : -1);
         }
 
+        /// <summary>One pass of every polled view.
+        ///
+        /// **Public on purpose (Sprint 35).** Update() does not run in
+        /// Editor batchmode, so before this existed the only headless
+        /// signal about the UI was "constructing it did not throw"
+        /// (BootstrapSmoke). A harness can now drive a real
+        /// RoundController through its phases, call this, and read what the
+        /// screen says through <see cref="UiProbe"/> -- which is what it
+        /// takes to catch a caption that is written and never shown.</summary>
+        public void RefreshViews()
+        {
+            if (!built) return;
+            hud.Refresh(wallet, rounds, spawner);
+            banner.Refresh(rounds);
+            shopView.Refresh();
+            knowledgeView.Refresh(root.panel, rounds != null ? (int)rounds.Phase : -1);
+            bandTabs.Refresh(root.panel);
+        }
+
         private void ReadKeys()
         {
             if (Input.GetKeyDown(KeyCode.BackQuote))
@@ -291,7 +348,12 @@ namespace ImmunologyTD.UI
                 UiTheme.Show(debug.Root, debugVisible);
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape)) { ClearSelection(); knowledgeView?.CloseExpanded(); }
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                ClearSelection();
+                knowledgeView?.CloseExpanded();
+                banner?.Dismiss();
+            }
 
             // Sprint 13's flash preview, moved off HudOverlay unchanged: one
             // frame that fires all five effect flashes across the tissue
@@ -321,7 +383,7 @@ namespace ImmunologyTD.UI
             var p = ScreenToPanel(screenPos);
             return Over(hud.Root, p) || Over(shopView.Root, p)
                 || Over(knowledgeView.Root, p) || Over(knowledgeView.Expanded, p)
-                || Over(upgrade.Root, p) || Over(picker.Root, p)
+                || Over(upgrade.Root, p) || Over(picker.Root, p) || Over(banner.Root, p)
                 || (debugVisible && Over(debug.Root, p));
         }
 

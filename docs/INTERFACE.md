@@ -2069,6 +2069,141 @@ production classes; builds its own boards via `ConfigureForTest` and
 **never loads the scene**, which is why it could not catch the stale
 serialized `columns` bug.
 
+## Sprints 22-31 — the backfill (written Sprint 35)
+
+**This section was missing for ten sprints.** `WORKFLOW.md` §5.3 requires
+an INTERFACE entry per sprint and the box was ticked without being true:
+the file jumped from Sprint 21 straight to Sprint 32.
+
+**How it was reconstructed, and what that is worth.** Not from memory and
+not from `CHANGELOG.md`, which records what the game does rather than what
+the surface is. Each entry below was extracted from the **code itself** --
+every `public`/`internal` member whose own doc comment names the sprint
+that introduced it -- and then read back for sense. That makes it accurate
+about *what exists*, and necessarily thinner than a contemporaneous entry
+about *why*: where the reasoning matters it is still in the member's doc
+comment, which is the one place it was never lost. Treat this as an index
+into the code, not as a substitute for the ten entries that should have
+been written at the time.
+
+### Sprint 22 — secretory IgA, mucus, the gut wall as a surface
+
+- `ImmunologyTD.Pathogens.IgaTuning` (new): `CoatChancePerSecond` and the
+  enchainment/clearance knobs.
+- `InvasionTuning.MucusBandDepthCells`, `InvasionTuning.MaxReleaseCrossSpread`.
+- `SearchUnit.CheckBarrierPatrol(float currentTime)` — the patrol step that
+  lets a unit work the wall rather than the tissue.
+- `RoundDefinition.WallPressure` — the per-round multiplier on batch size,
+  added because a defence against a problem the player never has is
+  invisible by construction.
+- `Palette.IgaCoat`, `Palette.MucusSlough`, `Palette.GutWallDead`;
+  `SpriteShapes.Sprint22.cs` (new partial).
+- `KnowledgeLadder`'s IgA rung gained its mechanic (the `Built` flag was
+  **not** flipped until Sprint 23 — see that file's header).
+
+### Sprint 23 — the adaptive and unconventional roster
+
+The largest surface change of the ten.
+
+- `GutWall.Current` (static) — how gamma-delta IELs reach the wall.
+- `TissueGrid`: `GetInfectionStress`, `AddInfectionStress`,
+  `NoteAttacker`, `AttackersLastTick`, `ReleaseIntracellular`, and
+  `KillHostCell(c, antigen, apoptotic)` — the apoptotic/necrotic split
+  that `TissueTuning.ApoptoticDebrisFraction` scores.
+- `TissueTuning.InfectionStressDecayPerSecond`, `TissueTuning.ApoptoticDebrisFraction`.
+- `BoardConfig.WorldToFine`, `BoardConfig.WorldToCoarse`.
+- `ImmunologyTD.Adaptive.AntibodyTuning` (new); `Antibody` gained its
+  secretion/lifespan surface.
+- `AdaptiveTuning.CytotoxicTEmissionIntervalSeconds`;
+  `EconomyTuning.CytotoxicTPrice` and the other new unit prices.
+- `UnitProfile` / `UnitLifecycleTuning`: `ApoptoticKill`,
+  `BarrierPatrolRadiusCells`, `BarrierRepairIntervalSeconds`,
+  `AntibodySecretionIntervalSeconds`.
+- `Palette.Antibody`, `Palette.FxApoptosis`, `Palette.FxIfnGamma`;
+  `SpriteShapes.Sprint23.cs` (new partial) with the
+  `InnerShadeCapsule` / `InnerShadeRing` primitives.
+
+### Sprint 24 — named species
+
+- `ImmunologyTD.Pathogens.PathogenSpecies` / `SpeciesProfile` /
+  `SpeciesRoster` (new) — the per-species table.
+- `PathogenAgent.Species`, `PathogenAgent.WithinTropismAt(CoarseCoord)`,
+  `PathogenAgent.InitializeInTissueDirect(...)`.
+- `Antigen.ForSpecies(PathogenSpecies)` and
+  `AdaptiveTuning.AntigenForSpecies` — the barcode became per species.
+- `KnowledgeLedger.Revision` — the poll early-out every HUD view uses.
+- `GutWall.ApplyToxinField(centre, strength, radiusCells, dt)`,
+  `GutWall.LocalInflammation(s)`; `BarrierTuning.ToxinChargeBonus`.
+- `TissueGrid.FullDebris`.
+
+### Sprint 25 — knowledge is per species, end to end
+
+- `KnowledgeLicence.RecognisesSpecies(kind, species, ledger)` — the gate
+  every adaptive unit asks before acting.
+- `KnowledgeWatcher.Species` became `SpeciesRoster.Count` (it was a
+  hardcoded 3, so the HUD could never show a named organism).
+- `ImmunologyTD.UI.UiTextAudit` (new) — the font-coverage audit, after
+  "γδ T cell (IEL)" shipped in a font with no Greek block.
+- `PathogenAgent.AdhesionChanceAt(int)` made public for the harness.
+- `AdaptiveTuning.DcMaxActiveChildren`, `LymphocyteMaxActiveChildren`;
+  `InvasionTuning.LumenLaneChangeChance`;
+  `ShopTuning.BarrierMucusTurnoverBasePrice`;
+  `ProgenitorUpgrades.ClonalCapPerLevel`.
+- **Complement left the knowledge ladder** and became a shop row. (The
+  parallel label array in `KnowledgeView` was not updated — the bug Sprint
+  35 found and fixed.)
+
+### Sprint 26 — the font
+
+- `UiTheme.FontFor(Weight)` and the ImmunoSans faces (Nunito + the Greek
+  block + scientific symbols, merged by `tools/merge_greek_font.py`),
+  with `UiFontCoverage` generated from the font files themselves.
+
+### Sprint 27 — marrow capacity
+
+- `BoneMarrowSlotState.Fatty`; `BoneMarrowManager.UnlockedSlots`,
+  `TryReconvertNextSlot()`.
+- `EconomyTuning.MarrowStartingSlots` / `MarrowMaxSlots`.
+- `ImmunologyTD.UI.MarrowReconvertTag` (new) — the price chip pinned to
+  the next fatty pad.
+- `Palette.MarrowFat`, `DegranulationFlash.ReconversionColor`.
+
+### Sprint 28 — repulsion and the shop's new corner
+
+- `UnitTuning.RepulsionRadiusFineTiles`, `UnitTuning.RepulsionCrossKindWeight`.
+- `UiController`: the shop moved to the top left and the debug readout
+  took the bottom right (dock assignment only; no new members).
+
+### Sprint 29 — the barcode widened, and four dead shop rows woke up
+
+- `AdaptiveTuning.BarcodeBits` 8 → 10; `Antigen.RandomTag()`;
+  `SpeciesProfile.Antigen` re-cut as a set at minimum distance 6.
+- `AdaptiveTuning.KnowledgePerMatch`.
+- `ImmunologyTD.Grid.HostDefence` (new, static): `ViralEntryLevel`,
+  `GlycocalyxLevel`, `DsRnaSensorLevel`, `ComplementLevel` — the four host
+  rows that had taken ATP and done nothing.
+- `AdaptiveUnitTuning.MemoryRecallLevel`;
+  `ProgenitorUpgrades.CtlGranzymePerLevel`;
+  `UnitLifecycleTuning.AntibodyLifespanBonusSeconds`.
+- `SearchUnit.Live` (static read-only list).
+- `ImmunologyTD.UI.UpgradeAudit` (new) — the audit that finds an upgrade
+  row nothing reads.
+- `Palette.FxMemoryRecall`, `DegranulationFlash.MemoryRecallColor`.
+
+### Sprint 30 — viruses can reach the base
+
+- `InvasionTuning.VirusSpreadBudget`, `VirusSpreadBaseBias`,
+  `VirusDisseminationSeconds`.
+- `PathogenSpawner.RequestSpread(...)` and the agent's dissemination
+  state. Before this, **0 of 150** viruses dropped into tissue ever
+  reached the base.
+
+### Sprint 31 — the band permit's ancestor
+
+- `BoardConfig.FineDistanceToPermittedBand(FineCoord, BandPermit)` — the
+  distance function that stops a unit walking out of its compartment.
+- `UnitTuning` repulsion values re-tuned against it.
+
 ## Sprint 32 changes — the band permit, species-level rounds, innate turnover
 
 ### `ImmunologyTD.Grid.BandPermit` (new, `[Flags]`)
@@ -2486,3 +2621,125 @@ resolution is unaffected.
 `PlaqueCrowdWeight = 1.9f`. The last is capped below
 `InvasionTuning.IngressCrowdFloor` (2.0) on purpose — see §1b Step 2 and
 `ENGINE_STATUS.md`.
+
+## Sprint 35 changes — the screen says it
+
+### `ImmunologyTD.UI.UiProbe` + `UiNames` (new) — the harness can see the UI
+
+```csharp
+public static class UiNames { /* HudCaption, RoundBanner, KnowledgeViewport, ... */
+    public static string KnowledgeSpecies(int species);   // "knowledge-species-3"
+}
+
+public static class UiProbe
+{
+    public static VisualElement Root { get; }        // registered by UiController.Build
+    public static void Register(VisualElement root);
+    public static void Clear();                      // between harness runs
+
+    public static VisualElement Find(string name);
+    public static bool   Exists(string name);
+    public static int    Count(string name);         // >1 is a naming bug
+    public static string TextOf(string name);        // null = no element, "" = says nothing
+    public static bool   IsDisplayed(string name);
+    public static string HiddenBecause(string name); // names the ancestor that hid it
+    public static bool   HasBackgroundSprite(string name, Sprite sprite);
+    public static float  OpacityOf(string name);
+    public static List<string> Names();
+    public static string Dump(int maxDepth = 12);
+    public static Rect   RectOf(string name);        // Rect.zero unless HasLayout
+    public static bool   HasLayout { get; }          // false in batchmode, always
+    public static bool   IsRenderable(string text);
+}
+```
+
+**The limit is part of the interface.** Editor batchmode runs no layout
+pass, so `RectOf` is all zeroes and `HasLayout` is false. A check must
+treat zero as *unknown*, never as *off screen*. Nothing here can prove a
+line is legible, unclipped or on top.
+
+### `UiController` — a public refresh and an audit surface
+
+```csharp
+public void RefreshViews();          // one pass of every polled view
+public float KnowledgeScrollOffset { get; }
+public float KnowledgeScrollRange  { get; }
+public void KnowledgeScrollBySlots(int slots);
+public PathogenSpecies[] KnowledgeVisibleSpecies();
+```
+
+`Update()` now calls `RefreshViews()`; a harness calls it directly,
+because `Update()` does not run in batchmode.
+
+### `ImmunologyTD.Pathogens.SpeciesSightings` (new, static, pure)
+
+```csharp
+public static int  Revision { get; }
+public static void ResetForNewRun();                 // called from GameBootstrap
+public static void Record(PathogenSpecies species);  // called from PathogenAgent init
+public static bool HasSeen(PathogenSpecies s);
+public static int  LastSeenOrder(PathogenSpecies s); // 0 = never; higher = more recent
+public static int  FirstSeenOrder(PathogenSpecies s);
+public static int  CountSeen(PathogenSpecies s);
+public static int  DistinctSeen();
+public static int  OrderForDisplay(PathogenSpecies[] into);   // no allocation
+```
+
+`OrderForDisplay` is the ribbon's ordering as a pure function — most
+recently seen first, never-seen last in roster order, stable — so the sort
+can be asserted without building a UI tree.
+
+### `ImmunologyTD.Pathogens.PathogenForm` (new)
+
+```csharp
+public enum PathogenForm { Primary = 0, Alternate = 1 }
+public PathogenForm PathogenAgent.Form { get; }      // set from state, never by a caller
+```
+
+### `SpeciesProfile` — four new fields
+
+```csharp
+public string Warning;            // the debut card's negative line
+public bool   NeverEntersCells;   // applicability flag, not a multiplier
+public bool   AnchorsWhenAdhered; // draws its Alternate form on the wall
+public bool   SwimsStraight;      // non-chemotactic (V. cholerae)
+```
+
+Plus `SpeciesRoster.WarningOf(species)` and
+`SpeciesRoster.ReservedAntigens` — the ten 12-bit tags held for the
+specified-but-unbuilt organisms, in the file rather than the spec because
+the property that matters (120 pairs at minimum distance 6) is only true
+of the set as a whole.
+
+### `SpriteShapes` / `Palette` — the per-species dispatch
+
+```csharp
+public static Sprite SpriteShapes.ForSpecies(PathogenSpecies s, PathogenForm form = Primary);
+public static bool   SpriteShapes.HasAlternateForm(PathogenSpecies s);
+public static Sprite SpriteShapes.Rotavirus, Vibrio,
+                     AttachingEffacingEcoli, AttachingEffacingEcoliAnchored, FadeToRight;
+public static Color  Palette.ForSpecies(PathogenSpecies s);
+```
+
+Both fall back to the class generic for an undrawn species, so every
+render path is safe to route through them before the whole roster exists.
+
+### `AdaptiveTuning.BarcodeBits`: 10 → 12
+
+Ten admits at most 12 species at r=2; the planned roster is 16. See
+`ROSTER_EXPANSION_SPEC.md` §5.1.
+
+### `KnowledgeView` — the ribbon
+
+Cards now live in a clipped five-slot viewport over a sliding strip, and
+`Refresh` takes the round phase: `Refresh(IPanel panel, int phase)`. The
+phase is the boundary the recency ordering is snapshotted at, so the
+ribbon does not churn mid-round.
+
+### Changed call sites worth knowing about
+
+- `PathogenAgent` picks its sprite and colour in **one** place
+  (`ApplySpeciesVisual`), where three class-based sites used to answer
+  independently.
+- `HudView`'s buy-phase caption no longer carries the tagline;
+  `RoundBannerView` does.

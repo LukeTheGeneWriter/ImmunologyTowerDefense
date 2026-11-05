@@ -549,6 +549,27 @@ the §5c co-localisation signal (DC↔helper-T in the node): a
 **DC-attractant** in the tissue. Other sensor variants (dsDNA, LPS, flagellin)
 are the obvious follow-ons, each keyed to a class.
 
+> **Amendment (Sprint 35): this row needs an APPLICABILITY FLAG, not a
+> multiplier.** The whole upgrade is predicated on there being an infected
+> cell to die well, and for some organisms there is never one. *Vibrio
+> cholerae* — already on the board — adheres and secretes and never enters
+> a cell at all. *Giardia* never infects a cell either, and
+> *Cryptosporidium*'s infected cells are **survivin-protected against
+> apoptosis**, so the mechanism is specifically blocked rather than merely
+> absent.
+>
+> An upgrade that silently does nothing is this project's most-repeated
+> defect, so the design states the exception rather than discovering it in
+> a playtest: `SpeciesProfile.NeverEntersCells` marks the organism, and
+> the knowledge HUD prints **"no effect on this one"** against the rungs
+> that act on an infected cell. Shipped in Sprint 35 for the two knowledge
+> rungs that have the same dependency (cytotoxic T cells, memory T cells);
+> this shop row inherits it when it is built.
+>
+> It follows that `TissueTuning.ApoptoticDebrisFraction` is **not "the
+> whole reward in one number"** — it needs a per-species
+> apoptosis-resistance factor before *Cryptosporidium* is built.
+
 ### Reduced viral entry
 
 Lower the per-tick chance (`InvasionTuning.VirusEntryChancePerTick`) that
@@ -753,7 +774,7 @@ new ones.
 | **Intracellular — virus** | generic virus | Hides inside a host cell; the cell is not replaced | The host cell, not itself (until sensed) | **§4b:** contact stress-sense roll (innate low / stress sensors high) → loud kill of the cell; or the infection burns out on its own; precise MHC-I killing (adaptive, ~10% knowledge, §5) is the quiet version |
 | **Intracellular — bacterium** | *Salmonella* (or *Listeria*/*Shigella* — genuinely gut-invasive, unlike *C. diff*, which is extracellular and toxin-mediated, not intracellular) | Roams freely when extracellular; hides inside a host cell (cell not replaced), replicating | Itself when extracellular; the host cell when inside | **§4b:** ordinary combat damage *only while extracellular*; while inside, the same contact stress-sense roll as the virus, else it runs its course (drains the cell to death, bursts out a brood) |
 | **Large bacterium (extracellular)** | generic gut bacterium | Kills and directly occupies one coarse slot | Itself — no disguise | Direct combat damage to the pathogen |
-| **Parasite** | generic multicellular/large parasite | Multiple coarse slots at once | Itself, spanning its footprint | Direct combat damage, more of it (bigger target) |
+| **Parasite** | *Giardia*, *Cryptosporidium*, *Cyclospora* (protozoa); helminths later | **One coarse slot, drawn larger** (see the Sprint 35 amendment) | Itself | **Expulsion, not killing** (see the Sprint 35 amendment) |
 
 **Intracellular pathogens are why innate-only clearing is destructive, not
 just suboptimal.** Neither macrophages nor neutrophils have MHC-I-restricted
@@ -765,11 +786,47 @@ already states this) *is* — it isn't flavor text, it's this mechanic. Tissue
 damage from clearing intracellular infections is what feeds fibrosis (§6)
 once that's built.
 
-**Large bacteria and parasites don't hide.** They've already killed and
-taken the slot (or slots) outright, so there's no host cell to collaterally
-damage — combat targets the pathogen directly. Mechanically simpler than
-the intracellular case, and closest to what Sprint 1's original adhesion
-model already does (a pathogen claiming a coarse slot).
+**Large bacteria don't hide.** They've already killed and taken the slot
+outright, so there's no host cell to collaterally damage — combat targets
+the pathogen directly. Mechanically simpler than the intracellular case,
+and closest to what Sprint 1's original adhesion model already does (a
+pathogen claiming a coarse slot).
+
+> ### Amendment (Sprint 35): the parasite class was over-specified, and
+> wrong about clearance
+>
+> Two corrections, both from the Sprint 34 research passes, both recorded
+> before anything in this class is built — which is the only cheap time to
+> make them.
+>
+> **1. The multi-slot footprint is not needed, and it was the thing
+> blocking the class.** `BACKLOG.md` has called that footprint "more
+> engineering than the other three classes combined" since Sprint 2, and
+> it deferred the whole class on those grounds. But **not one enteric
+> protozoan needs it.** A *Giardia* trophozoite is ~15 µm; a
+> microsporidian spore is *smaller than this game's bacterium*. The class
+> is therefore re-specified as **one coarse slot with a size multiplier**
+> — which the renderer already supports — and the multi-slot footprint is
+> deferred to **helminths**, where a 10 cm *Trichuris* genuinely does span
+> a stretch of wall. This unblocks four of the ten organisms in
+> `ROSTER_EXPANSION_SPEC.md` at roughly no engineering cost, and it is the
+> rarer kind of correction: the design was harder than the biology.
+>
+> **2. "Parasites don't hide" and "cleared by direct combat damage, more
+> of it" are both wrong, and the second is actively misleading.**
+> Cytotoxic lymphocytes are **inactive against helminths**; clearance is
+> **expulsion** — the type-2 "weep-and-sweep" response, mucus and smooth
+> muscle, not killing. For the protozoa the picture is mixed but still not
+> "more damage": *Giardia* never enters a cell at all and is cleared by
+> antibody and expulsion, and *Cryptosporidium*'s infected cells are
+> survivin-protected **against** apoptosis.
+>
+> So the player's instinct on meeting this class — build more killers —
+> is the wrong answer for the entire group, and the design must not quietly
+> reward it. That is a good mechanic, not a problem: it is the first
+> enemy class whose counter is a *different verb*. See `IGA_REFERENCE.md`
+> for the aimed mucus purge already queued as the adaptive tier of exactly
+> this verb.
 
 > **Viruses can reach the base as of Sprint 30 — before it, they could
 > not, at all.** An intracellular virus has no movement code by design
