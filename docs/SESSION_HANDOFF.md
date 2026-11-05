@@ -6,7 +6,41 @@ copies.** It is not one of `WORKFLOW.md` §3's canonical docs; if it
 contradicts `SPRINT_PLAN.md`, `ENGINE_STATUS.md` or `INTERFACE.md`, those
 win.
 
-## START HERE — what the next sprint is
+## START HERE — the Director plays first
+
+> **Before any work, before reading the rest of this file: serve the
+> build and hand it to Luke.** He asked for this explicitly at the end of
+> Sprint 35 (2026-11-05): *"remind me to play first thing next time."*
+>
+> ```
+> tools/serve_webgl.py        # → http://localhost:8000
+> ```
+>
+> The build at `590119e` is already made (WebGL Succeeded, 9,328,875
+> bytes, 0 errors), so this is a one-line start, not a 30-minute one. If
+> `main` has moved since, rebuild with `tools/unity.sh webgl` first.
+>
+> **Why this outranks the queue.** Four playtest questions are open and
+> three have been open since Sprint 32, because two sprints running went
+> somewhere else. Sprint 35 changed a great deal of what the game *says*
+> — a new buy-phase card, a first-sighting banner, a rewritten HUD
+> caption, per-species sprites, a scrolling knowledge ribbon — and
+> **none of it has been seen by a human.** The harness explicitly cannot
+> judge any of it: batchmode runs no layout pass, so nothing in the suite
+> can tell legible from illegible. That is exactly the gap the Sprint 33
+> caption fell through.
+>
+> **What to watch for, and ask him about:**
+> - Do the round messages land now, or do three surfaces crowd each
+>   other? (Debut card 16 s, plain round 7 s, first-sighting banner
+>   2.6 s — all guesses.)
+> - Does the 40-round curriculum read as teaching?
+> - Is a one-burst round 40 exciting, or a wall of sprites?
+> - **Is IgA perceptible now that the ribbon finally calls it IgA?**
+> - Can he tell A/E *E. coli* from a generic gut bacterium at board
+>   scale? (Known weak pair; the free form has no tell by design.)
+
+## Then — what the next sprint is
 
 **Build the organisms. The gates are down.**
 
